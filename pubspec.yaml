@@ -1,0 +1,83 @@
+name: qless
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ">=3.8.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # UI
+  safe_device: ^1.1.0
+  cupertino_icons: ^1.0.8
+  intl: ^0.20.2
+  url_launcher: ^6.3.2
+  
+  
+
+  # State & Storage
+  flutter_riverpod: ^2.6.1
+  flutter_secure_storage: ^10.0.0
+  shared_preferences: ^2.5.4
+  
+
+  # Networking
+  dio: ^5.9.0
+  retrofit: 4.9.2
+  http: ^1.6.0
+  connectivity_plus: 7.0.0
+
+  # Serialization
+  json_annotation: 4.9.0
+  freezed_annotation: ^3.1.0
+
+  # Device / Media
+  #image_picker: ^1.2.1
+  permission_handler: ^12.0.1
+  geolocator: ^14.0.2
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  path: ^1.9.0
+
+  # print
+  printing: ^5.12.0
+  pdf: ^3.10.7
+
+  # excel
+  excel: ^2.1.0
+  
+  image_picker: ^1.1.2         # For camera and gallery
+  file_picker: ^8.1.2
+  flutter_pdfview: ^1.2.7
+ 
+  open_file: ^3.3.2 
+  share_plus: ^12.0.1
+  audioplayers: ^6.1.0
+  path_provider: ^2.1.2
+
+  google_maps_flutter: ^2.6.0
+  flutter_polyline_points: ^2.0.1
+  
+ 
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.14.4
+
+  # Code generation (LOCKED — THIS IS CRITICAL)
+  retrofit_generator: ^10.2.1
+  json_serializable: ^6.11.4
+  freezed: ^3.2.4
+  build_runner: ^2.10.5
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - asset/sound/success.mp3
