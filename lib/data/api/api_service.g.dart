@@ -12,7 +12,7 @@ part of 'api_service.dart';
 
 class _ApiService implements ApiService {
   _ApiService(this._dio, {this.baseUrl, this.errorLogger}) {
-    baseUrl ??= 'https://vmorderbooking.vengurlatech.com/';
+    baseUrl ??= 'https://qless.vengurlatech.com/';
   }
 
   final Dio _dio;
@@ -20,8 +20,6 @@ class _ApiService implements ApiService {
   String? baseUrl;
 
   final ParseErrorLogger? errorLogger;
-
-
 
   @override
   Future<TokenResponse> createLogin(TokenResponse tokenResponse) async {
