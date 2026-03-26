@@ -99,7 +99,7 @@ class TokenInterceptor extends Interceptor {
   // void _goToLogin() {
   //   print("Redirecting to login screen due to authentication failure.");
   //   Future.microtask(() {
-  //     navigatorKey.currentState?.pushAndRemoveUntil(
+  //     navigatorKey.curr entState?.pushAndRemoveUntil(
   //       MaterialPageRoute(builder: (context) => LoginScreen()),
   //       (route) => false, // remove all previous screens
   //     );
