@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/token_response.dart';
 
@@ -33,7 +32,7 @@ class TokenInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    final sanitizedErr = _sanitizeError(err);
+    final sanitizedErr = err;
 
     final statusCode = err.response?.statusCode;
     final isAuthError = statusCode == 401 || statusCode == 403;
@@ -90,9 +89,9 @@ class TokenInterceptor extends Interceptor {
       handler.resolve(response);
     } catch (e) {
       if (e is DioException) {
-        handler.next(_sanitizeError(e));
+        handler.next(e);
       } else {
-        handler.next(_sanitizeError(err));
+        handler.next(err);
       }
     }
   }
