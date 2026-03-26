@@ -1,21 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:qless/screens/doctor_registration.dart';
+import 'package:qless/screens/otp_screen.dart';
+import 'package:qless/screens/patient_registration.dart';
 
-class DoctorLoginScreen extends StatefulWidget {
-  const DoctorLoginScreen({super.key});
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({
+    super.key,
+    this.role = 'doctor',
+  });
+
+  final String role;
 
   @override
-  State<DoctorLoginScreen> createState() => _DoctorLoginScreenState();
+  State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
-  bool _rememberMe = false;
-  bool _obscurePassword = true;
+class _LoginScreenState extends State<LoginScreen> {
+  bool get isDoctor => widget.role == 'doctor';
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-     backgroundColor: Colors.white,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -46,7 +52,7 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
 
                   // ── TITLE ────────────────────────────────────
                   const Text(
-                    'Doctor Login',
+                    'Login',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -58,10 +64,12 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                   const SizedBox(height: 8),
 
                   // ── SUBTITLE ─────────────────────────────────
-                  const Text(
-                    'Welcome back! Please login to continue',
+                  Text(
+                    isDoctor
+                        ? 'Welcome back! Please login as doctor to continue'
+                        : 'Welcome back! Please login as patient to continue',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 13.5,
                       color: Color(0xFF64748B),
                       height: 1.45,
@@ -70,11 +78,11 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
 
                   const SizedBox(height: 32),
 
-                  // ── EMAIL FIELD ───────────────────────────────
+                  // ── mobile FIELD ───────────────────────────────
                   Align(
                     alignment: Alignment.centerLeft,
                     child: const Text(
-                      'Email Address',
+                      'Mobile Number',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -90,19 +98,16 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const TextField(
-                      keyboardType: TextInputType.emailAddress,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF0F172A),
-                      ),
+                      keyboardType: TextInputType.phone,
+                      style: TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                       decoration: InputDecoration(
-                        hintText: 'doctor@example.com',
+                        hintText: 'Enter mobile number',
                         hintStyle: TextStyle(
                           color: Color(0xFF94A3B8),
                           fontSize: 14,
                         ),
                         prefixIcon: Icon(
-                          Icons.email_outlined,
+                          Icons.phone,
                           color: Color(0xFF94A3B8),
                           size: 20,
                         ),
@@ -114,127 +119,21 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
 
                   const SizedBox(height: 18),
 
-                  // ── PASSWORD FIELD ────────────────────────────
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: const Text(
-                      'Password',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: TextField(
-                      obscureText: _obscurePassword,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF0F172A),
-                      ),
-                      decoration: InputDecoration(
-                        hintText: 'Enter your password',
-                        hintStyle: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 14,
-                        ),
-                        prefixIcon: const Icon(
-                          Icons.lock_outline,
-                          color: Color(0xFF94A3B8),
-                          size: 20,
-                        ),
-                        suffixIcon: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                          child: Icon(
-                            _obscurePassword
-                                ? Icons.remove_red_eye_outlined
-                                : Icons.visibility_off_outlined,
-                            color: const Color(0xFF94A3B8),
-                            size: 20,
-                          ),
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // ── REMEMBER ME + FORGOT PASSWORD ────────────
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: Checkbox(
-                              value: _rememberMe,
-                              onChanged: (val) {
-                                setState(() {
-                                  _rememberMe = val ?? false;
-                                });
-                              },
-                              activeColor: const Color(0xFF0F172A),
-                              side: const BorderSide(
-                                color: Color(0xFF94A3B8),
-                                width: 1.5,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                              materialTapTargetSize:
-                                  MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Remember me',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          // Navigator.pushNamed(context, '/forgot-password');
-                        },
-                        child: const Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
-
                   // ── LOGIN BUTTON ──────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
                       onPressed: () {
-                        // handle login
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => OtpVerificationScreen(
+                              mobileNumber: '',
+                              role: widget.role,
+                            ),
+                          ),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F172A),
@@ -269,12 +168,16 @@ class _DoctorLoginScreenState extends State<DoctorLoginScreen> {
                         ),
                       ),
                       GestureDetector(
-                    onTap: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const DoctorProfileSetupScreen()),
-  );
-},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => isDoctor
+                                  ? const DoctorProfileSetupScreen()
+                                  : const PatientRegistrationScreen(),
+                            ),
+                          );
+                        },
                         child: const Text(
                           'Register Now',
                           style: TextStyle(
@@ -338,9 +241,12 @@ class _StethoscopeIconPainter extends CustomPainter {
     final downPath = Path();
     downPath.moveTo(w * 0.50, h * 0.48);
     downPath.cubicTo(
-      w * 0.50, h * 0.60,
-      w * 0.66, h * 0.58,
-      w * 0.66, h * 0.72,
+      w * 0.50,
+      h * 0.60,
+      w * 0.66,
+      h * 0.58,
+      w * 0.66,
+      h * 0.72,
     );
     canvas.drawPath(downPath, stroke);
 
@@ -351,10 +257,7 @@ class _StethoscopeIconPainter extends CustomPainter {
     canvas.drawCircle(Offset(w * 0.26, h * 0.70), w * 0.075, fill);
     final bodyPath = Path();
     bodyPath.moveTo(w * 0.10, h * 0.96);
-    bodyPath.quadraticBezierTo(
-      w * 0.26, h * 0.82,
-      w * 0.42, h * 0.96,
-    );
+    bodyPath.quadraticBezierTo(w * 0.26, h * 0.82, w * 0.42, h * 0.96);
     canvas.drawPath(bodyPath, stroke..strokeWidth = 1.8);
   }
 

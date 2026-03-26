@@ -1,6 +1,6 @@
 
 import 'package:flutter/material.dart';
-import 'package:qless/screens/doctor_login_screen.dart';
+import 'package:qless/screens/login_screen.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -66,12 +66,14 @@ class SplashScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 54,
                 child: ElevatedButton(
-              onPressed: () {
-  Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => const DoctorLoginScreen()),
-  );
-},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LoginScreen(role: 'doctor'),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0F172A),
                     foregroundColor: Colors.white,
@@ -110,7 +112,12 @@ class SplashScreen extends StatelessWidget {
                 height: 54,
                 child: OutlinedButton(
                   onPressed: () {
-                    // Navigator.pushNamed(context, '/patient-login');
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const LoginScreen(role: 'patient'),
+                      ),
+                    );
                   },
                   style: OutlinedButton.styleFrom(
                     backgroundColor: Colors.white,
