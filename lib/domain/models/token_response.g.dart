@@ -13,6 +13,7 @@ TokenResponse _$TokenResponseFromJson(Map<String, dynamic> json) =>
       mobile: json['mobile'] as String?,
       deviceDetails: json['deviceDetails'] as String?,
       roleId: (json['roleId'] as num?)?.toInt(),
+      role: json['role'] as String?,
     );
 
 Map<String, dynamic> _$TokenResponseToJson(TokenResponse instance) =>
@@ -22,4 +23,5 @@ Map<String, dynamic> _$TokenResponseToJson(TokenResponse instance) =>
       'mobile': instance.mobile,
       'deviceDetails': instance.deviceDetails,
       'roleId': instance.roleId,
+      'role': instance.role,
     };

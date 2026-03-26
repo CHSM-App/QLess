@@ -145,7 +145,7 @@ class _OtpVerificationScreenState
     setState(() => _isLoading = true);
     final result = await ref
         .read(authViewModelProvider.notifier)
-        .login(TokenResponse(mobile: widget.mobileNumber, roleId: widget.role == 'doctor' ? 1 : 2));
+        .login(TokenResponse(mobile: widget.mobileNumber, role: widget.role));
 
     if (!mounted) return;
     setState(() => _isLoading = false);
