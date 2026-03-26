@@ -9,6 +9,7 @@ class TokenResponse {
   final String? mobile;
   final String? deviceDetails;
   final int? roleId;
+  final String? role;
 
   TokenResponse({
      this.accessToken,
@@ -16,6 +17,7 @@ class TokenResponse {
     this.mobile,
     this.deviceDetails,
      this.roleId,
+     this.role,
 
   });
 

@@ -32,7 +32,7 @@ class TokenInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    final sanitizedErr = err;
+    final sanitizedErr = _sanitizeError(err);
 
     final statusCode = err.response?.statusCode;
     final isAuthError = statusCode == 401 || statusCode == 403;
