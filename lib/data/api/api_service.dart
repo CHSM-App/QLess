@@ -35,4 +35,9 @@ abstract class ApiService {
 
   @POST("login/insertPatient")
   Future<dynamic> addPatient(@Body() Patients patient);
+
+
+  
+  @GET("login/checkPhonePatient")
+  Future<List<Patients>> checkPhonePatient(@Query("mobileNo") String mobileNo);
 }
