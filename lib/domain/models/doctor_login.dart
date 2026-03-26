@@ -16,10 +16,12 @@ class DoctorLogin {
   final int? experience;
   final String? specialization;
   final String? image;
+    @JsonKey(name: 'role_id')
+  final int? roleId;
 
   // Clinic fields
   @JsonKey(name: 'clinic_id')
-  final int? clinicId;
+  final String? clinicId;
   @JsonKey(name: 'clinic_name')
   final String? clinicName;
   @JsonKey(name: 'clinic_address')
@@ -57,6 +59,7 @@ class DoctorLogin {
     this.clinicEmail,
     this.clinicContact,
     this.imageUrl,
+    this.roleId,
   });
   
   factory DoctorLogin.fromJson(Map<String, dynamic> json) =>

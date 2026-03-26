@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/presentation/providers/viewModel_provider.dart';
 import 'package:qless/presentation/viewmodels/doctor_login_viewmodel.dart';
+import 'package:qless/screens/doctor_login_screen.dart';
 
 
 class DoctorProfileSetupScreen extends ConsumerStatefulWidget {
@@ -33,6 +34,7 @@ class _DoctorProfileSetupScreenState
   final _clinicAddressController = TextEditingController();
   final _clinicContactController = TextEditingController();
   final _clinicEmailController = TextEditingController();
+  final _clinicWebsiteController = TextEditingController();
   final _consultationFeeController = TextEditingController();
 
   String _selectedSpecialization = '';
@@ -62,6 +64,7 @@ class _DoctorProfileSetupScreenState
     _clinicAddressController.dispose();
     _clinicContactController.dispose();
     _clinicEmailController.dispose();
+    _clinicWebsiteController.dispose();
     _consultationFeeController.dispose();
     super.dispose();
   }
@@ -80,28 +83,95 @@ class _DoctorProfileSetupScreenState
     }
   }
 
-  void _handleSubmit() {
-    if (_step == 1) {
-      setState(() => _step = 2);
-    } else {
-      final doctorLogin = DoctorLogin(
-        name: _fullNameController.text,
-        mobile: _contactController.text,
-        email: _emailController.text,
-        specialization: _selectedSpecialization,
-        qualification: _qualificationController.text,
-        licenseNo: _licenseController.text,
-        experience: int.tryParse(_experienceController.text),
-        image: _doctorPhoto?.path,
-        clinicName: _clinicNameController.text,
-        clinicAddress: _clinicAddressController.text,
-        clinicContact: _clinicContactController.text,
-        clinicEmail: _clinicEmailController.text,
-        consultationFee: double.tryParse(_consultationFeeController.text),
-        //clinicImage: _clinicPhoto?.path,
-      );
+  bool _isBlank(TextEditingController controller) {
+    return controller.text.trim().isEmpty;
+  }
 
-      ref.read(doctorLoginViewModelProvider.notifier).addDoctorDetails(doctorLogin);
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _handleSubmit() async {
+    if (_step == 1) {
+      if (_isBlank(_fullNameController)) {
+        return _showError('Full Name is required');
+      }
+      if (_isBlank(_contactController)) {
+        return _showError('Contact No is required');
+      }
+      if (_isBlank(_emailController)) {
+        return _showError('Email is required');
+      }
+      if (_selectedSpecialization.isEmpty) {
+        return _showError('Specialization is required');
+      }
+      if (_isBlank(_qualificationController)) {
+        return _showError('Qualification is required');
+      }
+      if (_isBlank(_licenseController)) {
+        return _showError('License Number is required');
+      }
+      if (_isBlank(_experienceController)) {
+        return _showError('Experience is required');
+      }
+      final experience = int.tryParse(_experienceController.text.trim());
+      if (experience == null) {
+        return _showError('Experience must be a valid number');
+      }
+
+      setState(() => _step = 2);
+      return;
+    }
+
+    // Step 2 validation (clinic image + consultation fee are optional)
+    if (_isBlank(_clinicNameController)) {
+      return _showError('Clinic Name is required');
+    }
+    if (_isBlank(_clinicAddressController)) {
+      return _showError('Clinic Address is required');
+    }
+    if (_isBlank(_clinicContactController)) {
+      return _showError('Clinic Contact is required');
+    }
+    if (_isBlank(_clinicEmailController)) {
+      return _showError('Clinic Email is required');
+    }
+
+    final doctorLogin = DoctorLogin(
+      name: _fullNameController.text.trim(),
+      mobile: _contactController.text.trim(),
+      email: _emailController.text.trim(),
+      specialization: _selectedSpecialization,
+      qualification: _qualificationController.text.trim(),
+      licenseNo: _licenseController.text.trim(),
+      experience: int.tryParse(_experienceController.text.trim()),
+      image: _doctorPhoto?.path, // optional
+      clinicName: _clinicNameController.text.trim(),
+      clinicAddress: _clinicAddressController.text.trim(),
+      clinicContact: _clinicContactController.text.trim(),
+      clinicEmail: _clinicEmailController.text.trim(),
+      websiteName: _clinicWebsiteController.text.trim(),
+      consultationFee: _consultationFeeController.text.trim().isEmpty
+          ? null
+          : double.tryParse(_consultationFeeController.text.trim()),
+      imageUrl: _clinicPhoto?.path, // optional
+      roleId: 1
+    );
+
+    await ref
+        .read(doctorLoginViewModelProvider.notifier)
+        .addDoctorDetails(doctorLogin);
+
+    final latestState = ref.read(doctorLoginViewModelProvider);
+    if (latestState.error == null && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const DoctorLoginScreen()),
+      );
+    } else if (latestState.error != null) {
+      _showError(latestState.error!);
     }
   }
 
@@ -243,6 +313,8 @@ class _DoctorProfileSetupScreenState
                   _buildTextField('Clinic Contact', _clinicContactController),
                   const SizedBox(height: 16),
                   _buildTextField('Clinic Email', _clinicEmailController),
+                  const SizedBox(height: 16),
+                  _buildTextField('Clinic Website', _clinicWebsiteController),
                   const SizedBox(height: 16),
                   _buildTextField('Consultation Fee', _consultationFeeController,
                       keyboard: TextInputType.number),
