@@ -170,6 +170,7 @@ class _DoctorProfileSetupScreenState
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
+      
     } else if (latestState.error != null) {
       _showError(latestState.error!);
     }
