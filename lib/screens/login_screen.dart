@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/presentation/providers/viewModel_provider.dart';
+import 'package:qless/presentation/viewModels/doctor_login_viewmodel.dart';
 import 'package:qless/screens/doctor_registration.dart';
 import 'package:qless/screens/otp_screen.dart';
 import 'package:qless/screens/patient_registration.dart';
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({
     super.key,
     this.role = 'doctor',
@@ -12,14 +15,68 @@ class LoginScreen extends StatefulWidget {
   final String role;
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool get isDoctor => widget.role == 'doctor';
+  final _mobileCtrl = TextEditingController();
+  bool _shouldReact = false;
+
+  @override
+  void dispose() {
+    _mobileCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onContinue() {
+    final mobile = _mobileCtrl.text.trim();
+    if (mobile.length != 10 || !RegExp(r'^[0-9]+$').hasMatch(mobile)) {
+      _snack('Enter a valid 10-digit mobile number');
+      return;
+    }
+    _shouldReact = true;
+    ref.read(doctorLoginViewModelProvider.notifier).checkPhoneNumber(mobile);
+  }
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(doctorLoginViewModelProvider);
+
+    ref.listen<DoctorLoginState>(doctorLoginViewModelProvider, (prev, next) {
+      if (!_shouldReact) return;
+      next.phoneCheckResult.whenOrNull(
+        data: (list) {
+          _shouldReact = false;
+          if (list.isNotEmpty) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => OtpVerificationScreen(
+                  mobileNumber: _mobileCtrl.text.trim(),
+                  role: widget.role,
+                ),
+              ),
+            );
+          } else {
+            _snack('User not found');
+          }
+        },
+        error: (e, _) {
+          _shouldReact = false;
+          _snack('Something went wrong. Try again.');
+        },
+      );
+    });
+
+    final isLoading = state.phoneCheckResult is AsyncLoading;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -97,7 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const TextField(
+                    child: TextField(
+                      controller: _mobileCtrl,
                       keyboardType: TextInputType.phone,
                       style: TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
                       decoration: InputDecoration(
@@ -124,17 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => OtpVerificationScreen(
-                              mobileNumber: '',
-                              role: widget.role,
-                            ),
-                          ),
-                        );
-                      },
+                      onPressed: isLoading ? null : _onContinue,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F172A),
                         foregroundColor: Colors.white,
@@ -143,14 +191,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           borderRadius: BorderRadius.circular(13),
                         ),
                       ),
-                      child: const Text(
-                        'Login',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Login',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
 

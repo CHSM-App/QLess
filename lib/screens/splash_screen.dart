@@ -1,9 +1,50 @@
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/screens/doctor_screen/doctor_bottom_nav.dart';
 import 'package:qless/screens/login_screen.dart';
+import 'package:qless/screens/patient_screen/patient_bottom_nav.dart';
 
-class SplashScreen extends StatelessWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
+
+  @override
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _checkLogin();
+  }
+
+  Future<void> _checkLogin() async {
+    await ref.read(tokenProvider.notifier).loadTokens();
+    final tokenState = ref.read(tokenProvider);
+
+    if (!mounted) return;
+
+    if (tokenState.isLoggedIn) {
+      if (tokenState.roleId == 1) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
+        );
+      } else if (tokenState.roleId == 2) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const PatientBottomNav()),
+        );
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const SplashScreen()),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

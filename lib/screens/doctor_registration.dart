@@ -8,7 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/presentation/providers/viewModel_provider.dart';
 import 'package:qless/presentation/viewmodels/doctor_login_viewmodel.dart';
-import 'package:qless/screens/doctor_login_screen.dart';
+import 'package:qless/screens/login_screen.dart';
 
 
 class DoctorProfileSetupScreen extends ConsumerStatefulWidget {
@@ -168,7 +168,7 @@ class _DoctorProfileSetupScreenState
     if (latestState.error == null && mounted) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const DoctorLoginScreen()),
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
     } else if (latestState.error != null) {
       _showError(latestState.error!);
