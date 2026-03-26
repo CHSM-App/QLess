@@ -34,7 +34,6 @@ class _PatientMainScreenState extends State<PatientMainScreen>
   static const _primary   = Color(0xFF0EA5E9);
   static const _dark      = Color(0xFF0F172A);
   static const _slate     = Color(0xFF64748B);
-  static const _bgLight   = Color(0xFFF0F9FF);
 
   final _tabs = const [
     _TabItem(icon: Icons.home_rounded,            label: 'Home'),
@@ -389,7 +388,6 @@ class _HomeTab extends StatelessWidget {
 
   static const _primary = Color(0xFF0EA5E9);
   static const _dark    = Color(0xFF0F172A);
-  static const _slate   = Color(0xFF64748B);
 
   @override
   Widget build(BuildContext context) {
@@ -582,8 +580,6 @@ class _ProfileTab extends StatelessWidget {
 
   static const _dark  = Color(0xFF0F172A);
   static const _slate = Color(0xFF64748B);
-  static const _border = Color(0xFFE2E8F0);
-  static const _bg    = Color(0xFFF1F5F9);
 
   @override
   Widget build(BuildContext context) {

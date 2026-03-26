@@ -31,15 +31,6 @@ class SomethingWentWrongRetry extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: colorScheme.onSurface,
         );
-    final bodyStyle = theme.textTheme.bodySmall?.copyWith(
-          color:
-              theme.textTheme.bodySmall?.color ?? colorScheme.onSurfaceVariant,
-        ) ??
-        TextStyle(
-          fontSize: 12,
-          color: colorScheme.onSurfaceVariant,
-        );
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),

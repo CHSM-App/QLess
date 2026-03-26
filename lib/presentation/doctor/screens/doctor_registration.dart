@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
-import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
 

@@ -80,7 +80,6 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     final  roleId = await TokenStorage.getValue('role_id');
     
     final token = await TokenStorage.getValue('token');
-    final isCheckedIn = await TokenStorage.getValue('isCheckedIn');
     final doctorIdStr = await TokenStorage.getValue('doctor_id');
     final doctorId = int.tryParse(doctorIdStr ?? '0') ?? 0;
        final clinicName = await TokenStorage.getValue('clinic_name');

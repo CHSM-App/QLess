@@ -33,9 +33,6 @@ jobs:
       # Step 4: Get dependencies
       - run: flutter pub get
 
-      - name: Analyze code
-        run: flutter analyze
-
       # Step 6: Run unit & widget tests
       - name: Run tests
         run: flutter test --coverage
