@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qless/screens/patient/main_navigation.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String mobileNumber;
@@ -146,12 +147,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
 
     if (isValid) {
       // Navigate to home based on role
-      // if (_isDoctor) Navigator.pushReplacement(context,
-      //   MaterialPageRoute(builder: (_) => const DoctorHomeScreen()));
-      // else Navigator.pushReplacement(context,
-      //   MaterialPageRoute(builder: (_) => const PatientHomeScreen()));
+      if (_isDoctor) Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => const PatientMainScreen()));
+      else Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => const PatientMainScreen()));
 
-      _showSuccess();
+      // _showSuccess();
     } else {
       setState(() => _hasError = true);
       _shakeController.forward(from: 0);

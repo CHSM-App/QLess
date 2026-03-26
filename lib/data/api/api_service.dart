@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:qless/core/constant.dart';
 import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:retrofit/error_logger.dart';
 import 'package:retrofit/retrofit.dart';
@@ -26,4 +27,7 @@ abstract class ApiService {
 
     @POST("login/addDoctorDetails")
   Future<dynamic> addDoctorDetails(@Body() DoctorLogin doctorLogin);
+
+  @POST("login/insertPatient")
+  Future<dynamic> addPatient(@Body() Patients patient);
 }

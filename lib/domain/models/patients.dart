@@ -29,7 +29,7 @@ class Patients {
   @JsonKey(name: 'blood_group')
   final String? bloodGroup;
 
-  @JsonKey(name: 'Weight')
+  @JsonKey(name: 'weight')
   final double? weight;
  
 
