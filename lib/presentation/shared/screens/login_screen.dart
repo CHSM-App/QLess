@@ -45,6 +45,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  void _goRegister() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => isDoctor
+            ? const DoctorProfileSetupScreen()
+            : const PatientRegistrationScreen(),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(doctorLoginViewModelProvider);
@@ -80,85 +91,201 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 30),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 48),
+        child: OrientationBuilder(
+          builder: (context, orientation) {
+            return orientation == Orientation.landscape
+                ? _LandscapeLayout(
+                    isDoctor: isDoctor,
+                    isLoading: isLoading,
+                    mobileCtrl: _mobileCtrl,
+                    onContinue: _onContinue,
+                    onRegister: _goRegister,
+                  )
+                : _PortraitLayout(
+                    isDoctor: isDoctor,
+                    isLoading: isLoading,
+                    mobileCtrl: _mobileCtrl,
+                    onContinue: _onContinue,
+                    onRegister: _goRegister,
+                  );
+          },
+        ),
+      ),
+    );
+  }
+}
 
-                  // ── LOGO CIRCLE ─────────────────────────────
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF0F172A),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: CustomPaint(
-                        size: const Size(36, 36),
-                        painter: _StethoscopeIconPainter(),
-                      ),
+// ─────────────────────────────────────────────────────────────────────────────
+// LANDSCAPE LAYOUT
+// Left panel: dark branding  |  Right panel: white form
+// ─────────────────────────────────────────────────────────────────────────────
+class _LandscapeLayout extends StatelessWidget {
+  final bool isDoctor;
+  final bool isLoading;
+  final TextEditingController mobileCtrl;
+  final VoidCallback onContinue;
+  final VoidCallback onRegister;
+
+  const _LandscapeLayout({
+    required this.isDoctor,
+    required this.isLoading,
+    required this.mobileCtrl,
+    required this.onContinue,
+    required this.onRegister,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // ── LEFT PANEL: dark branding ─────────────────────────────────────
+        Expanded(
+          flex: 5,
+          child: Container(
+            color: const Color(0xFF0F172A),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo circle
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.25),
+                      width: 1.5,
                     ),
                   ),
+                  child: Center(
+                    child: CustomPaint(
+                      size: const Size(36, 36),
+                      painter: _StethoscopeIconPainter(),
+                    ),
+                  ),
+                ),
 
-                  const SizedBox(height: 22),
+                const SizedBox(height: 18),
 
-                  // ── TITLE ────────────────────────────────────
+                const Text(
+                  'HealthConnect',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+
+                const SizedBox(height: 8),
+
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Text(
+                    isDoctor
+                        ? 'Welcome back,\nDoctor'
+                        : 'Welcome back,\nPatient',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF94A3B8),
+                      height: 1.5,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Role badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.15),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    isDoctor ? '🩺 Doctor Portal' : '🏥 Patient Portal',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ── RIGHT PANEL: login form ───────────────────────────────────────
+        Expanded(
+          flex: 5,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   const Text(
                     'Login',
                     style: TextStyle(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF0F172A),
                       letterSpacing: -0.2,
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
 
-                  // ── SUBTITLE ─────────────────────────────────
                   Text(
                     isDoctor
-                        ? 'Welcome back! Please login as doctor to continue'
-                        : 'Welcome back! Please login as patient to continue',
-                    textAlign: TextAlign.center,
+                        ? 'Please login as doctor to continue'
+                        : 'Please login as patient to continue',
                     style: const TextStyle(
-                      fontSize: 13.5,
+                      fontSize: 12.5,
                       color: Color(0xFF64748B),
                       height: 1.45,
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
-                  // ── mobile FIELD ───────────────────────────────
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: const Text(
-                      'Mobile Number',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
-                      ),
+                  // Mobile number label
+                  const Text(
+                    'Mobile Number',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF0F172A),
                     ),
                   ),
+
                   const SizedBox(height: 8),
+
+                  // Mobile field
                   Container(
-                    height: 52,
+                    height: 50,
                     decoration: BoxDecoration(
                       color: const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: TextField(
-                      controller: _mobileCtrl,
+                      controller: mobileCtrl,
                       keyboardType: TextInputType.phone,
-                      style: TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-                      decoration: InputDecoration(
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF0F172A),
+                      ),
+                      decoration: const InputDecoration(
                         hintText: 'Enter mobile number',
                         hintStyle: TextStyle(
                           color: Color(0xFF94A3B8),
@@ -170,25 +297,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           size: 20,
                         ),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 16),
+                        contentPadding: EdgeInsets.symmetric(vertical: 15),
                       ),
                     ),
                   ),
 
                   const SizedBox(height: 18),
 
-                  // ── LOGIN BUTTON ──────────────────────────────
+                  // Login button
                   SizedBox(
-                    width: double.infinity,
-                    height: 54,
+                    height: 50,
                     child: ElevatedButton(
-                      onPressed: isLoading ? null : _onContinue,
+                      onPressed: isLoading ? null : onContinue,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F172A),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
+                          borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                       child: isLoading
@@ -203,7 +329,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           : const Text(
                               'Login',
                               style: TextStyle(
-                                fontSize: 16,
+                                fontSize: 15,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
@@ -211,34 +337,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
-                  // ── REGISTER LINK ─────────────────────────────
+                  // Register link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
                         'New to HealthConnect? ',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12.5,
                           color: Color(0xFF64748B),
                         ),
                       ),
                       GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => isDoctor
-                                  ? const DoctorProfileSetupScreen()
-                                  : const PatientRegistrationScreen(),
-                            ),
-                          );
-                        },
+                        onTap: onRegister,
                         child: const Text(
                           'Register Now',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w700,
                             color: Color(0xFF0F172A),
                           ),
@@ -246,11 +363,200 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ],
                   ),
-
-                  const SizedBox(height: 32),
                 ],
               ),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PORTRAIT LAYOUT  (original vertical layout — unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+class _PortraitLayout extends StatelessWidget {
+  final bool isDoctor;
+  final bool isLoading;
+  final TextEditingController mobileCtrl;
+  final VoidCallback onContinue;
+  final VoidCallback onRegister;
+
+  const _PortraitLayout({
+    required this.isDoctor,
+    required this.isLoading,
+    required this.mobileCtrl,
+    required this.onContinue,
+    required this.onRegister,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const SizedBox(height: 48),
+
+              // Logo circle
+              Container(
+                width: 72,
+                height: 72,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0F172A),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: CustomPaint(
+                    size: const Size(36, 36),
+                    painter: _StethoscopeIconPainter(),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 22),
+
+              const Text(
+                'Login',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF0F172A),
+                  letterSpacing: -0.2,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                isDoctor
+                    ? 'Welcome back! Please login as doctor to continue'
+                    : 'Welcome back! Please login as patient to continue',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  color: Color(0xFF64748B),
+                  height: 1.45,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Mobile number label
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Mobile Number',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // Mobile field
+              Container(
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  controller: mobileCtrl,
+                  keyboardType: TextInputType.phone,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF0F172A),
+                  ),
+                  decoration: const InputDecoration(
+                    hintText: 'Enter mobile number',
+                    hintStyle: TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 14,
+                    ),
+                    prefixIcon: Icon(
+                      Icons.phone,
+                      color: Color(0xFF94A3B8),
+                      size: 20,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // Login button
+              SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: isLoading ? null : onContinue,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Login',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              // Register link
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'New to HealthConnect? ',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: onRegister,
+                    child: const Text(
+                      'Register Now',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 32),
+            ],
           ),
         ),
       ),
@@ -258,9 +564,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
-// ─────────────────────────────────────────────
-// Stethoscope icon for logo circle
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PAINTER
+// ─────────────────────────────────────────────────────────────────────────────
 class _StethoscopeIconPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -298,20 +604,19 @@ class _StethoscopeIconPainter extends CustomPainter {
     final downPath = Path();
     downPath.moveTo(w * 0.50, h * 0.48);
     downPath.cubicTo(
-      w * 0.50,
-      h * 0.60,
-      w * 0.66,
-      h * 0.58,
-      w * 0.66,
-      h * 0.72,
+      w * 0.50, h * 0.60,
+      w * 0.66, h * 0.58,
+      w * 0.66, h * 0.72,
     );
     canvas.drawPath(downPath, stroke);
 
     // chest piece circle
     canvas.drawCircle(Offset(w * 0.66, h * 0.80), w * 0.09, fill);
 
-    // small person silhouette (bottom-left)
+    // small person head
     canvas.drawCircle(Offset(w * 0.26, h * 0.70), w * 0.075, fill);
+
+    // small person body arc
     final bodyPath = Path();
     bodyPath.moveTo(w * 0.10, h * 0.96);
     bodyPath.quadraticBezierTo(w * 0.26, h * 0.82, w * 0.42, h * 0.96);
