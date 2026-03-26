@@ -1,4 +1,4 @@
-// lib/screens/patient/patient_main_screen.dart
+// lib/presentation/patient/screens/main_navigation.dart
 //
 // Drop-in navigation shell for the Patient side.
 // Includes:

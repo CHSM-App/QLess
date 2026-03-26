@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
-import 'package:qless/presentation/controllers/sync_controller.dart';
-import 'package:qless/screens/splash_screen.dart';
+import 'package:qless/presentation/shared/controllers/sync_controller.dart';
+import 'package:qless/presentation/shared/screens/splash_screen.dart';
  
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();//Global navigator access
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =GlobalKey<ScaffoldMessengerState>();//Global scaffold messenger access

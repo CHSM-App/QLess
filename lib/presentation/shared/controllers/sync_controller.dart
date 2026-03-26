@@ -2,7 +2,7 @@
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/presentation/providers/connectivity_provider.dart';
+import 'package:qless/presentation/shared/providers/connectivity_provider.dart';
 
 final syncControllerProvider = Provider<void>((ref) {
   // Listen to connectivity changes

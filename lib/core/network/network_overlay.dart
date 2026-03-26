@@ -3,7 +3,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/presentation/providers/viewModel_provider.dart';
+import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 
 class NetworkOverlay extends ConsumerWidget {
   final Widget child;

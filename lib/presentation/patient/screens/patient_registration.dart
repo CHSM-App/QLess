@@ -1,12 +1,12 @@
-// lib/screens/patient_registration.dart
+// lib/presentation/patient/screens/patient_registration.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/patients.dart';
-import 'package:qless/presentation/providers/viewModel_provider.dart';
-import 'package:qless/presentation/viewModels/patient_login_viewmodel.dart';
-import 'package:qless/screens/otp_screen.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/shared/screens/otp_screen.dart';
 
 
 class PatientRegistrationScreen extends ConsumerStatefulWidget {

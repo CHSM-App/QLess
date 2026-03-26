@@ -4,10 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/token_response.dart';
-import 'package:qless/presentation/providers/viewModel_provider.dart';
-import 'package:qless/screens/doctor_screen/doctor_bottom_nav.dart';
-import 'package:qless/screens/patient_screen/patient_bottom_nav.dart';
-import 'package:qless/screens/patient/main_navigation.dart';
+import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
+import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
+import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String mobileNumber;

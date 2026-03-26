@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/presentation/providers/viewModel_provider.dart';
-import 'package:qless/presentation/viewModels/doctor_login_viewmodel.dart';
-import 'package:qless/screens/doctor_registration.dart';
-import 'package:qless/screens/otp_screen.dart';
-import 'package:qless/screens/patient_registration.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
+import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
+import 'package:qless/presentation/shared/screens/otp_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_registration.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({
