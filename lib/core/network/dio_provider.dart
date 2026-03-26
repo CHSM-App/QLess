@@ -3,8 +3,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/interceptor.dart';
-import 'package:qless/presentation/viewModels/network_model.dart';
-
 import '../../data/api/api_service.dart';
 import '../../data/repositories/auth_impl.dart';
 import '../constant.dart';
@@ -40,8 +38,4 @@ final apiServiceProvider = Provider<ApiService>((ref) {
   return ApiService(dio!);
 });
 
-
-final apiStateProvider = StateNotifierProvider<ApiStateNotifier, ApiState>((ref) {
-  return ApiStateNotifier(ref.watch(apiServiceProvider));
-});
 
