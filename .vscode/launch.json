@@ -1,22 +1,25 @@
+
+
 {
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        
         {
-            "name": "QLess",
+            "name": "qless",
             "request": "launch",
             "type": "dart"
         },
         {
-            "name": "QLess (profile mode)",
+            "name": "qless (profile mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "profile"
         },
         {
-            "name": "QLess (release mode)",
+            "name": "qless (release mode)",
             "request": "launch",
             "type": "dart",
             "flutterMode": "release"

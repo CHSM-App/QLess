@@ -63,7 +63,7 @@ dependencies:
 
   google_maps_flutter: ^2.6.0
   flutter_polyline_points: ^2.0.1
-  
+  font_awesome_flutter: ^10.7.0
  
 dev_dependencies:
   flutter_test:
@@ -79,3 +79,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  # assets:
+  #   - asset/sound/success.mp3
