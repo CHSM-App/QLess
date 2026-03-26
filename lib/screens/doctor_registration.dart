@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/presentation/providers/viewModel_provider.dart';
+import 'package:qless/presentation/viewmodels/doctor_login_viewmodel.dart';
 import 'package:qless/screens/login_screen.dart';
 
 
@@ -169,6 +170,7 @@ class _DoctorProfileSetupScreenState
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
+      
     } else if (latestState.error != null) {
       _showError(latestState.error!);
     }

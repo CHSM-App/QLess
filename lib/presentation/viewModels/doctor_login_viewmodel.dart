@@ -7,21 +7,29 @@ import 'package:qless/domain/usecase/doctor_login_usecase.dart';
 class DoctorLoginState {
   final bool isLoading;
   final String? error;
+  final int?doctorId;
   final String? name;
-  final String? mobileNo;
+  final String? mobile;
   final String? email;
   final String? roleId;
   final String? token;
+  final String? clinic_name;
+  final String? clinic_id;
+   final AsyncValue<List<DoctorLogin>> phoneCheckResult;
   
   const DoctorLoginState({
   
     this.isLoading = false,
     this.error,
     this.name,
-    this.mobileNo,
+    this.mobile,
     this.email,
     this.roleId,
     this.token,
+    this.doctorId,
+    this.clinic_id,
+    this.clinic_name,
+       this.phoneCheckResult = const AsyncValue.data([]),
   });
 
   DoctorLoginState copyWith({
@@ -30,21 +38,28 @@ class DoctorLoginState {
     String? error,
  
     String? name,
-    String? mobileNo,
+    String? mobile,
     String? email,
     String? roleId,
     String? token,
+    int? doctorId,
+    String? clinicId,
+    String? clinic_name,
+       AsyncValue<List<DoctorLogin>>? phoneCheckResult,
   }) {
     return DoctorLoginState(
      
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-    
+    doctorId: doctorId ?? this.doctorId,
       name: name ?? this.name,
-      mobileNo: mobileNo ?? this.mobileNo,
+      mobile: mobile ?? this.mobile,
       email: email ?? this.email,
       roleId: roleId ?? this.roleId,
       token: token ?? this.token,
+      clinic_id: clinicId??this.clinic_id,
+      clinic_name: clinic_name??this.clinic_name,
+           phoneCheckResult: phoneCheckResult ?? this.phoneCheckResult,
     
     );
   }
@@ -54,57 +69,46 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   final DoctorLoginUsecase usecase;
   DoctorLoginViewmodel(this.usecase) : super(const DoctorLoginState()) {
     // Initial fetch or setup can be done here if needed
-   // loadFromStorage();
+    loadFromStorage();
   }
 
-  // Future<void> loadFromStorage() async {
+  Future<void> loadFromStorage() async {
 
-  //   final name = await TokenStorage.getValue('name');
-  //   print("name is : $name");
-  //   final mobileNo = await TokenStorage.getValue('mobile_no');
-  //   final email = await TokenStorage.getValue('email');
-  //   final  roleId = await TokenStorage.getValue('role_id');
+    final name = await TokenStorage.getValue('name');
+    final mobile = await TokenStorage.getValue('mobile');
+    final email = await TokenStorage.getValue('email');
+    final  roleId = await TokenStorage.getValue('role_id');
     
-  //   final token = await TokenStorage.getValue('token');
-  //   final isCheckedIn = await TokenStorage.getValue('isCheckedIn');
-  //   final userIdStr = await TokenStorage.getValue('user_id');
-  //   final userId = int.tryParse(userIdStr ?? '0') ?? 0;
-    
-  //   print("company Id : $companyId");
-  //   print("company Name : $companyName");
-  //   final regionIdStr = await TokenStorage.getValue('region_id');
-  //   final regionId = int.tryParse(regionIdStr ?? '');
-  //   final joiningDate = await TokenStorage.getValue('joining_date');
-  //   final isSuperadminStr = await TokenStorage.getValue('is_superadmin');
-  //   final isSuperadmin = isSuperadminStr?.toString() == 'true';
-  //   state = state.copyWith(
-  //     companyId: companyId,
-  //     userId: userId,
-  //     name: name,
-  //     mobileNo: mobileNo,
-  //     email: email,
-  //     roleId: roleId,
-  //     companyName: companyName,
-  //     token: token,
-  //     isCheckedIn: isCheckedIn,
-  //     regionId: regionId,
-  //     joiningDate: joiningDate,
-  //     isSuperadmin: isSuperadmin,
+    final token = await TokenStorage.getValue('token');
+    final isCheckedIn = await TokenStorage.getValue('isCheckedIn');
+    final doctorIdStr = await TokenStorage.getValue('doctor_id');
+    final doctorId = int.tryParse(doctorIdStr ?? '0') ?? 0;
+       final clinicName = await TokenStorage.getValue('clinic_name');
+           final clinicId = await TokenStorage.getValue('clinic_id');
+    state = state.copyWith(
+      clinicId: clinicId,
+      doctorId: doctorId,
+      name: name,
+      mobile: mobile,
+      email: email,
+      roleId: roleId,
+      clinic_name: clinicName,
+      token: token,
 
-  //     phoneCheckResult: AsyncValue.data([
-  //       LoginInfo(
-  //         name: name,
-  //         mobileNo: mobileNo,
-  //         email: email,
-  //         roleId: roleId != null ? int.tryParse(roleId) : null,
-  //         companyName: companyName,
-  //         Token: token,
-  //         isCheckedIn: isCheckedIn,
-  //         companyId: companyId,
-  //       ),
-  //     ]),
-  //   );
-  // }
+      phoneCheckResult: AsyncValue.data([
+        DoctorLogin(
+          doctorId: doctorId,
+          name: name,
+          mobile: mobile,
+          email: email,
+          roleId: roleId != null ? int.tryParse(roleId) : null,
+          clinicName: clinicName,
+          Token: token,
+          clinicId: clinicId,
+        ),
+      ]),
+    );
+  }
 
   Future<void> addDoctorDetails(DoctorLogin doctorLogin) async {
     state = state.copyWith(isLoading: true, error: null);
@@ -113,6 +117,22 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       state = state.copyWith(isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> checkPhoneNumber(String mobile) async {
+    state = state.copyWith(
+      phoneCheckResult: const AsyncValue.loading(),
+      error: null,
+    );
+    try {
+      final result = await usecase.checkPhoneNumber(mobile);
+      state = state.copyWith(phoneCheckResult: AsyncValue.data(result));
+    } catch (e, st) {
+      state = state.copyWith(
+        phoneCheckResult: AsyncValue.error(e, st),
+        error: e.toString(),
+      );
     }
   }
 

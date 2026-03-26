@@ -12,4 +12,7 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.addDoctorDetails(doctorLogin);
   }
 
+  Future<List<DoctorLogin>> checkPhoneNumber(String mobile) {
+    return doctorLoginRepository.checkPhoneNumber(mobile);
+  }
 }

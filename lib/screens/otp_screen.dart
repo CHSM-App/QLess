@@ -1,9 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/domain/models/token_response.dart';
+import 'package:qless/presentation/providers/viewModel_provider.dart';
+import 'package:qless/screens/doctor_screen/doctor_bottom_nav.dart';
+import 'package:qless/screens/patient_screen/patient_bottom_nav.dart';
 import 'package:qless/screens/patient/main_navigation.dart';
 
-class OtpVerificationScreen extends StatefulWidget {
+class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String mobileNumber;
   final String role; // 'doctor' or 'patient'
 
@@ -14,10 +20,12 @@ class OtpVerificationScreen extends StatefulWidget {
   });
 
   @override
-  State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
+  ConsumerState<OtpVerificationScreen> createState() =>
+      _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState extends State<OtpVerificationScreen>
+class _OtpVerificationScreenState
+    extends ConsumerState<OtpVerificationScreen>
     with TickerProviderStateMixin {
   static const int _otpLength = 6;
   static const int _timerSeconds = 30;
@@ -136,23 +144,34 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
     if (!_isFilled) return;
 
     setState(() => _isLoading = true);
-    await Future.delayed(const Duration(milliseconds: 1200));
+    final result = await ref
+        .read(authViewModelProvider.notifier)
+        .login(TokenResponse(mobile: widget.mobileNumber));
 
     if (!mounted) return;
-
-    // Simulate wrong OTP for demo — replace with real validation
-    final isValid = _otpValue != '000000';
-
     setState(() => _isLoading = false);
 
-    if (isValid) {
-      // Navigate to home based on role
-      if (_isDoctor) Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (_) => const PatientMainScreen()));
-      else Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (_) => const PatientMainScreen()));
+    if (result == null) {
+      setState(() => _hasError = true);
+      _shakeController.forward(from: 0);
+      for (final c in _controllers) {
+        c.clear();
+      }
+      _focusNodes[0].requestFocus();
+      return;
+    }
 
-      // _showSuccess();
+    final roleId = ref.read(tokenProvider).roleId ?? 0;
+    if (roleId == 1) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
+      );
+    } else if (roleId == 2) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const PatientBottomNav()),
+      );
     } else {
       setState(() => _hasError = true);
       _shakeController.forward(from: 0);
@@ -162,7 +181,6 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen>
       _focusNodes[0].requestFocus();
     }
   }
-
   void _showSuccess() {
     showDialog(
       context: context,
@@ -649,3 +667,4 @@ class _OtpBoxState extends State<_OtpBox> {
     );
   }
 }
+
