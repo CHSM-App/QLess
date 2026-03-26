@@ -118,6 +118,24 @@ loadFromStoragePatient();
     );
   }
 
+  
+  Future<void> checkPhonePatient(String mobileNo) async {
+    state = state.copyWith(
+      patientPhoneCheck: const AsyncValue.loading(),
+      error: null,
+    );
+    try {
+      final result = await usecase.checkPhonePatient(mobileNo);
+      state = state.copyWith(patientPhoneCheck: AsyncValue.data(result));
+    } catch (e, st) {
+      state = state.copyWith(
+        patientPhoneCheck: AsyncValue.error(e, st),
+        error: e.toString(),
+      );
+    }
+  }
+
+
 
   void clearError() => state = state.copyWith(clearError: true);
 }

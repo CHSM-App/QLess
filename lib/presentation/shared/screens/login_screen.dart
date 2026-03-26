@@ -5,6 +5,8 @@ import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dar
 import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
 import 'package:qless/presentation/shared/screens/otp_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_registration.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({
@@ -36,7 +38,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       return;
     }
     _shouldReact = true;
-    ref.read(doctorLoginViewModelProvider.notifier).checkPhoneNumber(mobile);
+    if (isDoctor) {
+      ref.read(doctorLoginViewModelProvider.notifier).checkPhoneNumber(mobile);
+    } else {
+      ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+    }
   }
 
   void _snack(String msg) {
@@ -47,35 +53,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(doctorLoginViewModelProvider);
+    final isDoctor = this.isDoctor;
+    bool isLoading = false;
 
-    ref.listen<DoctorLoginState>(doctorLoginViewModelProvider, (prev, next) {
-      if (!_shouldReact) return;
-      next.phoneCheckResult.whenOrNull(
-        data: (list) {
-          _shouldReact = false;
-          if (list.isNotEmpty) {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => OtpVerificationScreen(
-                  mobileNumber: _mobileCtrl.text.trim(),
-                  role: widget.role,
+    if (isDoctor) {
+      final state = ref.watch(doctorLoginViewModelProvider);
+      isLoading = state.phoneCheckResult is AsyncLoading;
+
+      ref.listen<DoctorLoginState>(doctorLoginViewModelProvider, (prev, next) {
+        if (!_shouldReact) return;
+        next.phoneCheckResult.whenOrNull(
+          data: (list) {
+            _shouldReact = false;
+            if (list.isNotEmpty) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OtpVerificationScreen(
+                    mobileNumber: _mobileCtrl.text.trim(),
+                    role: widget.role,
+                  ),
                 ),
-              ),
-            );
-          } else {
-            _snack('User not found');
-          }
-        },
-        error: (e, _) {
-          _shouldReact = false;
-          _snack('Something went wrong. Try again.');
-        },
-      );
-    });
+              );
+            } else {
+              _snack('User not found');
+            }
+          },
+          error: (e, _) {
+            _shouldReact = false;
+            _snack('Something went wrong. Try again.');
+          },
+        );
+      });
+    } else {
+      final state = ref.watch(patientLoginViewModelProvider);
+      isLoading = state.patientPhoneCheck is AsyncLoading;
 
-    final isLoading = state.phoneCheckResult is AsyncLoading;
+      ref.listen<PatientLoginState>(patientLoginViewModelProvider,
+          (prev, next) {
+        if (!_shouldReact) return;
+        next.patientPhoneCheck.whenOrNull(
+          data: (list) {
+            _shouldReact = false;
+            if (list.isNotEmpty) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OtpVerificationScreen(
+                    mobileNumber: _mobileCtrl.text.trim(),
+                    role: widget.role,
+                  ),
+                ),
+              );
+            } else {
+              _snack('User not found');
+            }
+          },
+          error: (e, _) {
+            _shouldReact = false;
+            _snack('Something went wrong. Try again.');
+          },
+        );
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
