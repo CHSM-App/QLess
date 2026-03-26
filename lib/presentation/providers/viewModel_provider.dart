@@ -4,7 +4,9 @@ import 'package:qless/core/network/dio_provider.dart';
 import 'package:qless/core/network/network_service.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/data/repositories/auth_impl.dart';
+import 'package:qless/presentation/providers/usecase_provider.dart';
 import 'package:qless/presentation/viewModels/auth_model.dart';
+import 'package:qless/presentation/viewModels/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/viewModels/network_model.dart';
 
 
@@ -26,3 +28,9 @@ final authViewModelProvider =
       final authRepo = AuthImpl(ApiService(dio));
       return AuthViewModel(ref, authRepo);
     });
+
+final doctorLoginViewModelProvider =
+    StateNotifierProvider<DoctorLoginViewmodel, DoctorLoginState>((ref) {
+  final usecase = ref.watch(doctorLoginUsecaseProvider);
+  return DoctorLoginViewmodel(usecase);
+});

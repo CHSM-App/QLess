@@ -1,29 +1,46 @@
-import 'package:flutter/material.dart';
 
-class DoctorProfileSetupScreen extends StatefulWidget {
+
+
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/presentation/providers/viewModel_provider.dart';
+import 'package:qless/presentation/viewmodels/doctor_login_viewmodel.dart';
+
+
+class DoctorProfileSetupScreen extends ConsumerStatefulWidget {
   const DoctorProfileSetupScreen({super.key});
 
   @override
-  State<DoctorProfileSetupScreen> createState() =>
+  ConsumerState<DoctorProfileSetupScreen> createState() =>
       _DoctorProfileSetupScreenState();
 }
 
-class _DoctorProfileSetupScreenState extends State<DoctorProfileSetupScreen> {
+class _DoctorProfileSetupScreenState
+    extends ConsumerState<DoctorProfileSetupScreen> {
   int _step = 1;
 
+  // Controllers
   final _fullNameController = TextEditingController();
-    final _contactController = TextEditingController();
-      final _emailController = TextEditingController();
+  final _contactController = TextEditingController();
+  final _emailController = TextEditingController();
   final _qualificationController = TextEditingController();
   final _licenseController = TextEditingController();
   final _experienceController = TextEditingController();
   final _clinicNameController = TextEditingController();
   final _clinicAddressController = TextEditingController();
-    final _clinicContactController = TextEditingController();
-      final _clinicEmailController = TextEditingController();
+  final _clinicContactController = TextEditingController();
+  final _clinicEmailController = TextEditingController();
   final _consultationFeeController = TextEditingController();
 
   String _selectedSpecialization = '';
+
+  File? _doctorPhoto;
+  File? _clinicPhoto;
+
+  final ImagePicker _picker = ImagePicker();
 
   final List<Map<String, String>> _specializations = [
     {'value': 'general', 'label': 'General Physician'},
@@ -36,31 +53,64 @@ class _DoctorProfileSetupScreenState extends State<DoctorProfileSetupScreen> {
   @override
   void dispose() {
     _fullNameController.dispose();
+    _contactController.dispose();
+    _emailController.dispose();
     _qualificationController.dispose();
     _licenseController.dispose();
     _experienceController.dispose();
     _clinicNameController.dispose();
     _clinicAddressController.dispose();
+    _clinicContactController.dispose();
+    _clinicEmailController.dispose();
     _consultationFeeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(bool isDoctorPhoto) async {
+    final XFile? image =
+        await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      setState(() {
+        if (isDoctorPhoto) {
+          _doctorPhoto = File(image.path);
+        } else {
+          _clinicPhoto = File(image.path);
+        }
+      });
+    }
   }
 
   void _handleSubmit() {
     if (_step == 1) {
       setState(() => _step = 2);
     } else {
-      // Navigate to dashboard
-      // Navigator.pushReplacementNamed(context, '/doctor/dashboard');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile setup complete!')),
+      final doctorLogin = DoctorLogin(
+        name: _fullNameController.text,
+        mobile: _contactController.text,
+        email: _emailController.text,
+        specialization: _selectedSpecialization,
+        qualification: _qualificationController.text,
+        licenseNo: _licenseController.text,
+        experience: int.tryParse(_experienceController.text),
+        image: _doctorPhoto?.path,
+        clinicName: _clinicNameController.text,
+        clinicAddress: _clinicAddressController.text,
+        clinicContact: _clinicContactController.text,
+        clinicEmail: _clinicEmailController.text,
+        consultationFee: double.tryParse(_consultationFeeController.text),
+        //clinicImage: _clinicPhoto?.path,
       );
+
+      ref.read(doctorLoginViewModelProvider.notifier).addDoctorDetails(doctorLogin);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(doctorLoginViewModelProvider);
+
     return Scaffold(
-   backgroundColor: Colors.white,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -78,407 +128,253 @@ class _DoctorProfileSetupScreenState extends State<DoctorProfileSetupScreen> {
         title: const Text(
           'Profile Setup',
           style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
-          ),
+              fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Column(
-          children: [
-            // ── STEP INDICATOR ─────────────────────────────
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+      body: Stack(
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: _step == 1 ? 32 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _step == 1
-                        ? const Color(0xFF0F172A)
-                        : const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  width: _step == 2 ? 32 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: _step == 2
-                        ? const Color(0xFF0F172A)
-                        : const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── PROFILE PHOTO ───────────────────────────────
-            Column(
-              children: [
-                Stack(
+                // Step indicator
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 96,
-                      height: 96,
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: _step == 1 ? 32 : 8,
+                      height: 8,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        size: 52,
-                        color: Color(0xFF94A3B8),
+                        color: _step == 1
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF0F172A),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          size: 16,
-                          color: Colors.white,
-                        ),
+                    const SizedBox(width: 6),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      width: _step == 2 ? 32 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _step == 2
+                            ? const Color(0xFF0F172A)
+                            : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Upload Photo',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
+                const SizedBox(height: 24),
+
+                // Doctor Photo
+                if (_step == 1)
+                  Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _pickImage(true),
+                        child: CircleAvatar(
+                          radius: 48,
+                          backgroundColor: const Color(0xFFE2E8F0),
+                          backgroundImage: _doctorPhoto != null
+                              ? FileImage(_doctorPhoto!)
+                              : null,
+                          child: _doctorPhoto == null
+                              ? const Icon(Icons.person, size: 52, color: Color(0xFF94A3B8))
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Upload Doctor Photo',
+                        style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
 
-            const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-            // ── STEP 1 FIELDS ───────────────────────────────
-            if (_step == 1) ...[
-              _buildLabel('Full Name'),
-              _buildTextField(
-                controller: _fullNameController,
-                hint: 'Dr. John Smith',
-                keyboardType: TextInputType.name,
-              ),
-
+                // Step 1 fields
+                if (_step == 1) ...[
+                  _buildTextField('Full Name', _fullNameController),
                   const SizedBox(height: 16),
+                  _buildTextField('Contact No', _contactController, keyboard: TextInputType.phone),
+                  const SizedBox(height: 16),
+                  _buildTextField('Email', _emailController, keyboard: TextInputType.emailAddress),
+                  const SizedBox(height: 16),
+                  _buildDropdown(),
+                  const SizedBox(height: 16),
+                  _buildTextField('Qualification', _qualificationController),
+                  const SizedBox(height: 16),
+                  _buildTextField('License Number', _licenseController),
+                  const SizedBox(height: 16),
+                  _buildTextField('Experience (Years)', _experienceController,
+                      keyboard: TextInputType.number),
+                ],
 
-              _buildLabel('Contact No'),
-              _buildTextField(
-                controller: _contactController,
-                hint: 'Contact No',
-              ),
-                const SizedBox(height: 16),
+                // Step 2 fields
+                if (_step == 2) ...[
+                  // Clinic photo
+                  GestureDetector(
+                    onTap: () => _pickImage(false),
+                    child: CircleAvatar(
+                      radius: 48,
+                      backgroundColor: const Color(0xFFE2E8F0),
+                      backgroundImage:
+                          _clinicPhoto != null ? FileImage(_clinicPhoto!) : null,
+                      child: _clinicPhoto == null
+                          ? const Icon(Icons.local_hospital,
+                              size: 52, color: Color(0xFF94A3B8))
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Upload Clinic Photo',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField('Clinic Name', _clinicNameController),
+                  const SizedBox(height: 16),
+                  _buildTextArea('Clinic Address', _clinicAddressController),
+                  const SizedBox(height: 16),
+                  _buildTextField('Clinic Contact', _clinicContactController),
+                  const SizedBox(height: 16),
+                  _buildTextField('Clinic Email', _clinicEmailController),
+                  const SizedBox(height: 16),
+                  _buildTextField('Consultation Fee', _consultationFeeController,
+                      keyboard: TextInputType.number),
+                ],
 
-              _buildLabel('Email'),
-              _buildTextField(
-                controller: _emailController,
-                hint: 'Email',
-              ),
-              const SizedBox(height: 16),
-
-              _buildLabel('Specialization'),
-              _buildDropdown(),
-              const SizedBox(height: 16),
-
-              _buildLabel('Qualification'),
-              _buildTextField(
-                controller: _qualificationController,
-                hint: 'MBBS, MD',
-              ),
-              const SizedBox(height: 16),
-
-              _buildLabel('License Number'),
-              _buildTextField(
-                controller: _licenseController,
-                hint: 'MED123456',
-              ),
-              const SizedBox(height: 16),
-
-              _buildLabel('Experience (Years)'),
-              _buildTextField(
-                controller: _experienceController,
-                hint: '5',
-                keyboardType: TextInputType.number,
-              ),
-            ],
-
-            // ── STEP 2 FIELDS ───────────────────────────────
-             Column(
-              children: [
-                Stack(
-                  children: [
-                    Container(
-                      width: 96,
-                      height: 96,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE2E8F0),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.person,
-                        size: 52,
-                        color: Color(0xFF94A3B8),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: _handleSubmit,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
                       ),
                     ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF0F172A),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                      ),
+                    child: Text(
+                      _step == 1 ? 'Continue' : 'Complete Setup',
+                      style: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.w600),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Upload  Clinic Photo',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF64748B),
                   ),
                 ),
+                const SizedBox(height: 32),
               ],
             ),
-            if (_step == 2) ...[
-              _buildLabel('Clinic Name'),
-              _buildTextField(
-                controller: _clinicNameController,
-                hint: 'City Medical Center',
-              ),
-              const SizedBox(height: 16),
+          ),
 
-              _buildLabel('Clinic Address'),
-              _buildTextArea(
-                controller: _clinicAddressController,
-                hint: '123 Main St, City, State',
-              ),
-
-               const SizedBox(height: 16),
-
-              _buildLabel('Clinic Contact No'),
-              _buildTextArea(
-                controller: _clinicContactController,
-                hint: '123 Main St, City, State',
-              ),
-               const SizedBox(height: 16),
-
-              _buildLabel('Clinic Email'),
-              _buildTextArea(
-                controller: _clinicContactController,
-                hint: '123 Main St, City, State',
-              ),
-              const SizedBox(height: 16),
-
-              _buildLabel('Consultation Fee'),
-              _buildFeeField(),
-            ],
-
-            const SizedBox(height: 28),
-
-            // ── SUBMIT BUTTON ────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _handleSubmit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0F172A),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                ),
-                child: Text(
-                  _step == 1 ? 'Continue' : 'Complete Setup',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
+          // Loading indicator
+          if (state.isLoading)
+            const Center(
+              child: CircularProgressIndicator(),
             ),
-
-            const SizedBox(height: 32),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildLabel(String label) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF0F172A),
+  Widget _buildTextField(String label, TextEditingController controller,
+      {TextInputType keyboard = TextInputType.text}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF0F172A))),
+        const SizedBox(height: 8),
+        Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboard,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle:
-              const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+  Widget _buildTextArea(String label, TextEditingController controller) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF0F172A))),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: TextField(
+            controller: controller,
+            maxLines: 3,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildDropdown() {
-    return Container(
-      height: 52,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedSpecialization.isEmpty
-              ? null
-              : _selectedSpecialization,
-          hint: const Text(
-            'Select specialization',
-            style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Specialization',
+            style: TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF0F172A))),
+        const SizedBox(height: 8),
+        Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          isExpanded: true,
-          icon: const Icon(Icons.keyboard_arrow_down,
-              color: Color(0xFF94A3B8)),
-          style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-          dropdownColor: Colors.white,
-          items: _specializations
-              .map((s) => DropdownMenuItem<String>(
-                    value: s['value'],
-                    child: Text(s['label']!),
-                  ))
-              .toList(),
-          onChanged: (val) {
-            setState(() => _selectedSpecialization = val ?? '');
-          },
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTextArea({
-    required TextEditingController controller,
-    required String hint,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: TextField(
-        controller: controller,
-        maxLines: 3,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle:
-              const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-          border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeeField() {
-    return Container(
-      height: 52,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 16),
-            child: Text(
-              '₹',
-              style: TextStyle(fontSize: 15, color: Color(0xFF94A3B8)),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedSpecialization.isEmpty ? null : _selectedSpecialization,
+              hint: const Text('Select specialization'),
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8)),
+              items: _specializations
+                  .map((s) => DropdownMenuItem<String>(
+                        value: s['value'],
+                        child: Text(s['label']!),
+                      ))
+                  .toList(),
+              onChanged: (val) => setState(() => _selectedSpecialization = val ?? ''),
             ),
           ),
-          Expanded(
-            child: TextField(
-              controller: _consultationFeeController,
-              keyboardType: TextInputType.number,
-              style:
-                  const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-              decoration: const InputDecoration(
-                hintText: '500',
-                hintStyle:
-                    TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
-                border: InputBorder.none,
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-              ),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
