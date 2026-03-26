@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
-import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
-import 'package:qless/presentation/shared/screens/otp_screen.dart';
+import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/patient_registration.dart';
+
+import 'package:qless/presentation/shared/screens/otp_screen.dart';
+
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({
@@ -157,20 +160,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: TextField(
                       controller: _mobileCtrl,
                       keyboardType: TextInputType.phone,
-                      style: TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                      maxLength: 10, // ← add this
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly, // ← add this
+                      ],
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF0F172A),
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Enter mobile number',
-                        hintStyle: TextStyle(
+                        hintStyle: const TextStyle(
                           color: Color(0xFF94A3B8),
                           fontSize: 14,
                         ),
-                        prefixIcon: Icon(
+                        prefixIcon: const Icon(
                           Icons.phone,
                           color: Color(0xFF94A3B8),
                           size: 20,
                         ),
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(vertical: 16),
+                        counterText: '', // ← hides the "0/10" counter
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                        ),
                       ),
                     ),
                   ),
