@@ -16,7 +16,7 @@ DoctorLogin _$DoctorLoginFromJson(Map<String, dynamic> json) => DoctorLogin(
   experience: (json['experience'] as num?)?.toInt(),
   specialization: json['specialization'] as String?,
   image: json['image'] as String?,
-  clinicId: (json['clinic_id'] as num?)?.toInt(),
+  clinicId: json['clinic_id'] as String?,
   clinicName: json['clinic_name'] as String?,
   clinicAddress: json['clinic_address'] as String?,
   latitude: (json['latitude'] as num?)?.toDouble(),
@@ -26,6 +26,7 @@ DoctorLogin _$DoctorLoginFromJson(Map<String, dynamic> json) => DoctorLogin(
   clinicEmail: json['clinic_email'] as String?,
   clinicContact: json['clinic_contact'] as String?,
   imageUrl: json['image_url'] as String?,
+  roleId: (json['role_id'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$DoctorLoginToJson(DoctorLogin instance) =>
@@ -39,6 +40,7 @@ Map<String, dynamic> _$DoctorLoginToJson(DoctorLogin instance) =>
       'experience': instance.experience,
       'specialization': instance.specialization,
       'image': instance.image,
+      'role_id': instance.roleId,
       'clinic_id': instance.clinicId,
       'clinic_name': instance.clinicName,
       'clinic_address': instance.clinicAddress,
