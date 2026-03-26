@@ -4,8 +4,10 @@ import 'package:qless/core/network/dio_provider.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/data/repositories/auth_impl.dart';
 import 'package:qless/data/repositories/doctor_login_impl.dart';
+import 'package:qless/data/repositories/patient_login_impl.dart';
 import 'package:qless/domain/repository/auth_repo.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
+import 'package:qless/domain/repository/patient_login_repo.dart';
 
 //Auth Repository
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -18,4 +20,10 @@ final doctorLoginRepositoryProvider = Provider<DoctorLoginRepository>((ref) {
   final dio = ref.watch(dioProvider).value!;
   final api = ApiService(dio);
   return DoctorLoginImpl(api);
+});
+
+final patientLoginRepositoryProvider = Provider<PatientLoginRepository>((ref) {
+  final dio = ref.watch(dioProvider).value!;
+  final api = ApiService(dio);
+  return PatientLoginImpl(api);
 });

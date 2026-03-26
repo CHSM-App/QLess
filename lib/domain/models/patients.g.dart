@@ -15,7 +15,7 @@ Patients _$PatientsFromJson(Map<String, dynamic> json) => Patients(
   Gender: json['Gender'] as String?,
   address: json['address'] as String?,
   bloodGroup: json['blood_group'] as String?,
-  weight: (json['Weight'] as num?)?.toDouble(),
+  weight: (json['weight'] as num?)?.toDouble(),
 );
 
 Map<String, dynamic> _$PatientsToJson(Patients instance) => <String, dynamic>{
@@ -27,5 +27,5 @@ Map<String, dynamic> _$PatientsToJson(Patients instance) => <String, dynamic>{
   'Gender': instance.Gender,
   'DOB': instance.DOB?.toIso8601String(),
   'blood_group': instance.bloodGroup,
-  'Weight': instance.weight,
+  'weight': instance.weight,
 };
