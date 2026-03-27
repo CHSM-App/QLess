@@ -110,7 +110,12 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
       } else if (tokenState.roleId == 2) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const PatientBottomNav()),
+          MaterialPageRoute(
+            builder: (_) => PatientBottomNav(
+              onToggleTheme: () {},
+              themeMode: ThemeMode.light,
+            ),
+          ),
         );
       } 
       
@@ -516,3 +521,4 @@ class _PersonPainter extends CustomPainter {
   @override
   bool shouldRepaint(_PersonPainter old) => old.t != t;
 }
+
