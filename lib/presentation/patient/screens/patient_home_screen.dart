@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:qless/core/theme/theme.dart';
+import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
 
 class Doctor {
@@ -487,14 +488,11 @@ class _HomeScreenState extends State<HomeScreen>
                             icon: Icons.group_add_rounded,
                             label: 'Add\nFamily',
                             color: const Color(0xFF7C3AED),
-                            onTap: () {
-                              
-                            },
-                            // onTap: () => Navigator.push(
-                            //     context,
-                            //     MaterialPageRoute(
-                            //         builder: (_) =>
-                            //             const FamilyMembersScreen())),
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const FamilyMembersScreen())),
                           ),
                           const SizedBox(width: 12),
                           _QuickAction(
