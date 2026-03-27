@@ -10,7 +10,7 @@ import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String mobileNumber;
-  final String role; // 'doctor' or 'patient'
+  final String role;
 
   const OtpVerificationScreen({
     super.key,
@@ -23,8 +23,7 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
       _OtpVerificationScreenState();
 }
 
-class _OtpVerificationScreenState
-    extends ConsumerState<OtpVerificationScreen>
+class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     with TickerProviderStateMixin {
   static const int _otpLength = 6;
   static const int _timerSeconds = 30;
@@ -46,8 +45,7 @@ class _OtpVerificationScreenState
   bool _hasError = false;
 
   bool get _isDoctor => widget.role == 'doctor';
-  Color get _accentColor =>
-      _isDoctor ? const Color(0xFF0F172A) : const Color(0xFF0F172A);
+  Color get _accentColor => const Color(0xFF0F172A);
 
   String get _maskedNumber {
     final n = widget.mobileNumber;
@@ -102,23 +100,16 @@ class _OtpVerificationScreenState
     _fadeController.dispose();
     _shakeController.dispose();
     _timer?.cancel();
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    for (final c in _controllers) c.dispose();
+    for (final f in _focusNodes) f.dispose();
     super.dispose();
   }
 
-  String get _otpValue =>
-      _controllers.map((c) => c.text).join();
-
+  String get _otpValue => _controllers.map((c) => c.text).join();
   bool get _isFilled => _otpValue.length == _otpLength;
 
   void _onOtpChanged(int index, String value) {
     if (_hasError) setState(() => _hasError = false);
-
     if (value.length == 1 && index < _otpLength - 1) {
       _focusNodes[index + 1].requestFocus();
     }
@@ -141,8 +132,8 @@ class _OtpVerificationScreenState
 
   Future<void> _verifyOtp() async {
     if (!_isFilled) return;
-
     setState(() => _isLoading = true);
+
     final result = await ref
         .read(authViewModelProvider.notifier)
         .login(TokenResponse(mobile: widget.mobileNumber, role: widget.role));
@@ -151,12 +142,7 @@ class _OtpVerificationScreenState
     setState(() => _isLoading = false);
 
     if (result == null) {
-      setState(() => _hasError = true);
-      _shakeController.forward(from: 0);
-      for (final c in _controllers) {
-        c.clear();
-      }
-      _focusNodes[0].requestFocus();
+      _triggerError();
       return;
     }
 
@@ -172,88 +158,20 @@ class _OtpVerificationScreenState
         MaterialPageRoute(builder: (_) => const PatientBottomNav()),
       );
     } else {
-      setState(() => _hasError = true);
-      _shakeController.forward(from: 0);
-      for (final c in _controllers) {
-        c.clear();
-      }
-      _focusNodes[0].requestFocus();
+      _triggerError();
     }
   }
-  void _showSuccess() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Dialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_rounded,
-                    color: Color(0xFF10B981), size: 34),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Verified!',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Your number has been\nsuccessfully verified.',
-                textAlign: TextAlign.center,
-                style:
-                    TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    // proceed to home
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    'Continue',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+
+  void _triggerError() {
+    setState(() => _hasError = true);
+    _shakeController.forward(from: 0);
+    for (final c in _controllers) c.clear();
+    _focusNodes[0].requestFocus();
   }
 
   void _resendOtp() {
     if (_secondsLeft > 0) return;
-    for (final c in _controllers) {
-      c.clear();
-    }
+    for (final c in _controllers) c.clear();
     setState(() => _hasError = false);
     _focusNodes[0].requestFocus();
     _startTimer();
@@ -283,276 +201,223 @@ class _OtpVerificationScreenState
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const SizedBox(height: 12),
+          child: OrientationBuilder(
+            builder: (context, orientation) {
+              return orientation == Orientation.landscape
+                  ? _LandscapeLayout(
+                      isDoctor: _isDoctor,
+                      accentColor: _accentColor,
+                      maskedNumber: _maskedNumber,
+                      controllers: _controllers,
+                      focusNodes: _focusNodes,
+                      hasError: _hasError,
+                      isFilled: _isFilled,
+                      isLoading: _isLoading,
+                      secondsLeft: _secondsLeft,
+                      shakeAnim: _shakeAnim,
+                      onOtpChanged: _onOtpChanged,
+                      onKeyEvent: _onKeyEvent,
+                      onVerify: _verifyOtp,
+                      onResend: _resendOtp,
+                    )
+                  : _PortraitLayout(
+                      isDoctor: _isDoctor,
+                      accentColor: _accentColor,
+                      maskedNumber: _maskedNumber,
+                      controllers: _controllers,
+                      focusNodes: _focusNodes,
+                      hasError: _hasError,
+                      isFilled: _isFilled,
+                      isLoading: _isLoading,
+                      secondsLeft: _secondsLeft,
+                      shakeAnim: _shakeAnim,
+                      onOtpChanged: _onOtpChanged,
+                      onKeyEvent: _onKeyEvent,
+                      onVerify: _verifyOtp,
+                      onResend: _resendOtp,
+                    );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                // ── ICON ──────────────────────────────────────
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 350),
-                  width: 68,
-                  height: 68,
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED PROPS — passed to both layouts
+// ─────────────────────────────────────────────────────────────────────────────
+class _OtpLayoutProps {
+  final bool isDoctor;
+  final Color accentColor;
+  final String maskedNumber;
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+  final bool hasError;
+  final bool isFilled;
+  final bool isLoading;
+  final int secondsLeft;
+  final Animation<double> shakeAnim;
+  final void Function(int, String) onOtpChanged;
+  final void Function(int, KeyEvent) onKeyEvent;
+  final VoidCallback onVerify;
+  final VoidCallback onResend;
+
+  const _OtpLayoutProps({
+    required this.isDoctor,
+    required this.accentColor,
+    required this.maskedNumber,
+    required this.controllers,
+    required this.focusNodes,
+    required this.hasError,
+    required this.isFilled,
+    required this.isLoading,
+    required this.secondsLeft,
+    required this.shakeAnim,
+    required this.onOtpChanged,
+    required this.onKeyEvent,
+    required this.onVerify,
+    required this.onResend,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LANDSCAPE LAYOUT
+// Left panel: dark info  |  Right panel: OTP form
+// ─────────────────────────────────────────────────────────────────────────────
+class _LandscapeLayout extends StatelessWidget {
+  final bool isDoctor;
+  final Color accentColor;
+  final String maskedNumber;
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+  final bool hasError;
+  final bool isFilled;
+  final bool isLoading;
+  final int secondsLeft;
+  final Animation<double> shakeAnim;
+  final void Function(int, String) onOtpChanged;
+  final void Function(int, KeyEvent) onKeyEvent;
+  final VoidCallback onVerify;
+  final VoidCallback onResend;
+
+  const _LandscapeLayout({
+    required this.isDoctor,
+    required this.accentColor,
+    required this.maskedNumber,
+    required this.controllers,
+    required this.focusNodes,
+    required this.hasError,
+    required this.isFilled,
+    required this.isLoading,
+    required this.secondsLeft,
+    required this.shakeAnim,
+    required this.onOtpChanged,
+    required this.onKeyEvent,
+    required this.onVerify,
+    required this.onResend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // ── LEFT PANEL ────────────────────────────────────────────────────
+        Expanded(
+          flex: 4,
+          child: Container(
+            color: const Color(0xFF0F172A),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // SMS icon circle
+                Container(
+                  width: 64,
+                  height: 64,
                   decoration: BoxDecoration(
-                    color: _accentColor,
+                    color: Colors.white.withOpacity(0.12),
                     shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _accentColor.withOpacity(0.28),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.25),
+                      width: 1.5,
+                    ),
                   ),
-                  child: const Icon(Icons.sms_outlined,
-                      color: Colors.white, size: 30),
+                  child: const Icon(
+                    Icons.sms_outlined,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
 
-                const SizedBox(height: 22),
+                const SizedBox(height: 18),
 
-                // ── TITLE ─────────────────────────────────────
                 const Text(
                   'OTP Verification',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 19,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.4,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
                   ),
                 ),
 
                 const SizedBox(height: 10),
 
-                RichText(
-                  textAlign: TextAlign.center,
-                  text: TextSpan(
-                    style: const TextStyle(
-                      fontSize: 13.5,
-                      color: Color(0xFF64748B),
-                      height: 1.55,
-                    ),
-                    children: [
-                      const TextSpan(
-                          text: 'We sent a 6-digit code to\n'),
-                      TextSpan(
-                        text: '+91 $_maskedNumber',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF0F172A),
-                        ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  child: RichText(
+                    textAlign: TextAlign.center,
+                    text: TextSpan(
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: Color(0xFF94A3B8),
+                        height: 1.55,
                       ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 36),
-
-                // ── OTP FIELDS ────────────────────────────────
-                AnimatedBuilder(
-                  animation: _shakeAnim,
-                  builder: (context, child) {
-                    final shake = (_shakeAnim.value > 0)
-                        ? (8 *
-                            (0.5 -
-                                (_shakeAnim.value - 0.5).abs()) *
-                            2 *
-                            (_shakeAnim.value < 0.5 ? 1 : -1))
-                        : 0.0;
-                    return Transform.translate(
-                      offset: Offset(shake, 0),
-                      child: child,
-                    );
-                  },
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(_otpLength, (i) {
-                      return _OtpBox(
-                        controller: _controllers[i],
-                        focusNode: _focusNodes[i],
-                        hasError: _hasError,
-                        accentColor: _accentColor,
-                        onChanged: (val) => _onOtpChanged(i, val),
-                        onKeyEvent: (event) => _onKeyEvent(i, event),
-                      );
-                    }),
-                  ),
-                ),
-
-                // ── ERROR TEXT ────────────────────────────────
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: _hasError
-                      ? Padding(
-                          key: const ValueKey('error'),
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.error_outline_rounded,
-                                  color: Color(0xFFEF4444), size: 15),
-                              SizedBox(width: 5),
-                              Text(
-                                'Incorrect OTP. Please try again.',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Color(0xFFEF4444),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
+                      children: [
+                        const TextSpan(text: 'We sent a 6-digit code to\n'),
+                        TextSpan(
+                          text: '+91 $maskedNumber',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
                           ),
-                        )
-                      : const SizedBox(key: ValueKey('no-error'), height: 12),
-                ),
-
-                const SizedBox(height: 32),
-
-                // ── VERIFY BUTTON ─────────────────────────────
-                AnimatedOpacity(
-                  opacity: _isFilled ? 1.0 : 0.55,
-                  duration: const Duration(milliseconds: 250),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 350),
-                    width: double.infinity,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: _isDoctor
-                            ? [
-                                const Color(0xFF0F172A),
-                                const Color(0xFF1E3A5F),
-                              ]
-                            : [
-                                const Color(0xFF0F172A),
-                                const Color(0xFF1E3A5F),
-                              ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: _isFilled
-                          ? [
-                              BoxShadow(
-                                color: _accentColor.withOpacity(0.30),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
-                              ),
-                            ]
-                          : [],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: (_isFilled && !_isLoading) ? _verifyOtp : null,
-                        child: Center(
-                          child: _isLoading
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.5,
-                                  ),
-                                )
-                              : const Text(
-                                  'Verify OTP',
-                                  style: TextStyle(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
 
-                // ── RESEND ────────────────────────────────────
-                Column(
-                  children: [
-                    const Text(
-                      "Didn't receive the code?",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: _secondsLeft > 0
-                          ? Row(
-                              key: const ValueKey('timer'),
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.timer_outlined,
-                                    size: 14, color: Color(0xFF94A3B8)),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Resend in ${_secondsLeft}s',
-                                  style: const TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF94A3B8),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : GestureDetector(
-                              key: const ValueKey('resend'),
-                              onTap: _resendOtp,
-                              child: Text(
-                                'Resend OTP',
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: _accentColor,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: _accentColor,
-                                ),
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-
-                const Spacer(),
-
-                // ── ROLE BADGE ────────────────────────────────
+                // Role badge
                 Container(
-                  margin: const EdgeInsets.only(bottom: 24),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 8),
+                      horizontal: 14, vertical: 7),
                   decoration: BoxDecoration(
-                    color: _accentColor.withOpacity(0.08),
+                    color: Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: _accentColor.withOpacity(0.18)),
+                      color: Colors.white.withOpacity(0.15),
+                      width: 1,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _isDoctor
+                        isDoctor
                             ? Icons.medical_services_outlined
                             : Icons.person_outline_rounded,
-                        size: 14,
-                        color: _accentColor,
+                        size: 13,
+                        color: Colors.white,
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Logging in as ${_isDoctor ? 'Doctor' : 'Patient'}',
-                        style: TextStyle(
-                          fontSize: 12.5,
+                        'Logging in as ${isDoctor ? 'Doctor' : 'Patient'}',
+                        style: const TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _accentColor,
+                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -562,14 +427,474 @@ class _OtpVerificationScreenState
             ),
           ),
         ),
+
+        // ── RIGHT PANEL ───────────────────────────────────────────────────
+        Expanded(
+          flex: 6,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 32, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Enter the 6-digit code',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // OTP boxes
+                  _OtpBoxRow(
+                    controllers: controllers,
+                    focusNodes: focusNodes,
+                    hasError: hasError,
+                    accentColor: accentColor,
+                    shakeAnim: shakeAnim,
+                    onOtpChanged: onOtpChanged,
+                    onKeyEvent: onKeyEvent,
+                  ),
+
+                  // Error text
+                  _ErrorText(hasError: hasError),
+
+                  const SizedBox(height: 20),
+
+                  // Verify button
+                  _VerifyButton(
+                    isFilled: isFilled,
+                    isLoading: isLoading,
+                    isDoctor: isDoctor,
+                    accentColor: accentColor,
+                    onVerify: onVerify,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Resend
+                  _ResendRow(
+                    secondsLeft: secondsLeft,
+                    accentColor: accentColor,
+                    onResend: onResend,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PORTRAIT LAYOUT  (original vertical layout — unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+class _PortraitLayout extends StatelessWidget {
+  final bool isDoctor;
+  final Color accentColor;
+  final String maskedNumber;
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+  final bool hasError;
+  final bool isFilled;
+  final bool isLoading;
+  final int secondsLeft;
+  final Animation<double> shakeAnim;
+  final void Function(int, String) onOtpChanged;
+  final void Function(int, KeyEvent) onKeyEvent;
+  final VoidCallback onVerify;
+  final VoidCallback onResend;
+
+  const _PortraitLayout({
+    required this.isDoctor,
+    required this.accentColor,
+    required this.maskedNumber,
+    required this.controllers,
+    required this.focusNodes,
+    required this.hasError,
+    required this.isFilled,
+    required this.isLoading,
+    required this.secondsLeft,
+    required this.shakeAnim,
+    required this.onOtpChanged,
+    required this.onKeyEvent,
+    required this.onVerify,
+    required this.onResend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(height: 12),
+
+          // SMS icon
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 350),
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              color: accentColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.28),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: const Icon(Icons.sms_outlined,
+                color: Colors.white, size: 30),
+          ),
+
+          const SizedBox(height: 22),
+
+          const Text(
+            'OTP Verification',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.4,
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: Color(0xFF64748B),
+                height: 1.55,
+              ),
+              children: [
+                const TextSpan(text: 'We sent a 6-digit code to\n'),
+                TextSpan(
+                  text: '+91 $maskedNumber',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 36),
+
+          // OTP boxes
+          _OtpBoxRow(
+            controllers: controllers,
+            focusNodes: focusNodes,
+            hasError: hasError,
+            accentColor: accentColor,
+            shakeAnim: shakeAnim,
+            onOtpChanged: onOtpChanged,
+            onKeyEvent: onKeyEvent,
+          ),
+
+          // Error text
+          _ErrorText(hasError: hasError),
+
+          const SizedBox(height: 32),
+
+          // Verify button
+          _VerifyButton(
+            isFilled: isFilled,
+            isLoading: isLoading,
+            isDoctor: isDoctor,
+            accentColor: accentColor,
+            onVerify: onVerify,
+          ),
+
+          const SizedBox(height: 28),
+
+          // Resend
+          _ResendRow(
+            secondsLeft: secondsLeft,
+            accentColor: accentColor,
+            onResend: onResend,
+          ),
+
+          const Spacer(),
+
+          // Role badge
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: accentColor.withOpacity(0.18)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isDoctor
+                      ? Icons.medical_services_outlined
+                      : Icons.person_outline_rounded,
+                  size: 14,
+                  color: accentColor,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Logging in as ${isDoctor ? 'Doctor' : 'Patient'}',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: accentColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────
-// Single OTP input box
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED WIDGETS  — reused in both layouts
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _OtpBoxRow extends StatelessWidget {
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+  final bool hasError;
+  final Color accentColor;
+  final Animation<double> shakeAnim;
+  final void Function(int, String) onOtpChanged;
+  final void Function(int, KeyEvent) onKeyEvent;
+
+  const _OtpBoxRow({
+    required this.controllers,
+    required this.focusNodes,
+    required this.hasError,
+    required this.accentColor,
+    required this.shakeAnim,
+    required this.onOtpChanged,
+    required this.onKeyEvent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: shakeAnim,
+      builder: (context, child) {
+        final shake = (shakeAnim.value > 0)
+            ? (8 *
+                (0.5 - (shakeAnim.value - 0.5).abs()) *
+                2 *
+                (shakeAnim.value < 0.5 ? 1 : -1))
+            : 0.0;
+        return Transform.translate(
+          offset: Offset(shake, 0),
+          child: child,
+        );
+      },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: List.generate(6, (i) {
+          return _OtpBox(
+            controller: controllers[i],
+            focusNode: focusNodes[i],
+            hasError: hasError,
+            accentColor: accentColor,
+            onChanged: (val) => onOtpChanged(i, val),
+            onKeyEvent: (event) => onKeyEvent(i, event),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _ErrorText extends StatelessWidget {
+  final bool hasError;
+  const _ErrorText({required this.hasError});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 250),
+      child: hasError
+          ? Padding(
+              key: const ValueKey('error'),
+              padding: const EdgeInsets.only(top: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.error_outline_rounded,
+                      color: Color(0xFFEF4444), size: 15),
+                  SizedBox(width: 5),
+                  Text(
+                    'Incorrect OTP. Please try again.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox(key: ValueKey('no-error'), height: 12),
+    );
+  }
+}
+
+class _VerifyButton extends StatelessWidget {
+  final bool isFilled;
+  final bool isLoading;
+  final bool isDoctor;
+  final Color accentColor;
+  final VoidCallback onVerify;
+
+  const _VerifyButton({
+    required this.isFilled,
+    required this.isLoading,
+    required this.isDoctor,
+    required this.accentColor,
+    required this.onVerify,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      opacity: isFilled ? 1.0 : 0.55,
+      duration: const Duration(milliseconds: 250),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 350),
+        width: double.infinity,
+        height: 54,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF0F172A), Color(0xFF1E3A5F)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: isFilled
+              ? [
+                  BoxShadow(
+                    color: accentColor.withOpacity(0.30),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ]
+              : [],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: (isFilled && !isLoading) ? onVerify : null,
+            child: Center(
+              child: isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : const Text(
+                      'Verify OTP',
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResendRow extends StatelessWidget {
+  final int secondsLeft;
+  final Color accentColor;
+  final VoidCallback onResend;
+
+  const _ResendRow({
+    required this.secondsLeft,
+    required this.accentColor,
+    required this.onResend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Text(
+          "Didn't receive the code?",
+          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+        ),
+        const SizedBox(height: 8),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: secondsLeft > 0
+              ? Row(
+                  key: const ValueKey('timer'),
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.timer_outlined,
+                        size: 14, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Resend in ${secondsLeft}s',
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF94A3B8),
+                      ),
+                    ),
+                  ],
+                )
+              : GestureDetector(
+                  key: const ValueKey('resend'),
+                  onTap: onResend,
+                  child: Text(
+                    'Resend OTP',
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: accentColor,
+                      decoration: TextDecoration.underline,
+                      decorationColor: accentColor,
+                    ),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SINGLE OTP BOX  (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
 class _OtpBox extends StatefulWidget {
   const _OtpBox({
     required this.controller,
@@ -666,4 +991,3 @@ class _OtpBoxState extends State<_OtpBox> {
     );
   }
 }
-
