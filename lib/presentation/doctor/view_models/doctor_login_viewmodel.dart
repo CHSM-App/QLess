@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/usecase/doctor_login_usecase.dart';
 
 class DoctorLoginState {
@@ -15,6 +16,8 @@ class DoctorLoginState {
   final String? clinic_name;
   final String? clinic_id;
   final AsyncValue<List<DoctorLogin>> phoneCheckResult;
+    final AsyncValue<List<Medicine>>? medicines;
+  final AsyncValue<List<Medicine>>? medicineTypes;
 
   const DoctorLoginState({
     this.isLoading = false,
@@ -28,6 +31,8 @@ class DoctorLoginState {
     this.clinic_id,
     this.clinic_name,
     this.phoneCheckResult = const AsyncValue.data([]),
+    this.medicineTypes,
+    this.medicines
   });
 
   DoctorLoginState copyWith({
@@ -43,6 +48,9 @@ class DoctorLoginState {
     String? clinicId,
     String? clinic_name,
     AsyncValue<List<DoctorLogin>>? phoneCheckResult,
+      final AsyncValue<List<Medicine>>? medicines,
+  final AsyncValue<List<Medicine>>? medicineTypes,
+
   }) {
     return DoctorLoginState(
       isLoading: isLoading ?? this.isLoading,
@@ -56,6 +64,8 @@ class DoctorLoginState {
       clinic_id: clinicId ?? this.clinic_id,
       clinic_name: clinic_name ?? this.clinic_name,
       phoneCheckResult: phoneCheckResult ?? this.phoneCheckResult,
+      medicineTypes: medicineTypes ?? this.medicineTypes,
+      medicines: medicines ?? this.medicines,
     );
   }
 }
@@ -128,6 +138,44 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       );
     }
   }
+
+    Future<void> addMedicine(Medicine medicine) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+       await usecase.addMedicine(medicine);
+      state = state.copyWith(isLoading: false);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  //     Future<void> fetchMedicineTypes() async {
+  //   state = state.copyWith(isLoading: true, error: null);
+  //   try {
+  //     final result = await usecase.fetchMedicineTypes();
+  //     state = state.copyWith(isLoading: false, medicineTypes: AsyncValue.data(result));
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: e.toString());
+  //   }
+  // }
+
+  Future<void> fetchMedicineTypes() async {
+  state = state.copyWith(
+    medicineTypes: const AsyncValue.loading(),
+    error: null,
+  );
+  try {
+    final result = await usecase.fetchMedicineTypes();
+    state = state.copyWith(
+      medicineTypes: AsyncValue.data(result),
+    );
+  } catch (e, st) {
+    state = state.copyWith(
+      medicineTypes: AsyncValue.error(e, st),
+    );
+  }
+}
+
 }
 
   // Future<void> clearLogin(String refreshToken) async {
