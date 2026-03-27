@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/data/repositories/auth_impl.dart';
@@ -26,6 +27,8 @@ class AuthViewModel extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
       return "success";
     } catch (e, st) {
+      debugPrint('AuthViewModel.login error: $e');
+      debugPrint('$st');
       state = AsyncValue.error(e, st);
       return null;
     }

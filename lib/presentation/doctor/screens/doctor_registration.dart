@@ -1,6 +1,3 @@
-
-
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
-
 
 class DoctorProfileSetupScreen extends ConsumerStatefulWidget {
   const DoctorProfileSetupScreen({super.key});
@@ -69,8 +65,7 @@ class _DoctorProfileSetupScreenState
   }
 
   Future<void> _pickImage(bool isDoctorPhoto) async {
-    final XFile? image =
-        await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
         if (isDoctorPhoto) {
@@ -87,9 +82,9 @@ class _DoctorProfileSetupScreenState
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _handleSubmit() async {
@@ -156,7 +151,7 @@ class _DoctorProfileSetupScreenState
           ? null
           : double.tryParse(_consultationFeeController.text.trim()),
       imageUrl: _clinicPhoto?.path, // optional
-      roleId: 1
+      roleId: 1,
     );
 
     await ref
@@ -169,7 +164,6 @@ class _DoctorProfileSetupScreenState
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen()),
       );
-      
     } else if (latestState.error != null) {
       _showError(latestState.error!);
     }
@@ -185,8 +179,11 @@ class _DoctorProfileSetupScreenState
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 18, color: Color(0xFF0F172A)),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            size: 18,
+            color: Color(0xFF0F172A),
+          ),
           onPressed: () {
             if (_step == 2) {
               setState(() => _step = 1);
@@ -198,7 +195,10 @@ class _DoctorProfileSetupScreenState
         title: const Text(
           'Profile Setup',
           style: TextStyle(
-              fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
         ),
         centerTitle: true,
       ),
@@ -252,14 +252,21 @@ class _DoctorProfileSetupScreenState
                               ? FileImage(_doctorPhoto!)
                               : null,
                           child: _doctorPhoto == null
-                              ? const Icon(Icons.person, size: 52, color: Color(0xFF94A3B8))
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 52,
+                                  color: Color(0xFF94A3B8),
+                                )
                               : null,
                         ),
                       ),
                       const SizedBox(height: 8),
                       const Text(
                         'Upload Doctor Photo',
-                        style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                        ),
                       ),
                     ],
                   ),
@@ -270,9 +277,17 @@ class _DoctorProfileSetupScreenState
                 if (_step == 1) ...[
                   _buildTextField('Full Name', _fullNameController),
                   const SizedBox(height: 16),
-                  _buildTextField('Contact No', _contactController, keyboard: TextInputType.phone),
+                  _buildTextField(
+                    'Contact No',
+                    _contactController,
+                    keyboard: TextInputType.phone,
+                  ),
                   const SizedBox(height: 16),
-                  _buildTextField('Email', _emailController, keyboard: TextInputType.emailAddress),
+                  _buildTextField(
+                    'Email',
+                    _emailController,
+                    keyboard: TextInputType.emailAddress,
+                  ),
                   const SizedBox(height: 16),
                   _buildDropdown(),
                   const SizedBox(height: 16),
@@ -280,8 +295,11 @@ class _DoctorProfileSetupScreenState
                   const SizedBox(height: 16),
                   _buildTextField('License Number', _licenseController),
                   const SizedBox(height: 16),
-                  _buildTextField('Experience (Years)', _experienceController,
-                      keyboard: TextInputType.number),
+                  _buildTextField(
+                    'Experience (Years)',
+                    _experienceController,
+                    keyboard: TextInputType.number,
+                  ),
                 ],
 
                 // Step 2 fields
@@ -292,11 +310,15 @@ class _DoctorProfileSetupScreenState
                     child: CircleAvatar(
                       radius: 48,
                       backgroundColor: const Color(0xFFE2E8F0),
-                      backgroundImage:
-                          _clinicPhoto != null ? FileImage(_clinicPhoto!) : null,
+                      backgroundImage: _clinicPhoto != null
+                          ? FileImage(_clinicPhoto!)
+                          : null,
                       child: _clinicPhoto == null
-                          ? const Icon(Icons.local_hospital,
-                              size: 52, color: Color(0xFF94A3B8))
+                          ? const Icon(
+                              Icons.local_hospital,
+                              size: 52,
+                              color: Color(0xFF94A3B8),
+                            )
                           : null,
                     ),
                   ),
@@ -316,8 +338,11 @@ class _DoctorProfileSetupScreenState
                   const SizedBox(height: 16),
                   _buildTextField('Clinic Website', _clinicWebsiteController),
                   const SizedBox(height: 16),
-                  _buildTextField('Consultation Fee', _consultationFeeController,
-                      keyboard: TextInputType.number),
+                  _buildTextField(
+                    'Consultation Fee',
+                    _consultationFeeController,
+                    keyboard: TextInputType.number,
+                  ),
                 ],
 
                 const SizedBox(height: 28),
@@ -337,7 +362,9 @@ class _DoctorProfileSetupScreenState
                     child: Text(
                       _step == 1 ? 'Continue' : 'Complete Setup',
                       style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w600),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -347,23 +374,28 @@ class _DoctorProfileSetupScreenState
           ),
 
           // Loading indicator
-          if (state.isLoading)
-            const Center(
-              child: CircularProgressIndicator(),
-            ),
+          if (state.isLoading) const Center(child: CircularProgressIndicator()),
         ],
       ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
-      {TextInputType keyboard = TextInputType.text}) {
+  Widget _buildTextField(
+    String label,
+    TextEditingController controller, {
+    TextInputType keyboard = TextInputType.text,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF0F172A))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF0F172A),
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           height: 52,
@@ -378,7 +410,10 @@ class _DoctorProfileSetupScreenState
             style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
             decoration: const InputDecoration(
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
             ),
           ),
         ),
@@ -390,9 +425,14 @@ class _DoctorProfileSetupScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF0F172A))),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF0F172A),
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           decoration: BoxDecoration(
@@ -406,7 +446,10 @@ class _DoctorProfileSetupScreenState
             style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
             decoration: const InputDecoration(
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
             ),
           ),
         ),
@@ -418,9 +461,14 @@ class _DoctorProfileSetupScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Specialization',
-            style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF0F172A))),
+        const Text(
+          'Specialization',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF0F172A),
+          ),
+        ),
         const SizedBox(height: 8),
         Container(
           height: 52,
@@ -432,17 +480,25 @@ class _DoctorProfileSetupScreenState
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
-              value: _selectedSpecialization.isEmpty ? null : _selectedSpecialization,
+              value: _selectedSpecialization.isEmpty
+                  ? null
+                  : _selectedSpecialization,
               hint: const Text('Select specialization'),
               isExpanded: true,
-              icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF94A3B8)),
+              icon: const Icon(
+                Icons.keyboard_arrow_down,
+                color: Color(0xFF94A3B8),
+              ),
               items: _specializations
-                  .map((s) => DropdownMenuItem<String>(
-                        value: s['value'],
-                        child: Text(s['label']!),
-                      ))
+                  .map(
+                    (s) => DropdownMenuItem<String>(
+                      value: s['value'],
+                      child: Text(s['label']!),
+                    ),
+                  )
                   .toList(),
-              onChanged: (val) => setState(() => _selectedSpecialization = val ?? ''),
+              onChanged: (val) =>
+                  setState(() => _selectedSpecialization = val ?? ''),
             ),
           ),
         ),

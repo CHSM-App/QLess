@@ -10,12 +10,8 @@ import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.d
 
 import 'package:qless/presentation/shared/screens/otp_screen.dart';
 
-
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({
-    super.key,
-    this.role = 'doctor',
-  });
+  const LoginScreen({super.key, this.role = 'doctor'});
 
   final String role;
 
@@ -42,16 +38,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
     _shouldReact = true;
     if (isDoctor) {
-      ref.read(doctorLoginViewModelProvider.notifier).checkPhoneNumber(mobile);
+      ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(mobile);
     } else {
-      ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+      ref
+          .read(patientLoginViewModelProvider.notifier)
+          .checkPhonePatient(mobile);
     }
   }
 
   void _snack(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   void _goRegister() {
@@ -103,8 +99,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       final state = ref.watch(patientLoginViewModelProvider);
       isLoading = state.patientPhoneCheck is AsyncLoading;
 
-      ref.listen<PatientLoginState>(patientLoginViewModelProvider,
-          (prev, next) {
+      ref.listen<PatientLoginState>(patientLoginViewModelProvider, (
+        prev,
+        next,
+      ) {
         if (!_shouldReact) return;
         next.patientPhoneCheck.whenOrNull(
           data: (list) {
@@ -579,10 +577,7 @@ class _PortraitLayout extends StatelessWidget {
                 children: [
                   const Text(
                     'New to HealthConnect? ',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF64748B),
-                    ),
+                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                   ),
                   GestureDetector(
                     onTap: onRegister,
@@ -647,9 +642,12 @@ class _StethoscopeIconPainter extends CustomPainter {
     final downPath = Path();
     downPath.moveTo(w * 0.50, h * 0.48);
     downPath.cubicTo(
-      w * 0.50, h * 0.60,
-      w * 0.66, h * 0.58,
-      w * 0.66, h * 0.72,
+      w * 0.50,
+      h * 0.60,
+      w * 0.66,
+      h * 0.58,
+      w * 0.66,
+      h * 0.72,
     );
     canvas.drawPath(downPath, stroke);
 

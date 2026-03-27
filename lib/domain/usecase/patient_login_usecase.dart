@@ -10,9 +10,6 @@ class PatientLoginUsecase {
     return patientLoginRepository.addPatient(patient);
   }
 
-
-
-  
   Future<List<Patients>> checkPhonePatient(String mobileNo) {
     return patientLoginRepository.checkPhonePatient(mobileNo);
   }

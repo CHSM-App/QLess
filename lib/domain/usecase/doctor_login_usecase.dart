@@ -1,5 +1,3 @@
-
-
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
 
@@ -12,7 +10,7 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.addDoctorDetails(doctorLogin);
   }
 
-  Future<List<DoctorLogin>> checkPhoneNumber(String mobile) {
-    return doctorLoginRepository.checkPhoneNumber(mobile);
+  Future<List<DoctorLogin>> checkPhoneDoctor(String mobile) {
+    return doctorLoginRepository.checkPhoneDoctor(mobile);
   }
 }

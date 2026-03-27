@@ -15,7 +15,7 @@ Patients _$PatientsFromJson(Map<String, dynamic> json) => Patients(
   Gender: json['Gender'] as String?,
   address: json['address'] as String?,
   bloodGroup: json['blood_group'] as String?,
-  weight: (json['weight'] as num?)?.toDouble(),
+  weight: json['weight'] as String?,
   roleId: (json['role_id'] as num?)?.toInt(),
   Token: json['token'] as String?,
 );

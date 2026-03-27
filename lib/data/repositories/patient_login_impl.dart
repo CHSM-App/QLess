@@ -13,16 +13,17 @@ class PatientLoginImpl implements PatientLoginRepository {
     return apiService.addPatient(doctorLogin);
   }
 
-
-
   @override
   Future<List<Patients>> checkPhonePatient(String mobileNo) async {
     final response = await apiService.checkPhonePatient(mobileNo);
 
     if (response.isNotEmpty) {
       // Save values in secure storage
-  
-      await TokenStorage.saveValue('patient_id', response[0].patientId.toString());
+
+      await TokenStorage.saveValue(
+        'patient_id',
+        response[0].patientId.toString(),
+      );
       await TokenStorage.saveValue('name', response[0].name.toString());
       await TokenStorage.saveValue(
         'mobile_no',
@@ -30,10 +31,7 @@ class PatientLoginImpl implements PatientLoginRepository {
       );
       await TokenStorage.saveValue('email', response[0].email.toString());
       await TokenStorage.saveValue('role_id', response[0].roleId.toString());
-     
-      
     }
     return response;
   }
-
 }

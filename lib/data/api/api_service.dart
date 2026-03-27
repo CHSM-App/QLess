@@ -12,8 +12,7 @@ abstract class ApiService {
   @GET("/")
   Future<HttpResponse<dynamic>> checkHealth();
 
-
-  //POST API Login
+  //----------------------------------------//LOGIN API //---------------------------------
   @POST("login/CreateLogin")
   Future<TokenResponse> createLogin(@Body() TokenResponse tokenResponse);
 
@@ -23,20 +22,19 @@ abstract class ApiService {
   @POST("login/logout")
   Future<dynamic> logOut(@Body() TokenResponse tokenResponse);
 
+  //------------------------------------------//DOCTOR API//---------------------------------------
 
-    @POST("login/addDoctorDetails")
+  @GET("login/checkPhoneDoctor")
+  Future<List<DoctorLogin>> checkPhoneDoctor(@Query("mobile") String mobile);
+
+  @POST("login/addDoctorDetails")
   Future<dynamic> addDoctorDetails(@Body() DoctorLogin doctorLogin);
 
+  //-------------------------------------------//PATIENT API//----------------------------------------------
 
-  @GET("login/checkPhone")
-  Future<List<DoctorLogin>> CheckPhone(@Query("mobile") String mobile);
-
+  @GET("login/checkPhonePatient")
+  Future<List<Patients>> checkPhonePatient(@Query("mobileNo") String mobileNo);
 
   @POST("login/insertPatient")
   Future<dynamic> addPatient(@Body() Patients patient);
-
-
-  
-  @GET("login/checkPhonePatient")
-  Future<List<Patients>> checkPhonePatient(@Query("mobileNo") String mobileNo);
 }

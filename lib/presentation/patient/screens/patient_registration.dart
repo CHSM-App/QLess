@@ -133,7 +133,7 @@ class _PatientRegistrationScreenState
       Gender:      _selectedGender,
       DOB:         _selectedDob,
       bloodGroup:  _selectedBloodGroup,
-      weight:      double.tryParse(_weightController.text.trim()),
+      weight:      _weightController.text.trim(),
     );
 
     ref.read(patientLoginViewModelProvider.notifier).addPatient(patient);
