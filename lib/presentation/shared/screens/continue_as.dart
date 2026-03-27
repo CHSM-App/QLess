@@ -32,7 +32,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       } else if (tokenState.roleId == 2) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const PatientBottomNav()),
+          MaterialPageRoute(builder: (_) => PatientBottomNav(onToggleTheme: () {  }, themeMode: ThemeMode.light,)),
         );
       } else {
         Navigator.pushReplacement(

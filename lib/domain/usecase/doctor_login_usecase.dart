@@ -19,7 +19,11 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.addMedicine(medicine);
   }
 
-    Future<dynamic> fetchMedicineTypes() {
+    Future<List<Medicine>> fetchMedicineTypes() {
     return doctorLoginRepository.fetchMedicineTypes();
+  }
+
+     Future<List<Medicine>> fetchAllMedicines(int doctorId) {
+    return doctorLoginRepository.fetchAllMedicines(doctorId);
   }
 }
