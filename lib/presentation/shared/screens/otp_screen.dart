@@ -169,7 +169,10 @@ class _OtpVerificationScreenState
     } else if (roleId == 2) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const PatientBottomNav()),
+        MaterialPageRoute(
+          builder: (_) =>
+              PatientBottomNav(onToggleTheme: () {}, themeMode: ThemeMode.light),
+        ),
       );
     } else {
       setState(() => _hasError = true);
