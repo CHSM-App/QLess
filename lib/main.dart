@@ -1,15 +1,17 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/shared/controllers/sync_controller.dart';
+import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/presentation/shared/screens/splash_screen.dart';
- 
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();//Global navigator access
-final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =GlobalKey<ScaffoldMessengerState>();//Global scaffold messenger access
+
+final GlobalKey<NavigatorState> navigatorKey =
+    GlobalKey<NavigatorState>(); //Global navigator access
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>(); //Global scaffold messenger access
 
 void main() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
   final container = ProviderContainer();
   await container.read(tokenProvider.notifier).loadTokens();
@@ -31,26 +33,30 @@ class HealthcareApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-     title: 'HealthConnect',
+      title: 'HealthConnect',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
-          builder: (context, child) {
-      return Stack(
-        children: [
-          child!,
-          Padding(
-            padding: const EdgeInsets.only(bottom: kBottomNavigationBarHeight),
-            child: const Align(
-              alignment: Alignment.bottomCenter,
-              // child: NetworkBanner(),
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child!,
+            Padding(
+              padding: const EdgeInsets.only(
+                bottom: kBottomNavigationBarHeight,
+              ),
+              child: const Align(
+                alignment: Alignment.bottomCenter,
+                // child: NetworkBanner(),
+              ),
             ),
-          ),
-        ],
-      );
-    },
+          ],
+        );
+      },
       themeMode: ThemeMode.light,
-      home: const SplashScreen(), // ✅ Auto-login logic
+      home: QlessSplashScreen(
+        nextScreen: const SplashScreen(), // your existing role-select screen
+      ), // ✅ Auto-login logic
     );
   }
 }
