@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
 
-
 class FamilyMembersScreen extends StatefulWidget {
   const FamilyMembersScreen({super.key});
 
@@ -11,41 +10,68 @@ class FamilyMembersScreen extends StatefulWidget {
 }
 
 class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
-  // Sample pre-loaded data matching the screenshot
+  // Sample pre-loaded data matching the new FamilyMember model
   final List<FamilyMember> _members = [
     FamilyMember(
       memberId: 1,
       memberName: 'Jivan Kudalkar',
-      gender: Gender.male,
-      relation: Relation.self,
-      age: 41,
-      dateOfBirth: '1984-03-27',
+      genderId: 1,
+      genderName: 'Male',
+      dob: DateTime(1984, 3, 27),
+      relationId: 1,
+      relationName: 'Self',
     ),
     FamilyMember(
       memberId: 2,
       memberName: 'Sukhada Kudalkar',
-      gender: Gender.female,
-      relation: Relation.spouse,
-      age: 37,
-      dateOfBirth: '1988-06-15',
+      genderId: 2,
+      genderName: 'Female',
+      dob: DateTime(1988, 6, 15),
+      relationId: 2,
+      relationName: 'Spouse',
     ),
     FamilyMember(
       memberId: 3,
       memberName: 'Vaidehi Kudalkar',
-      gender: Gender.female,
-      relation: Relation.child,
-      age: 8,
-      dateOfBirth: '2017-01-10',
+      genderId: 2,
+      genderName: 'Female',
+      dob: DateTime(2017, 1, 10),
+      relationId: 3,
+      relationName: 'Child',
     ),
     FamilyMember(
       memberId: 4,
       memberName: 'Shivay Kudalkar',
-      gender: Gender.male,
-      relation: Relation.child,
-      age: 5,
-      dateOfBirth: '2020-05-20',
+      genderId: 1,
+      genderName: 'Male',
+      dob: DateTime(2020, 5, 20),
+      relationId: 3,
+      relationName: 'Child',
     ),
   ];
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  /// Calculates age from a DateTime DOB.
+  int _ageFrom(DateTime dob) {
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  /// Returns true when this member represents the account holder (Self).
+  bool _isSelf(FamilyMember m) =>
+      m.relationName?.toLowerCase() == 'self' || m.relationId == 1;
+
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
 
   void _onEditMember(FamilyMember member) async {
     final updated = await Navigator.push<FamilyMember>(
@@ -71,11 +97,13 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
       ),
     );
     if (newMember != null) {
-      setState(() {
-        _members.add(newMember);
-      });
+      setState(() => _members.add(newMember));
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +128,8 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
                   final member = _members[index];
                   return _FamilyMemberTile(
                     member: member,
-                    isSelf: member.relation == Relation.self,
+                    age: member.dob != null ? _ageFrom(member.dob!) : null,
+                    isSelf: _isSelf(member),
                     onEdit: () => _onEditMember(member),
                   );
                 },
@@ -162,19 +191,29 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tile widget
+// ---------------------------------------------------------------------------
+
 class _FamilyMemberTile extends StatelessWidget {
   final FamilyMember member;
+  final int? age;
   final bool isSelf;
   final VoidCallback onEdit;
 
   const _FamilyMemberTile({
     required this.member,
+    required this.age,
     required this.isSelf,
     required this.onEdit,
   });
 
   @override
   Widget build(BuildContext context) {
+    final relation = member.relationName ?? '—';
+    final gender = member.genderName ?? '—';
+    final ageLabel = age != null ? '$age yrs' : '—';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
@@ -195,7 +234,7 @@ class _FamilyMemberTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${member.relationLabel}  |  ${member.genderLabel}  |  ${member.age} yrs',
+                  '$relation  |  $gender  |  $ageLabel',
                   style: const TextStyle(
                     fontSize: 13,
                     color: Color(0xFF8A8A9A),
@@ -221,6 +260,10 @@ class _FamilyMemberTile extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Avatar widget
+// ---------------------------------------------------------------------------
 
 class _Avatar extends StatelessWidget {
   final String letter;

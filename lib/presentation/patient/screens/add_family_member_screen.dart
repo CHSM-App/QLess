@@ -2,12 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qless/domain/models/family_member.dart';
 
-
 class AddFamilyMemberScreen extends StatefulWidget {
-  /// Pass an existing member to pre-fill form for editing
+  /// Pass an existing member to pre-fill the form for editing.
   final FamilyMember? existingMember;
 
-  const AddFamilyMemberScreen({super.key, this.existingMember});
+  /// Gender options loaded from the API / DB (Gender_id + Gender label).
+  final List<GenderOption> genderOptions;
+
+  /// Relation options loaded from the API / DB (relation_id + relation label).
+  final List<RelationOption> relationOptions;
+
+  const AddFamilyMemberScreen({
+    super.key,
+    this.existingMember,
+    this.genderOptions = const [
+      GenderOption(genderId: 1, genderName: 'Male'),
+      GenderOption(genderId: 2, genderName: 'Female'),
+      GenderOption(genderId: 3, genderName: 'Other'),
+    ],
+    this.relationOptions = const [
+      RelationOption(relationId: 2, relationName: 'Spouse'),
+      RelationOption(relationId: 3, relationName: 'Child'),
+      RelationOption(relationId: 4, relationName: 'Parent'),
+      RelationOption(relationId: 5, relationName: 'Sibling'),
+      RelationOption(relationId: 6, relationName: 'Other'),
+    ],
+  });
 
   @override
   State<AddFamilyMemberScreen> createState() => _AddFamilyMemberScreenState();
@@ -19,21 +39,20 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
   final _mobileController = TextEditingController();
   final _dobController = TextEditingController();
 
-  Gender? _selectedGender;
-  Relation? _selectedRelation;
+  /// Holds the selected Gender_id.
+  int? _selectedGenderId;
+
+  /// Holds the selected relation_id.
+  int? _selectedRelationId;
+
   DateTime? _selectedDate;
   bool _isConfirmed = false;
 
   bool get _isEditing => widget.existingMember != null;
 
-  // Relation dropdown options
-  static const List<DropdownMenuItem<Relation>> _relationItems = [
-    DropdownMenuItem(value: Relation.spouse, child: Text('Spouse')),
-    DropdownMenuItem(value: Relation.child, child: Text('Child')),
-    DropdownMenuItem(value: Relation.parent, child: Text('Parent')),
-    DropdownMenuItem(value: Relation.sibling, child: Text('Sibling')),
-    DropdownMenuItem(value: Relation.other, child: Text('Other')),
-  ];
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
 
   @override
   void initState() {
@@ -43,27 +62,16 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
 
   void _prefillIfEditing() {
     final m = widget.existingMember;
-    if (m == null) {
-      _dobController.text = '01/01/1970';
-      return;
-    }
+    if (m == null) return;
+
     _nameController.text = m.memberName ?? '';
-    _mobileController.text = m.mobileNumber ?? '';
-    _selectedGender = m.gender;
-    _selectedRelation = m.relation;
-    if (m.dateOfBirth != null) {
-      try {
-        final parts = m.dateOfBirth!.split('-');
-        _selectedDate = DateTime(
-          int.parse(parts[0]),
-          int.parse(parts[1]),
-          int.parse(parts[2]),
-        );
-        _dobController.text =
-            '${parts[2].padLeft(2, '0')}/${parts[1].padLeft(2, '0')}/${parts[0]}';
-      } catch (_) {
-        _dobController.text = m.dateOfBirth ?? '';
-      }
+    _mobileController.text = m.mobileNo ?? '';
+    _selectedGenderId = m.genderId;
+    _selectedRelationId = m.relationId;
+
+    if (m.dob != null) {
+      _selectedDate = m.dob;
+      _dobController.text = _formatDisplayDate(m.dob!);
     }
   }
 
@@ -74,6 +82,39 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     _dobController.dispose();
     super.dispose();
   }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  /// Formats a DateTime to "DD/MM/YYYY" for display.
+  String _formatDisplayDate(DateTime date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/'
+      '${date.year}';
+
+  int _calculateAge(DateTime dob) {
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  GenderOption? get _selectedGenderOption => widget.genderOptions
+      .cast<GenderOption?>()
+      .firstWhere((g) => g?.genderId == _selectedGenderId, orElse: () => null);
+
+  RelationOption? get _selectedRelationOption => widget.relationOptions
+      .cast<RelationOption?>()
+      .firstWhere((r) => r?.relationId == _selectedRelationId,
+          orElse: () => null);
+
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
@@ -92,29 +133,15 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-        _dobController.text =
-            '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+        _dobController.text = _formatDisplayDate(picked);
       });
     }
   }
 
-  int _calculateAge(DateTime dob) {
-    final now = DateTime.now();
-    int age = now.year - dob.year;
-    if (now.month < dob.month ||
-        (now.month == dob.month && now.day < dob.day)) {
-      age--;
-    }
-    return age;
-  }
-
-  String _formatDobForModel(DateTime date) {
-    return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-  }
-
   void _onSave() {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedGender == null) {
+
+    if (_selectedGenderId == null) {
       _showSnack('Please select a gender.');
       return;
     }
@@ -122,7 +149,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
       _showSnack('Please select a date of birth.');
       return;
     }
-    if (_selectedRelation == null) {
+    if (_selectedRelationId == null) {
       _showSnack('Please select a relation.');
       return;
     }
@@ -134,13 +161,14 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     final member = FamilyMember(
       memberId: widget.existingMember?.memberId,
       memberName: _nameController.text.trim(),
-      gender: _selectedGender,
-      dateOfBirth: _formatDobForModel(_selectedDate!),
-      relation: _selectedRelation,
-      mobileNumber: _mobileController.text.trim().isEmpty
+      genderId: _selectedGenderId,
+      genderName: _selectedGenderOption?.genderName,
+      dob: _selectedDate,
+      relationId: _selectedRelationId,
+      relationName: _selectedRelationOption?.relationName,
+      mobileNo: _mobileController.text.trim().isEmpty
           ? null
           : _mobileController.text.trim(),
-      age: _calculateAge(_selectedDate!),
     );
 
     Navigator.of(context).pop(member);
@@ -151,6 +179,10 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
       SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +195,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
             const Divider(height: 1, color: Color(0xFFE0E0E0)),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -210,6 +243,10 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Header
+  // ---------------------------------------------------------------------------
+
   Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -233,7 +270,12 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     );
   }
 
-  Widget _buildLabel(String text, {bool required = false, bool optional = false}) {
+  // ---------------------------------------------------------------------------
+  // Form fields
+  // ---------------------------------------------------------------------------
+
+  Widget _buildLabel(String text,
+      {bool required = false, bool optional = false}) {
     return RichText(
       text: TextSpan(
         text: text,
@@ -272,22 +314,19 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     );
   }
 
+  /// Renders gender chips driven by [widget.genderOptions] (int ID + String label).
   Widget _buildGenderSelector() {
     return Row(
-      children: Gender.values.map((g) {
-        final label = g == Gender.male
-            ? 'Male'
-            : g == Gender.female
-                ? 'Female'
-                : 'Other';
-        final isSelected = _selectedGender == g;
+      children: widget.genderOptions.map((option) {
+        final isSelected = _selectedGenderId == option.genderId;
         return Padding(
           padding: const EdgeInsets.only(right: 10),
           child: GestureDetector(
-            onTap: () => setState(() => _selectedGender = g),
+            onTap: () => setState(() => _selectedGenderId = option.genderId),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
                 color: isSelected
                     ? const Color(0xFF3D5AF1)
@@ -300,11 +339,12 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                 ),
               ),
               child: Text(
-                label,
+                option.genderName,
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: isSelected ? Colors.white : const Color(0xFF6B7280),
+                  color:
+                      isSelected ? Colors.white : const Color(0xFF6B7280),
                 ),
               ),
             ),
@@ -331,18 +371,25 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     );
   }
 
+  /// Dropdown driven by [widget.relationOptions] (int ID + String label).
   Widget _buildRelationDropdown() {
-    return DropdownButtonFormField<Relation>(
-      value: _selectedRelation,
-      items: _relationItems,
-      onChanged: (val) => setState(() => _selectedRelation = val),
+    return DropdownButtonFormField<int>(
+      value: _selectedRelationId,
+      items: widget.relationOptions
+          .map((r) => DropdownMenuItem<int>(
+                value: r.relationId,
+                child: Text(r.relationName),
+              ))
+          .toList(),
+      onChanged: (val) => setState(() => _selectedRelationId = val),
       hint: const Text(
         'Select Relation',
         style: TextStyle(color: Color(0xFF9E9E9E)),
       ),
       decoration: _inputDecoration(''),
       validator: (v) => v == null ? 'Please select a relation' : null,
-      icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6B7280)),
+      icon:
+          const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6B7280)),
     );
   }
 
@@ -373,7 +420,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
         const SizedBox(width: 8),
         GestureDetector(
           onTap: () {
-            // Trigger verify flow
+            // TODO: trigger verify flow
           },
           child: const Text(
             'Verify Now',
@@ -404,7 +451,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
             height: 22,
             child: Checkbox(
               value: _isConfirmed,
-              onChanged: (val) => setState(() => _isConfirmed = val ?? false),
+              onChanged: (val) =>
+                  setState(() => _isConfirmed = val ?? false),
               activeColor: const Color(0xFF3D5AF1),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4),
@@ -415,7 +463,9 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'I confirm that the above details provided by me are accurate. I acknowledge that it\'s my responsibility to provide correct and updated information for availing the benefits/services.',
+              'I confirm that the above details provided by me are accurate. '
+              "I acknowledge that it's my responsibility to provide correct "
+              'and updated information for availing the benefits/services.',
               style: TextStyle(
                 fontSize: 13,
                 color: Color(0xFF4A4A6A),
@@ -428,15 +478,18 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Save button
+  // ---------------------------------------------------------------------------
+
   Widget _buildSaveButton() {
-    final isEnabled = _isConfirmed;
     return Padding(
       padding: const EdgeInsets.all(16),
       child: SizedBox(
         width: double.infinity,
         height: 54,
         child: ElevatedButton(
-          onPressed: isEnabled ? _onSave : null,
+          onPressed: _isConfirmed ? _onSave : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF3D5AF1),
             disabledBackgroundColor: const Color(0xFFB0B4D0),
@@ -457,22 +510,25 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Shared input decoration
+  // ---------------------------------------------------------------------------
+
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
       hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      // border: OutlinedBorder(
-      //   borderRadius: BorderRadius.all(Radius.circular(10)),
-      //   side: BorderSide.none,
-      // ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFFD0D3E8), width: 1.2),
+        borderSide:
+            const BorderSide(color: Color(0xFFD0D3E8), width: 1.2),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFF3D5AF1), width: 1.5),
+        borderSide:
+            const BorderSide(color: Color(0xFF3D5AF1), width: 1.5),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
