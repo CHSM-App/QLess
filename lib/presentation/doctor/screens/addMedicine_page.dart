@@ -39,39 +39,83 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage> {
     super.dispose();
   }
 
+  // Future<void> _save() async {
+  //   if (!(_formKey.currentState?.validate() ?? false)) return;
+  //   if (_selectedType == null) {
+  //     _snack('Please select a medicine type');
+  //     return;
+  //   }
+
+  //   final loginState = ref.read(doctorLoginViewModelProvider);
+
+  //   final medicine = Medicine(
+  //     medicineName: _nameCtrl.text.trim(),
+  //     medTypeId:      _selectedType!.medTypeId,   
+  //     medTypeName:  _selectedType!.medTypeName,
+  //     doctorId:   loginState.doctorId,
+  //   );
+
+  //   final response = await ref
+  //       .read(doctorLoginViewModelProvider.notifier)
+  //       .addMedicine(medicine);
+
+
+  //    if (response['success'] == 1) {
+  //   _snack('Medicine added successfully');
+  // } else {
+  //   _snack(response['message'] ?? 'Failed to add medicine');
+  // }
+
+  //   // Only pop if no error
+  //   // final error = ref.read(doctorLoginViewModelProvider).error;
+  //   // if (error == null && mounted) {
+  //   //   Navigator.pop(context);
+  //   // }
+  // }
+
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    if (_selectedType == null) {
-      _snack('Please select a medicine type');
-      return;
-    }
-
-    final loginState = ref.read(doctorLoginViewModelProvider);
-
-    final medicine = Medicine(
-      medicineName: _nameCtrl.text.trim(),
-      medTypeId:      _selectedType!.medTypeId,      // has ID now — API returns it
-      medTypeName:  _selectedType!.medTypeName,
-      businessId:   int.tryParse(loginState.clinic_id ?? '0') ?? 0,
-      mobileNo:     loginState.mobile,
-    );
-
-    await ref
-        .read(doctorLoginViewModelProvider.notifier)
-        .addMedicine(medicine);
-
-    // Only pop if no error
-    final error = ref.read(doctorLoginViewModelProvider).error;
-    if (error == null && mounted) {
-      Navigator.pop(context);
-    }
+  if (!(_formKey.currentState?.validate() ?? false)) return;
+  if (_selectedType == null) {
+    _snack('Please select a medicine type');
+    return;
   }
+
+  final loginState = ref.read(doctorLoginViewModelProvider);
+
+  final medicine = Medicine(
+    medicineName: _nameCtrl.text.trim(),
+    medTypeId:    _selectedType!.medTypeId,
+    medTypeName:  _selectedType!.medTypeName,
+    doctorId:     loginState.doctorId,
+  );
+
+  final response = await ref
+      .read(doctorLoginViewModelProvider.notifier)
+      .addMedicine(medicine);
+
+  if (response['success'] == 1) {
+    // ── Reset form ──────────────────────────────────────
+    _formKey.currentState?.reset();
+    _nameCtrl.clear();
+    setState(() => _selectedType = null);
+    // ────────────────────────────────────────────────────
+
+    _snack('Medicine added successfully');
+
+    // Wait for snackbar then go back with true (signals list to refresh)
+    await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) Navigator.pop(context, true); // ← pass true
+  } else {
+    _snack(response['message'] ?? 'Failed to add medicine');
+  }
+}
+
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: _red,
+        backgroundColor: const Color.fromARGB(255, 28, 129, 42),
         behavior: SnackBarBehavior.floating,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -274,59 +318,116 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage> {
                   ),
 
                   // ── Type chips from DB ───────────────────
-                  data: (types) => types.isEmpty
-                      ? const Text(
-                          'No medicine types available.',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: _muted,
-                          ),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: types.map((type) {
-                            // Compare by medType ID (API now returns it)
-                            // Fall back to name comparison if ID is null
-                            final sel = type.medTypeId != null
-                                ? _selectedType?.medTypeId == type.medTypeId
-                                : _selectedType?.medTypeName ==
-                                    type.medTypeName;
+                //   data: (types) => types.isEmpty
+                //       ? const Text(
+                //           'No medicine types available.',
+                //           style: TextStyle(
+                //             fontSize: 13,
+                //             color: _muted,
+                //           ),
+                //         )
+                //       : Wrap(
+                //           spacing: 8,
+                //           runSpacing: 8,
+                //           children: types.map((type) {
+                //             // Compare by medType ID (API now returns it)
+                //             // Fall back to name comparison if ID is null
+                //             final sel = type.medTypeId != null
+                //                 ? _selectedType?.medTypeId == type.medTypeId
+                //                 : _selectedType?.medTypeName ==
+                //                     type.medTypeName;
 
-                            return GestureDetector(
-                              onTap: () =>
-                                  setState(() => _selectedType = type),
-                              child: AnimatedContainer(
-                                duration:
-                                    const Duration(milliseconds: 180),
-                                height: 44,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20),
-                                decoration: BoxDecoration(
-                                  color: sel ? _dark : Colors.white,
-                                  borderRadius: BorderRadius.circular(11),
-                                  border: Border.all(
-                                    color: sel ? _dark : _border,
-                                    width: sel ? 1.8 : 1,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    type.medTypeName ?? '—',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: sel
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color:
-                                          sel ? Colors.white : _slate,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
+                //             return GestureDetector(
+                //               onTap: () =>
+                //                   setState(() => _selectedType = type),
+                //               child: AnimatedContainer(
+                //                 duration:
+                //                     const Duration(milliseconds: 180),
+                //                 height: 44,
+                //                 padding: const EdgeInsets.symmetric(
+                //                     horizontal: 20),
+                //                 decoration: BoxDecoration(
+                //                   color: sel ? _dark : Colors.white,
+                //                   borderRadius: BorderRadius.circular(11),
+                //                   border: Border.all(
+                //                     color: sel ? _dark : _border,
+                //                     width: sel ? 1.8 : 1,
+                //                   ),
+                //                 ),
+                //                 child: Center(
+                //                   child: Text(
+                //                     type.medTypeName ?? '—',
+                //                     style: TextStyle(
+                //                       fontSize: 13,
+                //                       fontWeight: sel
+                //                           ? FontWeight.w700
+                //                           : FontWeight.w500,
+                //                       color:
+                //                           sel ? Colors.white : _slate,
+                //                     ),
+                //                   ),
+                //                 ),
+                //               ),
+                //             );
+                //           }).toList(),
+                //         ),
+                // ),
+              data: (types) => types.isEmpty
+    ? const Text(
+        'No medicine types available.',
+        style: TextStyle(fontSize: 13, color: _muted),
+      )
+    : LayoutBuilder(
+        builder: (context, constraints) {
+          final screenWidth = constraints.maxWidth;
+
+          // 👇 Adjust min width based on device
+          final minItemWidth = screenWidth > 600 ? 140.0 : 100.0;
+
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: types.map((type) {
+              final sel = type.medTypeId != null
+                  ? _selectedType?.medTypeId == type.medTypeId
+                  : _selectedType?.medTypeName == type.medTypeName;
+
+              return ConstrainedBox(
+                constraints: BoxConstraints(
+                  minWidth: minItemWidth,
+                  maxWidth: screenWidth / 2 - 12, // max 2 per row if long text
+                ),
+                child: GestureDetector(
+                  onTap: () => setState(() => _selectedType = type),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: sel ? _dark : Colors.white,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(
+                        color: sel ? _dark : _border,
+                        width: sel ? 1.8 : 1,
+                      ),
+                    ),
+                    child: Text(
+                      type.medTypeName ?? '—',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight:
+                            sel ? FontWeight.w700 : FontWeight.w500,
+                        color: sel ? Colors.white : _slate,
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          );
+        },
+      ),
                 ),
 
               const SizedBox(height: 32),

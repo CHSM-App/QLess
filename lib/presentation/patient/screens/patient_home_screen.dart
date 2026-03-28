@@ -5,6 +5,7 @@
 import 'package:flutter/material.dart';
 import 'package:qless/core/theme/theme.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
+import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
@@ -532,7 +533,17 @@ class _HomeScreenState extends State<HomeScreen>
                       const SizedBox(width: 10),
                       _QuickAction(icon: Icons.history_rounded,            label: 'My\nAppts.',    color: const Color(0xFF00BFA5), onTap: () => widget.onTabChange(2)),
                       const SizedBox(width: 10),
-                      _QuickAction(icon: Icons.group_add_rounded,          label: 'Add\nFamily',   color: const Color(0xFF7C3AED), onTap: () {Navigator.push(context, MaterialPageRoute(builder: (_) => const FamilyMembersScreen()));}),
+                      _QuickAction(
+                        icon: Icons.group_add_rounded,
+                        label: 'Add\nFamily',
+                        color: const Color(0xFF7C3AED),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const FamilyMembersScreen(),
+                          ),
+                        ),
+                      ),
                       const SizedBox(width: 10),
                       _QuickAction(icon: Icons.medical_information_rounded, label: 'My\nRecords',  color: const Color(0xFFF59E0B), onTap: () {}),
                     ]),

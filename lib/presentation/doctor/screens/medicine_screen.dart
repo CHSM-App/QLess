@@ -1,39 +1,26 @@
 // lib/screens/doctor/tabs/doctor_medicines_tab.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 
-class DoctorMedicinePage extends StatefulWidget {
+class DoctorMedicinePage extends ConsumerStatefulWidget {
   final int businessId;
   const DoctorMedicinePage({super.key, this.businessId = 0});
 
   @override
-  State<DoctorMedicinePage> createState() => _DoctorMedicinesTabState();
+  ConsumerState<DoctorMedicinePage> createState() => _DoctorMedicinesTabState();
 }
 
-class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
+class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   final _searchController = TextEditingController();
   int _selectedType = 0;
 
   static const _types = ['All', 'Tablet', 'Syrup', 'Injection', 'Drops'];
+  
 
-  final List<Medicine> _medicines = [
-    Medicine(
-      medicineId: 1,
-      medicineName: 'Paracetamol',
-      medTypeName: 'Tablet',
-      medTypeId: 1,
-      strength: 500,
-    ),
-    Medicine(
-      medicineId: 2,
-      medicineName: 'Amoxicillin',
-      medTypeName: 'Tablet',
-      medTypeId: 1,
-      strength: 250,
-    ),
-  ];
 
   @override
   void dispose() {
@@ -41,66 +28,91 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
     super.dispose();
   }
 
-  void _goToAddMedicine() async {
-    final result = await Navigator.push<Medicine>(
-      context,
-      MaterialPageRoute(builder: (_) => const AddMedicinePage()),
-    );
-    if (result != null) {
-      setState(() => _medicines.add(result));
-    }
-  }
+  @override
+void initState() {
+  super.initState();
 
-  void _deleteMedicine(int index) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Remove Medicine',
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A)),
-        ),
-        content: Text(
-          'Remove "${_medicines[index].medicineName}" from your library?',
-          style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() => _medicines.removeAt(index));
-              Navigator.pop(context);
-            },
-            child: const Text('Remove',
-                style: TextStyle(
-                    color: Color(0xFFEF4444), fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-  }
+  Future.microtask(() {
+    ref
+        .read(doctorLoginViewModelProvider.notifier)
+        .fetchAllMedicines(ref.read(doctorLoginViewModelProvider).doctorId ?? 0);
+  });
+}
 
-  List<Medicine> get _filtered {
-    return _medicines.where((m) {
-      final matchType =
-          _selectedType == 0 || m.medTypeName == _types[_selectedType];
-      final query = _searchController.text.toLowerCase().trim();
-      final matchSearch = query.isEmpty ||
-          (m.medicineName?.toLowerCase().contains(query) ?? false) ||
-          (m.medTypeName?.toLowerCase().contains(query) ?? false);
-      return matchType && matchSearch;
-    }).toList();
+
+void _goToAddMedicine() async {
+  final result = await Navigator.push<bool>(  // ← expect bool now
+    context,
+    MaterialPageRoute(builder: (_) => const AddMedicinePage()),
+  );
+
+  // Refresh the list if save was successful
+  if (result == true) {
+    ref
+      .read(doctorLoginViewModelProvider.notifier)
+      .fetchAllMedicines(widget.businessId); 
   }
+}
+
+
+
+  // void _deleteMedicine(int index) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (_) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  //       title: const Text(
+  //         'Remove Medicine',
+  //         style: TextStyle(
+  //             fontSize: 16,
+  //             fontWeight: FontWeight.w700,
+  //             color: Color(0xFF0F172A)),
+  //       ),
+  //       content: Text(
+  //         'Remove "${[index].medicineName}" from your library?',
+  //         style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('Cancel',
+  //               style: TextStyle(color: Color(0xFF64748B))),
+  //         ),
+  //         TextButton(
+  //           onPressed: () {
+  //             setState(() => _medicines.removeAt(index));
+  //             Navigator.pop(context);
+  //           },
+  //           child: const Text('Remove',
+  //               style: TextStyle(
+  //                   color: Color(0xFFEF4444), fontWeight: FontWeight.w700)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+
+  List<Medicine> _filtered(List<Medicine> medicines) {
+  return medicines.where((m) {
+    final matchType =
+        _selectedType == 0 || m.medTypeName == _types[_selectedType];
+
+    final query = _searchController.text.toLowerCase().trim();
+
+    final matchSearch = query.isEmpty ||
+        (m.medicineName?.toLowerCase().contains(query) ?? false) ||
+        (m.medTypeName?.toLowerCase().contains(query) ?? false);
+
+    return matchType && matchSearch;
+  }).toList();
+}
 
   @override
   Widget build(BuildContext context) {
+
+    final medicinesAsync = ref.watch(doctorLoginViewModelProvider).medicines;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Column(
@@ -178,35 +190,68 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
 
           // ── Count ─────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${_filtered.length} medicines',
-                style: const TextStyle(
-                    fontSize: 12.5,
-                    color: Color(0xFF94A3B8),
-                    fontWeight: FontWeight.w500),
-              ),
-            ),
-          ),
+  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+  child: Align(
+    alignment: Alignment.centerLeft,
+    child: medicinesAsync!.when(
+      data: (list) => Text(
+        '${_filtered(list).length} medicines',
+        style: const TextStyle(
+          fontSize: 12.5,
+          color: Color(0xFF94A3B8),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      loading: () => const Text(
+        'Loading...',
+        style: TextStyle(
+          fontSize: 12.5,
+          color: Color(0xFF94A3B8),
+        ),
+      ),
+      error: (_, __) => const Text(
+        'Error loading medicines',
+        style: TextStyle(
+          fontSize: 12.5,
+          color: Color(0xFFEF4444),
+        ),
+      ),
+    ),
+  ),
+),
 
           // ── List ──────────────────────────────────────────────
-          Expanded(
-            child: _filtered.isEmpty
-                ? const _EmptyState()
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
-                    itemCount: _filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _MedicineCard(
-                      medicine: _filtered[i],
-                      onDelete: () => _deleteMedicine(
-                        _medicines.indexOf(_filtered[i]),
-                      ),
-                    ),
-                  ),
-          ),
+       Expanded(
+  child: medicinesAsync!.when(
+    loading: () => const Center(
+      child: CircularProgressIndicator(),
+    ),
+
+    error: (e, _) => Center(
+      child: Text('Failed to load medicines'),
+    ),
+
+    data: (medicines) {
+      final filtered = _filtered(medicines);
+
+      if (filtered.isEmpty) {
+        return const _EmptyState();
+      }
+
+      return ListView.separated(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
+        itemCount: filtered.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 10),
+        itemBuilder: (_, i) => _MedicineCard(
+          medicine: filtered[i],
+          onDelete: () {
+            // later connect delete API
+          },
+        ),
+      );
+    },
+  ),
+)
         ],
       ),
 

@@ -30,7 +30,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _onContinue() {
+  Future<void> _onContinue() async {
     final mobile = _mobileCtrl.text.trim();
     if (mobile.length != 10 || !RegExp(r'^[0-9]+$').hasMatch(mobile)) {
       _snack('Enter a valid 10-digit mobile number');
@@ -44,6 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(patientLoginViewModelProvider.notifier)
           .checkPhonePatient(mobile);
     }
+    await ref.read(doctorLoginViewModelProvider.notifier).loadFromStorage();
   }
 
   void _snack(String msg) {

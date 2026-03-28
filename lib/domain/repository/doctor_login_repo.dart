@@ -8,5 +8,8 @@ abstract class DoctorLoginRepository {
 
    Future<dynamic> addMedicine(Medicine medicine);
 
-    Future<dynamic> fetchMedicineTypes();
+    Future<List<Medicine>> fetchMedicineTypes();
+
+    Future<List<Medicine>> fetchAllMedicines(int doctId);
+
 }
