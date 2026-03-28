@@ -17,7 +17,9 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   final _searchController = TextEditingController();
   int _selectedType = 0;
 
-  static const _types = ['All', 'Tablet', 'Syrup', 'Injection', 'Drops'];
+  static const _types = ['All', 'Tablet','Lotions', 'Syrup', 'Injection', 'Drops', 'Spray'];
+  
+
 
   @override
   void dispose() {
@@ -46,10 +48,52 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
       MaterialPageRoute(builder: (_) => const AddMedicinePage()),
     );
 
-    if (result == true) {
-      _refreshMedicines();
-    }
+  // Refresh the list if save was successful
+  if (result == true) {
+    ref
+      .read(doctorLoginViewModelProvider.notifier)
+      .fetchAllMedicines(ref.read(doctorLoginViewModelProvider).doctorId ?? 0); 
   }
+}
+
+
+
+  // void _deleteMedicine(int index) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (_) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  //       title: const Text(
+  //         'Remove Medicine',
+  //         style: TextStyle(
+  //             fontSize: 16,
+  //             fontWeight: FontWeight.w700,
+  //             color: Color(0xFF0F172A)),
+  //       ),
+  //       content: Text(
+  //         'Remove "${[index].medicineName}" from your library?',
+  //         style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('Cancel',
+  //               style: TextStyle(color: Color(0xFF64748B))),
+  //         ),
+  //         TextButton(
+  //           onPressed: () {
+  //             setState(() => _medicines.removeAt(index));
+  //             Navigator.pop(context);
+  //           },
+  //           child: const Text('Remove',
+  //               style: TextStyle(
+  //                   color: Color(0xFFEF4444), fontWeight: FontWeight.w700)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
 
   List<Medicine> _filtered(List<Medicine> medicines) {
     return medicines.where((m) {
