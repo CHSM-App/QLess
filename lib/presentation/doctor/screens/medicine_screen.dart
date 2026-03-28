@@ -7,8 +7,7 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 
 class DoctorMedicinePage extends ConsumerStatefulWidget {
-  final int businessId;
-  const DoctorMedicinePage({super.key, this.businessId = 0});
+  const DoctorMedicinePage({super.key});
 
   @override
   ConsumerState<DoctorMedicinePage> createState() => _DoctorMedicinesTabState();
@@ -18,7 +17,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   final _searchController = TextEditingController();
   int _selectedType = 0;
 
-  static const _types = ['All', 'Tablet', 'Syrup', 'Injection', 'Drops'];
+  static const _types = ['All', 'Tablet','Lotions', 'Syrup', 'Injection', 'Drops', 'Spray'];
   
 
 
@@ -50,7 +49,7 @@ void _goToAddMedicine() async {
   if (result == true) {
     ref
       .read(doctorLoginViewModelProvider.notifier)
-      .fetchAllMedicines(widget.businessId); 
+      .fetchAllMedicines(ref.read(doctorLoginViewModelProvider).doctorId ?? 0); 
   }
 }
 

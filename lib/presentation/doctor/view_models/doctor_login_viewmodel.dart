@@ -85,8 +85,8 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
 
     final token = await TokenStorage.getValue('token');
     final doctorIdStr = await TokenStorage.getValue('doctor_id');
+    print(doctorIdStr);
     final doctorId = int.tryParse(doctorIdStr ?? '0') ?? 0;
-    print(doctorId);
     final clinicName = await TokenStorage.getValue('clinic_name');
     final clinicId = await TokenStorage.getValue('clinic_id');
     state = state.copyWith(

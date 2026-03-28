@@ -44,7 +44,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           .read(patientLoginViewModelProvider.notifier)
           .checkPhonePatient(mobile);
     }
-    await ref.read(doctorLoginViewModelProvider.notifier).loadFromStorage();
+    
   }
 
   void _snack(String msg) {
