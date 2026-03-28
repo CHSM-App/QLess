@@ -50,19 +50,11 @@ void _goToAddMedicine() async {
   if (result == true) {
     ref
       .read(doctorLoginViewModelProvider.notifier)
-      .fetchAllMedicines(widget.businessId); // ← re-fetch from API
+      .fetchAllMedicines(widget.businessId); 
   }
 }
 
-  // void _goToAddMedicine() async {
-  //   final result = await Navigator.push<Medicine>(
-  //     context,
-  //     MaterialPageRoute(builder: (_) => const AddMedicinePage()),
-  //   );
-  //   if (result != null) {
-  //     setState(() => _searchController.clear());
-  //   }
-  // }
+
 
   // void _deleteMedicine(int index) {
   //   showDialog(
