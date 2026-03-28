@@ -8,8 +8,8 @@ class Medicine {
   @JsonKey(name: 'medicine_id')
   final int? medicineId;
 
-  @JsonKey(name: 'business_id')
-  final int? businessId;
+  @JsonKey(name: 'doctor_id')
+  final int? doctorId;
 
   @JsonKey(name: 'mobile_no')
   final String? mobileNo;
@@ -31,7 +31,7 @@ class Medicine {
 
   Medicine({
     this.medicineName,
-    this.businessId,
+    this.doctorId,
     this.medTypeId,
     this.medicineId,
     this.mobileNo,

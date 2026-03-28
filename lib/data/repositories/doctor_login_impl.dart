@@ -52,4 +52,9 @@ class DoctorLoginImpl implements DoctorLoginRepository {
    Future<List<Medicine>> fetchMedicineTypes() {
     return apiService.fetchMedicineTypes();
   }
+
+  @override
+   Future<List<Medicine>> fetchAllMedicines(int doctorId) {
+    return apiService.fetchAllMedicines(doctorId);
+  }
 }

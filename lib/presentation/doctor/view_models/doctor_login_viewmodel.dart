@@ -85,6 +85,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
 
     final token = await TokenStorage.getValue('token');
     final doctorIdStr = await TokenStorage.getValue('doctor_id');
+    print(doctorIdStr);
     final doctorId = int.tryParse(doctorIdStr ?? '0') ?? 0;
     final clinicName = await TokenStorage.getValue('clinic_name');
     final clinicId = await TokenStorage.getValue('clinic_id');
@@ -139,13 +140,30 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     }
   }
 
-    Future<void> addMedicine(Medicine medicine) async {
-    state = state.copyWith(isLoading: true, error: null);
+  //   Future<void> addMedicine(Medicine medicine) async {
+  //   state = state.copyWith(isLoading: true, error: null);
+  //   try {
+  //      final response = await usecase.addMedicine(medicine);
+  //     state = state.copyWith(isLoading: false);
+  //     return response;
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: e.toString());
+  //   }
+  // }
+
+  Future<Map<String, dynamic>> addMedicine(Medicine medicine) async {
     try {
-       await usecase.addMedicine(medicine);
+      state = state.copyWith(isLoading: true, error: null);
+
+      final response = await usecase.addMedicine(medicine);
+
       state = state.copyWith(isLoading: false);
+
+      return response;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: 'Failed to add medicine');
+
+      return {"success": 0, "message": "Failed to add medicine"};
     }
   }
 
@@ -172,6 +190,23 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   } catch (e, st) {
     state = state.copyWith(
       medicineTypes: AsyncValue.error(e, st),
+    );
+  }
+}
+
+  Future<void> fetchAllMedicines(int doctorId) async {
+  state = state.copyWith(
+    medicines: const AsyncValue.loading(),
+    error: null,
+  );
+  try {
+    final result = await usecase.fetchAllMedicines(doctorId);
+    state = state.copyWith(
+      medicines: AsyncValue.data(result),
+    );
+  } catch (e, st) {
+    state = state.copyWith(
+      medicines: AsyncValue.error(e, st),
     );
   }
 }

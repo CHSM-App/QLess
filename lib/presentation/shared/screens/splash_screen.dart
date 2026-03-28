@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
@@ -62,8 +63,7 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
-    _logoFade =
-        CurvedAnimation(parent: _logoController, curve: Curves.easeOut);
+    _logoFade = CurvedAnimation(parent: _logoController, curve: Curves.easeOut);
     _logoSlide = Tween<double>(begin: 22, end: 0).animate(
       CurvedAnimation(parent: _logoController, curve: Curves.easeOutCubic),
     );
@@ -73,8 +73,7 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 450),
     );
-    _tipFade =
-        CurvedAnimation(parent: _tipController, curve: Curves.easeInOut);
+    _tipFade = CurvedAnimation(parent: _tipController, curve: Curves.easeInOut);
     _tipController.forward();
 
     _queueTimer = Timer.periodic(
@@ -97,11 +96,12 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
     });
   }
 
-    Future<void> checkLogin() async {
+  Future<void> checkLogin() async {
     await ref.read(tokenProvider.notifier).loadTokens();
     final tokenState = ref.read(tokenProvider);
 
     if (tokenState.isLoggedIn) {
+      await ref.read(doctorLoginViewModelProvider.notifier).loadFromStorage();
       if (tokenState.roleId == 1) {
         Navigator.pushReplacement(
           context,
@@ -117,10 +117,7 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
             ),
           ),
         );
-      } 
-      
-      
-      else {
+      } else {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const SplashScreen()),
@@ -521,4 +518,3 @@ class _PersonPainter extends CustomPainter {
   @override
   bool shouldRepaint(_PersonPainter old) => old.t != t;
 }
-

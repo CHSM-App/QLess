@@ -31,7 +31,8 @@ abstract class ApiService {
   @GET("doctor/users/getMedicineTypes")
   Future<List<Medicine>> fetchMedicineTypes();
 
-
+  @GET("doctor/users/getAllMedicines/{doctor_id}")
+  Future<List<Medicine>> fetchAllMedicines(@Path("doctor_id") int doctorId);
 
   // Doctor's Post API 
   @POST("login/addDoctorDetails")
