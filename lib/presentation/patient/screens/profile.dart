@@ -1,17 +1,17 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/core/theme/theme.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
-import 'package:qless/core/storage/token_storage.dart';
-import 'package:qless/presentation/shared/screens/continue_as.dart';
-import 'package:qless/presentation/shared/screens/splash_screen.dart';
+import 'package:qless/presentation/shared/screens/continue_as.dart' as continue_as;
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       backgroundColor: Colors.white,
@@ -162,10 +162,12 @@ class ProfileScreen extends StatelessWidget {
                     color: AppTheme.error,
                     isDark: isDark,
                     onTap: () async {
-                    
+                      await ref.read(tokenProvider.notifier).clearTokens();
                       if (!context.mounted) return;
                       Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const SplashScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const continue_as.SplashScreen(),
+                        ),
                         (route) => false,
                       );
                     },
