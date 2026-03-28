@@ -2,7 +2,10 @@
 // ─── MAIN SHELL (Bottom Nav) ──────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
+import 'package:qless/presentation/patient/screens/appintment_screen.dart';
+import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_home_screen.dart';
+import 'package:qless/presentation/patient/screens/profile.dart';
 
 class PatientBottomNav extends StatefulWidget {
   final VoidCallback onToggleTheme;
@@ -27,9 +30,9 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
         themeMode: widget.themeMode,
         onTabChange: (i) => setState(() => _tab = i),
       ),
-      // const DoctorSearchScreen(),
-      // const AppointmentsScreen(),
-      // const ProfileScreen(),
+       const DoctorSearchScreen(),
+       const AppointmentScreen(),
+      const ProfileScreen(),
     ];
   }
 

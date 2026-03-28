@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
@@ -323,6 +324,11 @@ class _LandscapeLayout extends StatelessWidget {
                     child: TextField(
                       controller: mobileCtrl,
                       keyboardType: TextInputType.phone,
+                      maxLength: 10,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ],
                       style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF0F172A),
@@ -338,6 +344,7 @@ class _LandscapeLayout extends StatelessWidget {
                           color: Color(0xFF94A3B8),
                           size: 20,
                         ),
+                        counterText: '',
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(vertical: 15),
                       ),
@@ -513,6 +520,11 @@ class _PortraitLayout extends StatelessWidget {
                 child: TextField(
                   controller: mobileCtrl,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
                   style: const TextStyle(
                     fontSize: 14,
                     color: Color(0xFF0F172A),
@@ -528,6 +540,7 @@ class _PortraitLayout extends StatelessWidget {
                       color: Color(0xFF94A3B8),
                       size: 20,
                     ),
+                    counterText: '',
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(vertical: 16),
                   ),

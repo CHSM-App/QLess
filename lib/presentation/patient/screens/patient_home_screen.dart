@@ -3,6 +3,8 @@
 // ─── DATA MODELS ─────────────────────────────────────────────────────────────
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:flutter/foundation.dart';
 import 'package:qless/core/theme/theme.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
@@ -325,17 +327,42 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     ));
     _animCtrl.forward();
-    _loadLocation(); // non-blocking: UI paints first, pill fills in when ready
+    _ensureLocationPermission(); // ask permission on first run, then fetch
   }
 
   @override
   void dispose() { _animCtrl.dispose(); super.dispose(); }
 
+  Future<void> _ensureLocationPermission() async {
+    // Always request permission on first run so mobile shows the dialog.
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.deniedForever) {
+      if (mounted) _showLocationSettingsSnack();
+      // Still show cached/manual if any.
+      await _loadLocation();
+      return;
+    }
+    await _loadLocation();
+  }
+
   // ── FIX 1: non-blocking location load with shimmer fallback ───────────────
   Future<void> _loadLocation() async {
+    // If user set a manual location, always prefer it.
+    final isManual = await LocationStorage.isManual();
+    if (isManual) {
+      final saved = await LocationStorage.getLocation();
+      if (saved != null && saved.isNotEmpty) {
+        if (mounted) setState(() { _location = saved; _locationLoaded = true; });
+        return;
+      }
+    }
+
     // 1) Try cached value first — instant if previously saved
     final saved = await LocationStorage.getLocation();
-    if (saved != null && saved.isNotEmpty) {
+    if (saved != null && saved.isNotEmpty && !_isGenericLocation(saved)) {
       if (mounted) setState(() { _location = saved; _locationLoaded = true; });
       return;
     }
@@ -343,7 +370,10 @@ class _HomeScreenState extends State<HomeScreen>
     final current = await LocationService.getCurrentAddress();
     if (mounted) {
       setState(() { _location = current; _locationLoaded = true; });
-      await LocationStorage.saveLocation(current);
+      await LocationStorage.saveLocation(current, isManual: false);
+      if (_isPermissionIssue(current)) {
+        _showLocationSettingsSnack();
+      }
     }
   }
 
@@ -357,10 +387,51 @@ class _HomeScreenState extends State<HomeScreen>
         currentLocation: _location,
         onLocationSelected: (loc) async {
           setState(() { _location = loc; _locationLoaded = true; });
-          await LocationStorage.saveLocation(loc);
+          await LocationStorage.saveLocation(loc, isManual: true);
+          if (_isPermissionIssue(loc)) {
+            _showLocationSettingsSnack();
+          }
         },
       ),
     );
+  }
+
+  bool _isPermissionIssue(String value) {
+    final v = value.toLowerCase();
+    return v.contains('location disabled') ||
+        v.contains('permission denied') ||
+        v.contains('permission permanently denied') ||
+        v.contains('permission unavailable');
+  }
+
+  void _showLocationSettingsSnack() {
+    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    final message = isWindows
+        ? 'Enable Windows location services to detect location'
+        : 'Enable phone location services to detect location';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+          label: 'Open Settings',
+          onPressed: () {
+            Geolocator.openLocationSettings();
+          },
+        ),
+      ),
+    );
+  }
+
+  bool _isGenericLocation(String value) {
+    final v = value.trim().toLowerCase();
+    // Generic messages or coordinates should be refreshed to get a better name.
+    if (v.contains('location ') ||
+        v.contains('permission') ||
+        v.contains('unknown')) {
+      return true;
+    }
+    final coordRegex = RegExp(r'^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$');
+    return coordRegex.hasMatch(v);
   }
 
   // ── Helper: wrap any child in the stagger animation ───────────────────────
@@ -379,6 +450,7 @@ class _HomeScreenState extends State<HomeScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
           // ── HEADER ────────────────────────────────────────────────────────
@@ -422,10 +494,8 @@ class _HomeScreenState extends State<HomeScreen>
                                       color: Colors.white,
                                       fontSize: 20, fontWeight: FontWeight.w800,
                                     )),
-                              ],
-                            ),
-                          ),
 
+                                    
                           // ── FIX 1: Location pill – shimmer while GPS loads ──
                           GestureDetector(
                             onTap: _openLocationPicker,
@@ -465,7 +535,11 @@ class _HomeScreenState extends State<HomeScreen>
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(width: 2),
 
                           _HeaderBtn(
                             icon: widget.themeMode == ThemeMode.dark
@@ -615,7 +689,90 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 }
-
+  // ── Banner Card ─────────────────────────────
+  Widget _buildBannerCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1A73E8), Color(0xFF1557B0)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF1A73E8).withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            )
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Text('🏥 Special Offer',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text('Book Your\nConsultation Today',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          height: 1.3)),
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                   // onTap: () => _showBookingSheet(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text('Book Now',
+                          style: TextStyle(
+                              color: Color(0xFF1A73E8),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              width: 90,
+              height: 90,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.local_hospital_rounded,
+                  color: Colors.white, size: 48),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 // ─── LOCATION PICKER SHEET ────────────────────────────────────────────────────
 // Extracted into its own StatefulWidget so it owns search state cleanly.
 // FIX 2: search field filters the city list live; tapping any row sets it.
@@ -676,12 +833,48 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   // ── GPS button ────────────────────────────────────────────────────────────
   Future<void> _useGPS() async {
     setState(() => _isLoadingGPS = true);
-    final current = await LocationService.getCurrentAddress();
-    if (mounted) {
-      widget.onLocationSelected(current);
-      Navigator.pop(context);
+    try {
+      final current = await LocationService.getCurrentAddress();
+      if (mounted) {
+        widget.onLocationSelected(current);
+        final lower = current.toLowerCase();
+        final permissionIssue = lower.contains('location disabled') ||
+            lower.contains('permission denied') ||
+            lower.contains('permission permanently denied') ||
+            lower.contains('permission unavailable');
+        if (!permissionIssue) {
+          await LocationStorage.saveLocation(current, isManual: false);
+          Navigator.pop(context);
+        } else {
+          setState(() => _isLoadingGPS = false);
+          _showLocationSettingsSnack();
+        }
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingGPS = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to detect location')),
+      );
     }
   }
+
+  void _showLocationSettingsSnack() {
+    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    final message = isWindows
+        ? 'Enable Windows location services to detect location'
+        : 'Enable phone location services to detect location';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        action: SnackBarAction(
+          label: 'Open Settings',
+          onPressed: () => Geolocator.openLocationSettings(),
+        ),
+      ),
+    );
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -878,6 +1071,43 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                     if (!_isLoadingGPS)
                       const Icon(Icons.chevron_right_rounded,
                           color: Color(0xFF1A73E8), size: 20),
+                  ]),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Clear saved location
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: GestureDetector(
+                onTap: () async {
+                  await LocationStorage.clearLocation();
+                  if (!mounted) return;
+                  widget.onLocationSelected('');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Location cache cleared')),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white10 : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: divColor),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.delete_outline_rounded, size: 18, color: sub),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Clear Saved Location',
+                        style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: textColor),
+                      ),
+                    ),
                   ]),
                 ),
               ),
