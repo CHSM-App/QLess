@@ -16,32 +16,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkLogin();
   }
 
-  Future<void> _checkLogin() async {
-    await ref.read(tokenProvider.notifier).loadTokens();
-    final tokenState = ref.read(tokenProvider);
-    if (!mounted) return;
-    if (tokenState.isLoggedIn) {
-      if (tokenState.roleId == 1) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
-        );
-      } else if (tokenState.roleId == 2) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const PatientBottomNav()),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const SplashScreen()),
-        );
-      }
-    }
-  }
+
 
   void _goDoctor() => Navigator.push(
         context,

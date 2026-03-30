@@ -100,38 +100,44 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
     Future<void> checkLogin() async {
     await ref.read(tokenProvider.notifier).loadTokens();
     final tokenState = ref.read(tokenProvider);
-
-    if (tokenState.isLoggedIn) {
-      if (tokenState.roleId == 1) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
-        );
-      } else if (tokenState.roleId == 2) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PatientBottomNav(
-              onToggleTheme: () {},
-              themeMode: ThemeMode.light,
-            ),
-          ),
-        );
-      } 
-      
-      
-      else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const SplashScreen()),
-        );
-      }
-    } else {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const SplashScreen()),
       );
-    }
+    // if (tokenState.isLoggedIn) {
+    //           Navigator.pushReplacement(
+    //       context,
+    //       MaterialPageRoute(builder: (_) => const SplashScreen()),
+    //     );
+    //   if (tokenState.roleId == 1) {
+    //     Navigator.pushReplacement(
+    //       context,
+    //       MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
+    //     );
+    //   } else if (tokenState.roleId == 2) {
+    //     Navigator.pushReplacement(
+    //       context,
+    //       MaterialPageRoute(
+    //         builder: (_) => PatientBottomNav(
+    //           onToggleTheme: () {},
+    //           themeMode: ThemeMode.light,
+    //         ),
+    //       ),
+    //     );
+    //   } 
+      
+    //   else {
+    //     Navigator.pushReplacement(
+    //       context,
+    //       MaterialPageRoute(builder: (_) => const SplashScreen()),
+    //     );
+    //   }
+    // } else {
+    //   Navigator.pushReplacement(
+    //     context,
+    //     MaterialPageRoute(builder: (_) => const SplashScreen()),
+    //   );
+    // }
   }
 
   void _advanceQueue() {

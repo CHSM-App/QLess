@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "644313122183",
+    "project_id": "qless-4f033",
+    "storage_bucket": "qless-4f033.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:644313122183:android:383980469e9142aa3cff22",
+        "android_client_info": {
+          "package_name": "vengurlatech.qless"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "644313122183-djf5mlrbie5rkpua257qktu9raldkf93.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "vengurlatech.qless",
+            "certificate_hash": "9b63be1a9c7b39bcc7767df6e30ce701ea3990b2"
+          }
+        },
+        {
+          "client_id": "644313122183-as9njs7699hu9lc42kta8he4apnca81g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAu9URRhAdofq_GuVrJsfNmYixj0fKcQVI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "644313122183-as9njs7699hu9lc42kta8he4apnca81g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

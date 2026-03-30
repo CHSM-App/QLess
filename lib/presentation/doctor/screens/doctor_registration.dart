@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -36,6 +38,8 @@ class _DoctorProfileSetupScreenState
 
   File? _doctorPhoto;
   File? _clinicPhoto;
+  String? _fcmToken;
+  StreamSubscription<String>? _tokenRefreshSub;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -48,7 +52,14 @@ class _DoctorProfileSetupScreenState
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _initFcm();
+  }
+
+  @override
   void dispose() {
+    _tokenRefreshSub?.cancel();
     _fullNameController.dispose();
     _contactController.dispose();
     _emailController.dispose();
@@ -62,6 +73,23 @@ class _DoctorProfileSetupScreenState
     _clinicWebsiteController.dispose();
     _consultationFeeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initFcm() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      await messaging.requestPermission(alert: true, badge: true, sound: true);
+      final token = await messaging.getToken();
+      if (!mounted) return;
+      setState(() => _fcmToken = token);
+      _tokenRefreshSub = messaging.onTokenRefresh.listen((token) {
+        if (mounted) {
+          setState(() => _fcmToken = token);
+        }
+      });
+    } catch (e) {
+      debugPrint('FCM token fetch failed: $e');
+    }
   }
 
   Future<void> _pickImage(bool isDoctorPhoto) async {
@@ -95,6 +123,7 @@ class _DoctorProfileSetupScreenState
       if (_isBlank(_contactController)) {
         return _showError('Contact No is required');
       }
+      
       if (_isBlank(_emailController)) {
         return _showError('Email is required');
       }
@@ -133,6 +162,14 @@ class _DoctorProfileSetupScreenState
       return _showError('Clinic Email is required');
     }
 
+    if (_fcmToken == null) {
+      try {
+        _fcmToken = await FirebaseMessaging.instance.getToken();
+      } catch (e) {
+        debugPrint('FCM token refresh failed: $e');
+      }
+    }
+
     final doctorLogin = DoctorLogin(
       name: _fullNameController.text.trim(),
       mobile: _contactController.text.trim(),
@@ -152,6 +189,7 @@ class _DoctorProfileSetupScreenState
           : double.tryParse(_consultationFeeController.text.trim()),
       imageUrl: _clinicPhoto?.path, // optional
       roleId: 1,
+      Token: _fcmToken,
     );
 
     await ref
