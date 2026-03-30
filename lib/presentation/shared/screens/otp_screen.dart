@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -146,6 +148,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       return;
     }
 
+    await _printFcmToken();
+
     final roleId = ref.read(tokenProvider).roleId ?? 0;
     if (roleId == 1) {
       Navigator.pushReplacement(
@@ -162,6 +166,25 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       );
     } else {
       _triggerError();
+    }
+  }
+
+  Future<void> _printFcmToken() async {
+    try {
+      await _ensureFirebaseInitialized();
+      final token = await FirebaseMessaging.instance.getToken();
+      debugPrint('FCM token (OTP verify): $token');
+    } catch (e) {
+      debugPrint('FCM token fetch failed (OTP verify): $e');
+    }
+  }
+
+  Future<void> _ensureFirebaseInitialized() async {
+    if (Firebase.apps.isNotEmpty) return;
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      debugPrint('Firebase init failed (OTP verify): $e');
     }
   }
 
