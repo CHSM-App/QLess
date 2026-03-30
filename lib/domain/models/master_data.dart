@@ -27,13 +27,21 @@ class BloodGroupModel {
   @JsonKey(name: 'blood_group_id')
   final int? bloodGroupId;
 
-  @JsonKey(name: 'blood_Group_name')
+  @JsonKey(name: 'blood_Group_name', readValue: _readBloodGroupName)
   final String? bloodGroupName;
 
   const BloodGroupModel({
     this.bloodGroupId,
     this.bloodGroupName,
   });
+
+  static Object? _readBloodGroupName(Map<dynamic, dynamic> json, String key) {
+    if (json.containsKey(key)) return json[key];
+    if (json.containsKey('blood_group_name')) return json['blood_group_name'];
+    if (json.containsKey('bloodGroupName')) return json['bloodGroupName'];
+    if (json.containsKey('blood_group')) return json['blood_group'];
+    return null;
+  }
 
   factory BloodGroupModel.fromJson(Map<String, dynamic> json) =>
       _$BloodGroupModelFromJson(json);

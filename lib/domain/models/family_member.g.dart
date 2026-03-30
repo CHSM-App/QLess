@@ -7,6 +7,7 @@ part of 'family_member.dart';
 // **************************************************************************
 
 FamilyMember _$FamilyMemberFromJson(Map<String, dynamic> json) => FamilyMember(
+  familyId: (json['family_id'] as num?)?.toInt(),
   memberId: (json['member_id'] as num?)?.toInt(),
   memberName: json['name'] as String?,
   genderId: (json['Gender_id'] as num?)?.toInt(),
@@ -19,6 +20,7 @@ FamilyMember _$FamilyMemberFromJson(Map<String, dynamic> json) => FamilyMember(
 
 Map<String, dynamic> _$FamilyMemberToJson(FamilyMember instance) =>
     <String, dynamic>{
+      'family_id': instance.familyId,
       'member_id': instance.memberId,
       'name': instance.memberName,
       'Gender_id': instance.genderId,

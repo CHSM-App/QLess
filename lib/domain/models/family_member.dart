@@ -4,6 +4,10 @@ part 'family_member.g.dart';
 
 @JsonSerializable()
 class FamilyMember {
+  /// Maps to DB column: family_id
+  @JsonKey(name: 'family_id')
+  final int? familyId;
+
   @JsonKey(name: 'member_id')
   final int? memberId;
 
@@ -36,6 +40,7 @@ class FamilyMember {
   final String? mobileNo;
 
   const FamilyMember({
+    this.familyId,
     this.memberId,
     this.memberName,
     this.genderId,

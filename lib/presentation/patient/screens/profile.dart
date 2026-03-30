@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
-import 'package:qless/core/theme/theme.dart';
+import 'package:qless/core/theme/patient_theme.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart' as continue_as;
 

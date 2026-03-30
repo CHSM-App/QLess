@@ -4,7 +4,8 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:qless/core/theme/theme.dart';
+import 'package:qless/core/theme/patient_theme.dart';
+
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});

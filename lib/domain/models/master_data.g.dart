@@ -20,7 +20,9 @@ Map<String, dynamic> _$GenderModelToJson(GenderModel instance) =>
 BloodGroupModel _$BloodGroupModelFromJson(Map<String, dynamic> json) =>
     BloodGroupModel(
       bloodGroupId: (json['blood_group_id'] as num?)?.toInt(),
-      bloodGroupName: json['blood_Group_name'] as String?,
+      bloodGroupName:
+          BloodGroupModel._readBloodGroupName(json, 'blood_Group_name')
+              as String?,
     );
 
 Map<String, dynamic> _$BloodGroupModelToJson(BloodGroupModel instance) =>

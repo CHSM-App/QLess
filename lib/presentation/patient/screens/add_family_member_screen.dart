@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/master_data.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
-class AddFamilyMemberScreen extends StatefulWidget {
-  /// Pass an existing member to pre-fill the form for editing.
+class AddFamilyMemberScreen extends ConsumerStatefulWidget {
   final FamilyMember? existingMember;
-
-  /// Gender options loaded from the API / DB (Gender_id + Gender label).
   final List<GenderModel> genderOptions;
-
-  /// Relation options loaded from the API / DB (relation_id + relation label).
   final List<RelationModel> relationOptions;
 
   const AddFamilyMemberScreen({
@@ -31,10 +29,12 @@ class AddFamilyMemberScreen extends StatefulWidget {
   });
 
   @override
-  State<AddFamilyMemberScreen> createState() => _AddFamilyMemberScreenState();
+  ConsumerState<AddFamilyMemberScreen> createState() =>
+      _AddFamilyMemberScreenState();
 }
 
-class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
+class _AddFamilyMemberScreenState
+    extends ConsumerState<AddFamilyMemberScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _mobileController = TextEditingController();
@@ -48,6 +48,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
 
   DateTime? _selectedDate;
   bool _isConfirmed = false;
+  bool _didSubmit = false;
 
   bool get _isEditing => widget.existingMember != null;
 
@@ -159,7 +160,14 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
       return;
     }
 
+    final patientId = ref.read(patientLoginViewModelProvider).patientId;
+    if (patientId == null || patientId == 0) {
+      _showSnack('Unable to find patient id. Please login again.');
+      return;
+    }
+
     final member = FamilyMember(
+      familyId: patientId,
       memberId: widget.existingMember?.memberId,
       memberName: _nameController.text.trim(),
       genderId: _selectedGenderId,
@@ -172,7 +180,8 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
           : _mobileController.text.trim(),
     );
 
-    Navigator.of(context).pop(member);
+    _didSubmit = true;
+    ref.read(patientLoginViewModelProvider.notifier).addFamilyMember(member);
   }
 
   void _showSnack(String msg) {
@@ -187,6 +196,31 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<PatientLoginState>(patientLoginViewModelProvider,
+        (prev, next) {
+      if (_didSubmit && next.isSuccess && !(prev?.isSuccess ?? false)) {
+        Navigator.of(context).pop(
+          FamilyMember(
+            familyId: ref.read(patientLoginViewModelProvider).patientId!,
+            memberId: widget.existingMember?.memberId,
+            memberName: _nameController.text.trim(),
+            genderId: _selectedGenderId,
+            genderName: _selectedGenderOption?.gender,
+            dob: _selectedDate,
+            relationId: _selectedRelationId,
+            relationName: _selectedRelationOption?.relation,
+            mobileNo: _mobileController.text.trim().isEmpty
+                ? null
+                : _mobileController.text.trim(),
+          ),
+        );
+      }
+      if (next.error != null && next.error != prev?.error) {
+        _showSnack(next.error!);
+      }
+    });
+
+    final state = ref.watch(patientLoginViewModelProvider);
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -237,7 +271,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                 ),
               ),
             ),
-            _buildSaveButton(),
+            _buildSaveButton(isLoading: state.isLoading),
           ],
         ),
       ),
@@ -483,14 +517,14 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
   // Save button
   // ---------------------------------------------------------------------------
 
-  Widget _buildSaveButton() {
+  Widget _buildSaveButton({required bool isLoading}) {
     return Padding(
       padding: const EdgeInsets.all(16),
       child: SizedBox(
         width: double.infinity,
         height: 54,
         child: ElevatedButton(
-          onPressed: _isConfirmed ? _onSave : null,
+          onPressed: _isConfirmed && !isLoading ? _onSave : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF3D5AF1),
             disabledBackgroundColor: const Color(0xFFB0B4D0),
@@ -498,14 +532,21 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: Text(
-            _isEditing ? 'Update & Continue' : 'Save & Continue',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
-          ),
+          child: isLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2.5, color: Colors.white),
+                )
+              : Text(
+                  _isEditing ? 'Update & Continue' : 'Save & Continue',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
         ),
       ),
     );
