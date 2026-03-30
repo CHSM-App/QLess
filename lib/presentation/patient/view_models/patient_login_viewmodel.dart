@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
+import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/usecase/patient_login_usecase.dart';
 
@@ -126,6 +127,20 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
       );
     }
   }
+
+    Future<void> addFamilyMember(FamilyMember member) async {
+    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
+    try {
+      await usecase.addFamilyMember(member);
+      state = state.copyWith(isLoading: false, isSuccess: true);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString().replaceFirst('Exception: ', ''),
+      );
+    }
+  }
+
 
   void clearError() => state = state.copyWith(clearError: true);
 }

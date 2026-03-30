@@ -304,12 +304,34 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<MasterData>> fetchGenderList() async {
+  Future<dynamic> addFamilyMember(FamilyMember member) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(member.toJson());
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'patient/insert/insertFamilyMember',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<List<GenderModel>> fetchGenderList() async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
-    final _options = _setStreamType<List<MasterData>>(
+    final _options = _setStreamType<List<GenderModel>>(
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -320,10 +342,10 @@ class _ApiService implements ApiService {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<List<dynamic>>(_options);
-    late List<MasterData> _value;
+    late List<GenderModel> _value;
     try {
       _value = _result.data!
-          .map((dynamic i) => MasterData.fromJson(i as Map<String, dynamic>))
+          .map((dynamic i) => GenderModel.fromJson(i as Map<String, dynamic>))
           .toList();
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
@@ -333,12 +355,12 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<MasterData>> fetchRelationList() async {
+  Future<List<RelationModel>> fetchRelationList() async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
-    final _options = _setStreamType<List<MasterData>>(
+    final _options = _setStreamType<List<RelationModel>>(
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -349,10 +371,10 @@ class _ApiService implements ApiService {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<List<dynamic>>(_options);
-    late List<MasterData> _value;
+    late List<RelationModel> _value;
     try {
       _value = _result.data!
-          .map((dynamic i) => MasterData.fromJson(i as Map<String, dynamic>))
+          .map((dynamic i) => RelationModel.fromJson(i as Map<String, dynamic>))
           .toList();
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);
@@ -362,12 +384,12 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<MasterData>> fetchBloodGroupList() async {
+  Future<List<BloodGroupModel>> fetchBloodGroupList() async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
-    final _options = _setStreamType<List<MasterData>>(
+    final _options = _setStreamType<List<BloodGroupModel>>(
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
@@ -378,10 +400,12 @@ class _ApiService implements ApiService {
           .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
     );
     final _result = await _dio.fetch<List<dynamic>>(_options);
-    late List<MasterData> _value;
+    late List<BloodGroupModel> _value;
     try {
       _value = _result.data!
-          .map((dynamic i) => MasterData.fromJson(i as Map<String, dynamic>))
+          .map(
+            (dynamic i) => BloodGroupModel.fromJson(i as Map<String, dynamic>),
+          )
           .toList();
     } on Object catch (e, s) {
       errorLogger?.logError(e, s, _options, response: _result);

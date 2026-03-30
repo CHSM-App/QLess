@@ -6,38 +6,48 @@ part of 'family_member.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
+GenderOption _$GenderOptionFromJson(Map<String, dynamic> json) => GenderOption(
+  genderId: (json['Gender_id'] as num).toInt(),
+  genderName: json['Gender'] as String,
+);
+
+Map<String, dynamic> _$GenderOptionToJson(GenderOption instance) =>
+    <String, dynamic>{
+      'Gender_id': instance.genderId,
+      'Gender': instance.genderName,
+    };
+
+RelationOption _$RelationOptionFromJson(Map<String, dynamic> json) =>
+    RelationOption(
+      relationId: (json['relation_id'] as num).toInt(),
+      relationName: json['relation'] as String,
+    );
+
+Map<String, dynamic> _$RelationOptionToJson(RelationOption instance) =>
+    <String, dynamic>{
+      'relation_id': instance.relationId,
+      'relation': instance.relationName,
+    };
+
 FamilyMember _$FamilyMemberFromJson(Map<String, dynamic> json) => FamilyMember(
   memberId: (json['member_id'] as num?)?.toInt(),
-  memberName: json['member_name'] as String?,
-  gender: $enumDecodeNullable(_$GenderEnumMap, json['gender']),
-  dateOfBirth: json['date_of_birth'] as String?,
-  relation: $enumDecodeNullable(_$RelationEnumMap, json['relation']),
-  mobileNumber: json['mobile_number'] as String?,
-  age: (json['age'] as num?)?.toInt(),
+  memberName: json['name'] as String?,
+  genderId: (json['Gender_id'] as num?)?.toInt(),
+  genderName: json['Gender'] as String?,
+  dob: json['DOB'] == null ? null : DateTime.parse(json['DOB'] as String),
+  relationId: (json['relation_id'] as num?)?.toInt(),
+  relationName: json['relation'] as String?,
+  mobileNo: json['mobile_no'] as String?,
 );
 
 Map<String, dynamic> _$FamilyMemberToJson(FamilyMember instance) =>
     <String, dynamic>{
       'member_id': instance.memberId,
-      'member_name': instance.memberName,
-      'gender': _$GenderEnumMap[instance.gender],
-      'date_of_birth': instance.dateOfBirth,
-      'relation': _$RelationEnumMap[instance.relation],
-      'mobile_number': instance.mobileNumber,
-      'age': instance.age,
+      'name': instance.memberName,
+      'Gender_id': instance.genderId,
+      'Gender': instance.genderName,
+      'DOB': instance.dob?.toIso8601String(),
+      'relation_id': instance.relationId,
+      'relation': instance.relationName,
+      'mobile_no': instance.mobileNo,
     };
-
-const _$GenderEnumMap = {
-  Gender.male: 'male',
-  Gender.female: 'female',
-  Gender.other: 'other',
-};
-
-const _$RelationEnumMap = {
-  Relation.self: 'self',
-  Relation.spouse: 'spouse',
-  Relation.child: 'child',
-  Relation.parent: 'parent',
-  Relation.sibling: 'sibling',
-  Relation.other: 'other',
-};

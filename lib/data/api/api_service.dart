@@ -44,25 +44,11 @@ abstract class ApiService {
 
 
   //-------------------------------------------//PATIENT API//----------------------------------------------
-
+  // GET API
   @GET("login/checkPhonePatient")
   Future<List<Patients>> checkPhonePatient(@Query("mobileNo") String mobileNo);
 
+  // POST API
   @POST("login/insertPatient")
   Future<dynamic> addPatient(@Body() Patients patient);
-
-
-
-  //-----------------------------------------//PATIENT AND DOCTOR COMMON API//------------------------------
-  
-  @GET("users/fetchGenderList")
-  Future<List<MasterData>> fetchGenderList();
-
-  
-  @GET("users/fetchRelationList")
-  Future<List<MasterData>> fetchRelationList();
-
-  
-  @GET("users/fetchBloodGroupList")
-  Future<List<MasterData>> fetchBloodGroupList();
 }

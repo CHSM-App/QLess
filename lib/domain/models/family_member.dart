@@ -2,98 +2,91 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'family_member.g.dart';
 
-enum Gender {
-  @JsonValue('male')
-  male,
-  @JsonValue('female')
-  female,
-  @JsonValue('other')
-  other,
+// ---------------------------------------------------------------------------
+// Lookup models — used to populate Gender & Relation dropdowns from DB
+// ---------------------------------------------------------------------------
+
+@JsonSerializable()
+class GenderOption {
+  @JsonKey(name: 'Gender_id')
+  final int genderId;
+
+  @JsonKey(name: 'Gender')
+  final String genderName;
+
+  const GenderOption({required this.genderId, required this.genderName});
+
+  factory GenderOption.fromJson(Map<String, dynamic> json) =>
+      _$GenderOptionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$GenderOptionToJson(this);
 }
 
-enum Relation {
-  @JsonValue('self')
-  self,
-  @JsonValue('spouse')
-  spouse,
-  @JsonValue('child')
-  child,
-  @JsonValue('parent')
-  parent,
-  @JsonValue('sibling')
-  sibling,
-  @JsonValue('other')
-  other,
+@JsonSerializable()
+class RelationOption {
+  @JsonKey(name: 'relation_id')
+  final int relationId;
+
+  @JsonKey(name: 'relation')
+  final String relationName;
+
+  const RelationOption({required this.relationId, required this.relationName});
+
+  factory RelationOption.fromJson(Map<String, dynamic> json) =>
+      _$RelationOptionFromJson(json);
+
+  Map<String, dynamic> toJson() => _$RelationOptionToJson(this);
 }
+
+// ---------------------------------------------------------------------------
+// Main FamilyMember model — matches your DB columns exactly
+// ---------------------------------------------------------------------------
 
 @JsonSerializable()
 class FamilyMember {
   @JsonKey(name: 'member_id')
   final int? memberId;
 
-  @JsonKey(name: 'member_name')
+  /// Maps to DB column: name
+  @JsonKey(name: 'name')
   final String? memberName;
 
-  @JsonKey(name: 'gender')
-  final Gender? gender;
+  /// Maps to DB column: Gender_id  (sent on insert/update)
+  @JsonKey(name: 'Gender_id')
+  final int? genderId;
 
-  @JsonKey(name: 'date_of_birth')
-  final String? dateOfBirth;
+  /// Maps to DB column: Gender  (received on fetch — display label)
+  @JsonKey(name: 'Gender')
+  final String? genderName; // ← fixed: was int?, must be String?
 
+  /// Maps to DB column: DOB
+  @JsonKey(name: 'DOB')
+  final DateTime? dob;
+
+  /// Maps to DB column: relation_id  (sent on insert/update)
+  @JsonKey(name: 'relation_id')
+  final int? relationId;
+
+  /// Maps to DB column: relation  (received on fetch — display label)
   @JsonKey(name: 'relation')
-  final Relation? relation;
+  final String? relationName;
 
-  @JsonKey(name: 'mobile_number')
-  final String? mobileNumber;
+  /// Maps to DB column: mobile_no
+  @JsonKey(name: 'mobile_no')
+  final String? mobileNo;
 
-  @JsonKey(name: 'age')
-  final int? age;
-
-  FamilyMember({
+  const FamilyMember({
     this.memberId,
     this.memberName,
-    this.gender,
-    this.dateOfBirth,
-    this.relation,
-    this.mobileNumber,
-    this.age,
+    this.genderId,
+    this.genderName,
+    this.dob,
+    this.relationId,
+    this.relationName,
+    this.mobileNo,
   });
 
-  /// Returns display label for gender
-  String get genderLabel {
-    switch (gender) {
-      case Gender.male:
-        return 'Male';
-      case Gender.female:
-        return 'Female';
-      case Gender.other:
-        return 'Other';
-      default:
-        return '';
-    }
-  }
-
-  /// Returns display label for relation
-  String get relationLabel {
-    switch (relation) {
-      case Relation.self:
-        return 'Self';
-      case Relation.spouse:
-        return 'Spouse';
-      case Relation.child:
-        return 'Child';
-      case Relation.parent:
-        return 'Parent';
-      case Relation.sibling:
-        return 'Sibling';
-      case Relation.other:
-        return 'Other';
-      default:
-        return '';
-    }
-  }
-
-  /// Returns first letter of name for avatar
+  /// Avatar letter for list tiles
   String get avatarLetter =>
       (memberName != null && memberName!.isNotEmpty)
           ? memberName![0].toUpperCase()
