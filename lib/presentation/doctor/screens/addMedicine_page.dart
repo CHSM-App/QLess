@@ -15,6 +15,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage> {
   final _nameCtrl = TextEditingController();
 
   Medicine? _selectedType;
+  bool _isEnsuringDoctorId = false;
 
   static const _dark   = Color(0xFF0F172A);
   static const _slate  = Color(0xFF64748B);
@@ -80,13 +81,26 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage> {
     return;
   }
 
-  final loginState = ref.read(doctorLoginViewModelProvider);
+  final notifier = ref.read(doctorLoginViewModelProvider.notifier);
+  var loginState = ref.read(doctorLoginViewModelProvider);
+  var doctorId = loginState.doctorId ?? 0;
+  if (doctorId == 0 && !_isEnsuringDoctorId) {
+    _isEnsuringDoctorId = true;
+    await notifier.loadFromStorage();
+    loginState = ref.read(doctorLoginViewModelProvider);
+    doctorId = loginState.doctorId ?? 0;
+    _isEnsuringDoctorId = false;
+  }
+  if (doctorId == 0) {
+    _snack('Doctor ID not found. Please login again.');
+    return;
+  }
 
   final medicine = Medicine(
     medicineName: _nameCtrl.text.trim(),
     medTypeId:    _selectedType!.medTypeId,
     medTypeName:  _selectedType!.medTypeName,
-    doctorId:     loginState.doctorId,
+    doctorId:     doctorId,
   );
 
   final response = await ref

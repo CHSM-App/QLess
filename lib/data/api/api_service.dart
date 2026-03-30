@@ -49,6 +49,11 @@ abstract class ApiService {
   @GET("login/checkPhonePatient")
   Future<List<Patients>> checkPhonePatient(@Query("mobileNo") String mobileNo);
 
+
+
+  @GET("patient/users/fetchFamilyMembers/{family_id}")
+  Future<List<FamilyMember>> fetchFamilyMembers(@Path("family_id") int familyId);
+  
   // POST API
   @POST("login/insertPatient")
   Future<dynamic> addPatient(@Body() Patients patient);
@@ -56,6 +61,8 @@ abstract class ApiService {
 
   @POST("patient/insert/insertFamilyMember")
   Future<dynamic> addFamilyMember(@Body() FamilyMember member);
+
+
 
   //-----------------------------------------//PATIENT AND DOCTOR COMMON API//------------------------------
   
