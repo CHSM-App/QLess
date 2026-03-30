@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:qless/core/constant.dart';
 import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/models/token_response.dart';
@@ -49,4 +50,19 @@ abstract class ApiService {
 
   @POST("login/insertPatient")
   Future<dynamic> addPatient(@Body() Patients patient);
+
+
+
+  //-----------------------------------------//PATIENT AND DOCTOR COMMON API//------------------------------
+  
+  @GET("users/fetchGenderList")
+  Future<List<MasterData>> fetchGenderList();
+
+  
+  @GET("users/fetchRelationList")
+  Future<List<MasterData>> fetchRelationList();
+
+  
+  @GET("users/fetchBloodGroupList")
+  Future<List<MasterData>> fetchBloodGroupList();
 }

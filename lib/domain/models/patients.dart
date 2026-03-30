@@ -20,8 +20,8 @@ class Patients {
   @JsonKey(name: 'email')
   final String? email;
 
-  @JsonKey(name: 'Gender')
-  final String? Gender;
+  @JsonKey(name: 'gender')
+  final String? gender;
 
   @JsonKey(name: 'DOB')
   final DateTime? DOB;
@@ -37,7 +37,11 @@ class Patients {
   @JsonKey(name: 'token')
   final String? Token;
  
+  @JsonKey(name: 'gender_id')
+  final int? genderId;
 
+  @JsonKey(name: 'blood_group_id')
+  final int? bloodGroupId;
 
 
 
@@ -47,12 +51,14 @@ class Patients {
     this.email,
     this.mobileNo,
     this.DOB,
-    this.Gender,
+    this.gender,
     this.address,
     this.bloodGroup,
     this.weight,
     this.roleId,
     this.Token,
+    this.genderId,
+    this.bloodGroupId
   });
   
   factory Patients.fromJson(Map<String, dynamic> json) =>

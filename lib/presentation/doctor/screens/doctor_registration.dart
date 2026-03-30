@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
+import 'package:qless/presentation/shared/view_models/master_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
 class DoctorProfileSetupScreen extends ConsumerStatefulWidget {
@@ -33,6 +35,8 @@ class _DoctorProfileSetupScreenState
   final _consultationFeeController = TextEditingController();
 
   String _selectedSpecialization = '';
+  String? _selectedGender;
+  int? _selectedGenderId;
 
   File? _doctorPhoto;
   File? _clinicPhoto;
@@ -46,6 +50,15 @@ class _DoctorProfileSetupScreenState
     {'value': 'pediatrics', 'label': 'Pediatrics'},
     {'value': 'orthopedics', 'label': 'Orthopedics'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(masterViewModelProvider.notifier).fetchGenderList();
+    });
+  }
 
   @override
   void dispose() {
@@ -98,6 +111,9 @@ class _DoctorProfileSetupScreenState
       if (_isBlank(_emailController)) {
         return _showError('Email is required');
       }
+      if (_selectedGenderId == null || _selectedGenderId! <= 0) {
+        return _showError('Gender is required');
+      }
       if (_selectedSpecialization.isEmpty) {
         return _showError('Specialization is required');
       }
@@ -137,6 +153,7 @@ class _DoctorProfileSetupScreenState
       name: _fullNameController.text.trim(),
       mobile: _contactController.text.trim(),
       email: _emailController.text.trim(),
+      genderId: _selectedGenderId,
       specialization: _selectedSpecialization,
       qualification: _qualificationController.text.trim(),
       licenseNo: _licenseController.text.trim(),
@@ -172,6 +189,7 @@ class _DoctorProfileSetupScreenState
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(doctorLoginViewModelProvider);
+    final masterState = ref.watch(masterViewModelProvider);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -288,6 +306,8 @@ class _DoctorProfileSetupScreenState
                     _emailController,
                     keyboard: TextInputType.emailAddress,
                   ),
+                  const SizedBox(height: 16),
+                  _buildGenderSection(masterState),
                   const SizedBox(height: 16),
                   _buildDropdown(),
                   const SizedBox(height: 16),
@@ -503,6 +523,198 @@ class _DoctorProfileSetupScreenState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGenderSection(MasterState masterState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Gender',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 8),
+        masterState.fetchGender.when(
+          data: (list) {
+            final options = list
+                .map((e) => e.gender)
+                .whereType<String>()
+                .where((e) => e.trim().isNotEmpty)
+                .toList();
+            if (options.isEmpty) return const _InlineLoading();
+            final idByName = <String, int>{};
+            for (final g in list) {
+              final name = g.gender?.trim();
+              final id = g.genderId;
+              if (name != null && name.isNotEmpty && id != null) {
+                idByName[name] = id;
+              }
+            }
+            return _GenderSelector(
+              options: options,
+              selected: _selectedGender,
+              onChanged: (v) => setState(() {
+                _selectedGender = v;
+                _selectedGenderId = idByName[v];
+              }),
+            );
+          },
+          loading: () => const _InlineLoading(),
+          error: (e, _) =>
+              const _InlineError(text: 'Unable to load gender list'),
+        ),
+      ],
+    );
+  }
+}
+
+class _GenderSelector extends StatelessWidget {
+  const _GenderSelector({
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<String> options;
+  final String? selected;
+  final ValueChanged<String> onChanged;
+
+  static const _iconMap = {
+    'male': Icons.male_rounded,
+    'female': Icons.female_rounded,
+    'other': Icons.transgender_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(options.length, (i) {
+        final label = options[i];
+        final icon =
+            _iconMap[label.toLowerCase()] ?? Icons.person_outline_rounded;
+        return Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(right: i < options.length - 1 ? 8 : 0),
+            child: _GenderOption(
+              label: label,
+              icon: icon,
+              isSelected: selected == label,
+              onTap: () => onChanged(label),
+            ),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _GenderOption extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _GenderOption({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        height: 48,
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFF0F172A).withOpacity(0.08)
+              : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.8 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 18,
+                color: isSelected
+                    ? const Color(0xFF0F172A)
+                    : const Color(0xFF94A3B8)),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color:
+                    isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineLoading extends StatelessWidget {
+  const _InlineLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 48,
+      child: Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineError extends StatelessWidget {
+  final String text;
+  const _InlineError({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              size: 18, color: Color(0xFFEF4444)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFB91C1C)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
