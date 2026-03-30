@@ -8,7 +8,6 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
-import 'package:qless/presentation/shared/screens/otp_screen.dart';
 
 
 class PatientRegistrationScreen extends ConsumerStatefulWidget {
@@ -177,7 +176,7 @@ class _PatientRegistrationScreenState
 
   // ── State listener ───────────────────────────────────────────────────────
   void _onStateChange(PatientLoginState? prev, PatientLoginState next) {
-    // Navigate to OTP on success
+    // Navigate to Login on success
     if (next.isSuccess && !(prev?.isSuccess ?? false)) {
       Navigator.pushReplacement(
         context,

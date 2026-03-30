@@ -15,8 +15,8 @@ class PatientLoginState {
   final String? email;
   final String? roleId;
   final String? token;
-
   final AsyncValue<List<Patients>> patientPhoneCheck;
+    final AsyncValue<List<FamilyMember>> allfamilyMembers;
   const PatientLoginState({
     this.isLoading = false,
     this.error,
@@ -28,6 +28,7 @@ class PatientLoginState {
     this.token,
     this.patientId,
     this.patientPhoneCheck = const AsyncValue.data([]),
+     this.allfamilyMembers = const AsyncValue.data([]),
   });
 
   PatientLoginState copyWith({
@@ -43,6 +44,7 @@ class PatientLoginState {
     int? patientId,
 
     AsyncValue<List<Patients>>? patientPhoneCheck,
+      AsyncValue<List<FamilyMember>>? allfamilyMembers,
   }) {
     return PatientLoginState(
       isLoading: isLoading ?? this.isLoading,
@@ -55,6 +57,7 @@ class PatientLoginState {
       roleId: roleId ?? this.roleId,
       token: token ?? this.token,
       patientPhoneCheck: patientPhoneCheck ?? this.patientPhoneCheck,
+        allfamilyMembers: allfamilyMembers ?? this.allfamilyMembers
     );
   }
 }
@@ -87,7 +90,12 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
 
     final token = await TokenStorage.getValue('token');
     final patientIdStr = await TokenStorage.getValue('patient_id');
-    final patientId = int.tryParse(patientIdStr ?? '0') ?? 0;
+    
+ debugPrint("STORED patient_id: $patientIdStr");
+
+  final patientId = int.tryParse(patientIdStr ?? '0') ?? 0;
+
+  debugPrint("PARSED patient_id: $patientId");
 
     state = state.copyWith(
       patientId: patientId,
@@ -117,7 +125,7 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     );
     try {
       final result = await usecase.checkPhonePatient(mobileNo);
-      state = state.copyWith(patientPhoneCheck: AsyncValue.data(result));
+      state = state.copyWith(patientPhoneCheck: AsyncValue.data(result),);
     } catch (e, st) {
       debugPrint('PatientLoginViewmodel.checkPhonePatient error: $e');
       debugPrint('$st');
@@ -139,6 +147,24 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
         error: e.toString().replaceFirst('Exception: ', ''),
       );
     }
+  }
+
+  
+  Future<void> fetchAllFamilyMembers(int familyId) async {
+  state = state.copyWith(
+    allfamilyMembers: const AsyncValue.loading(),
+    error: null,
+  );
+  try {
+    final result = await usecase.fetchFamilyMembers(familyId);
+    state = state.copyWith(
+      allfamilyMembers: AsyncValue.data(result),
+    );
+  } catch (e, st) {
+    state = state.copyWith(
+      allfamilyMembers: AsyncValue.error(e, st),
+    );
+  }
   }
 
 

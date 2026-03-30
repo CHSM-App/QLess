@@ -282,6 +282,35 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<List<FamilyMember>> fetchFamilyMembers(int familyId) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<FamilyMember>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'patient/users/fetchFamilyMembers/${familyId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<FamilyMember> _value;
+    try {
+      _value = _result.data!
+          .map((dynamic i) => FamilyMember.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<dynamic> addPatient(Patients patient) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};

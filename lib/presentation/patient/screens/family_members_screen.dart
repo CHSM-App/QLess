@@ -1,60 +1,71 @@
-import 'package:flutter/material.dart';
-import 'package:qless/domain/models/family_member.dart';
-import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
 
-class FamilyMembersScreen extends StatefulWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+
+class FamilyMembersScreen extends ConsumerStatefulWidget {
   const FamilyMembersScreen({super.key});
 
   @override
-  State<FamilyMembersScreen> createState() => _FamilyMembersScreenState();
+  ConsumerState<FamilyMembersScreen> createState() =>
+      _FamilyMembersScreenState();
 }
 
-class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
-  // Sample pre-loaded data matching the new FamilyMember model
-  final List<FamilyMember> _members = [
-    FamilyMember(
-      memberId: 1,
-      memberName: 'Jivan Kudalkar',
-      genderId: 1,
-      genderName: 'Male',
-      dob: DateTime(1984, 3, 27),
-      relationId: 1,
-      relationName: 'Self',
-    ),
-    FamilyMember(
-      memberId: 2,
-      memberName: 'Sukhada Kudalkar',
-      genderId: 2,
-      genderName: 'Female',
-      dob: DateTime(1988, 6, 15),
-      relationId: 2,
-      relationName: 'Spouse',
-    ),
-    FamilyMember(
-      memberId: 3,
-      memberName: 'Vaidehi Kudalkar',
-      genderId: 2,
-      genderName: 'Female',
-      dob: DateTime(2017, 1, 10),
-      relationId: 3,
-      relationName: 'Child',
-    ),
-    FamilyMember(
-      memberId: 4,
-      memberName: 'Shivay Kudalkar',
-      genderId: 1,
-      genderName: 'Male',
-      dob: DateTime(2020, 5, 20),
-      relationId: 3,
-      relationName: 'Child',
-    ),
-  ];
+class _FamilyMembersScreenState
+    extends ConsumerState<FamilyMembersScreen> {
+  bool _didFetch = false;
+  bool _isWaitingForId = false;
+  bool _idMissing = false;
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
+  @override
+  void initState() {
+    super.initState();
+
+    Future.microtask(_ensurePatientIdAndFetch);
+  }
+
+  Future<void> _ensurePatientIdAndFetch() async {
+    if (_didFetch) return;
+    final notifier = ref.read(patientLoginViewModelProvider.notifier);
+    var patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    if (patientId == 0) {
+      if (!_isWaitingForId) {
+        setState(() {
+          _isWaitingForId = true;
+          _idMissing = false;
+        });
+      }
+      await notifier.loadFromStoragePatient();
+      patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      if (mounted) {
+        setState(() {
+          _isWaitingForId = false;
+        });
+      }
+      if (patientId == 0) {
+        if (mounted) {
+          setState(() {
+            _idMissing = true;
+          });
+        }
+        return;
+      }
+    }
+    _didFetch = true;
+    notifier.fetchAllFamilyMembers(patientId);
+  }
 
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /// Calculates age from a DateTime DOB.
   int _ageFrom(DateTime dob) {
     final now = DateTime.now();
     int age = now.year - dob.year;
@@ -65,7 +76,6 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
     return age;
   }
 
-  /// Returns true when this member represents the account holder (Self).
   bool _isSelf(FamilyMember m) =>
       m.relationName?.toLowerCase() == 'self' || m.relationId == 1;
 
@@ -73,31 +83,40 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
   // Navigation
   // ---------------------------------------------------------------------------
 
-  void _onEditMember(FamilyMember member) async {
-    final updated = await Navigator.push<FamilyMember>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AddFamilyMemberScreen(existingMember: member),
-      ),
-    );
-    if (updated != null) {
-      setState(() {
-        final index =
-            _members.indexWhere((m) => m.memberId == updated.memberId);
-        if (index != -1) _members[index] = updated;
-      });
+  Future<void> _refresh() async {
+    final patientId =
+        ref.read(patientLoginViewModelProvider).patientId;
+
+    if (patientId != null && patientId != 0) {
+      await ref
+          .read(patientLoginViewModelProvider.notifier)
+          .fetchAllFamilyMembers(patientId);
     }
   }
 
   void _onAddMember() async {
-    final newMember = await Navigator.push<FamilyMember>(
+    final result = await Navigator.push<FamilyMember>(
       context,
       MaterialPageRoute(
         builder: (_) => const AddFamilyMemberScreen(),
       ),
     );
-    if (newMember != null) {
-      setState(() => _members.add(newMember));
+
+    if (result != null) {
+      await _refresh();
+    }
+  }
+
+  void _onEditMember(FamilyMember member) async {
+    final result = await Navigator.push<FamilyMember>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddFamilyMemberScreen(existingMember: member),
+      ),
+    );
+
+    if (result != null) {
+      await _refresh();
     }
   }
 
@@ -107,34 +126,98 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<PatientLoginState>(patientLoginViewModelProvider, (prev, next) {
+      final prevId = prev?.patientId ?? 0;
+      final nextId = next.patientId ?? 0;
+      if (prevId == 0 && nextId != 0 && !_didFetch) {
+        _ensurePatientIdAndFetch();
+      }
+    });
+
+    final state = ref.watch(patientLoginViewModelProvider);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
-            const Divider(height: 1, color: Color(0xFFE0E0E0)),
+            const Divider(height: 1),
+
+            /// 🔥 API LIST
             Expanded(
-              child: ListView.separated(
-                padding: EdgeInsets.zero,
-                itemCount: _members.length,
-                separatorBuilder: (_, __) => const Divider(
-                  height: 1,
-                  indent: 16,
-                  endIndent: 16,
-                  color: Color(0xFFE0E0E0),
+              child: state.allfamilyMembers.when(
+                loading: () => _buildLoading(),
+
+                error: (err, _) => Center(
+                  child: Text('Error: $err'),
                 ),
-                itemBuilder: (context, index) {
-                  final member = _members[index];
-                  return _FamilyMemberTile(
-                    member: member,
-                    age: member.dob != null ? _ageFrom(member.dob!) : null,
-                    isSelf: _isSelf(member),
-                    onEdit: () => _onEditMember(member),
+
+                data: (members) {
+                  final patientId = state.patientId ?? 0;
+                  final selfName = state.name;
+                  final selfMobile = state.mobileNo;
+
+                  if (_isWaitingForId) {
+                    return _buildLoading();
+                  }
+                  if (_idMissing && patientId == 0) {
+                    return const Center(
+                      child: Text('Please login again to load members'),
+                    );
+                  }
+
+                  final selfMember = (patientId != 0 &&
+                          (selfName?.trim().isNotEmpty ?? false))
+                      ? FamilyMember(
+                          familyId: patientId,
+                          memberId: patientId,
+                          memberName: selfName,
+                          relationId: 1,
+                          relationName: 'Self',
+                          mobileNo: selfMobile,
+                        )
+                      : null;
+
+                  final hasSelf = members.any((m) =>
+                      (m.relationName?.toLowerCase() == 'self') ||
+                      (m.relationId == 1));
+
+                  final displayMembers = [
+                    if (selfMember != null && !hasSelf) selfMember,
+                    ...members,
+                  ];
+
+                  if (displayMembers.isEmpty) {
+                    return const Center(
+                      child: Text('No family members found'),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: ListView.separated(
+                      itemCount: displayMembers.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final member = displayMembers[index];
+
+                        return _FamilyMemberTile(
+                          member: member,
+                          age: member.dob != null
+                              ? _ageFrom(member.dob!)
+                              : null,
+                          isSelf: _isSelf(member),
+                          onEdit: () => _onEditMember(member),
+                        );
+                      },
+                    ),
                   );
                 },
               ),
             ),
+
             _buildAddButton(),
           ],
         ),
@@ -142,23 +225,23 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------------------------
+
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.all(16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           const Text(
             'Family Members',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A2E),
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
           GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
-            child: const Icon(Icons.close, color: Color(0xFF1A1A2E), size: 24),
+            onTap: () => Navigator.pop(context),
+            child: const Icon(Icons.close),
           ),
         ],
       ),
@@ -170,29 +253,31 @@ class _FamilyMembersScreenState extends State<FamilyMembersScreen> {
       padding: const EdgeInsets.all(16),
       child: OutlinedButton.icon(
         onPressed: _onAddMember,
-        icon: const Icon(Icons.add_circle_outline, color: Color(0xFF3D5AF1)),
-        label: const Text(
-          'Add New Member',
-          style: TextStyle(
-            color: Color(0xFF3D5AF1),
-            fontSize: 16,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+        icon: const Icon(Icons.add),
+        label: const Text('Add New Member'),
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 54),
-          side: const BorderSide(color: Color(0xFF3D5AF1), width: 1.5),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          minimumSize: const Size(double.infinity, 50),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLoading() {
+    return const Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(),
+          SizedBox(height: 8),
+          Text('Loading family members...'),
+        ],
       ),
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Tile widget
+// Tile
 // ---------------------------------------------------------------------------
 
 class _FamilyMemberTile extends StatelessWidget {
@@ -210,83 +295,19 @@ class _FamilyMemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final relation = member.relationName ?? '—';
-    final gender = member.genderName ?? '—';
-    final ageLabel = age != null ? '$age yrs' : '—';
+    final relation = member.relationName ?? '';
+    final gender = member.genderName ?? '';
+    final ageText = age != null ? '$age yrs' : '';
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Row(
-        children: [
-          _Avatar(letter: member.avatarLetter),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member.memberName ?? '',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A2E),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$relation  |  $gender  |  $ageLabel',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF8A8A9A),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!isSelf)
-            GestureDetector(
-              onTap: onEdit,
-              child: const Text(
-                'Edit',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF3D5AF1),
-                ),
-              ),
-            ),
-        ],
+    return ListTile(
+      leading: CircleAvatar(
+        child: Text(member.avatarLetter),
       ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Avatar widget
-// ---------------------------------------------------------------------------
-
-class _Avatar extends StatelessWidget {
-  final String letter;
-
-  const _Avatar({required this.letter});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 48,
-      height: 48,
-      decoration: const BoxDecoration(
-        color: Color(0xFFE8EAF6),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        letter,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: Color(0xFF3D5AF1),
-        ),
+      title: Text(member.memberName ?? ''),
+      subtitle: Text('$relation | $gender | $ageText'),
+      trailing: TextButton(
+        onPressed: onEdit,
+        child: const Text('Edit'),
       ),
     );
   }

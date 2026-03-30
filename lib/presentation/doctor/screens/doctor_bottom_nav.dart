@@ -1,39 +1,7 @@
-// import 'package:flutter/material.dart';
-
-// class DoctorBottomNav extends StatelessWidget {
-//   const DoctorBottomNav({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return const Scaffold(
-//       backgroundColor: Colors.white,
-//       body: Center(
-//         child: Text(
-//           'Doctor Home',
-//           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-// lib/screens/doctor/doctor_main_screen.dart
-//
-// Navigation shell only — AppBar + BottomNavigationBar + routing.
-// Each tab is a separate file.
-//
-// File structure:
-//   lib/screens/doctor/
-//   ├── doctor_main_screen.dart   ← this file
-//   └── tabs/
-//       ├── doctor_home_tab.dart
-//       ├── doctor_patients_tab.dart
-//       ├── doctor_medicines_tab.dart
-//       └── doctor_profile_tab.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qless/presentation/doctor/screens/home_screen.dart';
+
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
 import 'package:qless/presentation/doctor/screens/profile_screen.dart';
@@ -115,7 +83,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          DoctorHomePage(),
+          QueueHomePage(),
           DoctorPatientsPage(),
           DoctorMedicinePage(),
           DoctorProfilePage(),
