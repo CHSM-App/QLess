@@ -6,29 +6,6 @@ part of 'family_member.dart';
 // JsonSerializableGenerator
 // **************************************************************************
 
-GenderOption _$GenderOptionFromJson(Map<String, dynamic> json) => GenderOption(
-  genderId: (json['Gender_id'] as num).toInt(),
-  genderName: json['Gender'] as String,
-);
-
-Map<String, dynamic> _$GenderOptionToJson(GenderOption instance) =>
-    <String, dynamic>{
-      'Gender_id': instance.genderId,
-      'Gender': instance.genderName,
-    };
-
-RelationOption _$RelationOptionFromJson(Map<String, dynamic> json) =>
-    RelationOption(
-      relationId: (json['relation_id'] as num).toInt(),
-      relationName: json['relation'] as String,
-    );
-
-Map<String, dynamic> _$RelationOptionToJson(RelationOption instance) =>
-    <String, dynamic>{
-      'relation_id': instance.relationId,
-      'relation': instance.relationName,
-    };
-
 FamilyMember _$FamilyMemberFromJson(Map<String, dynamic> json) => FamilyMember(
   memberId: (json['member_id'] as num?)?.toInt(),
   memberName: json['name'] as String?,

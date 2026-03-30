@@ -12,9 +12,9 @@ class MasterState {
   final bool isLoading;
   final Map<String, dynamic>? data;
   final String? error;
-  final AsyncValue<List<MasterData>> fetchGender;
-  final AsyncValue<List<MasterData>> fetchRelation;
-  final AsyncValue<List<MasterData>> fetchBloodGroup;
+  final AsyncValue<List<GenderModel>> fetchGender;
+  final AsyncValue<List<RelationModel>> fetchRelation;
+  final AsyncValue<List<BloodGroupModel>> fetchBloodGroup;
 
 
   const MasterState({
@@ -35,9 +35,9 @@ class MasterState {
     String? error,
     bool clearError = false,
     bool clearData = false,
-    AsyncValue<List<MasterData>>? fetchGender,
-    AsyncValue<List<MasterData>>? fetchBloodGroup,
-    AsyncValue<List<MasterData>>? fetchRelation,
+    AsyncValue<List<GenderModel>>? fetchGender,
+    AsyncValue<List<BloodGroupModel>>? fetchBloodGroup,
+    AsyncValue<List<RelationModel>>? fetchRelation,
   
   }) {
     return MasterState(

@@ -1,31 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/domain/models/master_data.dart';
 
 class AddFamilyMemberScreen extends StatefulWidget {
   /// Pass an existing member to pre-fill the form for editing.
   final FamilyMember? existingMember;
 
   /// Gender options loaded from the API / DB (Gender_id + Gender label).
-  final List<GenderOption> genderOptions;
+  final List<GenderModel> genderOptions;
 
   /// Relation options loaded from the API / DB (relation_id + relation label).
-  final List<RelationOption> relationOptions;
+  final List<RelationModel> relationOptions;
 
   const AddFamilyMemberScreen({
     super.key,
     this.existingMember,
     this.genderOptions = const [
-      GenderOption(genderId: 1, genderName: 'Male'),
-      GenderOption(genderId: 2, genderName: 'Female'),
-      GenderOption(genderId: 3, genderName: 'Other'),
+      GenderModel(genderId: 1, gender: 'Male'),
+      GenderModel(genderId: 2, gender: 'Female'),
+      GenderModel(genderId: 3, gender: 'Other'),
     ],
     this.relationOptions = const [
-      RelationOption(relationId: 2, relationName: 'Spouse'),
-      RelationOption(relationId: 3, relationName: 'Child'),
-      RelationOption(relationId: 4, relationName: 'Parent'),
-      RelationOption(relationId: 5, relationName: 'Sibling'),
-      RelationOption(relationId: 6, relationName: 'Other'),
+      RelationModel(relationId: 2, relation: 'Spouse'),
+      RelationModel(relationId: 3, relation: 'Child'),
+      RelationModel(relationId: 4, relation: 'Parent'),
+      RelationModel(relationId: 5, relation: 'Sibling'),
+      RelationModel(relationId: 6, relation: 'Other'),
     ],
   });
 
@@ -103,12 +104,12 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
     return age;
   }
 
-  GenderOption? get _selectedGenderOption => widget.genderOptions
-      .cast<GenderOption?>()
+  GenderModel? get _selectedGenderOption => widget.genderOptions
+      .cast<GenderModel?>()
       .firstWhere((g) => g?.genderId == _selectedGenderId, orElse: () => null);
 
-  RelationOption? get _selectedRelationOption => widget.relationOptions
-      .cast<RelationOption?>()
+  RelationModel? get _selectedRelationOption => widget.relationOptions
+      .cast<RelationModel?>()
       .firstWhere((r) => r?.relationId == _selectedRelationId,
           orElse: () => null);
 
@@ -162,10 +163,10 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
       memberId: widget.existingMember?.memberId,
       memberName: _nameController.text.trim(),
       genderId: _selectedGenderId,
-      genderName: _selectedGenderOption?.genderName,
+      genderName: _selectedGenderOption?.gender,
       dob: _selectedDate,
       relationId: _selectedRelationId,
-      relationName: _selectedRelationOption?.relationName,
+      relationName: _selectedRelationOption?.relation,
       mobileNo: _mobileController.text.trim().isEmpty
           ? null
           : _mobileController.text.trim(),
@@ -339,7 +340,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
                 ),
               ),
               child: Text(
-                option.genderName,
+                option.gender??"",
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -378,7 +379,7 @@ class _AddFamilyMemberScreenState extends State<AddFamilyMemberScreen> {
       items: widget.relationOptions
           .map((r) => DropdownMenuItem<int>(
                 value: r.relationId,
-                child: Text(r.relationName),
+                child: Text(r.relation??""),
               ))
           .toList(),
       onChanged: (val) => setState(() => _selectedRelationId = val),

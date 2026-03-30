@@ -59,13 +59,4 @@ class DoctorLoginImpl implements DoctorLoginRepository {
     return apiService.fetchAllMedicines(doctorId);
   }
 
-   @override
-   Future<List<GenderOption>> getGenderList() {
-    return apiService.getGenderList();
-  }
-
-   @override
-   Future<List<RelationOption>> getRelationList() {
-    return apiService.getRelationList();
-  }
 }

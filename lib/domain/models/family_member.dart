@@ -2,46 +2,6 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'family_member.g.dart';
 
-// ---------------------------------------------------------------------------
-// Lookup models — used to populate Gender & Relation dropdowns from DB
-// ---------------------------------------------------------------------------
-
-@JsonSerializable()
-class GenderOption {
-  @JsonKey(name: 'Gender_id')
-  final int genderId;
-
-  @JsonKey(name: 'Gender')
-  final String genderName;
-
-  const GenderOption({required this.genderId, required this.genderName});
-
-  factory GenderOption.fromJson(Map<String, dynamic> json) =>
-      _$GenderOptionFromJson(json);
-
-  Map<String, dynamic> toJson() => _$GenderOptionToJson(this);
-}
-
-@JsonSerializable()
-class RelationOption {
-  @JsonKey(name: 'relation_id')
-  final int relationId;
-
-  @JsonKey(name: 'relation')
-  final String relationName;
-
-  const RelationOption({required this.relationId, required this.relationName});
-
-  factory RelationOption.fromJson(Map<String, dynamic> json) =>
-      _$RelationOptionFromJson(json);
-
-  Map<String, dynamic> toJson() => _$RelationOptionToJson(this);
-}
-
-// ---------------------------------------------------------------------------
-// Main FamilyMember model — matches your DB columns exactly
-// ---------------------------------------------------------------------------
-
 @JsonSerializable()
 class FamilyMember {
   @JsonKey(name: 'member_id')

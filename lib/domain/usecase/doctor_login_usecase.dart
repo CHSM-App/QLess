@@ -28,10 +28,4 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.fetchAllMedicines(doctorId);
   }
 
-   Future<List<GenderOption>> getGenderList() {
-    return doctorLoginRepository.getGenderList();
-  }
-   Future<List<RelationOption>> getRelationList() {
-    return doctorLoginRepository.getRelationList();
-  }
 }

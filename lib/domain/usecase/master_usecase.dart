@@ -8,15 +8,15 @@ class MasterUsecase {
   MasterUsecase(this.masterRepo);
   
 
-  Future<List<MasterData>> fetchGenderList() {
+  Future<List<GenderModel>> fetchGenderList() {
     return masterRepo.fetchGenderList();
   }
 
-  Future<List<MasterData>> fetchRelationList() {
+  Future<List<RelationModel>> fetchRelationList() {
     return masterRepo.fetchRelationList();
   }
 
-  Future<List<MasterData>> fetchBloodGroupList() {
+  Future<List<BloodGroupModel>> fetchBloodGroupList() {
     return masterRepo.fetchBloodGroupList();
   }
 

@@ -11,17 +11,17 @@ class MasterImpl implements MasterRepo {
   MasterImpl(this.apiService);
 
   @override
-  Future<List<MasterData>> fetchGenderList() {
+  Future<List<GenderModel>> fetchGenderList() {
     return apiService.fetchGenderList();
   }
 
   @override
-  Future<List<MasterData>> fetchRelationList() {
+  Future<List<RelationModel>> fetchRelationList() {
     return apiService.fetchRelationList();
   }
 
   @override
-  Future<List<MasterData>> fetchBloodGroupList() {
+  Future<List<BloodGroupModel>> fetchBloodGroupList() {
     return apiService.fetchBloodGroupList();
   }
 

@@ -13,8 +13,6 @@ abstract class DoctorLoginRepository {
 
     Future<List<Medicine>> fetchAllMedicines(int doctId);
 
-    Future<List<GenderOption>> getGenderList();
-
-    Future<List<RelationOption>> getRelationList();
+   
 
 }

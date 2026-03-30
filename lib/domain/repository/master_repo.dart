@@ -5,9 +5,9 @@ import 'package:qless/domain/models/master_data.dart';
 
 abstract class MasterRepo {
 
-  Future<List<MasterData>> fetchGenderList();
-    Future<List<MasterData>> fetchRelationList();
-      Future<List<MasterData>> fetchBloodGroupList();
+  Future<List<GenderModel>> fetchGenderList();
+    Future<List<RelationModel>> fetchRelationList();
+      Future<List<BloodGroupModel>> fetchBloodGroupList();
   
 
 }
