@@ -12,12 +12,14 @@ Patients _$PatientsFromJson(Map<String, dynamic> json) => Patients(
   email: json['email'] as String?,
   mobileNo: json['mobile_no'] as String?,
   DOB: json['DOB'] == null ? null : DateTime.parse(json['DOB'] as String),
-  Gender: json['Gender'] as String?,
+  gender: json['gender'] as String?,
   address: json['address'] as String?,
   bloodGroup: json['blood_group'] as String?,
   weight: json['weight'] as String?,
   roleId: (json['role_id'] as num?)?.toInt(),
   Token: json['token'] as String?,
+  genderId: (json['gender_id'] as num?)?.toInt(),
+  bloodGroupId: (json['blood_group_id'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$PatientsToJson(Patients instance) => <String, dynamic>{
@@ -26,10 +28,12 @@ Map<String, dynamic> _$PatientsToJson(Patients instance) => <String, dynamic>{
   'mobile_no': instance.mobileNo,
   'address': instance.address,
   'email': instance.email,
-  'Gender': instance.Gender,
+  'gender': instance.gender,
   'DOB': instance.DOB?.toIso8601String(),
   'blood_group': instance.bloodGroup,
   'weight': instance.weight,
   'role_id': instance.roleId,
   'token': instance.Token,
+  'gender_id': instance.genderId,
+  'blood_group_id': instance.bloodGroupId,
 };

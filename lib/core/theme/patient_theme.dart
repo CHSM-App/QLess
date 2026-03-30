@@ -28,7 +28,7 @@ class AppTheme {
       surface: surface,
       error: error,
     ),
-    scaffoldBackgroundColor: surface,
+    scaffoldBackgroundColor: Colors.white,
     fontFamily: 'Nunito',
     appBarTheme: const AppBarTheme(
       backgroundColor: Colors.transparent,

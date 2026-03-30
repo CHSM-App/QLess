@@ -1,0 +1,18 @@
+import 'package:flutter/material.dart';
+
+class DoctorSearchScreen extends StatelessWidget {
+  const DoctorSearchScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: Colors.white,
+      body: Center(
+        child: Text(
+          'Search Doctors',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+}

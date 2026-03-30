@@ -1,39 +1,25 @@
 // lib/screens/doctor/tabs/doctor_medicines_tab.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 
-class DoctorMedicinePage extends StatefulWidget {
-  final int businessId;
-  const DoctorMedicinePage({super.key, this.businessId = 0});
+class DoctorMedicinePage extends ConsumerStatefulWidget {
+  const DoctorMedicinePage({super.key});
 
   @override
-  State<DoctorMedicinePage> createState() => _DoctorMedicinesTabState();
+  ConsumerState<DoctorMedicinePage> createState() => _DoctorMedicinesTabState();
 }
 
-class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
+class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   final _searchController = TextEditingController();
   int _selectedType = 0;
 
-  static const _types = ['All', 'Tablet', 'Syrup', 'Injection', 'Drops'];
+  static const _types = ['All', 'Tablet','Lotions', 'Syrup', 'Injection', 'Drops', 'Spray'];
+  
 
-  final List<Medicine> _medicines = [
-    Medicine(
-      medicineId: 1,
-      medicineName: 'Paracetamol',
-      medTypeName: 'Tablet',
-      medTypeId: 1,
-      strength: 500,
-    ),
-    Medicine(
-      medicineId: 2,
-      medicineName: 'Amoxicillin',
-      medTypeName: 'Tablet',
-      medTypeId: 1,
-      strength: 250,
-    ),
-  ];
 
   @override
   void dispose() {
@@ -41,66 +27,94 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
     super.dispose();
   }
 
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(_refreshMedicines);
+  }
+
+  // Single source of truth — always reads doctorId from provider
+  void _refreshMedicines() {
+    final doctorId =
+        ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+    ref
+        .read(doctorLoginViewModelProvider.notifier)
+        .fetchAllMedicines(doctorId);
+  }
+
   void _goToAddMedicine() async {
-    final result = await Navigator.push<Medicine>(
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const AddMedicinePage()),
     );
-    if (result != null) {
-      setState(() => _medicines.add(result));
-    }
-  }
 
-  void _deleteMedicine(int index) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'Remove Medicine',
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A)),
-        ),
-        content: Text(
-          'Remove "${_medicines[index].medicineName}" from your library?',
-          style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: Color(0xFF64748B))),
-          ),
-          TextButton(
-            onPressed: () {
-              setState(() => _medicines.removeAt(index));
-              Navigator.pop(context);
-            },
-            child: const Text('Remove',
-                style: TextStyle(
-                    color: Color(0xFFEF4444), fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
+  // Refresh the list if save was successful
+  if (result == true) {
+    ref
+      .read(doctorLoginViewModelProvider.notifier)
+      .fetchAllMedicines(ref.read(doctorLoginViewModelProvider).doctorId ?? 0); 
   }
+}
 
-  List<Medicine> get _filtered {
-    return _medicines.where((m) {
+
+
+  // void _deleteMedicine(int index) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (_) => AlertDialog(
+  //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+  //       title: const Text(
+  //         'Remove Medicine',
+  //         style: TextStyle(
+  //             fontSize: 16,
+  //             fontWeight: FontWeight.w700,
+  //             color: Color(0xFF0F172A)),
+  //       ),
+  //       content: Text(
+  //         'Remove "${[index].medicineName}" from your library?',
+  //         style: const TextStyle(fontSize: 13.5, color: Color(0xFF64748B)),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('Cancel',
+  //               style: TextStyle(color: Color(0xFF64748B))),
+  //         ),
+  //         TextButton(
+  //           onPressed: () {
+  //             setState(() => _medicines.removeAt(index));
+  //             Navigator.pop(context);
+  //           },
+  //           child: const Text('Remove',
+  //               style: TextStyle(
+  //                   color: Color(0xFFEF4444), fontWeight: FontWeight.w700)),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+
+  List<Medicine> _filtered(List<Medicine> medicines) {
+    return medicines.where((m) {
       final matchType =
           _selectedType == 0 || m.medTypeName == _types[_selectedType];
+
       final query = _searchController.text.toLowerCase().trim();
+
       final matchSearch = query.isEmpty ||
           (m.medicineName?.toLowerCase().contains(query) ?? false) ||
           (m.medTypeName?.toLowerCase().contains(query) ?? false);
+
       return matchType && matchSearch;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final medicinesAsync =
+        ref.watch(doctorLoginViewModelProvider).medicines;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: Column(
@@ -119,8 +133,8 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
               child: TextField(
                 controller: _searchController,
                 onChanged: (_) => setState(() {}),
-                style:
-                    const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
+                style: const TextStyle(
+                    fontSize: 14, color: Color(0xFF0F172A)),
                 decoration: const InputDecoration(
                   hintText: 'Search medicines...',
                   hintStyle:
@@ -151,7 +165,8 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: sel ? const Color(0xFF0F172A) : Colors.white,
+                      color:
+                          sel ? const Color(0xFF0F172A) : Colors.white,
                       borderRadius: BorderRadius.circular(22),
                       border: Border.all(
                         color: sel
@@ -165,7 +180,9 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
                         fontSize: 12.5,
                         fontWeight:
                             sel ? FontWeight.w700 : FontWeight.w500,
-                        color: sel ? Colors.white : const Color(0xFF64748B),
+                        color: sel
+                            ? Colors.white
+                            : const Color(0xFF64748B),
                       ),
                     ),
                   ),
@@ -181,31 +198,64 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                '${_filtered.length} medicines',
-                style: const TextStyle(
+              child: medicinesAsync!.when(
+                data: (list) => Text(
+                  '${_filtered(list).length} medicines',
+                  style: const TextStyle(
                     fontSize: 12.5,
                     color: Color(0xFF94A3B8),
-                    fontWeight: FontWeight.w500),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                loading: () => const Text(
+                  'Loading...',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF94A3B8),
+                  ),
+                ),
+                error: (_, __) => const Text(
+                  'Error loading medicines',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFFEF4444),
+                  ),
+                ),
               ),
             ),
           ),
 
           // ── List ──────────────────────────────────────────────
           Expanded(
-            child: _filtered.isEmpty
-                ? const _EmptyState()
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
-                    itemCount: _filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _MedicineCard(
-                      medicine: _filtered[i],
-                      onDelete: () => _deleteMedicine(
-                        _medicines.indexOf(_filtered[i]),
-                      ),
-                    ),
+            child: medicinesAsync!.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(),
+              ),
+              error: (e, _) => const Center(
+                child: Text('Failed to load medicines'),
+              ),
+              data: (medicines) {
+                final filtered = _filtered(medicines);
+
+                if (filtered.isEmpty) {
+                  return const _EmptyState();
+                }
+
+                return ListView.separated(
+                  padding:
+                      const EdgeInsets.fromLTRB(16, 10, 16, 100),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: 10),
+                  itemBuilder: (_, i) => _MedicineCard(
+                    medicine: filtered[i],
+                    onDelete: () {
+                      // TODO: connect delete API
+                    },
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -230,19 +280,20 @@ class _DoctorMedicinesTabState extends State<DoctorMedicinePage> {
 }
 
 // ─────────────────────────────────────────────
-// Medicine Card — uses actual Medicine model fields
+// Medicine Card
 // ─────────────────────────────────────────────
 class _MedicineCard extends StatelessWidget {
-  const _MedicineCard({required this.medicine, required this.onDelete});
+  const _MedicineCard(
+      {required this.medicine, required this.onDelete});
 
   final Medicine medicine;
   final VoidCallback onDelete;
 
   static const _typeColors = {
-    'Tablet':    [Color(0xFFEFF6FF), Color(0xFF3B82F6)],
-    'Syrup':     [Color(0xFFECFDF5), Color(0xFF10B981)],
+    'Tablet': [Color(0xFFEFF6FF), Color(0xFF3B82F6)],
+    'Syrup': [Color(0xFFECFDF5), Color(0xFF10B981)],
     'Injection': [Color(0xFFFFF7ED), Color(0xFFF97316)],
-    'Drops':     [Color(0xFFF5F3FF), Color(0xFF8B5CF6)],
+    'Drops': [Color(0xFFF5F3FF), Color(0xFF8B5CF6)],
   };
 
   @override
@@ -250,10 +301,8 @@ class _MedicineCard extends StatelessWidget {
     final colors = _typeColors[medicine.medTypeName] ??
         [const Color(0xFFF1F5F9), const Color(0xFF64748B)];
 
-    // Format strength label e.g. "500 mg"
-    final strengthLabel = medicine.strength != null
-        ? '${medicine.strength} mg'
-        : '—';
+    final strengthLabel =
+        medicine.strength != null ? '${medicine.strength} mg' : '—';
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -271,12 +320,12 @@ class _MedicineCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header row: badge + name + delete ────────────────
+          // ── Header row ────────────────────────────────────────
           Row(
             children: [
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: colors[0],
                   borderRadius: BorderRadius.circular(7),
@@ -317,7 +366,7 @@ class _MedicineCard extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // ── Detail row: strength · mobile · medicine ID ───────
+          // ── Detail row ────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(

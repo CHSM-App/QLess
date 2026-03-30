@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
+import 'package:qless/presentation/shared/screens/login_screen.dart';
 import 'package:qless/presentation/shared/screens/otp_screen.dart';
 
 
@@ -29,7 +31,9 @@ class _PatientRegistrationScreenState
   final _weightController      = TextEditingController();
 
   String?   _selectedGender;
+  int?      _selectedGenderId;
   String?   _selectedBloodGroup;
+  int?      _selectedBloodGroupId;
   DateTime? _selectedDob;
 
   // ── Theme constants ─────────────────────────────────────────────────────
@@ -40,6 +44,17 @@ class _PatientRegistrationScreenState
   static const _bg      = Color(0xFFF1F5F9);
   static const _border  = Color(0xFFE2E8F0);
   static const _red     = Color(0xFFEF4444);
+
+  @override
+  void initState() {
+    super.initState();
+    // Fetch master data after first frame to avoid provider modification during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(masterViewModelProvider.notifier).fetchGenderList();
+      ref.read(masterViewModelProvider.notifier).fetchBloodGroupList();
+    });
+  }
 
   @override
   void dispose() {
@@ -112,7 +127,7 @@ class _PatientRegistrationScreenState
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    if (_selectedGender == null) {
+    if (_selectedGenderId == null) {
       _snack('Please select your gender', isError: true);
       return;
     }
@@ -120,7 +135,7 @@ class _PatientRegistrationScreenState
       _snack('Please select your date of birth', isError: true);
       return;
     }
-    if (_selectedBloodGroup == null) {
+    if (_selectedBloodGroupId == null) {
       _snack('Please select your blood group', isError: true);
       return;
     }
@@ -130,9 +145,11 @@ class _PatientRegistrationScreenState
       mobileNo:    _mobileController.text.trim(),
       email:       _emailController.text.trim(),
       address:     _addressController.text.trim(),
-      Gender:      _selectedGender,
+      gender:      _selectedGender,
       DOB:         _selectedDob,
       bloodGroup:  _selectedBloodGroup,
+      genderId:    _selectedGenderId,
+      bloodGroupId: _selectedBloodGroupId,
       weight:      _weightController.text.trim(),
     );
 
@@ -165,8 +182,7 @@ class _PatientRegistrationScreenState
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => OtpVerificationScreen(
-            mobileNumber: _mobileController.text.trim(),
+          builder: (_) => LoginScreen(
             role: 'patient',
           ),
         ),
@@ -184,6 +200,7 @@ class _PatientRegistrationScreenState
   Widget build(BuildContext context) {
     ref.listen<PatientLoginState>(patientLoginViewModelProvider, _onStateChange);
     final state = ref.watch(patientLoginViewModelProvider);
+    final masterState = ref.watch(masterViewModelProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -336,9 +353,33 @@ class _PatientRegistrationScreenState
 
               _FieldLabel(label: 'Gender'),
               const SizedBox(height: 8),
-              _GenderSelector(
-                selected: _selectedGender,
-                onChanged: (v) => setState(() => _selectedGender = v),
+              masterState.fetchGender.when(
+                data: (list) {
+                  final options = list
+                      .where((e) =>
+                          (e.gender?.trim().isNotEmpty ?? false) &&
+                          (e.genderId != null))
+                      .map((e) => _Option(
+                            id: e.genderId!,
+                            label: e.gender!.trim(),
+                          ))
+                      .toList();
+                  if (options.isEmpty) {
+                    return const _InlineError(
+                        text: 'No gender data found');
+                  }
+                  return _GenderSelector(
+                    options: options,
+                    selectedId: _selectedGenderId,
+                    onChanged: (opt) => setState(() {
+                      _selectedGender = opt.label;
+                      _selectedGenderId = opt.id;
+                    }),
+                  );
+                },
+                loading: () => const _InlineLoading(),
+                error: (e, _) => _InlineError(
+                    text: 'Unable to load gender list. Please retry.'),
               ),
 
               const SizedBox(height: 16),
@@ -364,9 +405,33 @@ class _PatientRegistrationScreenState
 
               _FieldLabel(label: 'Blood Group'),
               const SizedBox(height: 8),
-              _BloodGroupPicker(
-                selected: _selectedBloodGroup,
-                onChanged: (v) => setState(() => _selectedBloodGroup = v),
+              masterState.fetchBloodGroup.when(
+                data: (list) {
+                  final groups = list
+                      .where((e) =>
+                          (e.bloodGroupName?.trim().isNotEmpty ?? false) &&
+                          (e.bloodGroupId != null))
+                      .map((e) => _Option(
+                            id: e.bloodGroupId!,
+                            label: e.bloodGroupName!.trim(),
+                          ))
+                      .toList();
+                  if (groups.isEmpty) {
+                    return const _InlineError(
+                        text: 'No blood group data found');
+                  }
+                  return _BloodGroupPicker(
+                    groups: groups,
+                    selectedId: _selectedBloodGroupId,
+                    onChanged: (opt) => setState(() {
+                      _selectedBloodGroup = opt.label;
+                      _selectedBloodGroupId = opt.id;
+                    }),
+                  );
+                },
+                loading: () => const _InlineLoading(),
+                error: (e, _) => _InlineError(
+                    text: 'Unable to load blood groups. Please retry.'),
               ),
 
               const SizedBox(height: 16),
@@ -586,31 +651,41 @@ class _PhonePrefix extends StatelessWidget {
   }
 }
 
+class _Option {
+  final int id;
+  final String label;
+  const _Option({required this.id, required this.label});
+}
+
 class _GenderSelector extends StatelessWidget {
-  const _GenderSelector(
-      {required this.selected, required this.onChanged});
+  const _GenderSelector({
+    required this.options,
+    required this.selectedId,
+    required this.onChanged,
+  });
 
-  final String? selected;
-  final ValueChanged<String> onChanged;
-
-  static const _options = [
-    ('Male',   Icons.male_rounded),
-    ('Female', Icons.female_rounded),
-    ('Other',  Icons.transgender_rounded),
-  ];
+  final List<_Option> options;
+  final int? selectedId;
+  final ValueChanged<_Option> onChanged;
+  static const _iconMap = {
+    'male': Icons.male_rounded,
+    'female': Icons.female_rounded,
+    'other': Icons.transgender_rounded,
+  };
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: List.generate(_options.length, (i) {
-        final label     = _options[i].$1;
-        final icon      = _options[i].$2;
-        final isSelected = selected == label;
+      children: List.generate(options.length, (i) {
+        final opt = options[i];
+        final icon =
+            _iconMap[opt.label.toLowerCase()] ?? Icons.person_outline_rounded;
+        final isSelected = selectedId == opt.id;
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: i < _options.length - 1 ? 8 : 0),
+            padding: EdgeInsets.only(right: i < options.length - 1 ? 8 : 0),
             child: GestureDetector(
-              onTap: () => onChanged(label),
+              onTap: () => onChanged(opt),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 height: 48,
@@ -635,7 +710,7 @@ class _GenderSelector extends StatelessWidget {
                             ? const Color(0xFF0EA5E9)
                             : const Color(0xFF94A3B8)),
                     const SizedBox(width: 5),
-                    Text(label,
+                    Text(opt.label,
                         style: TextStyle(
                             fontSize: 13,
                             fontWeight: isSelected
@@ -656,21 +731,23 @@ class _GenderSelector extends StatelessWidget {
 }
 
 class _BloodGroupPicker extends StatelessWidget {
-  const _BloodGroupPicker(
-      {required this.selected, required this.onChanged});
+  const _BloodGroupPicker({
+    required this.groups,
+    required this.selectedId,
+    required this.onChanged,
+  });
 
-  final String? selected;
-  final ValueChanged<String> onChanged;
-
-  static const _groups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  final List<_Option> groups;
+  final int? selectedId;
+  final ValueChanged<_Option> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _groups.map((g) {
-        final isSelected = selected == g;
+      children: groups.map((g) {
+        final isSelected = selectedId == g.id;
         return GestureDetector(
           onTap: () => onChanged(g),
           child: AnimatedContainer(
@@ -698,7 +775,7 @@ class _BloodGroupPicker extends StatelessWidget {
                   : [],
             ),
             child: Center(
-              child: Text(g,
+              child: Text(g.label,
                   style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
@@ -709,6 +786,57 @@ class _BloodGroupPicker extends StatelessWidget {
           ),
         );
       }).toList(),
+    );
+  }
+}
+
+class _InlineLoading extends StatelessWidget {
+  const _InlineLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 48,
+      child: Center(
+        child: SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineError extends StatelessWidget {
+  final String text;
+  const _InlineError({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFFECACA)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              size: 18, color: Color(0xFFEF4444)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFB91C1C)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

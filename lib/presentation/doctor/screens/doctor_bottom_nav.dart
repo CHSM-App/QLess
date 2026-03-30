@@ -117,7 +117,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
         children: [
           DoctorHomePage(),
           DoctorPatientsPage(),
-          DoctorMedicinePage(businessId: widget.businessId),
+          DoctorMedicinePage(),
           DoctorProfilePage(),
         ],
       ),

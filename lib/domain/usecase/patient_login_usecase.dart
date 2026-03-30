@@ -1,3 +1,4 @@
+import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/repository/patient_login_repo.dart';
 
@@ -13,4 +14,9 @@ class PatientLoginUsecase {
   Future<List<Patients>> checkPhonePatient(String mobileNo) {
     return patientLoginRepository.checkPhonePatient(mobileNo);
   }
+
+    Future<dynamic> addFamilyMember(FamilyMember member) {
+    return patientLoginRepository.addFamilyMember(member);
+  }
+
 }

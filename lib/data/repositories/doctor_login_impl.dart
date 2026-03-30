@@ -1,6 +1,7 @@
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
 
@@ -52,4 +53,10 @@ class DoctorLoginImpl implements DoctorLoginRepository {
    Future<List<Medicine>> fetchMedicineTypes() {
     return apiService.fetchMedicineTypes();
   }
+
+  @override
+   Future<List<Medicine>> fetchAllMedicines(int doctorId) {
+    return apiService.fetchAllMedicines(doctorId);
+  }
+
 }

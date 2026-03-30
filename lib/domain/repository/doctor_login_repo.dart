@@ -1,5 +1,6 @@
 
 import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/medicine.dart';
 
 abstract class DoctorLoginRepository {
@@ -8,5 +9,10 @@ abstract class DoctorLoginRepository {
 
    Future<dynamic> addMedicine(Medicine medicine);
 
-    Future<dynamic> fetchMedicineTypes();
+    Future<List<Medicine>> fetchMedicineTypes();
+
+    Future<List<Medicine>> fetchAllMedicines(int doctId);
+
+   
+
 }
