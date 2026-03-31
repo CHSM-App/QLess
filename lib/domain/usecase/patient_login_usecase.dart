@@ -19,4 +19,7 @@ class PatientLoginUsecase {
     return patientLoginRepository.addFamilyMember(member);
   }
 
+    Future<List<FamilyMember>> fetchFamilyMembers(int familyId) {
+    return patientLoginRepository.fetchFamilyMembers(familyId);
+  }
 }

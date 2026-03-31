@@ -20,11 +20,14 @@ class AddFamilyMemberScreen extends ConsumerStatefulWidget {
       GenderModel(genderId: 3, gender: 'Other'),
     ],
     this.relationOptions = const [
+      RelationModel(relationId: 1, relation: 'Parent'),
       RelationModel(relationId: 2, relation: 'Spouse'),
       RelationModel(relationId: 3, relation: 'Child'),
-      RelationModel(relationId: 4, relation: 'Parent'),
-      RelationModel(relationId: 5, relation: 'Sibling'),
-      RelationModel(relationId: 6, relation: 'Other'),
+      RelationModel(relationId: 4, relation: 'Sibling'),
+      RelationModel(relationId: 5, relation: 'Parent-in-law'),
+      RelationModel(relationId: 6, relation: 'Partner'),
+      RelationModel(relationId: 7, relation: 'Grandparent'),
+      RelationModel(relationId: 8, relation: 'Other'),
     ],
   });
 
@@ -70,11 +73,13 @@ class _AddFamilyMemberScreenState
     _mobileController.text = m.mobileNo ?? '';
     _selectedGenderId = m.genderId;
     _selectedRelationId = m.relationId;
+    _isConfirmed = true;
 
     if (m.dob != null) {
       _selectedDate = m.dob;
       _dobController.text = _formatDisplayDate(m.dob!);
     }
+ 
   }
 
   @override
@@ -140,50 +145,58 @@ class _AddFamilyMemberScreenState
     }
   }
 
-  void _onSave() {
-    if (!_formKey.currentState!.validate()) return;
+void _onSave() {
+  if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedGenderId == null) {
-      _showSnack('Please select a gender.');
-      return;
-    }
-    if (_selectedDate == null) {
-      _showSnack('Please select a date of birth.');
-      return;
-    }
-    if (_selectedRelationId == null) {
-      _showSnack('Please select a relation.');
-      return;
-    }
-    if (!_isConfirmed) {
-      _showSnack('Please confirm that the details are accurate.');
-      return;
-    }
-
-    final patientId = ref.read(patientLoginViewModelProvider).patientId;
-    if (patientId == null || patientId == 0) {
-      _showSnack('Unable to find patient id. Please login again.');
-      return;
-    }
-
-    final member = FamilyMember(
-      familyId: patientId,
-      memberId: widget.existingMember?.memberId,
-      memberName: _nameController.text.trim(),
-      genderId: _selectedGenderId,
-      genderName: _selectedGenderOption?.gender,
-      dob: _selectedDate,
-      relationId: _selectedRelationId,
-      relationName: _selectedRelationOption?.relation,
-      mobileNo: _mobileController.text.trim().isEmpty
-          ? null
-          : _mobileController.text.trim(),
-    );
-
-    _didSubmit = true;
-    ref.read(patientLoginViewModelProvider.notifier).addFamilyMember(member);
+  if (_selectedGenderId == null) {
+    _showSnack('Please select a gender.');
+    return;
   }
 
+  if (_selectedDate == null) {
+    _showSnack('Please select a date of birth.');
+    return;
+  }
+
+  if (_selectedRelationId == null) {
+    _showSnack('Please select a relation.');
+    return;
+  }
+
+  if (!_isConfirmed) {
+    _showSnack('Please confirm that the details are accurate.');
+    return;
+  }
+
+  final patientId = ref.read(patientLoginViewModelProvider).patientId;
+
+  if (patientId == null || patientId == 0) {
+    _showSnack('Unable to find patient id. Please login again.');
+    return;
+  }
+
+  // ✅ IMPORTANT: memberId for update
+  final member = FamilyMember(
+    memberId: widget.existingMember?.memberId, // 🔥 FIXED
+    familyId: patientId,
+    memberName: _nameController.text.trim(),
+    genderId: _selectedGenderId,
+    genderName: _selectedGenderOption?.gender,
+    dob: _selectedDate,
+    relationId: _selectedRelationId,
+    relationName: _selectedRelationOption?.relation,
+    mobileNo: _mobileController.text.trim().isEmpty
+        ? null
+        : _mobileController.text.trim(),
+  );
+
+  // ✅ Debug print (VERY IMPORTANT)
+  print("SUBMIT DATA: ${member.toJson()}");
+
+  _didSubmit = true;
+
+  ref.read(patientLoginViewModelProvider.notifier).addFamilyMember(member);
+}
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
