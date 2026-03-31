@@ -167,8 +167,9 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
     //     context,
     //     MaterialPageRoute(builder: (_) => const SplashScreen()),
     //   );
-    // }
-    
+    }
+  }
+
   void _advanceQueue() {
     if (!mounted) return;
     setState(() {
