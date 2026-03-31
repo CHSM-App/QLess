@@ -132,6 +132,8 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
         context,
         MaterialPageRoute(builder: (_) => const SplashScreen()),
       );
+    }
+  }
     // if (tokenState.isLoggedIn) {
     //           Navigator.pushReplacement(
     //       context,
@@ -166,8 +168,7 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
     //     MaterialPageRoute(builder: (_) => const SplashScreen()),
     //   );
     // }
-  }
-
+    
   void _advanceQueue() {
     if (!mounted) return;
     setState(() {
