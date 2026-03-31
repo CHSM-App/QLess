@@ -2,12 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
-import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
-import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
-import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
-import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
-import 'package:qless/presentation/shared/screens/login_screen.dart';
 
 class QlessSplashScreen extends ConsumerStatefulWidget {
   final Widget nextScreen;
@@ -101,37 +96,41 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
     await ref.read(tokenProvider.notifier).loadTokens();
     final tokenState = ref.read(tokenProvider);
 
-    if (tokenState.isLoggedIn) {
-      if (tokenState.roleId == 1) {
-        await ref.read(doctorLoginViewModelProvider.notifier).loadFromStorage();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
-        );
-      } else if (tokenState.roleId == 2) {
-        await ref
-            .read(patientLoginViewModelProvider.notifier)
-            .loadFromStoragePatient();
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PatientBottomNav(
-              onToggleTheme: () {},
-              themeMode: ThemeMode.light,
-            ),
-          ),
-        );
-      } else {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const SplashScreen()),
-        );
-      }
-    } else {
-      Navigator.pushReplacement(
+    Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const SplashScreen()),
-      );
+        MaterialPageRoute(builder: (_) => const SplashScreen()));
+
+    // if (tokenState.isLoggedIn) {
+    //   if (tokenState.roleId == 1) {
+    //     await ref.read(doctorLoginViewModelProvider.notifier).loadFromStorage();
+    //     Navigator.pushReplacement(
+    //       context,
+    //       MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
+    //     );
+    //   } else if (tokenState.roleId == 2) {
+    //     await ref
+    //         .read(patientLoginViewModelProvider.notifier)
+    //         .loadFromStoragePatient();
+    //     Navigator.pushReplacement(
+    //       context,
+    //       MaterialPageRoute(
+    //         builder: (_) => PatientBottomNav(
+    //           onToggleTheme: () {},
+    //           themeMode: ThemeMode.light,
+    //         ),
+    //       ),
+    //     );
+    //   } else {
+    //     Navigator.pushReplacement(
+    //       context,
+    //       MaterialPageRoute(builder: (_) => const SplashScreen()),
+    //     );
+    //   }
+    // } else {
+    //   Navigator.pushReplacement(
+    //     context,
+    //     MaterialPageRoute(builder: (_) => const SplashScreen()),
+    //   );
     // if (tokenState.isLoggedIn) {
     //           Navigator.pushReplacement(
     //       context,
@@ -165,8 +164,8 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
     //     context,
     //     MaterialPageRoute(builder: (_) => const SplashScreen()),
     //   );
-    // }
-  }
+    }
+  // }
 
   void _advanceQueue() {
     if (!mounted) return;

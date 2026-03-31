@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/core/network/token_provider.dart';
-import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
-import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});

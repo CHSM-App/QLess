@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/token_response.dart';
+import 'package:qless/firebase_options.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
@@ -102,8 +103,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     _fadeController.dispose();
     _shakeController.dispose();
     _timer?.cancel();
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
     super.dispose();
   }
 
@@ -182,7 +181,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   Future<void> _ensureFirebaseInitialized() async {
     if (Firebase.apps.isNotEmpty) return;
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
     } catch (e) {
       debugPrint('Firebase init failed (OTP verify): $e');
     }
@@ -272,45 +273,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED PROPS — passed to both layouts
-// ─────────────────────────────────────────────────────────────────────────────
-class _OtpLayoutProps {
-  final bool isDoctor;
-  final Color accentColor;
-  final String maskedNumber;
-  final List<TextEditingController> controllers;
-  final List<FocusNode> focusNodes;
-  final bool hasError;
-  final bool isFilled;
-  final bool isLoading;
-  final int secondsLeft;
-  final Animation<double> shakeAnim;
-  final void Function(int, String) onOtpChanged;
-  final void Function(int, KeyEvent) onKeyEvent;
-  final VoidCallback onVerify;
-  final VoidCallback onResend;
-
-  const _OtpLayoutProps({
-    required this.isDoctor,
-    required this.accentColor,
-    required this.maskedNumber,
-    required this.controllers,
-    required this.focusNodes,
-    required this.hasError,
-    required this.isFilled,
-    required this.isLoading,
-    required this.secondsLeft,
-    required this.shakeAnim,
-    required this.onOtpChanged,
-    required this.onKeyEvent,
-    required this.onVerify,
-    required this.onResend,
-  });
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LANDSCAPE LAYOUT
-// Left panel: dark info  |  Right panel: OTP form
-// ─────────────────────────────────────────────────────────────────────────────
 class _LandscapeLayout extends StatelessWidget {
   final bool isDoctor;
   final Color accentColor;
