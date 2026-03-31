@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/screens/home_screen.dart';
 
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
@@ -84,7 +85,10 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
         index: _currentIndex,
         children: [
           QueueHomePage(),
-          DoctorPatientsPage(),
+          PrescriptionScreen(
+            doctorId: 1,
+            patientId: 1,
+          ),
           DoctorMedicinePage(),
           DoctorProfilePage(),
         ],

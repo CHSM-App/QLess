@@ -1,0 +1,84 @@
+// GENERATED CODE - DO NOT MODIFY BY HAND
+
+part of 'prescription.dart';
+
+// **************************************************************************
+// JsonSerializableGenerator
+// **************************************************************************
+
+PrescriptionMedicineModel _$PrescriptionMedicineModelFromJson(
+  Map<String, dynamic> json,
+) => PrescriptionMedicineModel(
+  prescMedId: (json['presc_med_id'] as num?)?.toInt(),
+  prescriptionId: (json['prescription_id'] as num?)?.toInt(),
+  medicineId: (json['medicine_id'] as num?)?.toInt(),
+  medicineTypeId: (json['medicine_type_id'] as num?)?.toInt(),
+  frequency: json['frequency'] as String?,
+  duration: json['duration'] as String?,
+  timing: json['timing'] as String?,
+  tabletDosage: json['tablet_dosage'] as String?,
+  syrupDosageMl: json['syrup_dosage_ml'] as String?,
+  injDosage: json['inj_dosage'] as String?,
+  injRoute: json['inj_route'] as String?,
+  dropsCount: json['drops_count'] as String?,
+  dropsApplication: json['drops_application'] as String?,
+  lotionApplyArea: json['lotion_apply_area'] as String?,
+  sprayPuffs: json['spray_puffs'] as String?,
+  sprayUsage: json['spray_usage'] as String?,
+);
+
+Map<String, dynamic> _$PrescriptionMedicineModelToJson(
+  PrescriptionMedicineModel instance,
+) => <String, dynamic>{
+  'presc_med_id': instance.prescMedId,
+  'prescription_id': instance.prescriptionId,
+  'medicine_id': instance.medicineId,
+  'medicine_type_id': instance.medicineTypeId,
+  'frequency': instance.frequency,
+  'duration': instance.duration,
+  'timing': instance.timing,
+  'tablet_dosage': instance.tabletDosage,
+  'syrup_dosage_ml': instance.syrupDosageMl,
+  'inj_dosage': instance.injDosage,
+  'inj_route': instance.injRoute,
+  'drops_count': instance.dropsCount,
+  'drops_application': instance.dropsApplication,
+  'lotion_apply_area': instance.lotionApplyArea,
+  'spray_puffs': instance.sprayPuffs,
+  'spray_usage': instance.sprayUsage,
+};
+
+PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
+    PrescriptionModel(
+      prescriptionId: (json['prescription_id'] as num?)?.toInt(),
+      patientId: (json['patient_id'] as num?)?.toInt(),
+      doctorId: (json['doctor_id'] as num?)?.toInt(),
+      prescriptionDate: json['prescription_date'] as String?,
+      symptoms: json['symptoms'] as String?,
+      diagnosis: json['diagnosis'] as String?,
+      clinicalNotes: json['clinical_notes'] as String?,
+      followUpDate: json['follow_up_date'] as String?,
+      advice: json['advice'] as String?,
+      createdAt: json['created_at'] as String?,
+      medicines: (json['medicines'] as List<dynamic>?)
+          ?.map(
+            (e) =>
+                PrescriptionMedicineModel.fromJson(e as Map<String, dynamic>),
+          )
+          .toList(),
+    );
+
+Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
+    <String, dynamic>{
+      'prescription_id': instance.prescriptionId,
+      'patient_id': instance.patientId,
+      'doctor_id': instance.doctorId,
+      'prescription_date': instance.prescriptionDate,
+      'symptoms': instance.symptoms,
+      'diagnosis': instance.diagnosis,
+      'clinical_notes': instance.clinicalNotes,
+      'follow_up_date': instance.followUpDate,
+      'advice': instance.advice,
+      'created_at': instance.createdAt,
+      'medicines': instance.medicines?.map((e) => e.toJson()).toList(),
+    };
