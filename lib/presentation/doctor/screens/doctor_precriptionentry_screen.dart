@@ -8,15 +8,15 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS
 // ════════════════════════════════════════════════════════════════════
-const kPrimary = Color(0xFF2B7FFF);
-const kPrimaryBg = Color(0xFFE8F1FF);
-const kBg = Color(0xFFF5F7FB);
+const kPrimary = Color(0xFF1A73E8);
+const kPrimaryBg = Color(0xFFE8F0FE);
+const kBg = Color(0xFFF8F9FA);
 const kCardBg = Colors.white;
-const kTextDark = Color(0xFF1A1A2E);
+const kTextDark = Color(0xFF1F2937);
 const kTextMid = Color(0xFF6B7280);
-const kBorder = Color(0xFFE5E9F0);
-const kRed = Color(0xFFEF4444);
-const kGreen = Color(0xFF10B981);
+const kBorder = Color(0xFFE5E7EB);
+const kRed = Color(0xFFEA4335);
+const kGreen = Color(0xFF34A853);
 
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE TYPE
@@ -1037,6 +1037,8 @@ class _MedCardState extends State<_MedCard> {
       ]),
     ],
   );
+
+
 
   Widget _injBody() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,

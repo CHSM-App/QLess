@@ -230,7 +230,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
                               decoration: BoxDecoration(
                                 color: selected
                                     ? _primary.withOpacity(0.10)
-                                    : Colors.transparent,
+                                    : Colors.blue,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
@@ -239,7 +239,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
                               child: Icon(
                                 _navItems[i].icon,
                                 size: 22,
-                                color: selected ? _primary : _slate,
+                                color: selected ? Colors.blue : Colors.blueGrey,
                               ),
                             ),
                           ],
