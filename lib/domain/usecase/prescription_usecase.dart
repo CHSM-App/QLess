@@ -11,5 +11,4 @@ class PrescriptionUsecase {
     return prescriptionRepository.insertPrescription(prescription);
   }
 
-
 }

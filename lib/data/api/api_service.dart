@@ -56,6 +56,7 @@ abstract class ApiService {
   @GET("doctor/users/getDoctorSchedule/{doctor_id}")
   Future<DoctorScheduleModel> getDoctorSchedule(@Path("doctor_id") int doctorId);
 
+
   //-------------------------------------------//PATIENT API//----------------------------------------------
   // GET API
   @GET("login/checkPhonePatient")
