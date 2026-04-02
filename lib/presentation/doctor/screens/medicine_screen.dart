@@ -53,6 +53,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
 
   void _refreshMedicines() {
     final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+    if (doctorId == 0) return;
     ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
   }
 
@@ -165,6 +166,17 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(
+      doctorLoginViewModelProvider.select((s) => s.doctorId),
+      (prev, next) {
+        final id = next ?? 0;
+        if (id == 0 || prev == next) return;
+        ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .fetchAllMedicines(id);
+      },
+    );
+
     final medicinesAsync = ref.watch(doctorLoginViewModelProvider).medicines;
 
     return Scaffold(
