@@ -1,6 +1,3 @@
-
-
-
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/repository/doctor_settings_repo.dart';

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:qless/core/constant.dart';
-import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/domain/models/doctor_availability_model.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/domain/models/family_member.dart';
@@ -29,7 +30,7 @@ abstract class ApiService {
   //------------------------------------------//DOCTOR API//---------------------------------------
   // GET API
   @GET("login/checkPhoneDoctor")
-  Future<List<DoctorLogin>> checkPhoneDoctor(@Query("mobile") String mobile);
+  Future<List<DoctorDetails>> checkPhoneDoctor(@Query("mobile") String mobile);
 
   @GET("doctor/users/getMedicineTypes")
   Future<List<Medicine>> fetchMedicineTypes();
@@ -39,7 +40,7 @@ abstract class ApiService {
 
   // Doctor's Post API 
   @POST("login/addDoctorDetails")
-  Future<dynamic> addDoctorDetails(@Body() DoctorLogin doctorLogin);
+  Future<dynamic> addDoctorDetails(@Body() DoctorDetails doctorLogin);
 
   @POST("doctor/insert/insertMedicine")
   Future<dynamic> addMedicine(@Body() Medicine medicine);
@@ -68,7 +69,11 @@ abstract class ApiService {
   @POST("patient/insert/insertFamilyMember")
   Future<dynamic> addFamilyMember(@Body() FamilyMember member);
 
+  @GET("patient/users/doctorLogin")
+  Future<List<DoctorDetails>> fetchDoctors();
 
+  @GET("patient/users/getDoctorAvailability/{doctor_id}")
+  Future<List<DoctorAvailabilityModel>> getDoctorAvailability(@Path("doctor_id") int doctorId);
 
   //-----------------------------------------//PATIENT AND DOCTOR COMMON API//------------------------------
   

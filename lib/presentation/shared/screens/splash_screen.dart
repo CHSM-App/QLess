@@ -7,7 +7,6 @@ import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
-import 'package:qless/presentation/shared/screens/login_screen.dart';
 
 class QlessSplashScreen extends ConsumerStatefulWidget {
   final Widget nextScreen;

@@ -1,5 +1,4 @@
-import 'package:qless/domain/models/doctor_login.dart';
-import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
 
@@ -8,11 +7,11 @@ class DoctorLoginUsecase {
 
   DoctorLoginUsecase(this.doctorLoginRepository);
 
-  Future<dynamic> addDoctorDetails(DoctorLogin doctorLogin) {
+  Future<dynamic> addDoctorDetails(DoctorDetails doctorLogin) {
     return doctorLoginRepository.addDoctorDetails(doctorLogin);
   }
 
-  Future<List<DoctorLogin>> checkPhoneDoctor(String mobile) {
+  Future<List<DoctorDetails>> checkPhoneDoctor(String mobile) {
     return doctorLoginRepository.checkPhoneDoctor(mobile);
   }
 

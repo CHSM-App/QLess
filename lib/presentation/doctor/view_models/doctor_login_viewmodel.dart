@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
-import 'package:qless/domain/models/doctor_login.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/usecase/doctor_login_usecase.dart';
 
@@ -15,7 +15,7 @@ class DoctorLoginState {
   final String? token;
   final String? clinic_name;
   final String? clinic_id;
-  final AsyncValue<List<DoctorLogin>> phoneCheckResult;
+  final AsyncValue<List<DoctorDetails>> phoneCheckResult;
     final AsyncValue<List<Medicine>>? medicines;
   final AsyncValue<List<Medicine>>? medicineTypes;
 
@@ -47,7 +47,7 @@ class DoctorLoginState {
     int? doctorId,
     String? clinicId,
     String? clinic_name,
-    AsyncValue<List<DoctorLogin>>? phoneCheckResult,
+    AsyncValue<List<DoctorDetails>>? phoneCheckResult,
       final AsyncValue<List<Medicine>>? medicines,
   final AsyncValue<List<Medicine>>? medicineTypes,
 
@@ -85,7 +85,6 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
 
     final token = await TokenStorage.getValue('token');
     final doctorIdStr = await TokenStorage.getValue('doctor_id');
-    print(doctorIdStr);
     final doctorId = int.tryParse(doctorIdStr ?? '0') ?? 0;
     final clinicName = await TokenStorage.getValue('clinic_name');
     final clinicId = await TokenStorage.getValue('clinic_id');
@@ -100,7 +99,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       token: token,
 
       phoneCheckResult: AsyncValue.data([
-        DoctorLogin(
+        DoctorDetails(
           doctorId: doctorId,
           name: name,
           mobile: mobile,
@@ -114,7 +113,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
   }
 
-  Future<void> addDoctorDetails(DoctorLogin doctorLogin) async {
+  Future<void> addDoctorDetails(DoctorDetails doctorLogin) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       await usecase.addDoctorDetails(doctorLogin);
@@ -210,6 +209,11 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
   }
 }
+
+  Future<void> logout() async {
+    await TokenStorage.clear();
+    state = const DoctorLoginState();
+  }
 
 }
 

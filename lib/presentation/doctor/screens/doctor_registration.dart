@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:qless/domain/models/doctor_login.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/shared/view_models/master_viewmodel.dart';
@@ -43,6 +45,8 @@ class _DoctorProfileSetupScreenState
   File? _doctorPhoto;
   File? _clinicPhoto;
   String? _fcmToken;
+  double? _latitude;
+  double? _longitude;
   StreamSubscription<String>? _tokenRefreshSub;
 
   final ImagePicker _picker = ImagePicker();
@@ -108,6 +112,51 @@ class _DoctorProfileSetupScreenState
         } else {
           _clinicPhoto = File(image.path);
         }
+      });
+    }
+  }
+
+  Future<void> _getCurrentLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _showError('Location permission denied');
+        return;
+      }
+    }
+    if (permission == LocationPermission.deniedForever) {
+      _showError('Location permission permanently denied. Enable it in settings.');
+      return;
+    }
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
+    } catch (e) {
+      _showError('Failed to get location');
+    }
+  }
+
+  Future<void> _selectFromMap() async {
+    final result = await Navigator.push<LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _MapPickerScreen(
+          initialLatLng: _latitude != null && _longitude != null
+              ? LatLng(_latitude!, _longitude!)
+              : const LatLng(15.9073, 73.6990),
+        ),
+      ),
+    );
+    if (result != null) {
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
       });
     }
   }
@@ -180,7 +229,7 @@ class _DoctorProfileSetupScreenState
       }
     }
 
-    final doctorLogin = DoctorLogin(
+    final doctorLogin = DoctorDetails(
       name: _fullNameController.text.trim(),
       mobile: _contactController.text.trim(),
       email: _emailController.text.trim(),
@@ -199,6 +248,8 @@ class _DoctorProfileSetupScreenState
           ? null
           : double.tryParse(_consultationFeeController.text.trim()),
       imageUrl: _clinicPhoto?.path, // optional
+      latitude: _latitude,
+      longitude: _longitude,
       roleId: 1,
       Token: _fcmToken,
     );
@@ -395,6 +446,8 @@ class _DoctorProfileSetupScreenState
                     _consultationFeeController,
                     keyboard: TextInputType.number,
                   ),
+                  const SizedBox(height: 16),
+                  _buildLocationField(),
                 ],
 
                 const SizedBox(height: 28),
@@ -429,6 +482,85 @@ class _DoctorProfileSetupScreenState
           if (state.isLoading) const Center(child: CircularProgressIndicator()),
         ],
       ),
+    );
+  }
+
+  Widget _buildLocationField() {
+    final hasLocation = _latitude != null && _longitude != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Location',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                height: 52,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Text(
+                  hasLocation
+                      ? '${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
+                      : 'No location selected',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: hasLocation
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFF94A3B8),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: _getCurrentLocation,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF3B82F6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.navigation_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _selectFromMap,
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF3B82F6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.map_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -743,6 +875,110 @@ class _InlineError extends StatelessWidget {
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFFB91C1C)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAP PICKER SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MapPickerScreen extends StatefulWidget {
+  final LatLng initialLatLng;
+  const _MapPickerScreen({required this.initialLatLng});
+
+  @override
+  State<_MapPickerScreen> createState() => _MapPickerScreenState();
+}
+
+class _MapPickerScreenState extends State<_MapPickerScreen> {
+  late LatLng _selected;
+
+  @override
+  void initState() {
+    super.initState();
+    _selected = widget.initialLatLng;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new,
+              size: 18, color: Color(0xFF0F172A)),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Select Location',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, _selected),
+            child: const Text(
+              'Confirm',
+              style: TextStyle(
+                color: Color(0xFF3B82F6),
+                fontWeight: FontWeight.w600,
+                fontSize: 15,
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _selected,
+              zoom: 14,
+            ),
+            onTap: (latLng) => setState(() => _selected = latLng),
+            markers: {
+              Marker(
+                markerId: const MarkerId('selected'),
+                position: _selected,
+              ),
+            },
+          ),
+          Positioned(
+            bottom: 24,
+            left: 24,
+            right: 24,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                '${_selected.latitude.toStringAsFixed(4)}, ${_selected.longitude.toStringAsFixed(4)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
             ),
           ),
         ],

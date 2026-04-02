@@ -1,9 +1,9 @@
 import 'package:json_annotation/json_annotation.dart';
 
-part 'doctor_login.g.dart';
+part 'doctor_details.g.dart';
 
 @JsonSerializable()
-class DoctorLogin {
+class DoctorDetails {
   // Doctor fields
   @JsonKey(name: 'doctor_id')
   final int? doctorId;
@@ -42,7 +42,7 @@ class DoctorLogin {
    @JsonKey(name: 'gender_id')
   final int? genderId;
 
-  DoctorLogin({
+  DoctorDetails({
     this.doctorId,
     this.name,
     this.email,
@@ -67,10 +67,10 @@ class DoctorLogin {
     this.genderId,
   });
   
-  factory DoctorLogin.fromJson(Map<String, dynamic> json) =>
-   _$DoctorLoginFromJson(json);
+  factory DoctorDetails.fromJson(Map<String, dynamic> json) =>
+   _$DoctorDetailsFromJson(json);
   
 
-  Map<String, dynamic> toJson() => _$DoctorLoginToJson(this);
+  Map<String, dynamic> toJson() => _$DoctorDetailsToJson(this);
 
 }

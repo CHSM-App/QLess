@@ -34,6 +34,9 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
   static const _slate   = Color(0xFF64748B);
   static const _border  = Color(0xFFE2E8F0);
 
+  // Breakpoint: >= 600 → side rail (tablet/PC), < 600 → bottom nav (mobile)
+  static const _wideBreakpoint = 600.0;
+
   static const _navItems = [
     _NavItem(icon: Icons.home_rounded,             label: 'Home'),
     _NavItem(icon: Icons.people_alt_rounded,        label: 'Patients'),
@@ -77,24 +80,49 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: _buildHomeAppBar(),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: [
-          QueueHomePage(),
-          DoctorPatientsPage(),
-          DoctorMedicinePage(),
-          DoctorProfilePage(),
-        ],
-      ),
-      bottomNavigationBar: _buildBottomNav(),
-    );
+    final width = MediaQuery.of(context).size.width;
+    final isWide = width >= _wideBreakpoint;
+
+    final pages = [
+      QueueHomePage(),
+      DoctorPatientsPage(),
+      DoctorMedicinePage(),
+      DoctorProfilePage(),
+    ];
+
+    if (isWide) {
+      // ── Tablet / PC layout: left side rail ──────────────────────────────
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: _buildAppBar(),
+        body: Row(
+          children: [
+            _buildSideRail(),
+            Expanded(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: pages,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // ── Mobile layout: bottom nav ────────────────────────────────────────
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        appBar: _buildAppBar(),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
+        bottomNavigationBar: _buildBottomNav(),
+      );
+    }
   }
 
-  // ── Home AppBar ───────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildHomeAppBar() {
+  // ── Shared AppBar ─────────────────────────────────────────────────────────
+  PreferredSizeWidget _buildAppBar() {
     final initial = widget.doctorName.isNotEmpty
         ? widget.doctorName[0].toUpperCase()
         : 'D';
@@ -159,34 +187,88 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
     );
   }
 
-  // ── Generic AppBar ────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildGenericAppBar(String title) {
-    return AppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
-      titleSpacing: 20,
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-          color: _primary,
-          letterSpacing: -0.4,
+  // ── Left Side Rail (tablet / PC) ──────────────────────────────────────────
+  Widget _buildSideRail() {
+    return Container(
+      width: 76,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(right: BorderSide(color: _border, width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 16,
+            offset: Offset(4, 0),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            children: List.generate(_navItems.length, (i) {
+              final selected = _currentIndex == i;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: Tooltip(
+                  message: _navItems[i].label,
+                  preferBelow: false,
+                  child: GestureDetector(
+                    onTap: () => _onTabTap(i),
+                    behavior: HitTestBehavior.opaque,
+                    child: AnimatedBuilder(
+                      animation: _iconScales[i],
+                      builder: (context, _) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? _primary.withOpacity(0.09)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Transform.scale(
+                              scale: _iconScales[i].value,
+                              child: Icon(
+                                _navItems[i].icon,
+                                size: 22,
+                                color: selected ? _primary : _slate,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            AnimatedDefaultTextStyle(
+                              duration: const Duration(milliseconds: 200),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w400,
+                                color: selected ? _primary : _slate,
+                              ),
+                              child: Text(
+                                _navItems[i].label,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
         ),
       ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16),
-          child: _NotificationBell(),
-        ),
-      ],
-      bottom: const _AppBarDivider(),
     );
   }
 
-  // ── Bottom Navigation ─────────────────────────────────────────────────────
+  // ── Bottom Navigation (mobile) ─────────────────────────────────────────────
   Widget _buildBottomNav() {
     return Container(
       decoration: const BoxDecoration(
