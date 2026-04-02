@@ -16,7 +16,7 @@ class PatientLoginState {
   final String? roleId;
   final String? token;
   final AsyncValue<List<Patients>> patientPhoneCheck;
-    final AsyncValue<List<FamilyMember>> allfamilyMembers;
+  final AsyncValue<List<FamilyMember>> allfamilyMembers;
   const PatientLoginState({
     this.isLoading = false,
     this.error,
@@ -28,7 +28,7 @@ class PatientLoginState {
     this.token,
     this.patientId,
     this.patientPhoneCheck = const AsyncValue.data([]),
-     this.allfamilyMembers = const AsyncValue.data([]),
+    this.allfamilyMembers = const AsyncValue.data([]),
   });
 
   PatientLoginState copyWith({
@@ -44,7 +44,7 @@ class PatientLoginState {
     int? patientId,
 
     AsyncValue<List<Patients>>? patientPhoneCheck,
-      AsyncValue<List<FamilyMember>>? allfamilyMembers,
+    AsyncValue<List<FamilyMember>>? allfamilyMembers,
   }) {
     return PatientLoginState(
       isLoading: isLoading ?? this.isLoading,
@@ -57,7 +57,7 @@ class PatientLoginState {
       roleId: roleId ?? this.roleId,
       token: token ?? this.token,
       patientPhoneCheck: patientPhoneCheck ?? this.patientPhoneCheck,
-        allfamilyMembers: allfamilyMembers ?? this.allfamilyMembers
+      allfamilyMembers: allfamilyMembers ?? this.allfamilyMembers,
     );
   }
 }
@@ -90,12 +90,12 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
 
     final token = await TokenStorage.getValue('token');
     final patientIdStr = await TokenStorage.getValue('patient_id');
-    
- debugPrint("STORED patient_id: $patientIdStr");
 
-  final patientId = int.tryParse(patientIdStr ?? '0') ?? 0;
+    debugPrint("STORED patient_id: $patientIdStr");
 
-  debugPrint("PARSED patient_id: $patientId");
+    final patientId = int.tryParse(patientIdStr ?? '0') ?? 0;
+
+    debugPrint("PARSED patient_id: $patientId");
 
     state = state.copyWith(
       patientId: patientId,
@@ -125,10 +125,8 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     );
     try {
       final result = await usecase.checkPhonePatient(mobileNo);
-      state = state.copyWith(patientPhoneCheck: AsyncValue.data(result),);
+      state = state.copyWith(patientPhoneCheck: AsyncValue.data(result));
     } catch (e, st) {
-      debugPrint('PatientLoginViewmodel.checkPhonePatient error: $e');
-      debugPrint('$st');
       state = state.copyWith(
         patientPhoneCheck: AsyncValue.error(e, st),
         error: e.toString(),
@@ -136,7 +134,7 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     }
   }
 
-    Future<void> addFamilyMember(FamilyMember member) async {
+  Future<void> addFamilyMember(FamilyMember member) async {
     state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
     try {
       await usecase.addFamilyMember(member);
@@ -149,24 +147,18 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     }
   }
 
-  
   Future<void> fetchAllFamilyMembers(int familyId) async {
-  state = state.copyWith(
-    allfamilyMembers: const AsyncValue.loading(),
-    error: null,
-  );
-  try {
-    final result = await usecase.fetchFamilyMembers(familyId);
     state = state.copyWith(
-      allfamilyMembers: AsyncValue.data(result),
+      allfamilyMembers: const AsyncValue.loading(),
+      error: null,
     );
-  } catch (e, st) {
-    state = state.copyWith(
-      allfamilyMembers: AsyncValue.error(e, st),
-    );
+    try {
+      final result = await usecase.fetchFamilyMembers(familyId);
+      state = state.copyWith(allfamilyMembers: AsyncValue.data(result));
+    } catch (e, st) {
+      state = state.copyWith(allfamilyMembers: AsyncValue.error(e, st));
+    }
   }
-  }
-
 
   void clearError() => state = state.copyWith(clearError: true);
 }

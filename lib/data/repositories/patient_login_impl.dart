@@ -19,17 +19,9 @@ class PatientLoginImpl implements PatientLoginRepository {
     final response = await apiService.checkPhonePatient(mobileNo);
 
     if (response.isNotEmpty) {
-      // Save values in secure storage
-
-      await TokenStorage.saveValue(
-        'patient_id',
-        response[0].patientId.toString(),
-      );
+      await TokenStorage.saveValue('patient_id', response[0].patientId.toString());
       await TokenStorage.saveValue('name', response[0].name.toString());
-      await TokenStorage.saveValue(
-        'mobile_no',
-        response[0].mobileNo.toString(),
-      );
+      await TokenStorage.saveValue('mobile_no', response[0].mobileNo.toString());
       await TokenStorage.saveValue('email', response[0].email.toString());
       await TokenStorage.saveValue('role_id', response[0].roleId.toString());
     }

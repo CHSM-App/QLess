@@ -150,12 +150,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     await _printFcmToken();
 
     final roleId = ref.read(tokenProvider).roleId ?? 0;
-    if (roleId == 1) {
+    if (1 == roleId) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
       );
-    } else if (roleId == 2) {
+    } else if (2 == roleId) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
