@@ -253,6 +253,28 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<dynamic> insertPrescription(PrescriptionModel prescription) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(prescription.toJson());
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'doctor/insert/insertPrescription',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
   Future<dynamic> saveDoctorSchedule(DoctorScheduleModel doctorSchedule) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};

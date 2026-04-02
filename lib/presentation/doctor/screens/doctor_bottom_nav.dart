@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/screens/home_screen.dart';
 
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
@@ -308,7 +309,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
                               decoration: BoxDecoration(
                                 color: selected
                                     ? _primary.withOpacity(0.10)
-                                    : Colors.transparent,
+                                    : Colors.blue,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                             ),
@@ -317,7 +318,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
                               child: Icon(
                                 _navItems[i].icon,
                                 size: 22,
-                                color: selected ? _primary : _slate,
+                                color: selected ? Colors.blue : Colors.blueGrey,
                               ),
                             ),
                           ],
