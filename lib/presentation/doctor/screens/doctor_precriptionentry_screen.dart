@@ -167,7 +167,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final _advCtrl = TextEditingController();
   DateTime? _followDate;
   final List<MedicineEntry> _meds = [];
-  bool _requestedMeds = false;
+  int _lastDoctorId = 0;
 
   @override
   void dispose() {
@@ -180,6 +180,12 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   void _addMed() => setState(() => _meds.add(MedicineEntry()));
   void _delMed(int i) => setState(() => _meds.removeAt(i));
+
+  void _maybeFetchMedicines(int doctorId) {
+    if (doctorId == 0 || doctorId == _lastDoctorId) return;
+    _lastDoctorId = doctorId;
+    ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
+  }
 
   Future<void> _pickDate() async {
     final d = await showDatePicker(
@@ -269,18 +275,19 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(
+      doctorLoginViewModelProvider.select((s) => s.doctorId),
+      (_, next) {
+        final id = next ?? 0;
+        _maybeFetchMedicines(id);
+      },
+    );
+
     // Watch loading state to show overlay
     final state = ref.watch(prescriptionViewModelProvider);
     final doctorState = ref.watch(doctorLoginViewModelProvider);
     final doctorId = doctorState.doctorId ?? 0;
-    if (!_requestedMeds && doctorId > 0) {
-      _requestedMeds = true;
-      Future.microtask(() {
-        ref
-            .read(doctorLoginViewModelProvider.notifier)
-            .fetchAllMedicines(doctorId);
-      });
-    }
+    _maybeFetchMedicines(doctorId);
     final medicines = doctorState.medicines?.value ?? const <Medicine>[];
 
     return Stack(

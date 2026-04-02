@@ -129,8 +129,19 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(context);
+                    final id = medicine.medicineId ?? 0;
+                    if (id == 0) return;
+                    await ref
+                        .read(prescriptionViewModelProvider.notifier)
+                        .deleteMedicine(id);
+                    final err = ref.read(prescriptionViewModelProvider).error;
+                    if (err != null) {
+                      _showSnack(err, isError: true);
+                      return;
+                    }
+                    _showSnack('Medicine removed');
                     _refreshMedicines();
                   },
                   style: ElevatedButton.styleFrom(
@@ -148,6 +159,19 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? kRedAccent : kAccentGreen,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 3),
       ),
     );
   }

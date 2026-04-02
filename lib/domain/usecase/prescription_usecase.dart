@@ -1,4 +1,5 @@
 
+import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/domain/repository/prescription_repo.dart';
 
@@ -11,4 +12,7 @@ class PrescriptionUsecase {
     return prescriptionRepository.insertPrescription(prescription);
   }
 
+  Future<Medicine> deleteMedicine(int medicineId) {
+    return prescriptionRepository.deleteMedicine(medicineId);
+  }
 }
