@@ -7,26 +7,24 @@ import 'package:qless/domain/usecase/prescription_usecase.dart';
 class PrescriptionState {
   final bool isLoading;
   final String? error;
-  final List<Medicine>? typeWiseMedicines;
+
 
   const PrescriptionState({
     this.isLoading = false,
     this.error,
-    this.typeWiseMedicines,
-  
+
 
   });
 
   PrescriptionState copyWith({
     bool? isLoading,
     String? error,
-    List<Medicine>? typeWiseMedicines,
+
 
   }) {
     return PrescriptionState(
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-      typeWiseMedicines: typeWiseMedicines ?? this.typeWiseMedicines,
    
     );
   }
