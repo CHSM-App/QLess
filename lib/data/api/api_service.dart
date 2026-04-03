@@ -84,6 +84,20 @@ abstract class ApiService {
     @Path("doctor_id") int doctorId,
   );
 
+  
+  @GET("patient/users/patientPrescriptionDetails/{prescription_id}")
+  Future<List<PrescriptionModel>> patientPrescriptionDetails(
+    @Path("prescription_id") int prescriptionId,
+  );
+
+
+  @GET("patient/users/patientPrescriptionList/{patient_id}")
+  Future<List<PrescriptionModel>> patientPrescriptionList(
+    @Path("patient_id") int patientId,
+  );
+
+
+
   // POST API
   @POST("login/insertPatient")
   Future<dynamic> addPatient(@Body() Patients patient);

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_home_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/profile.dart';
 
 class PatientBottomNav extends StatefulWidget {
@@ -31,7 +32,7 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
         onTabChange: (i) => setState(() => _tab = i),
       ),
        const DoctorSearchScreen(),
-       const AppointmentScreen(),
+       const PatientPrescriptionListScreen(),
       const ProfileScreen(),
     ];
   }

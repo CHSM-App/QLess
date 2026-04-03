@@ -9,6 +9,9 @@ class Prescriptionmpl implements PrescriptionRepository {
 
   Prescriptionmpl(this.apiService);
 
+
+  //DOCTOR PRESCRIPTION API
+
   @override
   Future<dynamic> insertPrescription(PrescriptionModel prescription) {
     return apiService.insertPrescription(prescription);
@@ -19,5 +22,18 @@ class Prescriptionmpl implements PrescriptionRepository {
     return apiService.deleteMedicine(medicineId);
   }
 
+
+
+//PATIENT PRESCRIPTION API
+@override
+  Future<List<PrescriptionModel>> patientPrescriptionDetails(int prescriptionId) {
+    return apiService.patientPrescriptionDetails(prescriptionId);
+  }
+
+
+@override
+  Future<List<PrescriptionModel>> patientPrescriptionList(int patientId) {
+    return apiService.patientPrescriptionList(patientId);
+  }
 
 }

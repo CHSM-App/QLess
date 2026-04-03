@@ -17,6 +17,7 @@ class PatientLoginState {
   final String? token;
   final AsyncValue<List<Patients>> patientPhoneCheck;
   final AsyncValue<List<FamilyMember>> allfamilyMembers;
+  
   const PatientLoginState({
     this.isLoading = false,
     this.error,

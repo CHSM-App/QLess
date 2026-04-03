@@ -7,11 +7,15 @@ import 'package:qless/domain/usecase/prescription_usecase.dart';
 class PrescriptionState {
   final bool isLoading;
   final String? error;
+final List<PrescriptionModel>? prescriptionsListPatient;
+final List<PrescriptionModel>? prescriptionDetailsPatient;
 
 
   const PrescriptionState({
     this.isLoading = false,
     this.error,
+    this.prescriptionsListPatient,
+    this.prescriptionDetailsPatient,
 
 
   });
@@ -19,13 +23,17 @@ class PrescriptionState {
   PrescriptionState copyWith({
     bool? isLoading,
     String? error,
+    List<PrescriptionModel>? prescriptionsListPatient,
+    List<PrescriptionModel>? prescriptionDetailsPatient,
 
 
   }) {
     return PrescriptionState(
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-   
+      prescriptionsListPatient: prescriptionsListPatient ?? this.prescriptionsListPatient,
+      prescriptionDetailsPatient: prescriptionDetailsPatient ?? this.prescriptionDetailsPatient,
+
     );
   }
 }
@@ -45,6 +53,8 @@ class PrescriptionViewmodel extends StateNotifier<PrescriptionState> {
     return e.toString();
   }
 
+
+//DOCTOR PRESCRIPTION API
   Future<void> insertPrescription(PrescriptionModel prescription) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -65,4 +75,28 @@ class PrescriptionViewmodel extends StateNotifier<PrescriptionState> {
     }
   }
 
+
+
+
+  ///PATIENT PRESCRIPTION API
+
+  Future<void> patientPrescriptionList(int patientId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final prescriptions = await usecase.patientPrescriptionList(patientId);
+      state = state.copyWith(isLoading: false, prescriptionsListPatient: prescriptions);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractError(e));
+    }
+  }
+
+  Future<void> patientPrescriptionDetails(int prescriptionId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final details = await usecase.patientPrescriptionDetails(prescriptionId);
+      state = state.copyWith(isLoading: false, prescriptionDetailsPatient: details);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractError(e));
+    }
+  }
 }

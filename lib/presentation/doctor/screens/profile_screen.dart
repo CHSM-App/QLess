@@ -89,7 +89,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         Expanded(
           child: Column(
             children: [
-              _buildTopBar(isTablet: true, doctorState: doctorState),
+             // _buildTopBar(isTablet: true, doctorState: doctorState),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,

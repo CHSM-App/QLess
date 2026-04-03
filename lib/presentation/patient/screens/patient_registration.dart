@@ -43,11 +43,11 @@ class _PatientRegistrationScreenState
   static const _bg      = Color(0xFFF1F5F9);
   static const _border  = Color(0xFFE2E8F0);
   static const _red     = Color(0xFFEF4444);
+ 
 
   @override
   void initState() {
     super.initState();
-    // Fetch master data after first frame to avoid provider modification during build
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(masterViewModelProvider.notifier).fetchGenderList();
