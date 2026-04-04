@@ -16,8 +16,7 @@ class PatientLoginState {
   final String? roleId;
   final String? token;
   final AsyncValue<List<Patients>> patientPhoneCheck;
-  final AsyncValue<List<FamilyMember>> allfamilyMembers;
-  
+
   const PatientLoginState({
     this.isLoading = false,
     this.error,
@@ -29,7 +28,6 @@ class PatientLoginState {
     this.token,
     this.patientId,
     this.patientPhoneCheck = const AsyncValue.data([]),
-    this.allfamilyMembers = const AsyncValue.data([]),
   });
 
   PatientLoginState copyWith({
@@ -45,7 +43,6 @@ class PatientLoginState {
     int? patientId,
 
     AsyncValue<List<Patients>>? patientPhoneCheck,
-    AsyncValue<List<FamilyMember>>? allfamilyMembers,
   }) {
     return PatientLoginState(
       isLoading: isLoading ?? this.isLoading,
@@ -58,7 +55,6 @@ class PatientLoginState {
       roleId: roleId ?? this.roleId,
       token: token ?? this.token,
       patientPhoneCheck: patientPhoneCheck ?? this.patientPhoneCheck,
-      allfamilyMembers: allfamilyMembers ?? this.allfamilyMembers,
     );
   }
 }
@@ -132,32 +128,6 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
         patientPhoneCheck: AsyncValue.error(e, st),
         error: e.toString(),
       );
-    }
-  }
-
-  Future<void> addFamilyMember(FamilyMember member) async {
-    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
-    try {
-      await usecase.addFamilyMember(member);
-      state = state.copyWith(isLoading: false, isSuccess: true);
-    } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString().replaceFirst('Exception: ', ''),
-      );
-    }
-  }
-
-  Future<void> fetchAllFamilyMembers(int familyId) async {
-    state = state.copyWith(
-      allfamilyMembers: const AsyncValue.loading(),
-      error: null,
-    );
-    try {
-      final result = await usecase.fetchFamilyMembers(familyId);
-      state = state.copyWith(allfamilyMembers: AsyncValue.data(result));
-    } catch (e, st) {
-      state = state.copyWith(allfamilyMembers: AsyncValue.error(e, st));
     }
   }
 

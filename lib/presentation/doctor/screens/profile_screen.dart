@@ -1,32 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
+import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
-
-
-
-class DoctorProfilePage extends StatelessWidget {
-  const DoctorProfilePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Doctor Profile',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1A73E8),
-          brightness: Brightness.light,
-        ),
-        fontFamily: 'Roboto',
-      ),
-      home: const DoctorSettingsPage(),
-    );
-  }
-}
+import 'package:qless/core/network/token_provider.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -56,6 +36,37 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   bool _darkMode = false;
   bool _availableForConsultation = true;
   int _selectedNavIndex = 3; // Settings tab
+  bool _didFetchProfile = false;
+  late final ProviderSubscription<DoctorLoginState> _doctorLoginSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _doctorLoginSub = ref.listenManual<DoctorLoginState>(
+      doctorLoginViewModelProvider,
+      (prev, next) {
+      if (_didFetchProfile) return;
+      final mobile = next.mobile;
+      if (mobile != null && mobile.trim().isNotEmpty) {
+        _didFetchProfile = true;
+        ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(mobile);
+      }
+    },
+    );
+    Future.microtask(() {
+      final mobile = ref.read(doctorLoginViewModelProvider).mobile;
+      if (mobile != null && mobile.trim().isNotEmpty) {
+        _didFetchProfile = true;
+        ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(mobile);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _doctorLoginSub.close();
+    super.dispose();
+  }
 
   String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return '?';
@@ -67,22 +78,33 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final doctorState = ref.watch(doctorLoginViewModelProvider);
+    final doctorDetails = doctorState.phoneCheckResult.maybeWhen(
+      data: (list) => list.isNotEmpty ? list.first : null,
+      orElse: () => null,
+    );
     final screenWidth  = MediaQuery.of(context).size.width;
     final isTablet     = screenWidth >= 600;
     final isLargeTablet = screenWidth >= 900;
 
     return Scaffold(
       backgroundColor: kSurface,
+      // appBar: PreferredSize(
+      //   preferredSize: Size.fromHeight(isTablet ? 72 : 64),
+      //   child: _buildTopBar(isTablet: isTablet, doctorState: doctorState),
+      // ),
       body: isLargeTablet
-          ? _buildLargeTabletLayout(doctorState)
-          : _buildMobileLayout(isTablet, doctorState),
+          ? _buildLargeTabletLayout(doctorState, doctorDetails)
+          : _buildMobileLayout(isTablet, doctorState, doctorDetails),
       // bottomNavigationBar: isLargeTablet ? null : _buildBottomNav(),
     );
   }
 
   // ── Large Tablet (Side Rail) ──────────────────────────────────────────────
 
-  Widget _buildLargeTabletLayout(DoctorLoginState doctorState) {
+  Widget _buildLargeTabletLayout(
+    DoctorLoginState doctorState,
+    DoctorDetails? doctorDetails,
+  ) {
     return Row(
       children: [
         // _buildSideRail(),
@@ -96,7 +118,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                   children: [
                     Expanded(
                       flex: 3,
-                      child: _buildScrollContent(isTablet: true, doctorState: doctorState),
+                      child: _buildScrollContent(
+                        isTablet: true,
+                        doctorState: doctorState,
+                        doctorDetails: doctorDetails,
+                      ),
                     ),
                     SizedBox(
                       width: 320,
@@ -114,48 +140,27 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
   // ── Mobile / Tablet Layout ────────────────────────────────────────────────
 
-  Widget _buildMobileLayout(bool isTablet, DoctorLoginState doctorState) {
+  Widget _buildMobileLayout(
+    bool isTablet,
+    DoctorLoginState doctorState,
+    DoctorDetails? doctorDetails,
+  ) {
     return Column(
       children: [
-        _buildTopBar(isTablet: isTablet, doctorState: doctorState),
-        Expanded(child: _buildScrollContent(isTablet: isTablet, doctorState: doctorState)),
+     //   _buildTopBar(isTablet: isTablet, doctorState: doctorState),
+        Expanded(
+          child: _buildScrollContent(
+            isTablet: isTablet,
+            doctorState: doctorState,
+            doctorDetails: doctorDetails,
+          ),
+        ),
       ],
     );
   }
 
   // ── Top Bar ───────────────────────────────────────────────────────────────
 
-  Widget _buildTopBar({required bool isTablet, required DoctorLoginState doctorState}) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: kCardBg,
-        border: Border(bottom: BorderSide(color: kDivider)),
-      ),
-      padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + (isTablet ? 12 : 8),
-        bottom: isTablet ? 12 : 8,
-        left: isTablet ? 24 : 16,
-        right: isTablet ? 24 : 16,
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.settings_rounded, color: kPrimaryBlue, size: 22),
-          const SizedBox(width: 10),
-          Text(
-            'Settings',
-            style: TextStyle(
-              fontSize: isTablet ? 22 : 18,
-              fontWeight: FontWeight.w700,
-              color: kTextDark,
-              letterSpacing: -0.3,
-            ),
-          ),
-          const Spacer(),
-          _buildAvatarChip(isTablet, doctorState),
-        ],
-      ),
-    );
-  }
 
   Widget _buildAvatarChip(bool isTablet, DoctorLoginState doctorState) {
     final initials = _initials(doctorState.name);
@@ -198,14 +203,18 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
   // ── Scroll Content ────────────────────────────────────────────────────────
 
-  Widget _buildScrollContent({required bool isTablet, required DoctorLoginState doctorState}) {
+  Widget _buildScrollContent({
+    required bool isTablet,
+    required DoctorLoginState doctorState,
+    DoctorDetails? doctorDetails,
+  }) {
     final hPad = isTablet ? 24.0 : 16.0;
     return SingleChildScrollView(
       padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildProfileCard(isTablet, doctorState),
+          _buildProfileCard(isTablet, doctorState, details: doctorDetails),
           const SizedBox(height: 20),
           _buildSectionTitle('Account'),
           _buildAccountSection(isTablet),
@@ -231,10 +240,16 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
   // ── Profile Card ──────────────────────────────────────────────────────────
 
-  Widget _buildProfileCard(bool isTablet, DoctorLoginState doctorState) {
-    final initials = _initials(doctorState.name);
-    final displayName = doctorState.name ?? 'Doctor';
-    final clinicName = doctorState.clinic_name ?? '';
+  Widget _buildProfileCard(
+    bool isTablet,
+    DoctorLoginState doctorState, {
+    DoctorDetails? details,
+  }) {
+    final initials = _initials(details?.name ?? doctorState.name);
+    final displayName = details?.name ?? doctorState.name ?? 'Doctor';
+    final clinicName = details?.clinicName ?? doctorState.clinic_name ?? '';
+    final specialization = details?.specialization ?? 'Cardiologist';
+    final qualification = details?.qualification ?? 'MBBS, MD, DM';
     return Container(
       decoration: _cardDecoration(),
       child: Column(
@@ -336,9 +351,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      const Text(
-                        'Cardiologist  •  MBBS, MD, DM',
-                        style: TextStyle(fontSize: 13, color: kTextMuted),
+                      Text(
+                        '$specialization  •  $qualification',
+                        style: const TextStyle(fontSize: 13, color: kTextMuted),
                       ),
                       const SizedBox(height: 4),
                       if (clinicName.isNotEmpty)
@@ -349,13 +364,19 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                       const SizedBox(height: 16),
                       // Stats row
                       isTablet
-                          ? _buildStatsRowTablet()
-                          : _buildStatsRowMobile(),
+                          ? _buildStatsRowTablet(details)
+                          : _buildStatsRowMobile(details),
                       const SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.of(context, rootNavigator: true).push(
+                              MaterialPageRoute(
+                                builder: (_) => const DoctorEditProfilePage(),
+                              ),
+                            );
+                          },
                           icon: const Icon(Icons.edit_outlined, size: 16),
                           label: const Text('Edit Profile'),
                           style: OutlinedButton.styleFrom(
@@ -377,11 +398,13 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  Widget _buildStatsRowMobile() {
+  Widget _buildStatsRowMobile(DoctorDetails? details) {
+    final exp = details?.experience?.toString();
+    final expText = exp != null && exp.isNotEmpty ? '$exp yrs' : '12 yrs';
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _statItem('12 yrs', 'Experience'),
+        _statItem(expText, 'Experience'),
         _vDivider(),
         _statItem('4.9 ★', 'Rating'),
         _vDivider(),
@@ -390,17 +413,21 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  Widget _buildStatsRowTablet() {
+  Widget _buildStatsRowTablet(DoctorDetails? details) {
+    final exp = details?.experience?.toString();
+    final expText = exp != null && exp.isNotEmpty ? '$exp yrs' : '12 yrs';
+    final fee = details?.consultationFee?.toStringAsFixed(0);
+    final feeText = fee != null && fee.isNotEmpty ? '₹$fee' : '₹800';
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _statItem('12 yrs', 'Experience'),
+        _statItem(expText, 'Experience'),
         _vDivider(),
         _statItem('4.9 ★', 'Rating'),
         _vDivider(),
         _statItem('2,340', 'Patients'),
         _vDivider(),
-        _statItem('₹800', 'Consultation'),
+        _statItem(feeText, 'Consultation'),
       ],
     );
   }
@@ -710,10 +737,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(context);
+                    await ref.read(tokenProvider.notifier).clearTokens();
                     await ref.read(doctorLoginViewModelProvider.notifier).logout();
                     if (mounted) {
                       Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const SplashScreen()),
+                        MaterialPageRoute(builder: (_) => const ContinueAsScreen()),
                         (_) => false,
                       );
                     }

@@ -14,7 +14,7 @@ class Patients {
   @JsonKey(name: 'mobile_no')
   final String? mobileNo;
 
-  @JsonKey(name: 'address')
+  @JsonKey(name: 'Address')
   final String? address;
 
   @JsonKey(name: 'email')

@@ -107,6 +107,10 @@ class _PatientPrescriptionListScreenState
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 3, vsync: this);
+    Future.microtask(() {
+      ref.read(tokenProvider.notifier).loadTokens();
+      ref.read(patientLoginViewModelProvider.notifier).loadFromStoragePatient();
+    });
     _patientSub = ref.listenManual<PatientLoginState>(
       patientLoginViewModelProvider,
       (prev, next) => _tryFetch(),
@@ -328,10 +332,9 @@ class _PatientPrescriptionListScreenState
 
   Widget _buildAppBar(int total) => Container(
     decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFF1558C0), kPrimary],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
+      color: kCardBg,
+      border: Border(
+        bottom: BorderSide(color: kBorder, width: 0.5),
       ),
     ),
     child: SafeArea(
@@ -343,7 +346,7 @@ class _PatientPrescriptionListScreenState
             IconButton(
               icon: const Icon(
                 Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
+                color: Colors.black,
                 size: 18,
               ),
               onPressed: () => Navigator.pop(context),
@@ -356,7 +359,7 @@ class _PatientPrescriptionListScreenState
                   const Text(
                     'Prescriptions',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: kTextDark,
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.3,
@@ -366,7 +369,7 @@ class _PatientPrescriptionListScreenState
                   Text(
                     '$total records',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.78),
+                      color: kTextMid,
                       fontSize: 12,
                     ),
                   ),
@@ -376,7 +379,7 @@ class _PatientPrescriptionListScreenState
             IconButton(
               icon: const Icon(
                 Icons.refresh_rounded,
-                color: Colors.white,
+                color: kTextDark,
                 size: 22,
               ),
               onPressed: () {

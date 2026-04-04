@@ -32,8 +32,8 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
         onTabChange: (i) => setState(() => _tab = i),
       ),
        const DoctorSearchScreen(),
-       const PatientPrescriptionListScreen(),
-      const ProfileScreen(),
+        AppointmentScreen(),
+      const PatientProfilePage(),
     ];
   }
 

@@ -99,13 +99,17 @@ abstract class ApiService {
 
 
   // POST API
-  @POST("login/insertPatient")
+  @POST("login/addPatientDetails")
   Future<dynamic> addPatient(@Body() Patients patient);
 
   @POST("patient/insert/insertFamilyMember")
   Future<dynamic> addFamilyMember(@Body() FamilyMember member);
 
   //DELETE API
+
+    // DELETE API
+  @DELETE("patient/index/deleteFamilyMember/{member_id}")
+  Future<FamilyMember> deleteFamilyMember(@Path("member_id") int memberId);
 
   //------------------------------------------------------------------------------------------------------------------------------------//
   //-----------------------------------------//PATIENT AND DOCTOR COMMON API//------------------------------

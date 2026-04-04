@@ -28,6 +28,8 @@ class DoctorMedicinePage extends ConsumerStatefulWidget {
 class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   final _searchController = TextEditingController();
   int _selectedType = 0;
+  bool _hasFetched = false;
+  late final ProviderSubscription<int?> _doctorIdSub;
 
   static const _types = [
     'All',
@@ -42,18 +44,29 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(_refreshMedicines);
+    _doctorIdSub = ref.listenManual<int?>(
+      doctorLoginViewModelProvider.select((s) => s.doctorId),
+      (prev, next) {
+        if (next != null && next > 0) {
+          _refreshMedicines(force: false);
+        }
+      },
+    );
+    Future.microtask(() => _refreshMedicines(force: false));
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _doctorIdSub.close();
     super.dispose();
   }
 
-  void _refreshMedicines() {
+  void _refreshMedicines({required bool force}) {
+    if (_hasFetched && !force) return;
     final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
     if (doctorId == 0) return;
+    _hasFetched = true;
     ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
   }
 
@@ -142,7 +155,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                       return;
                     }
                     _showSnack('Medicine removed');
-                    _refreshMedicines();
+                    _refreshMedicines(force: true);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kRedAccent,
@@ -190,16 +203,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(
-      doctorLoginViewModelProvider.select((s) => s.doctorId),
-      (prev, next) {
-        final id = next ?? 0;
-        if (id == 0 || prev == next) return;
-        ref
-            .read(doctorLoginViewModelProvider.notifier)
-            .fetchAllMedicines(id);
-      },
-    );
+    // Fetch handled in initState listener.
 
     final medicinesAsync = ref.watch(doctorLoginViewModelProvider).medicines;
 
@@ -241,7 +245,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                         child: CircularProgressIndicator(
                             color: kPrimaryBlue)),
                     error: (e, _) =>
-                        _ErrorState(onRetry: _refreshMedicines),
+                        _ErrorState(onRetry: () => _refreshMedicines(force: true)),
                     data: (medicines) {
                       final filtered = _filtered(medicines);
                       if (filtered.isEmpty) {
@@ -252,7 +256,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                       }
                       return RefreshIndicator(
                         color: kPrimaryBlue,
-                        onRefresh: () async => _refreshMedicines(),
+                        onRefresh: () async => _refreshMedicines(force: true),
                         child: ListView.separated(
                           padding:
                               const EdgeInsets.fromLTRB(20, 4, 20, 100),

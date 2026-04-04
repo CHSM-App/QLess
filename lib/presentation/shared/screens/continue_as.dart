@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
-class SplashScreen extends ConsumerStatefulWidget {
-  const SplashScreen({super.key});
+class ContinueAsScreen extends ConsumerStatefulWidget {
+  const ContinueAsScreen({super.key});
 
   @override
-  ConsumerState<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<ContinueAsScreen> createState() => _ContinueAsScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> {
+class _ContinueAsScreenState extends ConsumerState<ContinueAsScreen> {
   @override
   void initState() {
     super.initState();

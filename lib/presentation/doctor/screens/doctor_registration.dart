@@ -12,6 +12,17 @@ import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/shared/view_models/master_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
+// ─── Color Palette ───────────────────────────────────────────────────────────
+const kPrimaryBlue = Color(0xFF1A73E8);
+const kLightBlue   = Color(0xFFE8F0FE);
+const kAccentGreen = Color(0xFF34A853);
+const kRedAccent   = Color(0xFFEA4335);
+const kSurface     = Color(0xFFF8F9FA);
+const kCardBg      = Color(0xFFFFFFFF);
+const kTextDark    = Color(0xFF1F2937);
+const kTextMuted   = Color(0xFF6B7280);
+const kDivider     = Color(0xFFE5E7EB);
+
 class DoctorProfileSetupScreen extends ConsumerStatefulWidget {
   const DoctorProfileSetupScreen({super.key});
 
@@ -21,29 +32,32 @@ class DoctorProfileSetupScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorProfileSetupScreenState
-    extends ConsumerState<DoctorProfileSetupScreen> {
+    extends ConsumerState<DoctorProfileSetupScreen>
+    with SingleTickerProviderStateMixin {
   int _step = 1;
+  late AnimationController _animController;
+  late Animation<double> _fadeAnim;
 
   // Controllers
-  final _fullNameController = TextEditingController();
-  final _contactController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _qualificationController = TextEditingController();
-  final _licenseController = TextEditingController();
-  final _experienceController = TextEditingController();
-  final _clinicNameController = TextEditingController();
-  final _clinicAddressController = TextEditingController();
-  final _clinicContactController = TextEditingController();
-  final _clinicEmailController = TextEditingController();
-  final _clinicWebsiteController = TextEditingController();
+  final _fullNameController       = TextEditingController();
+  final _contactController        = TextEditingController();
+  final _emailController          = TextEditingController();
+  final _qualificationController  = TextEditingController();
+  final _licenseController        = TextEditingController();
+  final _experienceController     = TextEditingController();
+  final _clinicNameController     = TextEditingController();
+  final _clinicAddressController  = TextEditingController();
+  final _clinicContactController  = TextEditingController();
+  final _clinicEmailController    = TextEditingController();
+  final _clinicWebsiteController  = TextEditingController();
   final _consultationFeeController = TextEditingController();
 
-  String _selectedSpecialization = '';
+  String  _selectedSpecialization = '';
   String? _selectedGender;
-  int? _selectedGenderId;
+  int?    _selectedGenderId;
 
-  File? _doctorPhoto;
-  File? _clinicPhoto;
+  File?  _doctorPhoto;
+  File?  _clinicPhoto;
   String? _fcmToken;
   double? _latitude;
   double? _longitude;
@@ -52,16 +66,23 @@ class _DoctorProfileSetupScreenState
   final ImagePicker _picker = ImagePicker();
 
   final List<Map<String, String>> _specializations = [
-    {'value': 'general', 'label': 'General Physician'},
-    {'value': 'cardiology', 'label': 'Cardiology'},
-    {'value': 'dermatology', 'label': 'Dermatology'},
-    {'value': 'pediatrics', 'label': 'Pediatrics'},
-    {'value': 'orthopedics', 'label': 'Orthopedics'},
+    {'value': 'general',      'label': 'General Physician'},
+    {'value': 'cardiology',   'label': 'Cardiology'},
+    {'value': 'dermatology',  'label': 'Dermatology'},
+    {'value': 'pediatrics',   'label': 'Pediatrics'},
+    {'value': 'orthopedics',  'label': 'Orthopedics'},
   ];
 
   @override
   void initState() {
     super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _fadeAnim = CurvedAnimation(parent: _animController, curve: Curves.easeIn);
+    _animController.forward();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(masterViewModelProvider.notifier).fetchGenderList();
@@ -70,6 +91,7 @@ class _DoctorProfileSetupScreenState
 
   @override
   void dispose() {
+    _animController.dispose();
     _tokenRefreshSub?.cancel();
     _fullNameController.dispose();
     _contactController.dispose();
@@ -86,21 +108,9 @@ class _DoctorProfileSetupScreenState
     super.dispose();
   }
 
-  Future<void> _initFcm() async {
-    try {
-      final messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
-      final token = await messaging.getToken();
-      if (!mounted) return;
-      setState(() => _fcmToken = token);
-      _tokenRefreshSub = messaging.onTokenRefresh.listen((token) {
-        if (mounted) {
-          setState(() => _fcmToken = token);
-        }
-      });
-    } catch (e) {
-      debugPrint('FCM token fetch failed: $e');
-    }
+  void _animateStep() {
+    _animController.reset();
+    _animController.forward();
   }
 
   Future<void> _pickImage(bool isDoctorPhoto) async {
@@ -134,10 +144,10 @@ class _DoctorProfileSetupScreenState
         locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
       );
       setState(() {
-        _latitude = position.latitude;
+        _latitude  = position.latitude;
         _longitude = position.longitude;
       });
-    } catch (e) {
+    } catch (_) {
       _showError('Failed to get location');
     }
   }
@@ -155,103 +165,84 @@ class _DoctorProfileSetupScreenState
     );
     if (result != null) {
       setState(() {
-        _latitude = result.latitude;
+        _latitude  = result.latitude;
         _longitude = result.longitude;
       });
     }
   }
 
-  bool _isBlank(TextEditingController controller) {
-    return controller.text.trim().isEmpty;
-  }
+  bool _isBlank(TextEditingController c) => c.text.trim().isEmpty;
 
   void _showError(String message) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message, style: const TextStyle(fontSize: 13))),
+          ],
+        ),
+        backgroundColor: kRedAccent,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   Future<void> _handleSubmit() async {
     if (_step == 1) {
-      if (_isBlank(_fullNameController)) {
-        return _showError('Full Name is required');
-      }
-      if (_isBlank(_contactController)) {
-        return _showError('Contact No is required');
-      }
-      
-      if (_isBlank(_emailController)) {
-        return _showError('Email is required');
-      }
-      if (_selectedGenderId == null || _selectedGenderId! <= 0) {
-        return _showError('Gender is required');
-      }
-      if (_selectedSpecialization.isEmpty) {
-        return _showError('Specialization is required');
-      }
-      if (_isBlank(_qualificationController)) {
-        return _showError('Qualification is required');
-      }
-      if (_isBlank(_licenseController)) {
-        return _showError('License Number is required');
-      }
-      if (_isBlank(_experienceController)) {
-        return _showError('Experience is required');
-      }
-      final experience = int.tryParse(_experienceController.text.trim());
-      if (experience == null) {
-        return _showError('Experience must be a valid number');
-      }
-
+      if (_isBlank(_fullNameController))       return _showError('Full Name is required');
+      if (_isBlank(_contactController))        return _showError('Contact No is required');
+      if (_isBlank(_emailController))          return _showError('Email is required');
+      if (_selectedGenderId == null || _selectedGenderId! <= 0)
+                                               return _showError('Gender is required');
+      if (_selectedSpecialization.isEmpty)     return _showError('Specialization is required');
+      if (_isBlank(_qualificationController))  return _showError('Qualification is required');
+      if (_isBlank(_licenseController))        return _showError('License Number is required');
+      if (_isBlank(_experienceController))     return _showError('Experience is required');
+      if (int.tryParse(_experienceController.text.trim()) == null)
+                                               return _showError('Experience must be a valid number');
       setState(() => _step = 2);
+      _animateStep();
       return;
     }
 
-    // Step 2 validation (clinic image + consultation fee are optional)
-    if (_isBlank(_clinicNameController)) {
-      return _showError('Clinic Name is required');
-    }
-    if (_isBlank(_clinicAddressController)) {
-      return _showError('Clinic Address is required');
-    }
-    if (_isBlank(_clinicContactController)) {
-      return _showError('Clinic Contact is required');
-    }
-    if (_isBlank(_clinicEmailController)) {
-      return _showError('Clinic Email is required');
-    }
+    if (_isBlank(_clinicNameController))    return _showError('Clinic Name is required');
+    if (_isBlank(_clinicAddressController)) return _showError('Clinic Address is required');
+    if (_isBlank(_clinicContactController)) return _showError('Clinic Contact is required');
+    if (_isBlank(_clinicEmailController))   return _showError('Clinic Email is required');
 
     if (_fcmToken == null) {
-      try {
-        _fcmToken = await FirebaseMessaging.instance.getToken();
-      } catch (e) {
-        debugPrint('FCM token refresh failed: $e');
-      }
+      try { _fcmToken = await FirebaseMessaging.instance.getToken(); }
+      catch (e) { debugPrint('FCM token refresh failed: $e'); }
     }
 
     final doctorLogin = DoctorDetails(
-      name: _fullNameController.text.trim(),
-      mobile: _contactController.text.trim(),
-      email: _emailController.text.trim(),
-      genderId: _selectedGenderId,
-      specialization: _selectedSpecialization,
-      qualification: _qualificationController.text.trim(),
-      licenseNo: _licenseController.text.trim(),
-      experience: int.tryParse(_experienceController.text.trim()),
-      image: _doctorPhoto?.path, // optional
-      clinicName: _clinicNameController.text.trim(),
-      clinicAddress: _clinicAddressController.text.trim(),
-      clinicContact: _clinicContactController.text.trim(),
-      clinicEmail: _clinicEmailController.text.trim(),
-      websiteName: _clinicWebsiteController.text.trim(),
+      name:            _fullNameController.text.trim(),
+      mobile:          _contactController.text.trim(),
+      email:           _emailController.text.trim(),
+      genderId:        _selectedGenderId,
+      specialization:  _selectedSpecialization,
+      qualification:   _qualificationController.text.trim(),
+      licenseNo:       _licenseController.text.trim(),
+      experience:      int.tryParse(_experienceController.text.trim()),
+      image:           _doctorPhoto?.path,
+      clinicName:      _clinicNameController.text.trim(),
+      clinicAddress:   _clinicAddressController.text.trim(),
+      clinicContact:   _clinicContactController.text.trim(),
+      clinicEmail:     _clinicEmailController.text.trim(),
+      websiteName:     _clinicWebsiteController.text.trim(),
       consultationFee: _consultationFeeController.text.trim().isEmpty
           ? null
           : double.tryParse(_consultationFeeController.text.trim()),
-      imageUrl: _clinicPhoto?.path, // optional
-      latitude: _latitude,
-      longitude: _longitude,
-      roleId: 1,
-      Token: _fcmToken,
+      imageUrl:        _clinicPhoto?.path,
+      latitude:        _latitude,
+      longitude:       _longitude,
+      roleId:          1,
+      Token:           _fcmToken,
     );
 
     await ref
@@ -269,217 +260,413 @@ class _DoctorProfileSetupScreenState
     }
   }
 
+  // ─── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(doctorLoginViewModelProvider);
+    final state       = ref.watch(doctorLoginViewModelProvider);
     final masterState = ref.watch(masterViewModelProvider);
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            size: 18,
-            color: Color(0xFF0F172A),
-          ),
-          onPressed: () {
-            if (_step == 2) {
-              setState(() => _step = 1);
-            } else {
-              Navigator.pop(context);
-            }
-          },
-        ),
-        title: const Text(
-          'Profile Setup',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        centerTitle: true,
-      ),
+      backgroundColor: kSurface,
+      appBar: _buildAppBar(),
       body: Stack(
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              children: [
-                // Step indicator
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _step == 1 ? 32 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _step == 1
-                            ? const Color(0xFF0F172A)
-                            : const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: _step == 2 ? 32 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: _step == 2
-                            ? const Color(0xFF0F172A)
-                            : const Color(0xFFCBD5E1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Doctor Photo
-                if (_step == 1)
-                  Column(
-                    children: [
-                      GestureDetector(
-                        onTap: () => _pickImage(true),
-                        child: CircleAvatar(
-                          radius: 48,
-                          backgroundColor: const Color(0xFFE2E8F0),
-                          backgroundImage: _doctorPhoto != null
-                              ? FileImage(_doctorPhoto!)
-                              : null,
-                          child: _doctorPhoto == null
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 52,
-                                  color: Color(0xFF94A3B8),
-                                )
-                              : null,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Upload Doctor Photo',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                const SizedBox(height: 24),
-
-                // Step 1 fields
-                if (_step == 1) ...[
-                  _buildTextField('Full Name', _fullNameController),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    'Contact No',
-                    _contactController,
-                    keyboard: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    'Email',
-                    _emailController,
-                    keyboard: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildGenderSection(masterState),
-                  const SizedBox(height: 16),
-                  _buildDropdown(),
-                  const SizedBox(height: 16),
-                  _buildTextField('Qualification', _qualificationController),
-                  const SizedBox(height: 16),
-                  _buildTextField('License Number', _licenseController),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    'Experience (Years)',
-                    _experienceController,
-                    keyboard: TextInputType.number,
-                  ),
+          FadeTransition(
+            opacity: _fadeAnim,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildStepIndicator(),
+                  const SizedBox(height: 20),
+                  if (_step == 1) _buildStep1(masterState),
+                  if (_step == 2) _buildStep2(),
+                  const SizedBox(height: 24),
+                  _buildCTA(),
+                  const SizedBox(height: 32),
                 ],
-
-                // Step 2 fields
-                if (_step == 2) ...[
-                  // Clinic photo
-                  GestureDetector(
-                    onTap: () => _pickImage(false),
-                    child: CircleAvatar(
-                      radius: 48,
-                      backgroundColor: const Color(0xFFE2E8F0),
-                      backgroundImage: _clinicPhoto != null
-                          ? FileImage(_clinicPhoto!)
-                          : null,
-                      child: _clinicPhoto == null
-                          ? const Icon(
-                              Icons.local_hospital,
-                              size: 52,
-                              color: Color(0xFF94A3B8),
-                            )
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Upload Clinic Photo',
-                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField('Clinic Name', _clinicNameController),
-                  const SizedBox(height: 16),
-                  _buildTextArea('Clinic Address', _clinicAddressController),
-                  const SizedBox(height: 16),
-                  _buildTextField('Clinic Contact', _clinicContactController),
-                  const SizedBox(height: 16),
-                  _buildTextField('Clinic Email', _clinicEmailController),
-                  const SizedBox(height: 16),
-                  _buildTextField('Clinic Website', _clinicWebsiteController),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    'Consultation Fee',
-                    _consultationFeeController,
-                    keyboard: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildLocationField(),
-                ],
-
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(13),
-                      ),
-                    ),
-                    child: Text(
-                      _step == 1 ? 'Continue' : 'Complete Setup',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 32),
-              ],
+              ),
             ),
           ),
+          if (state.isLoading)
+            Container(
+              color: Colors.black26,
+              child: const Center(
+                child: CircularProgressIndicator(color: kPrimaryBlue),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 
-          // Loading indicator
-          if (state.isLoading) const Center(child: CircularProgressIndicator()),
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: kCardBg,
+      elevation: 0,
+      surfaceTintColor: kCardBg,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 0.5, color: kDivider),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: kTextDark),
+        onPressed: () {
+          if (_step == 2) {
+            setState(() => _step = 1);
+            _animateStep();
+          } else {
+            Navigator.pop(context);
+          }
+        },
+      ),
+      title: const Text(
+        'Profile Setup',
+        style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: kTextDark),
+      ),
+      centerTitle: true,
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: kLightBlue,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            'Step $_step of 2',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: kPrimaryBlue,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Step indicator ────────────────────────────────────────────────────────
+
+  Widget _buildStepIndicator() {
+    return Row(
+      children: [
+        _StepChip(
+          index: 1,
+          label: 'Personal Info',
+          icon: Icons.person_outline_rounded,
+          state: _step == 1
+              ? _StepState.active
+              : _StepState.done,
+        ),
+        Expanded(
+          child: Container(
+            height: 2,
+            margin: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: _step == 2 ? kPrimaryBlue : kDivider,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        _StepChip(
+          index: 2,
+          label: 'Clinic Details',
+          icon: Icons.local_hospital_outlined,
+          state: _step == 2 ? _StepState.active : _StepState.pending,
+        ),
+      ],
+    );
+  }
+
+  // ─── Step 1 ────────────────────────────────────────────────────────────────
+
+  Widget _buildStep1(MasterState masterState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Avatar
+        Center(child: _AvatarPicker(
+          photo: _doctorPhoto,
+          icon: Icons.person_rounded,
+          label: 'Upload Doctor Photo',
+          onTap: () => _pickImage(true),
+        )),
+        const SizedBox(height: 24),
+
+        _SectionHeader(title: 'Basic Details'),
+        const SizedBox(height: 12),
+        _Card(children: [
+          _buildField('Full Name', _fullNameController, hint: 'Dr. Arjun Sharma', required: true),
+          _buildField('Contact No', _contactController, hint: '+91 98765 43210',
+              keyboard: TextInputType.phone, required: true),
+          _buildField('Email Address', _emailController, hint: 'doctor@email.com',
+              keyboard: TextInputType.emailAddress, required: true),
+          _buildGenderSection(masterState),
+        ]),
+
+        const SizedBox(height: 16),
+        _SectionHeader(title: 'Professional Info'),
+        const SizedBox(height: 12),
+        _Card(children: [
+          _buildDropdown(),
+          _buildField('Qualification', _qualificationController, hint: 'MBBS, MD...', required: true),
+          Row(children: [
+            Expanded(child: _buildField('License No', _licenseController, hint: 'MCI-XXXXX', required: true)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildField('Experience (yrs)', _experienceController,
+                hint: 'e.g. 8', keyboard: TextInputType.number, required: true)),
+          ]),
+        ]),
+      ],
+    );
+  }
+
+  // ─── Step 2 ────────────────────────────────────────────────────────────────
+
+  Widget _buildStep2() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(child: _AvatarPicker(
+          photo: _clinicPhoto,
+          icon: Icons.local_hospital_rounded,
+          label: 'Upload Clinic Photo',
+          onTap: () => _pickImage(false),
+        )),
+        const SizedBox(height: 24),
+
+        _SectionHeader(title: 'Clinic Details'),
+        const SizedBox(height: 12),
+        _Card(children: [
+          _buildField('Clinic Name', _clinicNameController, hint: 'Apollo Clinic', required: true),
+          _buildTextArea('Clinic Address', _clinicAddressController,
+              hint: '123, MG Road, Panaji, Goa', required: true),
+          Row(children: [
+            Expanded(child: _buildField('Clinic Contact', _clinicContactController,
+                hint: '+91...', keyboard: TextInputType.phone, required: true)),
+            const SizedBox(width: 12),
+            Expanded(child: _buildField('Clinic Email', _clinicEmailController,
+                hint: 'clinic@...', keyboard: TextInputType.emailAddress, required: true)),
+          ]),
+          Row(children: [
+            Expanded(child: _buildField('Website', _clinicWebsiteController, hint: 'www.clinic.com')),
+            const SizedBox(width: 12),
+            Expanded(child: _buildField('Consult. Fee (₹)', _consultationFeeController,
+                hint: '500', keyboard: TextInputType.number)),
+          ]),
+        ]),
+
+        const SizedBox(height: 16),
+        _SectionHeader(title: 'Location'),
+        const SizedBox(height: 12),
+        _Card(children: [_buildLocationField()]),
+      ],
+    );
+  }
+
+  // ─── CTA button ────────────────────────────────────────────────────────────
+
+  Widget _buildCTA() {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: _handleSubmit,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: kPrimaryBlue,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              _step == 1 ? 'Continue' : 'Complete Setup',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, letterSpacing: 0.3),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              _step == 1 ? Icons.arrow_forward_rounded : Icons.check_circle_outline_rounded,
+              size: 18,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Field builders ────────────────────────────────────────────────────────
+
+  Widget _buildField(
+    String label,
+    TextEditingController controller, {
+    String hint = '',
+    TextInputType keyboard = TextInputType.text,
+    bool required = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FieldLabel(label: label, required: required),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            keyboardType: keyboard,
+            style: const TextStyle(fontSize: 14, color: kTextDark),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: Color(0xFFBCC1C8), fontSize: 14),
+              filled: true,
+              fillColor: kSurface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kDivider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kDivider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kPrimaryBlue, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextArea(
+    String label,
+    TextEditingController controller, {
+    String hint = '',
+    bool required = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _FieldLabel(label: label, required: required),
+          const SizedBox(height: 6),
+          TextField(
+            controller: controller,
+            maxLines: 3,
+            style: const TextStyle(fontSize: 14, color: kTextDark),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(color: Color(0xFFBCC1C8), fontSize: 14),
+              filled: true,
+              fillColor: kSurface,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kDivider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kDivider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kPrimaryBlue, width: 1.5),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDropdown() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _FieldLabel(label: 'Specialization', required: true),
+          const SizedBox(height: 6),
+          Container(
+            height: 50,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: kSurface,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _selectedSpecialization.isNotEmpty ? kPrimaryBlue : kDivider,
+                width: _selectedSpecialization.isNotEmpty ? 1.5 : 1,
+              ),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: _selectedSpecialization.isEmpty ? null : _selectedSpecialization,
+                hint: const Text(
+                  'Select specialization',
+                  style: TextStyle(color: Color(0xFFBCC1C8), fontSize: 14),
+                ),
+                isExpanded: true,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, color: kTextMuted),
+                style: const TextStyle(fontSize: 14, color: kTextDark),
+                items: _specializations
+                    .map((s) => DropdownMenuItem<String>(
+                          value: s['value'],
+                          child: Text(s['label']!),
+                        ))
+                    .toList(),
+                onChanged: (val) => setState(() => _selectedSpecialization = val ?? ''),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenderSection(MasterState masterState) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _FieldLabel(label: 'Gender', required: true),
+          const SizedBox(height: 8),
+          masterState.fetchGender.when(
+            data: (list) {
+              final options = list
+                  .map((e) => e.gender)
+                  .whereType<String>()
+                  .where((e) => e.trim().isNotEmpty)
+                  .toList();
+              if (options.isEmpty) return const _InlineLoading();
+              final idByName = <String, int>{};
+              for (final g in list) {
+                final name = g.gender?.trim();
+                final id   = g.genderId;
+                if (name != null && name.isNotEmpty && id != null) {
+                  idByName[name] = id;
+                }
+              }
+              return _GenderSelector(
+                options: options,
+                selected: _selectedGender,
+                onChanged: (v) => setState(() {
+                  _selectedGender   = v;
+                  _selectedGenderId = idByName[v];
+                }),
+              );
+            },
+            loading: () => const _InlineLoading(),
+            error:   (_, __) => const _InlineError(text: 'Unable to load gender list'),
+          ),
         ],
       ),
     );
@@ -490,347 +677,364 @@ class _DoctorProfileSetupScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Location',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF0F172A),
-          ),
-        ),
+        const _FieldLabel(label: 'Clinic Location'),
         const SizedBox(height: 8),
         Row(
           children: [
             Expanded(
               child: Container(
-                height: 52,
+                height: 50,
                 alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                ),
-                child: Text(
-                  hasLocation
-                      ? '${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
-                      : 'No location selected',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: hasLocation
-                        ? const Color(0xFF0F172A)
-                        : const Color(0xFF94A3B8),
+                  color: hasLocation ? kLightBlue : kSurface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: hasLocation ? kPrimaryBlue : kDivider,
+                    width: hasLocation ? 1.5 : 1,
                   ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasLocation ? Icons.location_on_rounded : Icons.location_off_rounded,
+                      size: 16,
+                      color: hasLocation ? kPrimaryBlue : kTextMuted,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        hasLocation
+                            ? '${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)}'
+                            : 'No location selected',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: hasLocation ? kPrimaryBlue : kTextMuted,
+                          fontWeight: hasLocation ? FontWeight.w500 : FontWeight.normal,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
             const SizedBox(width: 10),
-            GestureDetector(
+            _LocationButton(
+              icon: Icons.my_location_rounded,
+              tooltip: 'Use GPS',
               onTap: _getCurrentLocation,
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF3B82F6),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.navigation_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
             ),
             const SizedBox(width: 8),
-            GestureDetector(
+            _LocationButton(
+              icon: Icons.map_outlined,
+              tooltip: 'Pick on map',
               onTap: _selectFromMap,
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B82F6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.map_rounded,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
             ),
           ],
         ),
       ],
     );
   }
+}
 
-  Widget _buildTextField(
-    String label,
-    TextEditingController controller, {
-    TextInputType keyboard = TextInputType.text,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 52,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: TextField(
-            controller: controller,
-            keyboardType: keyboard,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// REUSABLE WIDGETS
+// ─────────────────────────────────────────────────────────────────────────────
 
-  Widget _buildTextArea(String label, TextEditingController controller) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: TextField(
-            controller: controller,
-            maxLines: 3,
-            style: const TextStyle(fontSize: 14, color: Color(0xFF0F172A)),
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+class _Card extends StatelessWidget {
+  final List<Widget> children;
+  const _Card({required this.children});
 
-  Widget _buildDropdown() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Specialization',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF0F172A),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kDivider),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 52,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: _selectedSpecialization.isEmpty
-                  ? null
-                  : _selectedSpecialization,
-              hint: const Text('Select specialization'),
-              isExpanded: true,
-              icon: const Icon(
-                Icons.keyboard_arrow_down,
-                color: Color(0xFF94A3B8),
-              ),
-              items: _specializations
-                  .map(
-                    (s) => DropdownMenuItem<String>(
-                      value: s['value'],
-                      child: Text(s['label']!),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (val) =>
-                  setState(() => _selectedSpecialization = val ?? ''),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGenderSection(MasterState masterState) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Gender',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        const SizedBox(height: 8),
-        masterState.fetchGender.when(
-          data: (list) {
-            final options = list
-                .map((e) => e.gender)
-                .whereType<String>()
-                .where((e) => e.trim().isNotEmpty)
-                .toList();
-            if (options.isEmpty) return const _InlineLoading();
-            final idByName = <String, int>{};
-            for (final g in list) {
-              final name = g.gender?.trim();
-              final id = g.genderId;
-              if (name != null && name.isNotEmpty && id != null) {
-                idByName[name] = id;
-              }
-            }
-            return _GenderSelector(
-              options: options,
-              selected: _selectedGender,
-              onChanged: (v) => setState(() {
-                _selectedGender = v;
-                _selectedGenderId = idByName[v];
-              }),
-            );
-          },
-          loading: () => const _InlineLoading(),
-          error: (e, _) =>
-              const _InlineError(text: 'Unable to load gender list'),
-        ),
-      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
     );
   }
 }
 
-class _GenderSelector extends StatelessWidget {
-  const _GenderSelector({
-    required this.options,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  final List<String> options;
-  final String? selected;
-  final ValueChanged<String> onChanged;
-
-  static const _iconMap = {
-    'male': Icons.male_rounded,
-    'female': Icons.female_rounded,
-    'other': Icons.transgender_rounded,
-  };
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader({required this.title});
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: List.generate(options.length, (i) {
-        final label = options[i];
-        final icon =
-            _iconMap[label.toLowerCase()] ?? Icons.person_outline_rounded;
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: i < options.length - 1 ? 8 : 0),
-            child: _GenderOption(
-              label: label,
-              icon: icon,
-              isSelected: selected == label,
-              onTap: () => onChanged(label),
-            ),
+      children: [
+        Container(width: 3, height: 14, decoration: BoxDecoration(
+          color: kPrimaryBlue,
+          borderRadius: BorderRadius.circular(2),
+        )),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: kTextDark,
+            letterSpacing: 0.3,
           ),
-        );
-      }),
+        ),
+      ],
     );
   }
 }
 
-class _GenderOption extends StatelessWidget {
+class _FieldLabel extends StatelessWidget {
   final String label;
+  final bool required;
+  const _FieldLabel({required this.label, this.required = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted),
+        ),
+        if (required) ...[
+          const SizedBox(width: 3),
+          const Text('*', style: TextStyle(color: kRedAccent, fontSize: 13, fontWeight: FontWeight.w700)),
+        ],
+      ],
+    );
+  }
+}
+
+class _AvatarPicker extends StatelessWidget {
+  final File? photo;
   final IconData icon;
-  final bool isSelected;
+  final String label;
   final VoidCallback onTap;
 
-  const _GenderOption({
-    required this.label,
+  const _AvatarPicker({
+    required this.photo,
     required this.icon,
-    required this.isSelected,
+    required this.label,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        height: 48,
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF0F172A).withOpacity(0.08)
-              : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
-            width: isSelected ? 1.8 : 1,
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 88,
+            height: 88,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: kLightBlue,
+              border: Border.all(color: kPrimaryBlue, width: 2),
+            ),
+            child: photo != null
+                ? ClipOval(child: Image.file(photo!, fit: BoxFit.cover))
+                : Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(icon, size: 42, color: kPrimaryBlue),
+                      Positioned(
+                        bottom: 6,
+                        right: 6,
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: const BoxDecoration(
+                            color: kPrimaryBlue,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.add_rounded, color: Colors.white, size: 14),
+                        ),
+                      ),
+                    ],
+                  ),
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon,
-                size: 18,
-                color: isSelected
-                    ? const Color(0xFF0F172A)
-                    : const Color(0xFF94A3B8)),
-            const SizedBox(width: 5),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color:
-                    isSelected ? const Color(0xFF0F172A) : const Color(0xFF64748B),
-              ),
-            ),
-          ],
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: kPrimaryBlue, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+}
+
+class _LocationButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _LocationButton({required this.icon, required this.tooltip, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: kLightBlue,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kPrimaryBlue.withOpacity(0.3)),
+          ),
+          child: Icon(icon, color: kPrimaryBlue, size: 20),
         ),
       ),
     );
   }
 }
+
+// ─── Step chip ───────────────────────────────────────────────────────────────
+
+enum _StepState { active, done, pending }
+
+class _StepChip extends StatelessWidget {
+  final int index;
+  final String label;
+  final IconData icon;
+  final _StepState state;
+
+  const _StepChip({
+    required this.index,
+    required this.label,
+    required this.icon,
+    required this.state,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color bg, fg, border;
+    IconData displayIcon;
+
+    switch (state) {
+      case _StepState.active:
+        bg = kLightBlue; fg = kPrimaryBlue; border = kPrimaryBlue;
+        displayIcon = icon;
+      case _StepState.done:
+        bg = const Color(0xFFE6F4EA); fg = kAccentGreen; border = kAccentGreen;
+        displayIcon = Icons.check_rounded;
+      case _StepState.pending:
+        bg = kSurface; fg = kTextMuted; border = kDivider;
+        displayIcon = icon;
+    }
+
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: bg,
+            shape: BoxShape.circle,
+            border: Border.all(color: border, width: 1.5),
+          ),
+          child: Icon(displayIcon, size: 14, color: fg),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: state == _StepState.pending ? FontWeight.normal : FontWeight.w600,
+            color: fg,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Gender selector ─────────────────────────────────────────────────────────
+
+class _GenderSelector extends StatelessWidget {
+  final List<String> options;
+  final String? selected;
+  final ValueChanged<String> onChanged;
+
+  const _GenderSelector({required this.options, required this.selected, required this.onChanged});
+
+  static const _iconMap = {
+    'male':   Icons.male_rounded,
+    'female': Icons.female_rounded,
+    'other':  Icons.transgender_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        children: List.generate(options.length, (i) {
+          final label     = options[i];
+          final icon      = _iconMap[label.toLowerCase()] ?? Icons.person_outline_rounded;
+          final isSelected = selected == label;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: i < options.length - 1 ? 8 : 0),
+              child: GestureDetector(
+                onTap: () => onChanged(label),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isSelected ? kLightBlue : kSurface,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isSelected ? kPrimaryBlue : kDivider,
+                      width: isSelected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(icon, size: 16,
+                          color: isSelected ? kPrimaryBlue : kTextMuted),
+                      const SizedBox(width: 5),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected ? kPrimaryBlue : kTextMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+// ─── Inline states ────────────────────────────────────────────────────────────
 
 class _InlineLoading extends StatelessWidget {
   const _InlineLoading();
@@ -838,12 +1042,11 @@ class _InlineLoading extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const SizedBox(
-      height: 48,
+      height: 44,
       child: Center(
         child: SizedBox(
-          width: 18,
-          height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          width: 18, height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryBlue),
         ),
       ),
     );
@@ -865,15 +1068,12 @@ class _InlineError extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded,
-              size: 18, color: Color(0xFFEF4444)),
+          const Icon(Icons.error_outline_rounded, size: 18, color: kRedAccent),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500,
                   color: Color(0xFFB91C1C)),
             ),
           ),
@@ -907,32 +1107,38 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kSurface,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: kCardBg,
         elevation: 0,
+        surfaceTintColor: kCardBg,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(height: 0.5, color: kDivider),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 18, color: Color(0xFF0F172A)),
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: kTextDark),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Select Location',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF0F172A),
-          ),
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: kTextDark),
         ),
         centerTitle: true,
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, _selected),
-            child: const Text(
-              'Confirm',
-              style: TextStyle(
-                color: Color(0xFF3B82F6),
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton(
+              onPressed: () => Navigator.pop(context, _selected),
+              style: TextButton.styleFrom(
+                backgroundColor: kPrimaryBlue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              ),
+              child: const Text(
+                'Confirm',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
               ),
             ),
           ),
@@ -941,10 +1147,7 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
       body: Stack(
         children: [
           GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _selected,
-              zoom: 14,
-            ),
+            initialCameraPosition: CameraPosition(target: _selected, zoom: 14),
             onTap: (latLng) => setState(() => _selected = latLng),
             markers: {
               Marker(
@@ -958,26 +1161,48 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
             left: 24,
             right: 24,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                color: kCardBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: kPrimaryBlue.withOpacity(0.3)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Text(
-                '${_selected.latitude.toStringAsFixed(4)}, ${_selected.longitude.toStringAsFixed(4)}',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF0F172A),
-                ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: kLightBlue,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.location_on_rounded, color: kPrimaryBlue, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Selected coordinates',
+                        style: TextStyle(fontSize: 11, color: kTextMuted),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${_selected.latitude.toStringAsFixed(4)}, ${_selected.longitude.toStringAsFixed(4)}',
+                        style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),

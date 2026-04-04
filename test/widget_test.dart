@@ -8,19 +8,19 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: SplashScreen(),
+          home: const ContinueAsScreen(),
         ),
       ),
     );
 
-    expect(find.byType(SplashScreen), findsOneWidget);
+    expect(find.byType(ContinueAsScreen), findsOneWidget);
   });
 
   testWidgets('Splash screen shows role buttons', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: SplashScreen(),
+          home: const ContinueAsScreen(),
         ),
       ),
     );

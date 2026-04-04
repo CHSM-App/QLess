@@ -78,7 +78,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     if (tokenReady && patientId > 0 && !_hasFetchedFamily) {
       _hasFetchedFamily = true;
       ref
-          .read(patientLoginViewModelProvider.notifier)
+          .read(familyViewModelProvider.notifier)
           .fetchAllFamilyMembers(patientId);
     }
   }
@@ -119,6 +119,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   Widget build(BuildContext context) {
     final doctorsState = ref.watch(doctorsViewModelProvider);
     final patientState = ref.watch(patientLoginViewModelProvider);
+    final familyState = ref.watch(familyViewModelProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0F172A) : _kSurface;
 
@@ -131,7 +132,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
             _Header(isDark: isDark),
 
             // ── "Booking for" dropdown ────────────────────────────────────
-            patientState.allfamilyMembers.maybeWhen(
+            familyState.allfamilyMembers.maybeWhen(
               data: (members) => _BookingForDropdown(
                 patientState: patientState,
                 members: members,

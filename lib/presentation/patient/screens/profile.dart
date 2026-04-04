@@ -1,315 +1,521 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
-import 'package:qless/core/theme/patient_theme.dart';
-import 'package:qless/presentation/patient/screens/patient_notification.dart';
-import 'package:qless/presentation/shared/screens/continue_as.dart' as continue_as;
+import 'package:qless/domain/models/patients.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/patient/screens/patient_edit_profile.dart'
+    show PatientEditProfilePage;
+import 'package:qless/presentation/shared/screens/continue_as.dart';
 
-class ProfileScreen extends ConsumerWidget {
-  const ProfileScreen({super.key});
+// ── Colour palette ────────────────────────────────────────────
+const kPrimary  = Color(0xFF1A73E8);
+const kPrimaryBg = Color(0xFFE8F0FE);
+const kBg       = Color(0xFFF4F6FB);
+const kCardBg   = Colors.white;
+const kTextDark = Color(0xFF1F2937);
+const kTextMid  = Color(0xFF6B7280);
+const kBorder   = Color(0xFFE5E7EB);
+const kRed      = Color(0xFFEA4335);
+const kGreen    = Color(0xFF34A853);
+const kOrange   = Color(0xFFF59E0B);
+const kPurple   = Color(0xFF8B5CF6);
+const kCyan     = Color(0xFF06B6D4);
+
+class PatientProfilePage extends ConsumerStatefulWidget {
+  const PatientProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+  ConsumerState<PatientProfilePage> createState() =>
+      _PatientProfilePageState();
+}
+
+class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
+  late final ProviderSubscription<PatientLoginState> _patientLoginSub;
+  bool _didFetchProfile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _patientLoginSub = ref.listenManual<PatientLoginState>(
+      patientLoginViewModelProvider,
+      (prev, next) => _maybeFetchProfile(next),
+    );
+    Future.microtask(() {
+      final state = ref.read(patientLoginViewModelProvider);
+      _maybeFetchProfile(state);
+    });
+  }
+
+  @override
+  void dispose() {
+    _patientLoginSub.close();
+    super.dispose();
+  }
+
+  void _maybeFetchProfile(PatientLoginState state) {
+    if (_didFetchProfile) return;
+    final mobile = state.mobileNo;
+    if (mobile != null && mobile.trim().isNotEmpty) {
+      _didFetchProfile = true;
+      ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final patientState = ref.watch(patientLoginViewModelProvider);
+    final patientDetails = patientState.patientPhoneCheck.maybeWhen(
+      data: (list) => list.isNotEmpty ? list.first : null,
+      orElse: () => null,
+    );
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isDark
-                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                      : [const Color(0xFF1A73E8), const Color(0xFF0D5DBF)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      backgroundColor: kBg,
+      appBar: _buildAppBar(),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(context, patientState, patientDetails),
+            const SizedBox(height: 16),
+            _buildEditButton(context),
+            const SizedBox(height: 12),
+            _buildStatsGrid(patientState, patientDetails),
+            const SizedBox(height: 20),
+            _buildAccountSection(context, ref),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── AppBar / Header ───────────────────────────────────────────
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: kCardBg,
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      title: const Text(
+        'My Profile',
+        style: TextStyle(
+          color: kTextDark,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(color: kBorder, height: 0.5),
+      ),
+    );
+  }
+
+  // ── Profile avatar + name + tags ──────────────────────────────
+  Widget _buildHeader(
+    BuildContext context,
+    PatientLoginState state,
+    Patients? details,
+  ) {
+    final displayName = details?.name ?? state.name ?? 'Patient';
+    final email = details?.email ?? state.email ?? '';
+    final mobile = details?.mobileNo ?? state.mobileNo ?? '';
+    final gender = _displayGender(details);
+    final age = _ageFromDob(details?.DOB);
+    final bloodGroup = details?.bloodGroup;
+    final contactLine = _joinNonEmpty([email, mobile], separator: ' · ');
+    return Container(
+      width: double.infinity,
+      color: kCardBg,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      child: Column(
+        children: [
+          Stack(
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: kPrimaryBg,
+                  border: Border.all(color: kPrimary, width: 3),
                 ),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(32),
-                  bottomRight: Radius.circular(32),
-                ),
+                child: const Icon(Icons.person, size: 44, color: kPrimary),
               ),
-              child: SafeArea(
-                bottom: false,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Profile',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          IconButton(
-                            icon: const Icon(Icons.edit_rounded,
-                                color: Colors.white),
-                            onPressed: () {},
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                      CircleAvatar(
-                        radius: 44,
-                        backgroundColor: Colors.white.withOpacity(0.3),
-                        child: const Text(
-                          'AM',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Arjun Mehta',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '+91 98765 43210 · arjun@email.com',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+              Positioned(
+                bottom: 2,
+                right: 2,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kGreen,
+                    border: Border.all(color: kCardBg, width: 2.5),
                   ),
+                  child: const Icon(Icons.check, size: 12, color: kCardBg),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            displayName,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: kTextDark,
             ),
           ),
-          SliverPadding(
-            padding: const EdgeInsets.all(24),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                _ProfileCard(isDark: isDark, children: [
-                  _ProfileInfoRow(
-                      'Blood Group', 'O+', Icons.bloodtype_rounded, isDark),
-                  _ProfileInfoRow('Date of Birth', '12 Aug 1992',
-                      Icons.cake_rounded, isDark),
-                  _ProfileInfoRow(
-                      'Gender', 'Male', Icons.person_rounded, isDark),
-                  _ProfileInfoRow('Age', '32 years',
-                      Icons.calendar_today_rounded, isDark),
-                ]),
-                const SizedBox(height: 16),
-                _ProfileCard(isDark: isDark, children: [
-                  _MenuTile(
-                    icon: Icons.group_rounded,
-                    label: 'Family Members',
-                    color: const Color(0xFF7C3AED),
-                    isDark: isDark,
-                    onTap: () {
-                      
-                    },
-                    // onTap: () => Navigator.push(
-                    //     context,
-                    //     MaterialPageRoute(
-                    //         builder: (_) => const FamilyMembersScreen())),
-                  ),
-                  _MenuTile(
-                    icon: Icons.notifications_rounded,
-                    label: 'Notifications',
-                    color: const Color(0xFFF59E0B),
-                    isDark: isDark,
-                    onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => const NotificationsScreen())),
-                  ),
-                  _MenuTile(
-                    icon: Icons.medical_information_rounded,
-                    label: 'Medical Records',
-                    color: const Color(0xFF10B981),
-                    isDark: isDark,
-                    onTap: () {},
-                  ),
-                  _MenuTile(
-                    icon: Icons.privacy_tip_rounded,
-                    label: 'Privacy & Security',
-                    color: const Color(0xFF06B6D4),
-                    isDark: isDark,
-                    onTap: () {},
-                  ),
-                  _MenuTile(
-                    icon: Icons.help_rounded,
-                    label: 'Help & Support',
-                    color: const Color(0xFF6366F1),
-                    isDark: isDark,
-                    onTap: () {},
-                    showDivider: false,
-                  ),
-                ]),
-                const SizedBox(height: 16),
-                _ProfileCard(isDark: isDark, children: [
-                  _MenuTile(
-                    icon: Icons.logout_rounded,
-                    label: 'Logout',
-                    color: AppTheme.error,
-                    isDark: isDark,
-                    onTap: () async {
-                      await ref.read(tokenProvider.notifier).clearTokens();
-                      if (!context.mounted) return;
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(
-                          builder: (_) => const continue_as.SplashScreen(),
-                        ),
-                        (route) => false,
-                      );
-                    },
-                    showDivider: false,
-                  ),
-                ]),
-                const SizedBox(height: 24),
-                Center(
-                  child: Text(
-                    'MedCare v1.0.0',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color:
-                            isDark ? Colors.white24 : AppTheme.textHint),
-                  ),
-                ),
-                const SizedBox(height: 24),
-              ]),
+          const SizedBox(height: 4),
+          if (contactLine.isNotEmpty)
+            Text(
+              contactLine,
+              style: const TextStyle(fontSize: 12, color: kTextMid),
             ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            children: [
+              if (gender.isNotEmpty) _tag(gender, kPrimary, kPrimaryBg),
+              if (age != null) _tag('Age $age', kPrimary, kPrimaryBg),
+              if (bloodGroup != null && bloodGroup.trim().isNotEmpty)
+                _tag('$bloodGroup Blood', kRed, const Color(0xFFFDEAEA)),
+            ],
           ),
         ],
       ),
     );
   }
-}
 
-class _ProfileCard extends StatelessWidget {
-  final List<Widget> children;
-  final bool isDark;
-  const _ProfileCard({required this.children, required this.isDark});
-  @override
-  Widget build(BuildContext context) {
+  Widget _tag(String label, Color fg, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+      ),
+    );
+  }
+
+  // ── Edit Profile button ───────────────────────────────────────
+  Widget _buildEditButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: OutlinedButton.icon(
+        onPressed: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+              builder: (_) => const PatientEditProfilePage()),
+        ),
+        icon: const Icon(Icons.edit_outlined, size: 16, color: kPrimary),
+        label: const Text(
+          'Edit Profile',
+          style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: kPrimary),
+        ),
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(double.infinity, 48),
+          side: const BorderSide(color: kBorder),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+          backgroundColor: kCardBg,
+        ),
+      ),
+    );
+  }
+
+  // ── 6 Stats cards (white bg, coloured icon) ───────────────────
+  Widget _buildStatsGrid(PatientLoginState state, Patients? details) {
+    final weight = details?.weight;
+    final blood = details?.bloodGroup;
+    final int? familyCount = null;
+    final items = [
+      _StatItem(weight?.trim().isNotEmpty == true ? '$weight kg' : '58 kg',
+          'Weight', Icons.monitor_weight_outlined, kPrimary, kPrimaryBg),
+      _StatItem('162 cm', 'Height',  Icons.height_rounded,
+          kPurple, const Color(0xFFEDE9FE)),
+      _StatItem(blood?.trim().isNotEmpty == true ? blood! : 'B+',
+          'Blood', Icons.bloodtype_outlined, kRed, const Color(0xFFFDEAEA)),
+      _StatItem('12',     'Visits',  Icons.calendar_today_rounded,
+          kGreen,  const Color(0xFFDCFCE7)),
+      _StatItem(familyCount?.toString() ?? '3', 'Family',
+          Icons.group_outlined, kOrange, const Color(0xFFFEF3C7)),
+      _StatItem('5',      'Records', Icons.description_outlined,
+          kCyan,   const Color(0xFFCFFAFE)),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 10,
+        childAspectRatio: 1.05,
+        children: items.map(_buildStatCard).toList(),
+      ),
+    );
+  }
+
+  Widget _buildStatCard(_StatItem item) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder, width: 0.5),
       ),
-      child: Column(children: children),
-    );
-  }
-}
-
-class _ProfileInfoRow extends StatelessWidget {
-  final String label, value;
-  final IconData icon;
-  final bool isDark;
-  const _ProfileInfoRow(this.label, this.value, this.icon, this.isDark);
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Row(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
+              color: item.iconBg,
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: AppTheme.primary, size: 18),
+            child: Icon(item.icon, size: 17, color: item.iconColor),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(height: 8),
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: isDark ? Colors.white54 : AppTheme.textSecondary,
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
+            item.value,
+            style: const TextStyle(
+              fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : AppTheme.textPrimary,
+              color: kTextDark,
             ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            item.label,
+            style: const TextStyle(fontSize: 11, color: kTextMid),
           ),
         ],
       ),
     );
   }
-}
 
-class _MenuTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool isDark;
-  final VoidCallback onTap;
-  final bool showDivider;
-  const _MenuTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.isDark,
-    required this.onTap,
-    this.showDivider = true,
-  });
-  @override
-  Widget build(BuildContext context) {
+  int? _ageFromDob(DateTime? dob) {
+    if (dob == null) return null;
+    final now = DateTime.now();
+    var age = now.year - dob.year;
+    final hasHadBirthday = (now.month > dob.month) ||
+        (now.month == dob.month && now.day >= dob.day);
+    if (!hasHadBirthday) age -= 1;
+    return age >= 0 ? age : null;
+  }
+
+  String _displayGender(Patients? details) {
+    final g = details?.gender?.trim();
+    if (g != null && g.isNotEmpty) return g;
+    final id = details?.genderId;
+    if (id == null) return '';
+    if (id == 2) return 'Female';
+    if (id == 3) return 'Other';
+    return 'Male';
+  }
+
+  String _joinNonEmpty(List<String> values, {String separator = ' '}) {
+    final filtered = values.map((v) => v.trim()).where((v) => v.isNotEmpty);
+    return filtered.join(separator);
+  }
+
+  // ── Account menu list ─────────────────────────────────────────
+  Widget _buildAccountSection(BuildContext context, WidgetRef ref) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ListTile(
-          onTap: onTap,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          title: Text(
-            label,
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Text(
+            'ACCOUNT',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : AppTheme.textPrimary,
+              color: kTextMid,
+              letterSpacing: 1.2,
             ),
           ),
-          trailing: Icon(Icons.chevron_right_rounded,
-              color: isDark ? Colors.white24 : AppTheme.textHint),
         ),
-        if (showDivider)
-          Divider(
-            indent: 20,
-            endIndent: 20,
-            height: 1,
-            color: isDark ? Colors.white12 : AppTheme.divider,
+        const SizedBox(height: 10),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: kCardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: kBorder, width: 0.5),
           ),
+          child: Column(
+            children: [
+              _menuItem(
+                icon: Icons.person_outline,
+                iconColor: kPrimary,
+                iconBg: kPrimaryBg,
+                title: 'Personal Information',
+                subtitle: 'Name, DOB, Gender',
+              ),
+              _menuItem(
+                icon: Icons.location_on_outlined,
+                iconColor: kOrange,
+                iconBg: const Color(0xFFFEF3C7),
+                title: 'Address',
+                subtitle: 'Home, City, ZIP',
+              ),
+              _menuItem(
+                icon: Icons.description_outlined,
+                iconColor: kCyan,
+                iconBg: const Color(0xFFCFFAFE),
+                title: 'Medical Records',
+                subtitle: 'Reports, Prescriptions',
+              ),
+              _menuItem(
+                icon: Icons.group_outlined,
+                iconColor: kPurple,
+                iconBg: const Color(0xFFEDE9FE),
+                title: 'Family Members',
+                subtitle: '3 members added',
+              ),
+              _menuItem(
+                icon: Icons.notifications_outlined,
+                iconColor: kOrange,
+                iconBg: const Color(0xFFFEF3C7),
+                title: 'Notifications',
+                subtitle: 'Alerts & reminders',
+              ),
+              _menuItem(
+                icon: Icons.logout,
+                iconColor: kRed,
+                iconBg: const Color(0xFFFDEAEA),
+                title: 'Logout',
+                subtitle: 'Sign out of account',
+                titleColor: kRed,
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => AlertDialog(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      title: const Text(
+                        'Log Out',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      content: const Text(
+                        'Are you sure you want to log out of your account?',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            await ref.read(tokenProvider.notifier).clearTokens();
+                            if (!context.mounted) return;
+                            Navigator.of(context, rootNavigator: true)
+                                .pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                  builder: (_) => const ContinueAsScreen()),
+                              (_) => false,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kRed,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Log Out'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                showDivider: false,
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
+
+  Widget _menuItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    Color titleColor = kTextDark,
+    bool showDivider = true,
+    VoidCallback? onTap,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap ?? () {},
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 13),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 18, color: iconColor),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: titleColor)),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: const TextStyle(
+                              fontSize: 12, color: kTextMid)),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right,
+                    size: 18,
+                    color: titleColor == kRed ? kRed : kTextMid),
+              ],
+            ),
+          ),
+        ),
+        if (showDivider)
+          const Divider(
+              height: 1,
+              thickness: 0.5,
+              color: kBorder,
+              indent: 14,
+              endIndent: 14),
+      ],
+    );
+  }
+}
+
+// ── Helper model ──────────────────────────────────────────────
+class _StatItem {
+  final String value, label;
+  final IconData icon;
+  final Color iconColor, iconBg;
+  const _StatItem(this.value, this.label, this.icon,
+      this.iconColor, this.iconBg);
 }
