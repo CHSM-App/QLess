@@ -4,11 +4,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
+// ── Colour palette ────────────────────────────────────────────────
+const kPrimary   = Color(0xFF1A73E8);
+const kPrimaryBg = Color(0xFFE8F0FE);
+const kBg        = Color(0xFFF4F6FB);
+const kTextDark  = Color(0xFF1F2937);
+const kTextMid   = Color(0xFF6B7280);
+const kBorder    = Color(0xFFE5E7EB);
+const kRed       = Color(0xFFEA4335);
+const kGreen     = Color(0xFF34A853);
+const kCyan      = Color(0xFF06B6D4);
+const kCyanBg    = Color(0xFFF0F9FF);
+const kCyanBorder = Color(0xFFBAE6FD);
+
 class AddFamilyMemberScreen extends ConsumerStatefulWidget {
-  final FamilyMember? existingMember;
-  final List<GenderModel> genderOptions;
+  final FamilyMember?       existingMember;
+  final List<GenderModel>   genderOptions;
   final List<RelationModel> relationOptions;
 
   const AddFamilyMemberScreen({
@@ -38,20 +52,16 @@ class AddFamilyMemberScreen extends ConsumerStatefulWidget {
 
 class _AddFamilyMemberScreenState
     extends ConsumerState<AddFamilyMemberScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _mobileController = TextEditingController();
-  final _dobController = TextEditingController();
+  final _formKey        = GlobalKey<FormState>();
+  final _nameCtrl       = TextEditingController();
+  final _mobileCtrl     = TextEditingController();
+  final _dobCtrl        = TextEditingController();
 
-  /// Holds the selected Gender_id.
-  int? _selectedGenderId;
-
-  /// Holds the selected relation_id.
-  int? _selectedRelationId;
-
+  int?     _selectedGenderId;
+  int?     _selectedRelationId;
   DateTime? _selectedDate;
-  bool _isConfirmed = false;
-  bool _didSubmit = false;
+  bool     _isConfirmed = false;
+  bool     _didSubmit   = false;
 
   bool get _isEditing => widget.existingMember != null;
 
@@ -68,25 +78,22 @@ class _AddFamilyMemberScreenState
   void _prefillIfEditing() {
     final m = widget.existingMember;
     if (m == null) return;
-
-    _nameController.text = m.memberName ?? '';
-    _mobileController.text = m.mobileNo ?? '';
-    _selectedGenderId = m.genderId;
+    _nameCtrl.text   = m.memberName ?? '';
+    _mobileCtrl.text = m.mobileNo   ?? '';
+    _selectedGenderId   = m.genderId;
     _selectedRelationId = m.relationId;
     _isConfirmed = true;
-
     if (m.dob != null) {
-      _selectedDate = m.dob;
-      _dobController.text = _formatDisplayDate(m.dob!);
+      _selectedDate   = m.dob;
+      _dobCtrl.text   = _fmtDate(m.dob!);
     }
- 
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _mobileController.dispose();
-    _dobController.dispose();
+    _nameCtrl.dispose();
+    _mobileCtrl.dispose();
+    _dobCtrl.dispose();
     super.dispose();
   }
 
@@ -94,36 +101,40 @@ class _AddFamilyMemberScreenState
   // Helpers
   // ---------------------------------------------------------------------------
 
-  /// Formats a DateTime to "DD/MM/YYYY" for display.
-  String _formatDisplayDate(DateTime date) =>
-      '${date.day.toString().padLeft(2, '0')}/'
-      '${date.month.toString().padLeft(2, '0')}/'
-      '${date.year}';
+  String _fmtDate(DateTime d) =>
+      '${d.day.toString().padLeft(2, '0')} / '
+      '${d.month.toString().padLeft(2, '0')} / '
+      '${d.year}';
 
+  int _calcAge(DateTime dob) {
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) age--;
+    return age;
+  }
 
-  GenderModel? get _selectedGenderOption => widget.genderOptions
+  GenderModel? get _selGender => widget.genderOptions
       .cast<GenderModel?>()
       .firstWhere((g) => g?.genderId == _selectedGenderId, orElse: () => null);
 
-  RelationModel? get _selectedRelationOption => widget.relationOptions
+  RelationModel? get _selRelation => widget.relationOptions
       .cast<RelationModel?>()
-      .firstWhere((r) => r?.relationId == _selectedRelationId,
-          orElse: () => null);
+      .firstWhere((r) => r?.relationId == _selectedRelationId, orElse: () => null);
 
   // ---------------------------------------------------------------------------
   // Actions
   // ---------------------------------------------------------------------------
 
   Future<void> _pickDate() async {
-    final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDate ?? DateTime(1990, 1, 1),
       firstDate: DateTime(1900),
-      lastDate: now,
-      builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: const ColorScheme.light(primary: Color(0xFF3D5AF1)),
+      lastDate: DateTime.now(),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(primary: kPrimary),
         ),
         child: child!,
       ),
@@ -131,66 +142,49 @@ class _AddFamilyMemberScreenState
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
-        _dobController.text = _formatDisplayDate(picked);
+        _dobCtrl.text = _fmtDate(picked);
       });
     }
   }
 
-void _onSave() {
-  if (!_formKey.currentState!.validate()) return;
+  void _onSave() {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedGenderId == null) { _snack('Please select a gender.'); return; }
+    if (_selectedDate    == null) { _snack('Please select a date of birth.'); return; }
+    if (_selectedRelationId == null) { _snack('Please select a relation.'); return; }
+    if (!_isConfirmed)            { _snack('Please confirm the details are accurate.'); return; }
 
-  if (_selectedGenderId == null) {
-    _showSnack('Please select a gender.');
-    return;
+    final patientId = ref.read(patientLoginViewModelProvider).patientId;
+    if (patientId == null || patientId == 0) {
+      _snack('Unable to find patient ID. Please login again.');
+      return;
+    }
+
+    final member = FamilyMember(
+      memberId:     widget.existingMember?.memberId,
+      familyId:     patientId,
+      memberName:   _nameCtrl.text.trim(),
+      genderId:     _selectedGenderId,
+      genderName:   _selGender?.gender,
+      dob:          _selectedDate,
+      relationId:   _selectedRelationId,
+      relationName: _selRelation?.relation,
+      mobileNo:     _mobileCtrl.text.trim().isEmpty ? null : _mobileCtrl.text.trim(),
+    );
+
+    debugPrint('SUBMIT DATA: ${member.toJson()}');
+    _didSubmit = true;
+    ref.read(familyViewModelProvider.notifier).addFamilyMember(member);
   }
 
-  if (_selectedDate == null) {
-    _showSnack('Please select a date of birth.');
-    return;
-  }
-
-  if (_selectedRelationId == null) {
-    _showSnack('Please select a relation.');
-    return;
-  }
-
-  if (!_isConfirmed) {
-    _showSnack('Please confirm that the details are accurate.');
-    return;
-  }
-
-  final patientId = ref.read(patientLoginViewModelProvider).patientId;
-
-  if (patientId == null || patientId == 0) {
-    _showSnack('Unable to find patient id. Please login again.');
-    return;
-  }
-
-  // ✅ IMPORTANT: memberId for update
-  final member = FamilyMember(
-    memberId: widget.existingMember?.memberId, // 🔥 FIXED
-    familyId: patientId,
-    memberName: _nameController.text.trim(),
-    genderId: _selectedGenderId,
-    genderName: _selectedGenderOption?.gender,
-    dob: _selectedDate,
-    relationId: _selectedRelationId,
-    relationName: _selectedRelationOption?.relation,
-    mobileNo: _mobileController.text.trim().isEmpty
-        ? null
-        : _mobileController.text.trim(),
-  );
-
-  // ✅ Debug print (VERY IMPORTANT)
-  print("SUBMIT DATA: ${member.toJson()}");
-
-  _didSubmit = true;
-
-  ref.read(patientLoginViewModelProvider.notifier).addFamilyMember(member);
-}
-  void _showSnack(String msg) {
+  void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
+      SnackBar(
+        content: Text(msg),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: kTextDark,
+      ),
     );
   }
 
@@ -200,82 +194,98 @@ void _onSave() {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<PatientLoginState>(patientLoginViewModelProvider,
-        (prev, next) {
+    ref.listen<FamilyState>(familyViewModelProvider, (prev, next) {
       if (_didSubmit && next.isSuccess && !(prev?.isSuccess ?? false)) {
-        Navigator.of(context).pop(
-          FamilyMember(
-            familyId: ref.read(patientLoginViewModelProvider).patientId!,
-            memberId: widget.existingMember?.memberId,
-            memberName: _nameController.text.trim(),
-            genderId: _selectedGenderId,
-            genderName: _selectedGenderOption?.gender,
-            dob: _selectedDate,
-            relationId: _selectedRelationId,
-            relationName: _selectedRelationOption?.relation,
-            mobileNo: _mobileController.text.trim().isEmpty
-                ? null
-                : _mobileController.text.trim(),
-          ),
+        _snack(_isEditing
+            ? 'Member updated successfully'
+            : 'Member added successfully');
+        final result = FamilyMember(
+          familyId:     ref.read(patientLoginViewModelProvider).patientId!,
+          memberId:     widget.existingMember?.memberId,
+          memberName:   _nameCtrl.text.trim(),
+          genderId:     _selectedGenderId,
+          genderName:   _selGender?.gender,
+          dob:          _selectedDate,
+          relationId:   _selectedRelationId,
+          relationName: _selRelation?.relation,
+          mobileNo:     _mobileCtrl.text.trim().isEmpty
+              ? null
+              : _mobileCtrl.text.trim(),
         );
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (!mounted) return;
+          Navigator.of(context).pop(result);
+        });
       }
-      if (next.error != null && next.error != prev?.error) {
-        _showSnack(next.error!);
-      }
+      if (next.error != null && next.error != prev?.error) _snack(next.error!);
     });
 
-    final state = ref.watch(patientLoginViewModelProvider);
+    final state = ref.watch(familyViewModelProvider);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kBg,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
-            const Divider(height: 1, color: Color(0xFFE0E0E0)),
             Expanded(
               child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildLabel('Member Name', required: true),
-                      const SizedBox(height: 8),
-                      _buildNameField(),
-                      const SizedBox(height: 20),
+                      _buildProgressBar(),
+                      const SizedBox(height: 18),
 
-                      _buildLabel('Gender', required: true),
-                      const SizedBox(height: 10),
-                      _buildGenderSelector(),
-                      const SizedBox(height: 20),
+                      // Name
+                      _label('Member name', required: true),
+                      const SizedBox(height: 6),
+                      _nameField(),
+                      const SizedBox(height: 16),
 
-                      _buildLabel('Date of Birth', required: true),
+                      // Gender
+                      _label('Gender', required: true),
                       const SizedBox(height: 8),
-                      _buildDobField(),
-                      const SizedBox(height: 20),
+                      _genderChips(),
+                      const SizedBox(height: 16),
 
-                      _buildLabel('Relation', required: true),
-                      const SizedBox(height: 8),
-                      _buildRelationDropdown(),
-                      const SizedBox(height: 20),
+                      // DOB
+                      _label('Date of birth', required: true),
+                      const SizedBox(height: 6),
+                      _dobField(),
+                      if (_selectedDate != null) ...[
+                        const SizedBox(height: 4),
+                        Text('Age: ${_calcAge(_selectedDate!)} years',
+                            style: const TextStyle(
+                                fontSize: 12, color: kCyan, fontWeight: FontWeight.w500)),
+                      ],
+                      const SizedBox(height: 16),
 
-                      _buildLabel('Enter Mobile Number', optional: true),
-                      const SizedBox(height: 8),
-                      _buildMobileField(),
-                      const SizedBox(height: 8),
-                      _buildMobileHint(),
-                      const SizedBox(height: 20),
+                      // Relation
+                      _label('Relation', required: true),
+                      const SizedBox(height: 6),
+                      _relationDropdown(),
+                      const SizedBox(height: 16),
 
-                      _buildConfirmationCheckbox(),
-                      const SizedBox(height: 24),
+                      // Mobile
+                      _label('Mobile number', optional: true),
+                      const SizedBox(height: 6),
+                      _mobileField(),
+                      const SizedBox(height: 8),
+                      _mobileHint(),
+                      const SizedBox(height: 16),
+
+                      // Confirm
+                      _confirmBox(),
+                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
               ),
             ),
-            _buildSaveButton(isLoading: state.isLoading),
+            _saveButton(isLoading: state.isLoading),
           ],
         ),
       ),
@@ -283,29 +293,54 @@ void _onSave() {
   }
 
   // ---------------------------------------------------------------------------
-  // Header
+  // Header & progress
   // ---------------------------------------------------------------------------
 
   Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
-            child: const Icon(Icons.arrow_back, color: Color(0xFF1A1A2E)),
+            child: Container(
+              width: 36, height: 36,
+              decoration: BoxDecoration(
+                color: kPrimaryBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  size: 16, color: kPrimary),
+            ),
           ),
           const SizedBox(width: 12),
-          Text(
-            _isEditing ? 'Edit Member' : 'Add New Member',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A2E),
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _isEditing ? 'Edit member' : 'Add new member',
+                style: const TextStyle(fontSize: 17,
+                    fontWeight: FontWeight.w600, color: kTextDark),
+              ),
+              const Text('Fill in the details below',
+                  style: TextStyle(fontSize: 12, color: kTextMid)),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildProgressBar() {
+    return Row(
+      children: [
+        _ProgStep(active: false, done: true),
+        const SizedBox(width: 6),
+        _ProgStep(active: true, done: false),
+        const SizedBox(width: 6),
+        _ProgStep(active: false, done: false),
+      ],
     );
   }
 
@@ -313,279 +348,270 @@ void _onSave() {
   // Form fields
   // ---------------------------------------------------------------------------
 
-  Widget _buildLabel(String text,
-      {bool required = false, bool optional = false}) {
+  Widget _label(String text, {bool required = false, bool optional = false}) {
     return RichText(
       text: TextSpan(
         text: text,
-        style: const TextStyle(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-          color: Color(0xFF1A1A2E),
-        ),
+        style: const TextStyle(fontSize: 13,
+            fontWeight: FontWeight.w500, color: kTextDark),
         children: [
           if (required)
-            const TextSpan(
-              text: ' *',
-              style: TextStyle(color: Color(0xFFE91E8C)),
-            ),
+            const TextSpan(text: ' *',
+                style: TextStyle(color: kRed, fontSize: 13)),
           if (optional)
-            const TextSpan(
-              text: ' (Optional)',
-              style: TextStyle(
-                color: Color(0xFF3D5AF1),
-                fontWeight: FontWeight.w400,
-                fontSize: 13,
-              ),
-            ),
+            const TextSpan(text: '  (optional)',
+                style: TextStyle(color: kPrimary,
+                    fontSize: 12, fontWeight: FontWeight.w400)),
         ],
       ),
     );
   }
 
-  Widget _buildNameField() {
-    return TextFormField(
-      controller: _nameController,
-      textCapitalization: TextCapitalization.words,
-      decoration: _inputDecoration('Enter member name'),
-      validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Name is required' : null,
-    );
-  }
+  InputDecoration _dec(String hint, {Widget? suffix}) => InputDecoration(
+    hintText: hint,
+    hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    filled: true,
+    fillColor: Colors.white,
+    suffixIcon: suffix,
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: kBorder, width: 0.8),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: kPrimary, width: 1.5),
+    ),
+    errorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: kRed, width: 1),
+    ),
+    focusedErrorBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: const BorderSide(color: kRed, width: 1.5),
+    ),
+  );
 
-  /// Renders gender chips driven by [widget.genderOptions] (int ID + String label).
-  Widget _buildGenderSelector() {
-    return Row(
-      children: widget.genderOptions.map((option) {
-        final isSelected = _selectedGenderId == option.genderId;
-        return Padding(
-          padding: const EdgeInsets.only(right: 10),
-          child: GestureDetector(
-            onTap: () => setState(() => _selectedGenderId = option.genderId),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? const Color(0xFF3D5AF1)
-                    : const Color(0xFFF0F1F8),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected
-                      ? const Color(0xFF3D5AF1)
-                      : const Color(0xFFD0D3E8),
-                ),
-              ),
-              child: Text(
-                option.gender??"",
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color:
-                      isSelected ? Colors.white : const Color(0xFF6B7280),
-                ),
+  Widget _nameField() => TextFormField(
+    controller: _nameCtrl,
+    textCapitalization: TextCapitalization.words,
+    style: const TextStyle(fontSize: 14, color: kTextDark),
+    decoration: _dec('Enter full name'),
+    validator: (v) =>
+        (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+  );
+
+  Widget _genderChips() => Row(
+    children: widget.genderOptions.map((opt) {
+      final sel = _selectedGenderId == opt.genderId;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: GestureDetector(
+          onTap: () => setState(() => _selectedGenderId = opt.genderId),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+            decoration: BoxDecoration(
+              color: sel ? kPrimary : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: sel ? kPrimary : kBorder,
+                width: sel ? 1.5 : 0.8,
               ),
             ),
+            child: Text(opt.gender ?? '',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: sel ? Colors.white : kTextMid,
+                )),
           ),
-        );
-      }).toList(),
-    );
-  }
+        ),
+      );
+    }).toList(),
+  );
 
-  Widget _buildDobField() {
-    return TextFormField(
-      controller: _dobController,
-      readOnly: true,
-      onTap: _pickDate,
-      decoration: _inputDecoration('DD/MM/YYYY').copyWith(
-        suffixIcon: GestureDetector(
-          onTap: _pickDate,
-          child: const Icon(Icons.calendar_today_outlined,
-              color: Color(0xFF6B7280), size: 20),
+  Widget _dobField() => TextFormField(
+    controller: _dobCtrl,
+    readOnly: true,
+    onTap: _pickDate,
+    style: const TextStyle(fontSize: 14, color: kTextDark),
+    decoration: _dec(
+      'DD / MM / YYYY',
+      suffix: GestureDetector(
+        onTap: _pickDate,
+        child: const Padding(
+          padding: EdgeInsets.all(10),
+          child: Icon(Icons.calendar_today_outlined,
+              size: 18, color: kTextMid),
         ),
       ),
-      validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Date of birth is required' : null,
-    );
-  }
+    ),
+    validator: (v) =>
+        (v == null || v.trim().isEmpty) ? 'Date of birth is required' : null,
+  );
 
-  /// Dropdown driven by [widget.relationOptions] (int ID + String label).
-  Widget _buildRelationDropdown() {
-    return DropdownButtonFormField<int>(
-      value: _selectedRelationId,
-      items: widget.relationOptions
-          .map((r) => DropdownMenuItem<int>(
-                value: r.relationId,
-                child: Text(r.relation??""),
-              ))
-          .toList(),
-      onChanged: (val) => setState(() => _selectedRelationId = val),
-      hint: const Text(
-        'Select Relation',
-        style: TextStyle(color: Color(0xFF9E9E9E)),
-      ),
-      decoration: _inputDecoration(''),
-      validator: (v) => v == null ? 'Please select a relation' : null,
-      icon:
-          const Icon(Icons.keyboard_arrow_down, color: Color(0xFF6B7280)),
-    );
-  }
+  Widget _relationDropdown() => DropdownButtonFormField<int>(
+    value: _selectedRelationId,
+    decoration: _dec(''),
+    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: kTextMid),
+    hint: const Text('Select relation',
+        style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
+    style: const TextStyle(fontSize: 14, color: kTextDark),
+    items: widget.relationOptions
+        .map((r) => DropdownMenuItem<int>(
+              value: r.relationId,
+              child: Text(r.relation ?? ''),
+            ))
+        .toList(),
+    onChanged: (val) => setState(() => _selectedRelationId = val),
+    validator: (v) => v == null ? 'Please select a relation' : null,
+  );
 
-  Widget _buildMobileField() {
-    return TextFormField(
-      controller: _mobileController,
-      keyboardType: TextInputType.phone,
-      inputFormatters: [
-        FilteringTextInputFormatter.digitsOnly,
-        LengthLimitingTextInputFormatter(10),
-      ],
-      decoration: _inputDecoration('Enter Mobile Number'),
-    );
-  }
+  Widget _mobileField() => TextFormField(
+    controller: _mobileCtrl,
+    keyboardType: TextInputType.phone,
+    style: const TextStyle(fontSize: 14, color: kTextDark),
+    inputFormatters: [
+      FilteringTextInputFormatter.digitsOnly,
+      LengthLimitingTextInputFormatter(10),
+    ],
+    decoration: _dec('Enter 10-digit number'),
+  );
 
-  Widget _buildMobileHint() {
-    return Row(
+  Widget _mobileHint() => Container(
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: kCyanBg,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: kCyanBorder, width: 0.8),
+    ),
+    child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline, size: 16, color: Color(0xFF6B7280)),
+        const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF0891B2)),
         const SizedBox(width: 6),
         const Expanded(
           child: Text(
             'This number will be used to access your benefits and cannot be changed once verified.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+            style: TextStyle(fontSize: 12, color: Color(0xFF0C4A6E), height: 1.5),
           ),
         ),
         const SizedBox(width: 8),
         GestureDetector(
-          onTap: () {
-            // TODO: trigger verify flow
-          },
-          child: const Text(
-            'Verify Now',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1A1A2E),
-              decoration: TextDecoration.underline,
-            ),
+          onTap: () {}, // TODO: verify flow
+          child: const Text('Verify now',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kPrimary,
+                decoration: TextDecoration.underline,
+              )),
+        ),
+      ],
+    ),
+  );
+
+  Widget _confirmBox() => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: kBorder, width: 0.8),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 20, height: 20,
+          child: Checkbox(
+            value: _isConfirmed,
+            onChanged: (v) => setState(() => _isConfirmed = v ?? false),
+            activeColor: kPrimary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            side: const BorderSide(color: Color(0xFFD1D5DB)),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Text(
+            'I confirm that the above details provided are accurate. '
+            "I acknowledge it's my responsibility to provide correct "
+            'and updated information for availing benefits/services.',
+            style: TextStyle(fontSize: 12.5, color: Color(0xFF4B5563), height: 1.5),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildConfirmationCheckbox() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F6FA),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 22,
-            height: 22,
-            child: Checkbox(
-              value: _isConfirmed,
-              onChanged: (val) =>
-                  setState(() => _isConfirmed = val ?? false),
-              activeColor: const Color(0xFF3D5AF1),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-              side: const BorderSide(color: Color(0xFFB0B4D0)),
-            ),
-          ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'I confirm that the above details provided by me are accurate. '
-              "I acknowledge that it's my responsibility to provide correct "
-              'and updated information for availing the benefits/services.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF4A4A6A),
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+    ),
+  );
 
   // ---------------------------------------------------------------------------
   // Save button
   // ---------------------------------------------------------------------------
 
-  Widget _buildSaveButton({required bool isLoading}) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
+  Widget _saveButton({required bool isLoading}) {
+    final enabled = _isConfirmed && !isLoading;
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: SizedBox(
         width: double.infinity,
-        height: 54,
+        height: 52,
         child: ElevatedButton(
-          onPressed: _isConfirmed && !isLoading ? _onSave : null,
+          onPressed: enabled ? _onSave : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF3D5AF1),
-            disabledBackgroundColor: const Color(0xFFB0B4D0),
+            backgroundColor: kPrimary,
+            disabledBackgroundColor: const Color(0xFF93C5FD),
+            foregroundColor: Colors.white,
+            elevation: 0,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+                borderRadius: BorderRadius.circular(14)),
           ),
           child: isLoading
               ? const SizedBox(
-                  width: 22,
-                  height: 22,
+                  width: 22, height: 22,
                   child: CircularProgressIndicator(
                       strokeWidth: 2.5, color: Colors.white),
                 )
-              : Text(
-                  _isEditing ? 'Update & Continue' : 'Save & Continue',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.check_circle_outline_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      _isEditing ? 'Update & continue' : 'Save & continue',
+                      style: const TextStyle(fontSize: 15,
+                          fontWeight: FontWeight.w500),
+                    ),
+                  ],
                 ),
         ),
       ),
     );
   }
+}
 
-  // ---------------------------------------------------------------------------
-  // Shared input decoration
-  // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Progress step widget
+// ---------------------------------------------------------------------------
 
-  InputDecoration _inputDecoration(String hint) {
-    return InputDecoration(
-      hintText: hint,
-      hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide:
-            const BorderSide(color: Color(0xFFD0D3E8), width: 1.2),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide:
-            const BorderSide(color: Color(0xFF3D5AF1), width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Colors.red, width: 1.2),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Colors.red, width: 1.5),
-      ),
-      filled: true,
-      fillColor: Colors.white,
+class _ProgStep extends StatelessWidget {
+  final bool active;
+  final bool done;
+  const _ProgStep({required this.active, required this.done});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = done
+        ? kPrimary
+        : active
+            ? kCyan
+            : kBorder;
+    return Expanded(
+      child: Container(height: 3, decoration: BoxDecoration(
+        color: color, borderRadius: BorderRadius.circular(2))),
     );
   }
 }

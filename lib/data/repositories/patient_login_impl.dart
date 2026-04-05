@@ -28,15 +28,6 @@ class PatientLoginImpl implements PatientLoginRepository {
     return response;
   }
 
-    @override
-  Future<dynamic> addFamilyMember(FamilyMember member) {
-    return apiService.addFamilyMember(member);
-  }
 
 
-  
-  @override
-   Future<List<FamilyMember>> fetchFamilyMembers(int familyId) {
-    return apiService.fetchFamilyMembers(familyId);
-  }
 }

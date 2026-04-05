@@ -6,7 +6,5 @@ abstract class PatientLoginRepository {
 
   Future<List<Patients>> checkPhonePatient(String mobile);
 
-  Future<dynamic> addFamilyMember(FamilyMember member);
-
-    Future<List<FamilyMember>> fetchFamilyMembers(int familyId);
+  
 }

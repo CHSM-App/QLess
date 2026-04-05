@@ -1,6 +1,7 @@
 
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/interceptor.dart';
 import '../../data/api/api_service.dart';
@@ -18,7 +19,7 @@ final dioProvider = FutureProvider<Dio>((ref) {
     baseUrl: baseUrl,          
     connectTimeout: const Duration(seconds: 30),
     receiveTimeout: const Duration(seconds: 30),
-    sendTimeout: const Duration(seconds: 30),
+    sendTimeout: kIsWeb ? null : const Duration(seconds: 30),
     headers: {
       'Accept': 'application/json',
       'Content-Type': 'application/json',

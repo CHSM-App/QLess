@@ -1,7 +1,3 @@
-
-
-// ─── DATA MODELS ─────────────────────────────────────────────────────────────
-
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +6,7 @@ import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
+import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 
 class Doctor {
   final String id, name, specialty, image, about, clinic, address;
@@ -618,7 +615,15 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
                       ),
                       const SizedBox(width: 10),
-                      _QuickAction(icon: Icons.medical_information_rounded, label: 'My\nRecords',  color: const Color(0xFFF59E0B), onTap: () {}),
+                      _QuickAction(icon: Icons.medical_information_rounded, 
+                      label: 'My\nRecords', 
+                       color: const Color(0xFFF59E0B), 
+                       onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PatientPrescriptionListScreen(),
+                          ),
+                        ),),
                     ]),
                   ],
                 )),

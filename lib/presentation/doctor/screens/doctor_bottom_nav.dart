@@ -86,16 +86,16 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
 
     final pages = [
       QueueHomePage(),
-      DoctorPatientsPage(),
+      PrescriptionScreen(patientId: 1, doctorId:1),
       DoctorMedicinePage(),
-      DoctorProfilePage(),
+      DoctorSettingsPage(),
     ];
 
     if (isWide) {
       // ── Tablet / PC layout: left side rail ──────────────────────────────
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        appBar: _buildAppBar(),
+        appBar: _currentIndex == 3 ? null : _buildAppBar(),
         body: Row(
           children: [
             _buildSideRail(),
@@ -112,7 +112,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
       // ── Mobile layout: bottom nav ────────────────────────────────────────
       return Scaffold(
         backgroundColor: const Color(0xFFF8FAFC),
-        appBar: _buildAppBar(),
+        appBar : _buildAppBar(),
         body: IndexedStack(
           index: _currentIndex,
           children: pages,

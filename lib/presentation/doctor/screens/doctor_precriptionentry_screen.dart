@@ -4,7 +4,6 @@ import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 
-
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS
 // ════════════════════════════════════════════════════════════════════
@@ -167,7 +166,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final _advCtrl = TextEditingController();
   DateTime? _followDate;
   final List<MedicineEntry> _meds = [];
-  bool _requestedMeds = false;
+  int _lastDoctorId = 0;
 
   @override
   void dispose() {
@@ -180,6 +179,12 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   void _addMed() => setState(() => _meds.add(MedicineEntry()));
   void _delMed(int i) => setState(() => _meds.removeAt(i));
+
+  void _maybeFetchMedicines(int doctorId) {
+    if (doctorId == 0 || doctorId == _lastDoctorId) return;
+    _lastDoctorId = doctorId;
+    ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
+  }
 
   Future<void> _pickDate() async {
     final d = await showDatePicker(
@@ -269,18 +274,19 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(doctorLoginViewModelProvider.select((s) => s.doctorId), (
+      _,
+      next,
+    ) {
+      final id = next ?? 0;
+      _maybeFetchMedicines(id);
+    });
+
     // Watch loading state to show overlay
     final state = ref.watch(prescriptionViewModelProvider);
     final doctorState = ref.watch(doctorLoginViewModelProvider);
     final doctorId = doctorState.doctorId ?? 0;
-    if (!_requestedMeds && doctorId > 0) {
-      _requestedMeds = true;
-      Future.microtask(() {
-        ref
-            .read(doctorLoginViewModelProvider.notifier)
-            .fetchAllMedicines(doctorId);
-      });
-    }
+    _maybeFetchMedicines(doctorId);
     final medicines = doctorState.medicines?.value ?? const <Medicine>[];
 
     return Stack(
@@ -410,7 +416,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   //  PATIENT CARD
- 
+
   Widget _patientCard() => _card(
     child: Row(
       children: [
@@ -455,7 +461,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   );
 
   //---------------------------------- TEXT SECTION-----------------------------------------
-  
+
   Widget _textSection(String label, TextEditingController ctrl, String hint) =>
       _card(
         child: Column(
@@ -472,7 +478,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           ],
         ),
       );
-//---------------------MEDICINES HEADER SECTION------------------------------------------------
+  //---------------------MEDICINES HEADER SECTION------------------------------------------------
   Widget _medicinesHeader() => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -545,7 +551,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       ),
     ),
   );
-//------------------------------Follow-Up -------------------------------------------------
+  //------------------------------Follow-Up -------------------------------------------------
   Widget _followUpCard() => _card(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -623,7 +629,6 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         ),
         child: Row(
           children: [
-          
             Expanded(
               child: OutlinedButton(
                 onPressed: isLoading
@@ -649,7 +654,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
               ),
             ),
             const SizedBox(width: 12),
-           
+
             Expanded(
               flex: 2,
               child: ElevatedButton(
@@ -1037,8 +1042,6 @@ class _MedCardState extends State<_MedCard> {
       ]),
     ],
   );
-
-
 
   Widget _injBody() => Column(
     crossAxisAlignment: CrossAxisAlignment.start,

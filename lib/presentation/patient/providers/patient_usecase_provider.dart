@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/usecase/doctors_usecase.dart';
+import 'package:qless/domain/usecase/family_usecase.dart';
 import 'package:qless/domain/usecase/patient_login_usecase.dart';
 import 'package:qless/presentation/patient/providers/patient_repository_provider.dart';
 
@@ -11,4 +12,9 @@ final patientLoginUsecaseProvider = Provider<PatientLoginUsecase>((ref) {
 final doctorsUsecaseProvider = Provider<DoctorsUseCase>((ref) {
   final repo = ref.watch(doctorsRepositoryProvider);
   return DoctorsUseCase(repo);
+});
+
+final familyUsecaseProvider = Provider<FamilyUsecase>((ref) {
+  final repo = ref.watch(familyRepositoryProvider);
+  return FamilyUsecase(repo);
 });

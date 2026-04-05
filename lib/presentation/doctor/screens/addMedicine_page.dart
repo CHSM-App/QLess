@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
@@ -7,14 +5,14 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const kPrimaryBlue = Color(0xFF1A73E8);
-const kLightBlue   = Color(0xFFE8F0FE);
+const kLightBlue = Color(0xFFE8F0FE);
 const kAccentGreen = Color(0xFF34A853);
-const kRedAccent   = Color(0xFFEA4335);
-const kSurface     = Color(0xFFF8F9FA);
-const kCardBg      = Color(0xFFFFFFFF);
-const kTextDark    = Color(0xFF1F2937);
-const kTextMuted   = Color(0xFF6B7280);
-const kDivider     = Color(0xFFE5E7EB);
+const kRedAccent = Color(0xFFEA4335);
+const kSurface = Color(0xFFF8F9FA);
+const kCardBg = Color(0xFFFFFFFF);
+const kTextDark = Color(0xFF1F2937);
+const kTextMuted = Color(0xFF6B7280);
+const kDivider = Color(0xFFE5E7EB);
 
 class AddMedicinePage extends ConsumerStatefulWidget {
   const AddMedicinePage({super.key});
@@ -25,15 +23,15 @@ class AddMedicinePage extends ConsumerStatefulWidget {
 
 class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     with SingleTickerProviderStateMixin {
-  final _formKey  = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
 
   Medicine? _selectedType;
   bool _isEnsuringDoctorId = false;
 
   late AnimationController _animCtrl;
-  late Animation<double>   _fadeAnim;
-  late Animation<Offset>   _slideAnim;
+  late Animation<double> _fadeAnim;
+  late Animation<Offset> _slideAnim;
 
   @override
   void initState() {
@@ -45,14 +43,13 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 0.06),
-      end:   Offset.zero,
+      end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     _animCtrl.forward();
 
     Future.microtask(
-      () => ref
-          .read(doctorLoginViewModelProvider.notifier)
-          .fetchMedicineTypes(),
+      () =>
+          ref.read(doctorLoginViewModelProvider.notifier).fetchMedicineTypes(),
     );
   }
 
@@ -71,15 +68,15 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       return;
     }
 
-    final notifier   = ref.read(doctorLoginViewModelProvider.notifier);
-    var   loginState = ref.read(doctorLoginViewModelProvider);
-    var   doctorId   = loginState.doctorId ?? 0;
+    final notifier = ref.read(doctorLoginViewModelProvider.notifier);
+    var loginState = ref.read(doctorLoginViewModelProvider);
+    var doctorId = loginState.doctorId ?? 0;
 
     if (doctorId == 0 && !_isEnsuringDoctorId) {
       _isEnsuringDoctorId = true;
       await notifier.loadFromStorage();
       loginState = ref.read(doctorLoginViewModelProvider);
-      doctorId   = loginState.doctorId ?? 0;
+      doctorId = loginState.doctorId ?? 0;
       _isEnsuringDoctorId = false;
     }
 
@@ -90,9 +87,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
 
     final medicine = Medicine(
       medicineName: _nameCtrl.text.trim(),
-      medTypeId:    _selectedType!.medTypeId,
-      medTypeName:  _selectedType!.medTypeName,
-      doctorId:     doctorId,
+      medTypeId: _selectedType!.medTypeId,
+      medTypeName: _selectedType!.medTypeName,
+      doctorId: doctorId,
     );
 
     final response = await ref
@@ -159,12 +156,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       doctorLoginViewModelProvider.select((s) => s.medicineTypes),
     );
 
-    ref.listen(
-      doctorLoginViewModelProvider.select((s) => s.error),
-      (_, error) {
-        if (error != null) _snack(error, isError: true);
-      },
-    );
+    ref.listen(doctorLoginViewModelProvider.select((s) => s.error), (_, error) {
+      if (error != null) _snack(error, isError: true);
+    });
 
     return Scaffold(
       backgroundColor: kSurface,
@@ -429,10 +423,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       return const SizedBox(
         height: 48,
         child: Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: kPrimaryBlue,
-          ),
+          child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryBlue),
         ),
       );
     }
@@ -440,8 +431,8 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     if (typesAsync is AsyncValue<List<Medicine>>) {
       return typesAsync.when(
         loading: _buildTypeLoading,
-        error:   (e, _) => _buildTypeError(),
-        data:    (types) => _buildTypeList(types),
+        error: (e, _) => _buildTypeError(),
+        data: (types) => _buildTypeList(types),
       );
     }
 
@@ -494,8 +485,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                 .read(doctorLoginViewModelProvider.notifier)
                 .fetchMedicineTypes(),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
                 color: kRedAccent,
                 borderRadius: BorderRadius.circular(8),
@@ -539,7 +529,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final w            = constraints.maxWidth;
+        final w = constraints.maxWidth;
         final minItemWidth = w > 600 ? 140.0 : 96.0;
 
         return Wrap(
@@ -559,7 +549,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                   maxWidth: w / 2 - 12,
                 ),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 10),
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: sel ? kPrimaryBlue : kSurface,
                   borderRadius: BorderRadius.circular(11),
@@ -595,8 +587,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13,
-                          fontWeight:
-                              sel ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                           color: sel ? Colors.white : kTextMuted,
                         ),
                       ),
@@ -618,21 +609,22 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       height: 56,
       child: ElevatedButton(
         onPressed: isSaving ? null : _save,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: kPrimaryBlue,
-          disabledBackgroundColor: kPrimaryBlue.withOpacity(0.45),
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ).copyWith(
-          overlayColor: MaterialStateProperty.resolveWith(
-            (states) => states.contains(MaterialState.pressed)
-                ? Colors.white.withOpacity(0.12)
-                : null,
-          ),
-        ),
+        style:
+            ElevatedButton.styleFrom(
+              backgroundColor: kPrimaryBlue,
+              disabledBackgroundColor: kPrimaryBlue.withOpacity(0.45),
+              elevation: 0,
+              shadowColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ).copyWith(
+              overlayColor: MaterialStateProperty.resolveWith(
+                (states) => states.contains(MaterialState.pressed)
+                    ? Colors.white.withOpacity(0.12)
+                    : null,
+              ),
+            ),
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 200),
           child: isSaving

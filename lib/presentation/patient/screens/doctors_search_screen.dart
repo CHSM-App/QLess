@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
@@ -44,26 +45,48 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   final _searchController = TextEditingController();
   String? _selectedSpecialty; // null = All
   int? _selectedMemberId; // null = patient themselves
+  bool _hasFetchedDoctors = false;
+  bool _hasFetchedFamily = false;
+  ProviderSubscription<TokenState>? _tokenSub;
+  ProviderSubscription<PatientLoginState>? _patientSub;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(doctorsViewModelProvider.notifier).fetchDoctors();
-
-      final patientState = ref.read(patientLoginViewModelProvider);
-      final patientId = patientState.patientId;
-      if (patientId != null && patientId > 0) {
-        ref
-            .read(patientLoginViewModelProvider.notifier)
-            .fetchAllFamilyMembers(patientId);
-      }
-    });
+    _tokenSub = ref.listenManual<TokenState>(
+      tokenProvider,
+      (prev, next) => _tryFetch(),
+    );
+    _patientSub = ref.listenManual<PatientLoginState>(
+      patientLoginViewModelProvider,
+      (prev, next) => _tryFetch(),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => _tryFetch());
   }
 
+  void _tryFetch() {
+    final tokenState = ref.read(tokenProvider);
+    final tokenReady = !tokenState.isLoading &&
+        (tokenState.accessToken ?? '').isNotEmpty;
+    if (tokenReady && !_hasFetchedDoctors) {
+      _hasFetchedDoctors = true;
+      ref.read(doctorsViewModelProvider.notifier).fetchDoctors();
+    }
+
+    final patientId =
+        ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    if (tokenReady && patientId > 0 && !_hasFetchedFamily) {
+      _hasFetchedFamily = true;
+      ref
+          .read(familyViewModelProvider.notifier)
+          .fetchAllFamilyMembers(patientId);
+    }
+  }
   @override
   void dispose() {
     _searchController.dispose();
+    _tokenSub?.close();
+    _patientSub?.close();
     super.dispose();
   }
 
@@ -96,6 +119,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   Widget build(BuildContext context) {
     final doctorsState = ref.watch(doctorsViewModelProvider);
     final patientState = ref.watch(patientLoginViewModelProvider);
+    final familyState = ref.watch(familyViewModelProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0F172A) : _kSurface;
 
@@ -108,7 +132,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
             _Header(isDark: isDark),
 
             // ── "Booking for" dropdown ────────────────────────────────────
-            patientState.allfamilyMembers.maybeWhen(
+            familyState.allfamilyMembers.maybeWhen(
               data: (members) => _BookingForDropdown(
                 patientState: patientState,
                 members: members,

@@ -27,7 +27,7 @@ abstract class ApiService {
 
   @POST("login/logout")
   Future<dynamic> logOut(@Body() TokenResponse tokenResponse);
-
+  //---------------------------------------------------------------------------------------------------------------------------------------//
   //------------------------------------------//DOCTOR API//---------------------------------------
   // GET API
   @GET("login/checkPhoneDoctor")
@@ -39,59 +39,87 @@ abstract class ApiService {
   @GET("doctor/users/getAllMedicines/{doctor_id}")
   Future<List<Medicine>> fetchAllMedicines(@Path("doctor_id") int doctorId);
 
-  // Doctor's Post API 
+  @GET("doctor/users/getDoctorSchedule/{doctor_id}")
+  Future<DoctorScheduleModel> getDoctorSchedule(
+    @Path("doctor_id") int doctorId,
+  );
+
+  //  POST API
   @POST("login/addDoctorDetails")
   Future<dynamic> addDoctorDetails(@Body() DoctorDetails doctorLogin);
 
   @POST("doctor/insert/insertMedicine")
   Future<dynamic> addMedicine(@Body() Medicine medicine);
-  
-  @POST("doctor/insert/insertPrescription")
-   Future<dynamic> insertPrescription(@Body() PrescriptionModel prescription);
 
-  
+  @POST("doctor/insert/insertPrescription")
+  Future<dynamic> insertPrescription(@Body() PrescriptionModel prescription);
 
   @POST("doctor/insert/saveDoctorSchedule")
-  Future<dynamic> saveDoctorSchedule(@Body() DoctorScheduleModel doctorSchedule);
+  Future<dynamic> saveDoctorSchedule(
+    @Body() DoctorScheduleModel doctorSchedule,
+  );
 
-  @GET("doctor/users/getDoctorSchedule/{doctor_id}")
-  Future<DoctorScheduleModel> getDoctorSchedule(@Path("doctor_id") int doctorId);
+  // DELETE API
+  @DELETE("doctor/index/deleteMedicine/{medicine_id}")
+  Future<Medicine> deleteMedicine(@Path("medicine_id") int medicineId);
 
 
+  
+  //------------------------------------------------------------------------------------------------------------------------//
   //-------------------------------------------//PATIENT API//----------------------------------------------
   // GET API
   @GET("login/checkPhonePatient")
   Future<List<Patients>> checkPhonePatient(@Query("mobileNo") String mobileNo);
 
-
-
   @GET("patient/users/fetchFamilyMembers/{family_id}")
-  Future<List<FamilyMember>> fetchFamilyMembers(@Path("family_id") int familyId);
-  
-  // POST API
-  @POST("login/insertPatient")
-  Future<dynamic> addPatient(@Body() Patients patient);
-
-
-  @POST("patient/insert/insertFamilyMember")
-  Future<dynamic> addFamilyMember(@Body() FamilyMember member);
+  Future<List<FamilyMember>> fetchFamilyMembers(
+    @Path("family_id") int familyId,
+  );
 
   @GET("patient/users/doctorLogin")
   Future<List<DoctorDetails>> fetchDoctors();
 
   @GET("patient/users/getDoctorAvailability/{doctor_id}")
-  Future<List<DoctorAvailabilityModel>> getDoctorAvailability(@Path("doctor_id") int doctorId);
+  Future<List<DoctorAvailabilityModel>> getDoctorAvailability(
+    @Path("doctor_id") int doctorId,
+  );
 
-  //-----------------------------------------//PATIENT AND DOCTOR COMMON API//------------------------------
   
+  @GET("patient/users/patientPrescriptionDetails/{prescription_id}")
+  Future<List<PrescriptionModel>> patientPrescriptionDetails(
+    @Path("prescription_id") int prescriptionId,
+  );
+
+
+  @GET("patient/users/patientPrescriptionList/{patient_id}")
+  Future<List<PrescriptionModel>> patientPrescriptionList(
+    @Path("patient_id") int patientId,
+  );
+
+
+
+  // POST API
+  @POST("login/addPatientDetails")
+  Future<dynamic> addPatient(@Body() Patients patient);
+
+  @POST("patient/insert/insertFamilyMember")
+  Future<dynamic> addFamilyMember(@Body() FamilyMember member);
+
+  //DELETE API
+
+    // DELETE API
+  @DELETE("patient/index/deleteFamilyMember/{member_id}")
+  Future<FamilyMember> deleteFamilyMember(@Path("member_id") int memberId);
+
+  //------------------------------------------------------------------------------------------------------------------------------------//
+  //-----------------------------------------//PATIENT AND DOCTOR COMMON API//------------------------------
+
   @GET("users/fetchGenderList")
   Future<List<GenderModel>> fetchGenderList();
 
-  
   @GET("users/fetchRelationList")
   Future<List<RelationModel>> fetchRelationList();
 
-  
   @GET("users/fetchBloodGroupList")
   Future<List<BloodGroupModel>> fetchBloodGroupList();
 }

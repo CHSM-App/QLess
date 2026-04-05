@@ -28,6 +28,8 @@ class DoctorMedicinePage extends ConsumerStatefulWidget {
 class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   final _searchController = TextEditingController();
   int _selectedType = 0;
+  bool _hasFetched = false;
+  late final ProviderSubscription<int?> _doctorIdSub;
 
   static const _types = [
     'All',
@@ -42,17 +44,29 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   @override
   void initState() {
     super.initState();
-    Future.microtask(_refreshMedicines);
+    _doctorIdSub = ref.listenManual<int?>(
+      doctorLoginViewModelProvider.select((s) => s.doctorId),
+      (prev, next) {
+        if (next != null && next > 0) {
+          _refreshMedicines(force: false);
+        }
+      },
+    );
+    Future.microtask(() => _refreshMedicines(force: false));
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _doctorIdSub.close();
     super.dispose();
   }
 
-  void _refreshMedicines() {
+  void _refreshMedicines({required bool force}) {
+    if (_hasFetched && !force) return;
     final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+    if (doctorId == 0) return;
+    _hasFetched = true;
     ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
   }
 
@@ -128,9 +142,20 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     Navigator.pop(context);
-                    _refreshMedicines();
+                    final id = medicine.medicineId ?? 0;
+                    if (id == 0) return;
+                    await ref
+                        .read(prescriptionViewModelProvider.notifier)
+                        .deleteMedicine(id);
+                    final err = ref.read(prescriptionViewModelProvider).error;
+                    if (err != null) {
+                      _showSnack(err, isError: true);
+                      return;
+                    }
+                    _showSnack('Medicine removed');
+                    _refreshMedicines(force: true);
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: kRedAccent,
@@ -151,6 +176,19 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
     );
   }
 
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? kRedAccent : kAccentGreen,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
   List<Medicine> _filtered(List<Medicine> medicines) {
     return medicines.where((m) {
       final matchType =
@@ -165,6 +203,8 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
 
   @override
   Widget build(BuildContext context) {
+    // Fetch handled in initState listener.
+
     final medicinesAsync = ref.watch(doctorLoginViewModelProvider).medicines;
 
     return Scaffold(
@@ -205,7 +245,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                         child: CircularProgressIndicator(
                             color: kPrimaryBlue)),
                     error: (e, _) =>
-                        _ErrorState(onRetry: _refreshMedicines),
+                        _ErrorState(onRetry: () => _refreshMedicines(force: true)),
                     data: (medicines) {
                       final filtered = _filtered(medicines);
                       if (filtered.isEmpty) {
@@ -216,7 +256,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                       }
                       return RefreshIndicator(
                         color: kPrimaryBlue,
-                        onRefresh: () async => _refreshMedicines(),
+                        onRefresh: () async => _refreshMedicines(force: true),
                         child: ListView.separated(
                           padding:
                               const EdgeInsets.fromLTRB(20, 4, 20, 100),

@@ -80,7 +80,7 @@ class HealthcareApp extends StatelessWidget {
       },
       themeMode: ThemeMode.light,
       home: QlessSplashScreen(
-        nextScreen: const SplashScreen(), // your existing role-select screen
+        nextScreen: const ContinueAsScreen(), // your existing role-select screen
       ), // ✅ Auto-login logic
     );
   }
