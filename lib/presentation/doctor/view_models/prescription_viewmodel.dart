@@ -1,9 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/core/storage/token_storage.dart';
-import 'package:qless/domain/models/doctor_login.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
-import 'package:qless/domain/usecase/doctor_login_usecase.dart';
 import 'package:qless/domain/usecase/prescription_usecase.dart';
 
 class PrescriptionState {

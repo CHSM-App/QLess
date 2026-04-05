@@ -100,15 +100,6 @@ class _AddFamilyMemberScreenState
       '${date.month.toString().padLeft(2, '0')}/'
       '${date.year}';
 
-  int _calculateAge(DateTime dob) {
-    final now = DateTime.now();
-    int age = now.year - dob.year;
-    if (now.month < dob.month ||
-        (now.month == dob.month && now.day < dob.day)) {
-      age--;
-    }
-    return age;
-  }
 
   GenderModel? get _selectedGenderOption => widget.genderOptions
       .cast<GenderModel?>()
