@@ -1954,8 +1954,7 @@ class _PatientPrescriptionViewScreenState
           child: const Row(
             children: [
               Expanded(flex: 4, child: _ColHead('MEDICINE')),
-              Expanded(flex: 2, child: _ColHead('DOSE')),
-              Expanded(flex: 3, child: _ColHead('FREQUENCY')),
+              Expanded(flex: 4, child: _ColHead('FREQUENCY/DOSE')),
               Expanded(flex: 2, child: _ColHead('TIMING')),
               Expanded(flex: 2, child: _ColHead('DURATION')),
             ],
@@ -2352,6 +2351,14 @@ class _MedRow extends StatelessWidget {
     );
   }
 
+  List<String> _splitSlots(String? raw, {String fallback = '-'}) {
+    final parts = (raw ?? '').split('-').map((p) => p.trim()).toList();
+    while (parts.length < 3) {
+      parts.add(fallback);
+    }
+    return parts.take(3).map((p) => p.isEmpty ? fallback : p).toList();
+  }
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
@@ -2407,50 +2414,12 @@ class _MedRow extends StatelessWidget {
           ),
         ),
         Expanded(
-          flex: 2,
-          child: Text(
-            med.doseDisplay,
-            style: const TextStyle(fontSize: 13, color: kTextDark),
-          ),
-        ),
-        Expanded(
-          flex: 3,
+          flex: 4,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                med.frequency ?? '-',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: kTextDark,
-                ),
-              ),
+              _doseFreqTable(),
               const SizedBox(height: 5),
-              Row(
-                children: _dots
-                    .map(
-                      (a) => Container(
-                        width: 8,
-                        height: 8,
-                        margin: const EdgeInsets.only(right: 4),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: a ? color : kBorder,
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 2),
-              const Text(
-                'M  A  N',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: kTextMid,
-                  letterSpacing: 2,
-                ),
-              ),
             ],
           ),
         ),
@@ -2473,6 +2442,132 @@ class _MedRow extends StatelessWidget {
           ),
         ),
       ],
+    ),
+  );
+
+  Widget _rowLabelValue(String label, String value) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      SizedBox(
+        width: 74,
+        child: Text(
+          '$label :',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: kTextMid,
+          ),
+        ),
+      ),
+      Expanded(
+        child: Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: kTextDark,
+          ),
+        ),
+      ),
+    ],
+  );
+
+  Widget _doseFreqTable() {
+    final freq = _splitSlots(med.frequency);
+    final dose = _splitSlots(med.doseDisplay);
+    return LayoutBuilder(
+      builder: (context, c) {
+        final maxW = c.maxWidth.isFinite ? c.maxWidth : 140.0;
+        final tableW = maxW < 140 ? maxW : 140.0;
+        return Align(
+          alignment: Alignment.center,
+          child: SizedBox(
+            width: tableW,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: kBg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kBorder),
+              ),
+              child: Column(
+                children: [
+                  const Row(
+                    children: [
+                  
+                      SizedBox(width: 18),
+                      Expanded(child: _SlotHead('M')),
+                      Expanded(child: _SlotHead('A')),
+                      Expanded(child: _SlotHead('N')),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Row(
+                  //   children: [
+                  //     _rowTag('F'),
+                  //     Expanded(child: _SlotVal(freq[0])),
+                  //     Expanded(child: _SlotVal(freq[1] == '0' ? '-' : freq[1])),
+                  //     Expanded(child: _SlotVal(freq[2])),
+                  //   ],
+                  // ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      _rowTag('D'),
+                      Expanded(child: _SlotVal(dose[0])),
+                      Expanded(child: _SlotVal(dose[1])),
+                      Expanded(child: _SlotVal(dose[2])),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _rowTag(String t) => SizedBox(
+    width: 18,
+    child: Text(
+      t,
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        color: kTextMid,
+      ),
+      textAlign: TextAlign.center,
+    ),
+  );
+}
+
+class _SlotHead extends StatelessWidget {
+  final String text;
+  const _SlotHead(this.text);
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      fontSize: 10,
+      fontWeight: FontWeight.w700,
+      color: kTextMid,
+    ),
+  );
+}
+
+class _SlotVal extends StatelessWidget {
+  final String text;
+  const _SlotVal(this.text);
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    textAlign: TextAlign.center,
+    style: const TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+      color: kTextDark,
     ),
   );
 }
@@ -2696,7 +2791,7 @@ class PrescriptionMedicineItem {
 
   String get doseDisplay {
     if (tabletDosage?.trim().isNotEmpty == true) return tabletDosage!;
-    if (syrupDosageMl?.trim().isNotEmpty == true) return '$syrupDosageMl ml';
+    if (syrupDosageMl?.trim().isNotEmpty == true) return '$syrupDosageMl';
     if (injDosage?.trim().isNotEmpty == true) return injDosage!;
     if (dropsCount?.trim().isNotEmpty == true) return dropsCount!;
     if (sprayPuffs?.trim().isNotEmpty == true) return sprayPuffs!;

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:qless/core/constant.dart';
+import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
@@ -46,6 +47,9 @@ abstract class ApiService {
   Future<DoctorScheduleModel> getDoctorSchedule(
     @Path("doctor_id") int doctorId,
   );
+
+  @GET("doctor/users/patientAppointmentList/{doctor_id}")
+  Future<List<AppointmentList>> fetchPatientAppointments(@Path("doctor_id") int doctorId);
 
   //  POST API
   @POST("login/addDoctorDetails")

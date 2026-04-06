@@ -1,4 +1,5 @@
 import 'package:qless/data/api/api_service.dart';
+import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
@@ -40,5 +41,10 @@ class AppointmentImpl implements AppointmentRepository {
   @override
   Future<List<MonthSlotData>> getBookedSlots(int doctorId) {
     return apiService.getBookedSlots(doctorId);
+  }
+
+  @override
+  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId) {
+    return apiService.fetchPatientAppointments(doctorId);
   }
 }

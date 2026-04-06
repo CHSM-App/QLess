@@ -730,8 +730,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             context: context,
             builder: (_) => AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.w700)),
-              content: const Text('Are you sure you want to log out of your account?'),
+              title: const Text('Confirm logout', style: TextStyle(fontWeight: FontWeight.w700)),
+              content: const Text('You will be signed out and returned to the Continue As screen.'),
               actions: [
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                 ElevatedButton(
@@ -747,14 +747,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                     }
                   },
                   style: ElevatedButton.styleFrom(backgroundColor: kRedAccent, foregroundColor: Colors.white),
-                  child: const Text('Log Out'),
+                  child: const Text('Log out'),
                 ),
               ],
             ),
           );
         },
         icon: const Icon(Icons.logout_rounded),
-        label: const Text('Log Out'),
+        label: const Text('Log out of account'),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFFCE8E6),
           foregroundColor: kRedAccent,
