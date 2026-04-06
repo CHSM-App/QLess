@@ -914,7 +914,14 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
           ),
           const SizedBox(height: 8),
           Row(
-            children: BookingMode.values.map((mode) {
+            children: BookingMode.values
+                .where((mode) => mode != BookingMode.both)
+                .toList()
+                .asMap()
+                .entries
+                .map((entry) {
+              final mode       = entry.value;
+              final isLast     = entry.key == 1; // queue, slots — 2 items
               final isSelected = _local.bookingMode == mode;
               return Expanded(
                 child: GestureDetector(
@@ -924,8 +931,7 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    margin: EdgeInsets.only(
-                        right: mode != BookingMode.both ? 8 : 0),
+                    margin: EdgeInsets.only(right: isLast ? 0 : 8),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
                       color: isSelected

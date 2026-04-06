@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 const _kNavy    = Color(0xFF0F172A);
@@ -55,7 +57,7 @@ String _fmtDateFull(DateTime dt) {
 bool _sessionBookable(int? mode, bool isToday) {
   switch (mode) {
     case 1: return isToday;
-    case 2: return !isToday;
+    case 2: return true;
     case 3: return true;
     default: return false;
   }
@@ -83,6 +85,7 @@ class _BookAppointmentScreenState
   DateTime? _selectedDate;
   int?      _selectedSlotId;
   String?   _selectedTime;
+  bool      _isBooking = false;
 
   @override
   void initState() {
@@ -91,11 +94,27 @@ class _BookAppointmentScreenState
       final id = widget.doctor.doctorId;
       if (id != null) {
         ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(id);
+        ref.read(appointmentViewModelProvider.notifier).getBookedSlots(id);
       }
     });
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+
+  String _formatDateForApi(DateTime dt) =>
+      '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+
+  /// Converts display time "09:30 AM" → "09:30" in 24-hour format for the API.
+  String _toApiTime(String displayTime) {
+    final parts = displayTime.trim().split(' ');
+    final hm    = parts[0].split(':');
+    int hour    = int.parse(hm[0]);
+    final min   = hm[1];
+    final isPm  = parts.length > 1 && parts[1].toUpperCase() == 'PM';
+    if (isPm && hour != 12) hour += 12;
+    if (!isPm && hour == 12) hour = 0;
+    return '${hour.toString().padLeft(2, '0')}:$min';
+  }
 
   TimeOfDay _parseTime(String? iso) {
     if (iso == null) return const TimeOfDay(hour: 9, minute: 0);
@@ -155,14 +174,62 @@ class _BookAppointmentScreenState
       _selectedSlotId = bookable.length == 1 ? bookable.first.slotId : null;
       _selectedTime   = null;
     });
+
+    if (widget.doctor.doctorId != null) {
+      ref.read(appointmentViewModelProvider.notifier).getAppointmentAvailability(
+        AppointmentRequestModel(
+          doctorId: widget.doctor.doctorId,
+          appointmentDate: _formatDateForApi(date),
+        ),
+      );
+    }
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final state  = ref.watch(doctorsViewModelProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final state           = ref.watch(doctorsViewModelProvider);
+    final appointmentState = ref.watch(appointmentViewModelProvider);
+    final isDark          = Theme.of(context).brightness == Brightness.dark;
+
+    // Build set of booked display-time strings for the selected date
+    final bookedTimesForDate = <String>{};
+    if (_selectedDate != null) {
+      final dateStr = _formatDateForApi(_selectedDate!);
+      for (final slot in appointmentState.bookedSlots) {
+        if (slot.bookingDate != null &&
+            slot.bookingDate!.startsWith(dateStr) &&
+            slot.startTime != null) {
+          bookedTimesForDate.add(_fmtTime(slot.startTime));
+        }
+      }
+    }
+
+    ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
+      // Booking completed
+      if (next.bookingResponse != null &&
+          next.bookingResponse != prev?.bookingResponse &&
+          !next.isLoading) {
+        final msg = next.bookingResponse!.message ?? 'Appointment booked!';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg), backgroundColor: _kGreen),
+        );
+        setState(() => _isBooking = false);
+        Navigator.pop(context, true);
+        return;
+      }
+      // Booking error
+      if (next.error != null &&
+          next.error != prev?.error &&
+          !next.isLoading &&
+          _isBooking) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!), backgroundColor: Colors.red),
+        );
+        setState(() => _isBooking = false);
+      }
+    });
 
     final enabled = state.doctorAvailabilities
         .where((a) => a.isEnabled == true)
@@ -205,23 +272,24 @@ class _BookAppointmentScreenState
           else
             SliverToBoxAdapter(
               child: _BookingBody(
-                isDark:         isDark,
-                grouped:        grouped,
-                enabled:        enabled,
-                selectedDate:   _selectedDate,
-                selectedSlotId: _selectedSlotId,
-                selectedTime:   _selectedTime,
-                selectedAvail:  selectedAvail,
-                dayIsToday:     dayIsToday,
-                onPickDate:     (date, sessions) =>
+                isDark:              isDark,
+                grouped:             grouped,
+                enabled:             enabled,
+                selectedDate:        _selectedDate,
+                selectedSlotId:      _selectedSlotId,
+                selectedTime:        _selectedTime,
+                selectedAvail:       selectedAvail,
+                dayIsToday:          dayIsToday,
+                bookedTimesForDate:  bookedTimesForDate,
+                onPickDate:          (date, sessions) =>
                     _pickDate(date, sessions),
-                onPickSession:  (slotId) => setState(() {
+                onPickSession:       (slotId) => setState(() {
                   _selectedSlotId = slotId;
                   _selectedTime   = null;
                 }),
-                onPickTime:     (t) => setState(() => _selectedTime = t),
-                buildSlots:     _buildSlots,
-                fmtTime:        _fmtTime,
+                onPickTime:          (t) => setState(() => _selectedTime = t),
+                buildSlots:          _buildSlots,
+                fmtTime:             _fmtTime,
               ),
             ),
         ],
@@ -232,6 +300,7 @@ class _BookAppointmentScreenState
               isQueue:      isQueue,
               selectedDate: _selectedDate,
               selectedSlot: _selectedTime,
+              isLoading:    _isBooking,
               onConfirm:    _onConfirm,
             )
           : null,
@@ -239,11 +308,33 @@ class _BookAppointmentScreenState
   }
 
   void _onConfirm() {
-    // TODO: call booking API
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Appointment booked!'),
-        backgroundColor: _kGreen,
+    if (_isBooking || _selectedDate == null) return;
+
+    final patientState = ref.read(patientLoginViewModelProvider);
+    final patientId    = widget.bookingForMemberId ?? patientState.patientId;
+
+    final doctorsState = ref.read(doctorsViewModelProvider);
+    final avail = _selectedSlotId == null
+        ? null
+        : doctorsState.doctorAvailabilities.cast<DoctorAvailabilityModel?>().firstWhere(
+            (a) => a?.slotId == _selectedSlotId,
+            orElse: () => null,
+          );
+    final isToday = _isToday(_selectedDate!);
+    final mode    = avail?.bookingMode ?? 0;
+    final isQueue = mode == 1 || (mode == 3 && isToday);
+
+    final startTime = isQueue
+        ? null
+        : (_selectedTime != null ? _toApiTime(_selectedTime!) : null);
+
+    setState(() => _isBooking = true);
+    ref.read(appointmentViewModelProvider.notifier).bookAppointment(
+      AppointmentRequestModel(
+        doctorId:        widget.doctor.doctorId,
+        patientId:       patientId,
+        appointmentDate: _formatDateForApi(_selectedDate!),
+        startTime:       startTime, 
       ),
     );
   }
@@ -410,6 +501,7 @@ class _BookingBody extends StatelessWidget {
   final String?       selectedTime;
   final DoctorAvailabilityModel? selectedAvail;
   final bool          dayIsToday;
+  final Set<String>  bookedTimesForDate;
   final void Function(DateTime, List<DoctorAvailabilityModel>) onPickDate;
   final ValueChanged<int?>   onPickSession;
   final ValueChanged<String> onPickTime;
@@ -425,6 +517,7 @@ class _BookingBody extends StatelessWidget {
     required this.selectedTime,
     required this.selectedAvail,
     required this.dayIsToday,
+    required this.bookedTimesForDate,
     required this.onPickDate,
     required this.onPickSession,
     required this.onPickTime,
@@ -484,10 +577,11 @@ class _BookingBody extends StatelessWidget {
               _QueueCard(avail: selectedAvail!)
             else
               _SlotPicker(
-                slots:        buildSlots(selectedAvail!),
-                selected:     selectedTime,
-                isDark:       isDark,
-                onSelected:   onPickTime,
+                slots:             buildSlots(selectedAvail!),
+                selected:          selectedTime,
+                isDark:            isDark,
+                bookedTimes:       bookedTimesForDate,
+                onSelected:        onPickTime,
               ),
           ],
         ],
@@ -972,12 +1066,14 @@ class _SlotPicker extends StatelessWidget {
   final List<String>         slots;
   final String?              selected;
   final bool                 isDark;
+  final Set<String>          bookedTimes;
   final ValueChanged<String> onSelected;
 
   const _SlotPicker({
     required this.slots,
     required this.selected,
     required this.isDark,
+    required this.bookedTimes,
     required this.onSelected,
   });
 
@@ -1020,27 +1116,24 @@ class _SlotPicker extends StatelessWidget {
         _label('Select Time Slot'),
         const SizedBox(height: 12),
         if (morning.isNotEmpty) ...[
-          _SlotGroupHeader(
-              icon: Icons.wb_sunny_outlined, label: 'Morning'),
+          _SlotGroupHeader(icon: Icons.wb_sunny_outlined, label: 'Morning'),
           const SizedBox(height: 8),
-          _SlotGrid(slots: morning, selected: selected,
-              isDark: isDark, onSelected: onSelected),
+          _SlotGrid(slots: morning, selected: selected, isDark: isDark,
+              bookedTimes: bookedTimes, onSelected: onSelected),
           const SizedBox(height: 16),
         ],
         if (afternoon.isNotEmpty) ...[
-          _SlotGroupHeader(
-              icon: Icons.wb_twilight_outlined, label: 'Afternoon'),
+          _SlotGroupHeader(icon: Icons.wb_twilight_outlined, label: 'Afternoon'),
           const SizedBox(height: 8),
-          _SlotGrid(slots: afternoon, selected: selected,
-              isDark: isDark, onSelected: onSelected),
+          _SlotGrid(slots: afternoon, selected: selected, isDark: isDark,
+              bookedTimes: bookedTimes, onSelected: onSelected),
           const SizedBox(height: 16),
         ],
         if (evening.isNotEmpty) ...[
-          _SlotGroupHeader(
-              icon: Icons.nights_stay_outlined, label: 'Evening'),
+          _SlotGroupHeader(icon: Icons.nights_stay_outlined, label: 'Evening'),
           const SizedBox(height: 8),
-          _SlotGrid(slots: evening, selected: selected,
-              isDark: isDark, onSelected: onSelected),
+          _SlotGrid(slots: evening, selected: selected, isDark: isDark,
+              bookedTimes: bookedTimes, onSelected: onSelected),
         ],
       ],
     );
@@ -1074,12 +1167,14 @@ class _SlotGrid extends StatelessWidget {
   final List<String>         slots;
   final String?              selected;
   final bool                 isDark;
+  final Set<String>          bookedTimes;
   final ValueChanged<String> onSelected;
 
   const _SlotGrid({
     required this.slots,
     required this.selected,
     required this.isDark,
+    required this.bookedTimes,
     required this.onSelected,
   });
 
@@ -1089,24 +1184,24 @@ class _SlotGrid extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: slots.map((slot) {
-        final isSel = selected == slot;
+        final isSel    = selected == slot;
+        final isBooked = bookedTimes.contains(slot);
         return GestureDetector(
-          onTap: () => onSelected(slot),
+          onTap: isBooked ? null : () => onSelected(slot),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 140),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: isSel
-                  ? _kBlue
-                  : (isDark
-                      ? const Color(0xFF1E293B)
-                      : Colors.white),
+              color: isBooked
+                  ? (isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9))
+                  : isSel
+                      ? _kBlue
+                      : (isDark ? const Color(0xFF1E293B) : Colors.white),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSel ? _kBlue : _kBorder,
+                color: isBooked ? const Color(0xFFCBD5E1) : (isSel ? _kBlue : _kBorder),
               ),
-              boxShadow: isSel
+              boxShadow: isSel && !isBooked
                   ? [
                       BoxShadow(
                         color: _kBlue.withValues(alpha: 0.25),
@@ -1121,7 +1216,11 @@ class _SlotGrid extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isSel ? Colors.white : _kNavy,
+                color: isBooked
+                    ? const Color(0xFFCBD5E1)
+                    : (isSel ? Colors.white : _kNavy),
+                decoration: isBooked ? TextDecoration.lineThrough : null,
+                decorationColor: const Color(0xFFCBD5E1),
               ),
             ),
           ),
@@ -1140,6 +1239,7 @@ class _ConfirmBar extends StatelessWidget {
   final bool         isQueue;
   final DateTime?    selectedDate;
   final String?      selectedSlot;
+  final bool         isLoading;
   final VoidCallback onConfirm;
 
   const _ConfirmBar({
@@ -1147,6 +1247,7 @@ class _ConfirmBar extends StatelessWidget {
     required this.isQueue,
     required this.selectedDate,
     required this.selectedSlot,
+    required this.isLoading,
     required this.onConfirm,
   });
 
@@ -1175,37 +1276,47 @@ class _ConfirmBar extends StatelessWidget {
         width: double.infinity,
         height: 50,
         child: ElevatedButton(
-          onPressed: onConfirm,
+          onPressed: isLoading ? null : onConfirm,
           style: ElevatedButton.styleFrom(
             backgroundColor: _kNavy,
             foregroundColor: Colors.white,
+            disabledBackgroundColor: _kNavy.withValues(alpha: 0.6),
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isQueue
-                    ? Icons.confirmation_number_rounded
-                    : Icons.calendar_month_rounded,
-                size: 17,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+          child: isLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
                   ),
-                  overflow: TextOverflow.ellipsis,
+                )
+              : Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isQueue
+                          ? Icons.confirmation_number_rounded
+                          : Icons.calendar_month_rounded,
+                      size: 17,
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

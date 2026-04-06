@@ -60,8 +60,8 @@ class TokenNotifier extends StateNotifier<TokenState> {
       accessToken: accessToken,
       refreshToken: refreshToken,
       roleId: roleId,
+      isLoading: false,
     );
-    // state = TokenState(accessToken: accessToken, refreshToken: refreshToken, roleId: roleId);
     await TokenStorage.saveTokens(accessToken, refreshToken, roleId);
   }
 

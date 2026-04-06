@@ -1,0 +1,38 @@
+import 'package:qless/domain/models/appointment_request_model.dart';
+import 'package:qless/domain/models/appointment_response_model.dart';
+import 'package:qless/domain/models/available_slots.dart';
+import 'package:qless/domain/repository/appointment_repo.dart';
+
+class AppointmentUsecase {
+  final AppointmentRepository appointmentRepository;
+
+  AppointmentUsecase(this.appointmentRepository);
+
+  Future<AppointmentResponseModel> getAppointmentAvailability(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.getAppointmentAvailability(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> bookAppointment(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.bookAppointment(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> cancelAppointment(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.cancelAppointment(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> updateQueueStatus(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.updateQueueStatus(appointmentRequest);
+  }
+
+  Future<List<MonthSlotData>> getBookedSlots(int doctorId) {
+    return appointmentRepository.getBookedSlots(doctorId);
+  }
+}

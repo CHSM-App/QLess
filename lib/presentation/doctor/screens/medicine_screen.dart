@@ -6,14 +6,14 @@ import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const kPrimaryBlue = Color(0xFF1A73E8);
-const kLightBlue   = Color(0xFFE8F0FE);
+const kLightBlue = Color(0xFFE8F0FE);
 const kAccentGreen = Color(0xFF34A853);
-const kRedAccent   = Color(0xFFEA4335);
-const kSurface     = Color(0xFFF8F9FA);
-const kCardBg      = Color(0xFFFFFFFF);
-const kTextDark    = Color(0xFF1F2937);
-const kTextMuted   = Color(0xFF6B7280);
-const kDivider     = Color(0xFFE5E7EB);
+const kRedAccent = Color(0xFFEA4335);
+const kSurface = Color(0xFFF8F9FA);
+const kCardBg = Color(0xFFFFFFFF);
+const kTextDark = Color(0xFF1F2937);
+const kTextMuted = Color(0xFF6B7280);
+const kDivider = Color(0xFFE5E7EB);
 
 // ════════════════════════════════════════════════════════════════════
 //  PAGE
@@ -52,7 +52,10 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
         }
       },
     );
-    Future.microtask(() => _refreshMedicines(force: false));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _refreshMedicines(force: false);
+    });
   }
 
   @override
@@ -87,8 +90,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: kCardBg,
         title: Row(
           children: [
@@ -99,8 +101,11 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                 color: kRedAccent.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.delete_outline_rounded,
-                  color: kRedAccent, size: 18),
+              child: const Icon(
+                Icons.delete_outline_rounded,
+                color: kRedAccent,
+                size: 18,
+              ),
             ),
             const SizedBox(width: 12),
             const Text(
@@ -132,11 +137,14 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                     foregroundColor: kTextMuted,
                     side: const BorderSide(color: kDivider),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text('Cancel',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -162,11 +170,14 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: const Text('Remove',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  child: const Text(
+                    'Remove',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                 ),
               ),
             ],
@@ -194,7 +205,8 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
       final matchType =
           _selectedType == 0 || m.medTypeName == _types[_selectedType];
       final query = _searchController.text.toLowerCase().trim();
-      final matchSearch = query.isEmpty ||
+      final matchSearch =
+          query.isEmpty ||
           (m.medicineName?.toLowerCase().contains(query) ?? false) ||
           (m.medTypeName?.toLowerCase().contains(query) ?? false);
       return matchType && matchSearch;
@@ -205,7 +217,9 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
   Widget build(BuildContext context) {
     // Fetch handled in initState listener.
 
-    final medicinesAsync = ref.watch(doctorLoginViewModelProvider).medicines;
+    final medicinesAsync =
+        ref.watch(doctorLoginViewModelProvider).medicines ??
+        const AsyncValue<List<Medicine>>.loading();
 
     return Scaffold(
       backgroundColor: kSurface,
@@ -218,59 +232,51 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
             types: _types,
             onSearchChanged: () => setState(() {}),
             onTypeSelected: (i) => setState(() => _selectedType = i),
+            onRefresh: () => _refreshMedicines(force: true),
           ),
 
           // ── Count row ─────────────────────────────────────────
-          if (medicinesAsync != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-              child: medicinesAsync.when(
-                data: (list) => _CountRow(
-                  count: _filtered(list).length,
-                  total: list.length,
-                ),
-                loading: () => const _CountShimmer(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+            child: medicinesAsync.when(
+              data: (list) =>
+                  _CountRow(count: _filtered(list).length, total: list.length),
+              loading: () => const _CountShimmer(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
+          ),
 
           // ── List ──────────────────────────────────────────────
           Expanded(
-            child: medicinesAsync == null
-                ? const Center(
-                    child:
-                        CircularProgressIndicator(color: kPrimaryBlue))
-                : medicinesAsync.when(
-                    loading: () => const Center(
-                        child: CircularProgressIndicator(
-                            color: kPrimaryBlue)),
-                    error: (e, _) =>
-                        _ErrorState(onRetry: () => _refreshMedicines(force: true)),
-                    data: (medicines) {
-                      final filtered = _filtered(medicines);
-                      if (filtered.isEmpty) {
-                        return _EmptyState(
-                          hasFilters: _selectedType != 0 ||
-                              _searchController.text.isNotEmpty,
-                        );
-                      }
-                      return RefreshIndicator(
-                        color: kPrimaryBlue,
-                        onRefresh: () async => _refreshMedicines(force: true),
-                        child: ListView.separated(
-                          padding:
-                              const EdgeInsets.fromLTRB(20, 4, 20, 100),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (_, i) => _MedicineCard(
-                            medicine: filtered[i],
-                            onDelete: () => _confirmDelete(filtered[i]),
-                          ),
-                        ),
-                      );
-                    },
+            child: medicinesAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(color: kPrimaryBlue),
+              ),
+              error: (e, _) =>
+                  _ErrorState(onRetry: () => _refreshMedicines(force: true)),
+              data: (medicines) {
+                final filtered = _filtered(medicines);
+                if (filtered.isEmpty) {
+                  return _EmptyState(
+                    hasFilters:
+                        _selectedType != 0 || _searchController.text.isNotEmpty,
+                  );
+                }
+                return RefreshIndicator(
+                  color: kPrimaryBlue,
+                  onRefresh: () async => _refreshMedicines(force: true),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) => _MedicineCard(
+                      medicine: filtered[i],
+                      onDelete: () => _confirmDelete(filtered[i]),
+                    ),
                   ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -305,6 +311,7 @@ class _TopBar extends StatelessWidget {
     required this.types,
     required this.onSearchChanged,
     required this.onTypeSelected,
+    required this.onRefresh,
   });
 
   final TextEditingController searchController;
@@ -312,6 +319,7 @@ class _TopBar extends StatelessWidget {
   final List<String> types;
   final VoidCallback onSearchChanged;
   final ValueChanged<int> onTypeSelected;
+  final VoidCallback onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -321,39 +329,71 @@ class _TopBar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Search field
-          Container(
-            height: 48,
-            decoration: BoxDecoration(
-              color: kSurface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kDivider),
-            ),
-            child: TextField(
-              controller: searchController,
-              onChanged: (_) => onSearchChanged(),
-              style: const TextStyle(fontSize: 14, color: kTextDark),
-              decoration: InputDecoration(
-                hintText: 'Search medicines...',
-                hintStyle:
-                    const TextStyle(color: kTextMuted, fontSize: 14),
-                prefixIcon: const Icon(Icons.search_rounded,
-                    color: kTextMuted, size: 20),
-                suffixIcon: searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close_rounded,
-                            color: kTextMuted, size: 18),
-                        onPressed: () {
-                          searchController.clear();
-                          onSearchChanged();
-                        },
-                      )
-                    : null,
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 14),
+          // Search field + refresh
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: kSurface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: kDivider),
+                  ),
+                  child: TextField(
+                    controller: searchController,
+                    onChanged: (_) => onSearchChanged(),
+                    style: const TextStyle(fontSize: 14, color: kTextDark),
+                    decoration: InputDecoration(
+                      hintText: 'Search medicines...',
+                      hintStyle: const TextStyle(
+                        color: kTextMuted,
+                        fontSize: 14,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: kTextMuted,
+                        size: 20,
+                      ),
+                      suffixIcon: searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                color: kTextMuted,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                searchController.clear();
+                                onSearchChanged();
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              // const SizedBox(width: 10),
+              // Container(
+              //   width: 48,
+              //   height: 48,
+              //   decoration: BoxDecoration(
+              //     color: kSurface,
+              //     borderRadius: BorderRadius.circular(14),
+              //     border: Border.all(color: kDivider),
+              //   ),
+              //   child: IconButton(
+              //     tooltip: 'Refresh',
+              //     icon: const Icon(
+              //       Icons.refresh_rounded,
+              //       color: kPrimaryBlue,
+              //       size: 20,
+              //     ),
+              //     onPressed: onRefresh,
+              //   ),
+              // ),
+            ],
           ),
 
           const SizedBox(height: 14),
@@ -372,20 +412,19 @@ class _TopBar extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 7),
+                      horizontal: 16,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       color: sel ? kPrimaryBlue : kCardBg,
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: sel ? kPrimaryBlue : kDivider,
-                      ),
+                      border: Border.all(color: sel ? kPrimaryBlue : kDivider),
                     ),
                     child: Text(
                       types[i],
                       style: TextStyle(
                         fontSize: 12.5,
-                        fontWeight:
-                            sel ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
                         color: sel ? Colors.white : kTextMuted,
                       ),
                     ),
@@ -425,8 +464,7 @@ class _CountRow extends StatelessWidget {
         ),
         const Spacer(),
         Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: kLightBlue,
             borderRadius: BorderRadius.circular(20),
@@ -464,8 +502,7 @@ class _CountShimmer extends StatelessWidget {
 // Type style descriptor
 // ─────────────────────────────────────────────
 class _TypeStyle {
-  const _TypeStyle(
-      {required this.bg, required this.fg, required this.icon});
+  const _TypeStyle({required this.bg, required this.fg, required this.icon});
   final Color bg;
   final Color fg;
   final IconData icon;
@@ -475,28 +512,53 @@ class _TypeStyle {
 // Medicine Card
 // ─────────────────────────────────────────────
 class _MedicineCard extends StatelessWidget {
-  const _MedicineCard(
-      {required this.medicine, required this.onDelete});
+  const _MedicineCard({required this.medicine, required this.onDelete});
 
   final Medicine medicine;
   final VoidCallback onDelete;
 
   static const _typeStyles = {
-    'Tablet':    _TypeStyle(bg: Color(0xFFE8F0FE), fg: kPrimaryBlue,        icon: Icons.medication_rounded),
-    'Lotion':    _TypeStyle(bg: Color(0xFFF3E8FF), fg: Color(0xFF7C3AED),   icon: Icons.science_outlined),
-    'Syrup':     _TypeStyle(bg: Color(0xFFD1FAE5), fg: Color(0xFF059669),   icon: Icons.local_drink_outlined),
-    'Injection': _TypeStyle(bg: Color(0xFFFFEDD5), fg: Color(0xFFEA580C),   icon: Icons.colorize_outlined),
-    'Drops':     _TypeStyle(bg: Color(0xFFEDE9FE), fg: Color(0xFF6D28D9),   icon: Icons.water_drop_outlined),
-    'Spray':     _TypeStyle(bg: Color(0xFFD1FAE5), fg: Color(0xFF0F6E56),   icon: Icons.air_outlined),
+    'Tablet': _TypeStyle(
+      bg: Color(0xFFE8F0FE),
+      fg: kPrimaryBlue,
+      icon: Icons.medication_rounded,
+    ),
+    'Lotion': _TypeStyle(
+      bg: Color(0xFFF3E8FF),
+      fg: Color(0xFF7C3AED),
+      icon: Icons.science_outlined,
+    ),
+    'Syrup': _TypeStyle(
+      bg: Color(0xFFD1FAE5),
+      fg: Color(0xFF059669),
+      icon: Icons.local_drink_outlined,
+    ),
+    'Injection': _TypeStyle(
+      bg: Color(0xFFFFEDD5),
+      fg: Color(0xFFEA580C),
+      icon: Icons.colorize_outlined,
+    ),
+    'Drops': _TypeStyle(
+      bg: Color(0xFFEDE9FE),
+      fg: Color(0xFF6D28D9),
+      icon: Icons.water_drop_outlined,
+    ),
+    'Spray': _TypeStyle(
+      bg: Color(0xFFD1FAE5),
+      fg: Color(0xFF0F6E56),
+      icon: Icons.air_outlined,
+    ),
   };
 
   @override
   Widget build(BuildContext context) {
-    final style = _typeStyles[medicine.medTypeName] ??
+    final style =
+        _typeStyles[medicine.medTypeName] ??
         const _TypeStyle(
-            bg: Color(0xFFF1F5F9),
-            fg: kTextMuted,
-            icon: Icons.medication_outlined);
+          bg: Color(0xFFF1F5F9),
+          fg: kTextMuted,
+          icon: Icons.medication_outlined,
+        );
 
     return Container(
       decoration: BoxDecoration(
@@ -544,7 +606,9 @@ class _MedicineCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: style.bg,
                       borderRadius: BorderRadius.circular(6),
@@ -572,8 +636,11 @@ class _MedicineCard extends StatelessWidget {
                   color: kRedAccent.withOpacity(0.08),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.delete_outline_rounded,
-                    color: kRedAccent, size: 17),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: kRedAccent,
+                  size: 17,
+                ),
               ),
             ),
           ],
@@ -645,8 +712,11 @@ class _EmptyState extends StatelessWidget {
               color: kLightBlue,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.medication_outlined,
-                color: kPrimaryBlue, size: 32),
+            child: const Icon(
+              Icons.medication_outlined,
+              color: kPrimaryBlue,
+              size: 32,
+            ),
           ),
           const SizedBox(height: 16),
           Text(
@@ -690,8 +760,11 @@ class _ErrorState extends StatelessWidget {
               color: kRedAccent.withOpacity(0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.error_outline_rounded,
-                color: kRedAccent, size: 32),
+            child: const Icon(
+              Icons.error_outline_rounded,
+              color: kRedAccent,
+              size: 32,
+            ),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -711,16 +784,18 @@ class _ErrorState extends StatelessWidget {
           ElevatedButton.icon(
             onPressed: onRetry,
             icon: const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Retry',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            label: const Text(
+              'Retry',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimaryBlue,
               foregroundColor: Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 24, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],

@@ -1,11 +1,7 @@
-import 'dart:io';
-
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/domain/usecase/master_usecase.dart';
-
 
 @immutable
 class MasterState {
@@ -16,20 +12,17 @@ class MasterState {
   final AsyncValue<List<RelationModel>> fetchRelation;
   final AsyncValue<List<BloodGroupModel>> fetchBloodGroup;
 
-
   const MasterState({
     this.isLoading = false,
     this.data,
     this.error,
-  
+
     this.fetchGender = const AsyncValue.loading(),
     this.fetchBloodGroup = const AsyncValue.loading(),
     this.fetchRelation = const AsyncValue.loading(),
-
   });
 
   MasterState copyWith({
-
     bool? isLoading,
     Map<String, dynamic>? data,
     String? error,
@@ -38,7 +31,6 @@ class MasterState {
     AsyncValue<List<GenderModel>>? fetchGender,
     AsyncValue<List<BloodGroupModel>>? fetchBloodGroup,
     AsyncValue<List<RelationModel>>? fetchRelation,
-  
   }) {
     return MasterState(
       isLoading: isLoading ?? this.isLoading,
@@ -47,7 +39,6 @@ class MasterState {
       fetchGender: fetchGender ?? this.fetchGender,
       fetchBloodGroup: fetchBloodGroup ?? this.fetchBloodGroup,
       fetchRelation: fetchRelation ?? this.fetchRelation,
-     
     );
   }
 }
@@ -67,6 +58,9 @@ class MasterViewModel extends StateNotifier<MasterState> {
       state = state.copyWith(fetchGender: AsyncValue.error(e, st));
     }
   }
+
+
+
 
   Future<void> fetchBloodGroupList() async {
     state = state.copyWith(fetchBloodGroup: const AsyncValue.loading());
