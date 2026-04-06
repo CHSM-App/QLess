@@ -131,5 +131,14 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     }
   }
 
+
+  
+
+
   void clearError() => state = state.copyWith(clearError: true);
+
+  Future<void> logout() async {
+    await TokenStorage.clear();
+    state = const PatientLoginState();
+  }
 }

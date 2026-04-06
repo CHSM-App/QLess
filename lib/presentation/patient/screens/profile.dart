@@ -394,8 +394,8 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                 icon: Icons.logout,
                 iconColor: kRed,
                 iconBg: const Color(0xFFFDEAEA),
-                title: 'Logout',
-                subtitle: 'Sign out of account',
+                title: 'Log out',
+                subtitle: 'Log out of account',
                 titleColor: kRed,
                 onTap: () {
                   showDialog(
@@ -405,11 +405,11 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       title: const Text(
-                        'Log Out',
+                        'Confirm logout',
                         style: TextStyle(fontWeight: FontWeight.w700),
                       ),
                       content: const Text(
-                        'Are you sure you want to log out of your account?',
+                        'You will be signed out and returned to the Continue As screen.',
                       ),
                       actions: [
                         TextButton(
@@ -420,6 +420,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                           onPressed: () async {
                             Navigator.pop(context);
                             await ref.read(tokenProvider.notifier).clearTokens();
+                            await ref.read(patientLoginViewModelProvider.notifier).logout();
                             if (!context.mounted) return;
                             Navigator.of(context, rootNavigator: true)
                                 .pushAndRemoveUntil(
@@ -432,7 +433,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                             backgroundColor: kRed,
                             foregroundColor: Colors.white,
                           ),
-                          child: const Text('Log Out'),
+                          child: const Text('Log out'),
                         ),
                       ],
                     ),
