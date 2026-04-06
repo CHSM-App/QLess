@@ -86,7 +86,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
 
     final pages = [
       QueueHomePage(),
-      PrescriptionScreen(patientId: 1, doctorId:1),
+      PatientListScreen(),
       DoctorMedicinePage(),
       DoctorSettingsPage(),
     ];
