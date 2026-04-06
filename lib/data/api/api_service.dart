@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:qless/core/constant.dart';
+import 'package:qless/domain/models/appointment_request_model.dart';
+import 'package:qless/domain/models/appointment_response_model.dart';
+import 'package:qless/domain/models/available_slots.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
@@ -97,6 +100,17 @@ abstract class ApiService {
   );
 
 
+  @GET("patient/insert/appointment/getAvailability")
+  Future<AppointmentResponseModel> getAppointmentAvailability(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+
+  @GET("patient/users/appointment/getBookedSlots/{doctor_id}")
+  Future<List<MonthSlotData>> getBookedSlots(
+    @Path("doctor_id") int doctorId,
+  );
+
 
   // POST API
   @POST("login/addPatientDetails")
@@ -105,9 +119,15 @@ abstract class ApiService {
   @POST("patient/insert/insertFamilyMember")
   Future<dynamic> addFamilyMember(@Body() FamilyMember member);
 
-  //DELETE API
+  @POST("patient/insert/appointment//book")
+  Future<AppointmentResponseModel> bookAppointment(@Body() AppointmentRequestModel appointmentRequest);
 
-    // DELETE API
+  @POST("patient/insert/appointment/cancel")
+  Future<AppointmentResponseModel> cancelAppointment(@Body() AppointmentRequestModel appointmentRequest);
+
+  @POST("patient/insert/appointment/queueStatus")
+  Future<AppointmentResponseModel> updateQueueStatus(@Body() AppointmentRequestModel appointmentRequest);
+
   @DELETE("patient/index/deleteFamilyMember/{member_id}")
   Future<FamilyMember> deleteFamilyMember(@Path("member_id") int memberId);
 

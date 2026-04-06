@@ -151,17 +151,19 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
     final roleId = ref.read(tokenProvider).roleId ?? 0;
     if (1 == roleId) {
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
+        (_) => false,
       );
     } else if (2 == roleId) {
-      Navigator.pushReplacement(
+      Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
           builder: (_) =>
               PatientBottomNav(onToggleTheme: () {}, themeMode: ThemeMode.light),
         ),
+        (_) => false,
       );
     } else {
       _triggerError();
