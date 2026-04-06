@@ -8,6 +8,7 @@ part of 'doctor_details.dart';
 
 DoctorDetails _$DoctorDetailsFromJson(Map<String, dynamic> json) =>
     DoctorDetails(
+      queueLength: (json['queue_length'] as num?)?.toInt(),
       doctorId: (json['doctor_id'] as num?)?.toInt(),
       name: json['name'] as String?,
       email: json['email'] as String?,
@@ -56,4 +57,5 @@ Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
       'clinic_contact': instance.clinicContact,
       'image_url': instance.imageUrl,
       'gender_id': instance.genderId,
+      'queue_length': instance.queueLength,
     };

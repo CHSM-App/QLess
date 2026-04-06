@@ -739,6 +739,29 @@ class _DoctorCard extends StatelessWidget {
                       ],
                     ),
                   ],
+                  if (doctor.queueLength != null) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.people_alt_rounded,
+                          size: 11,
+                          color: Color(0xFFF59E0B),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          doctor.queueLength == 0
+                              ? 'No queue'
+                              : '${doctor.queueLength} in queue',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFF59E0B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

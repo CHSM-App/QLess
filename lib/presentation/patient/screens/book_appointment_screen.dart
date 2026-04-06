@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 const _kNavy    = Color(0xFF0F172A);
@@ -86,15 +88,21 @@ class _BookAppointmentScreenState
   int?      _selectedSlotId;
   String?   _selectedTime;
   bool      _isBooking = false;
+  int?      _selectedMemberId; // null = patient themselves
 
   @override
   void initState() {
     super.initState();
+    _selectedMemberId = widget.bookingForMemberId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final id = widget.doctor.doctorId;
       if (id != null) {
         ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(id);
         ref.read(appointmentViewModelProvider.notifier).getBookedSlots(id);
+      }
+      final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      if (patientId > 0) {
+        ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(patientId);
       }
     });
   }
@@ -191,7 +199,13 @@ class _BookAppointmentScreenState
   Widget build(BuildContext context) {
     final state           = ref.watch(doctorsViewModelProvider);
     final appointmentState = ref.watch(appointmentViewModelProvider);
+    final patientState    = ref.watch(patientLoginViewModelProvider);
+    final familyState     = ref.watch(familyViewModelProvider);
     final isDark          = Theme.of(context).brightness == Brightness.dark;
+    final familyMembers   = familyState.allfamilyMembers.maybeWhen(
+      data: (m) => m,
+      orElse: () => <FamilyMember>[],
+    );
 
     // Build set of booked display-time strings for the selected date
     final bookedTimesForDate = <String>{};
@@ -261,6 +275,17 @@ class _BookAppointmentScreenState
             onBack: () => Navigator.pop(context),
           ),
 
+          // ── Booking for ────────────────────────────────────────────────
+          SliverToBoxAdapter(
+            child: _BookingForDropdown(
+              patientState:     patientState,
+              members:          familyMembers,
+              selectedMemberId: _selectedMemberId,
+              onSelected:       (id) => setState(() => _selectedMemberId = id),
+              isDark:           isDark,
+            ),
+          ),
+
           if (state.isLoading)
             const SliverFillRemaining(
               child: Center(child: CircularProgressIndicator(color: _kBlue)),
@@ -310,8 +335,10 @@ class _BookAppointmentScreenState
   void _onConfirm() {
     if (_isBooking || _selectedDate == null) return;
 
-    final patientState = ref.read(patientLoginViewModelProvider);
-    final patientId    = widget.bookingForMemberId ?? patientState.patientId;
+    final patientState    = ref.read(patientLoginViewModelProvider);
+    final isForMember     = _selectedMemberId != null;
+    final patientId       = isForMember ? _selectedMemberId : patientState.patientId;
+    final userType        = isForMember ? 2 : 1;
 
     final doctorsState = ref.read(doctorsViewModelProvider);
     final avail = _selectedSlotId == null
@@ -334,7 +361,8 @@ class _BookAppointmentScreenState
         doctorId:        widget.doctor.doctorId,
         patientId:       patientId,
         appointmentDate: _formatDateForApi(_selectedDate!),
-        startTime:       startTime, 
+        startTime:       startTime,
+        userType:        userType,
       ),
     );
   }
@@ -483,6 +511,150 @@ class _DoctorHeader extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BOOKING FOR DROPDOWN
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _BookingForDropdown extends StatelessWidget {
+  final PatientLoginState   patientState;
+  final List<FamilyMember>  members;
+  final int?                selectedMemberId;
+  final ValueChanged<int?>  onSelected;
+  final bool                isDark;
+
+  const _BookingForDropdown({
+    required this.patientState,
+    required this.members,
+    required this.selectedMemberId,
+    required this.onSelected,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = <DropdownMenuItem<int?>>[
+      DropdownMenuItem<int?>(
+        value: null,
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 12,
+              backgroundColor: _kNavy.withValues(alpha: 0.12),
+              child: Text(
+                (patientState.name?.isNotEmpty ?? false)
+                    ? patientState.name![0].toUpperCase()
+                    : 'M',
+                style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700, color: _kNavy),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(patientState.name ?? 'Me',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: _kNavy)),
+                const Text('You',
+                    style: TextStyle(fontSize: 10, color: _kSlate)),
+              ],
+            ),
+          ],
+        ),
+      ),
+      ...members.map((m) {
+        return DropdownMenuItem<int?>(
+          value: m.memberId,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 12,
+                backgroundColor: _kBlue.withValues(alpha: 0.12),
+                child: Text(
+                  m.memberName?.isNotEmpty == true
+                      ? m.memberName![0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w700, color: _kBlue),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(m.memberName ?? '?',
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600, color: _kNavy)),
+                  if (m.relationName?.isNotEmpty == true)
+                    Text(m.relationName!,
+                        style: const TextStyle(fontSize: 10, color: _kSlate)),
+                ],
+              ),
+            ],
+          ),
+        );
+      }),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      decoration: BoxDecoration(
+        color: _kBlue.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _kBlue.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.person_pin_circle_rounded, color: _kBlue, size: 18),
+          const SizedBox(width: 8),
+          const Text('Booking for',
+              style: TextStyle(fontSize: 13, color: _kSlate)),
+          const SizedBox(width: 4),
+          Expanded(
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int?>(
+                value: selectedMemberId,
+                isDense: true,
+                isExpanded: true,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                    size: 18, color: _kBlue),
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: _kBlue),
+                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                items: items,
+                onChanged: (val) => onSelected(val),
+                selectedItemBuilder: (_) => [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(patientState.name ?? 'Me',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: _kBlue)),
+                  ),
+                  ...members.map(
+                    (m) => Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(m.memberName ?? 'Member',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: _kBlue)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

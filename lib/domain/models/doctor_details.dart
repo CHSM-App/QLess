@@ -42,7 +42,11 @@ class DoctorDetails {
    @JsonKey(name: 'gender_id')
   final int? genderId;
 
+  @JsonKey(name : 'queue_length')
+  final int? queueLength;
+
   DoctorDetails({
+    this.queueLength,
     this.doctorId,
     this.name,
     this.email,

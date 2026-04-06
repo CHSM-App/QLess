@@ -79,7 +79,7 @@ abstract class ApiService {
     @Path("family_id") int familyId,
   );
 
-  @GET("patient/users/doctorLogin")
+  @GET("patient/users/getDoctors")
   Future<List<DoctorDetails>> fetchDoctors();
 
   @GET("patient/users/getDoctorAvailability/{doctor_id}")
