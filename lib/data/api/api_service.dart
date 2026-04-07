@@ -48,6 +48,13 @@ abstract class ApiService {
     @Path("doctor_id") int doctorId,
   );
 
+
+  
+  @GET("doctor/users/appointmentWisePrescription/{appointment_id}")
+  Future<List<PrescriptionModel>> appointmentWisePrescription(
+    @Path("appointment_id") int appointmentId,
+  );
+
   @GET("doctor/users/patientAppointmentList/{doctor_id}")
   Future<List<AppointmentList>> fetchPatientAppointments(@Path("doctor_id") int doctorId);
 

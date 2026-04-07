@@ -24,4 +24,8 @@ class PrescriptionUsecase {
   Future<List<PrescriptionModel>> patientPrescriptionDetails(int prescriptionId) {
     return prescriptionRepository.patientPrescriptionDetails(prescriptionId);
   }
+
+  Future<List<PrescriptionModel>> appointmentWisePrescription(int appointmentId) {
+    return prescriptionRepository.appointmentWisePrescription(appointmentId);
+  }
 }

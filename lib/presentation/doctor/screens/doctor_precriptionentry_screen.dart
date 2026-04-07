@@ -463,6 +463,7 @@ class MedicineEntry {
   String dropsApplication;
   String lotionApplyArea;
   String sprayUsage;
+  
 
   MedicineEntry()
       : type = MedicineType.tablet,
@@ -495,6 +496,7 @@ class MedicineEntry {
       lotionApplyArea:  type == MedicineType.lotion    ? (lotionApplyArea.isEmpty ? null : lotionApplyArea) : null,
       sprayPuffs:       type == MedicineType.spray     ? (dosage.isEmpty ? null : dosage) : null,
       sprayUsage:       type == MedicineType.spray     ? (sprayUsage.isEmpty ? null : sprayUsage) : null,
+      lotionUsage:    type == MedicineType.lotion    ? (dosage.isEmpty ? null : dosage) : null,
     );
   }
 }
@@ -505,11 +507,24 @@ class MedicineEntry {
 class PrescriptionScreen extends ConsumerStatefulWidget {
   final int patientId;
   final int doctorId;
+  final int userTypeId;
+  final int appointmentId;
+   final String patientName;     
+  final String? patientAge;      // ← optional
+  final String? patientGender;   // ← optional
+  final int? queueNumber;        // ← optional
+
 
   const PrescriptionScreen({
     super.key,
     required this.patientId,
     required this.doctorId,
+    required this.userTypeId,
+    required this.appointmentId,
+       required this.patientName, 
+    this.patientAge,
+    this.patientGender,
+    this.queueNumber,
   });
 
   @override
@@ -524,11 +539,28 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   DateTime? _followDate;
   final List<MedicineEntry> _meds = [];
   int _lastDoctorId = 0;
+  late final ProviderSubscription<int?> _doctorIdSub;
+
+  @override
+  void initState() {
+    super.initState();
+    _doctorIdSub = ref.listenManual<int?>(
+      doctorLoginViewModelProvider.select((s) => s.doctorId),
+      (prev, next) {
+        _maybeFetchMedicines(next ?? 0);
+      },
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _maybeFetchMedicines(widget.doctorId);
+    });
+  }
 
   @override
   void dispose() {
     _sympCtrl.dispose(); _diagCtrl.dispose();
     _clinCtrl.dispose(); _advCtrl.dispose();
+    _doctorIdSub.close();
     super.dispose();
   }
 
@@ -537,6 +569,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   void _maybeFetchMedicines(int doctorId) {
     if (doctorId == 0 || doctorId == _lastDoctorId) return;
+    debugPrint('PrescriptionScreen: fetching medicines for doctorId=$doctorId');
     _lastDoctorId = doctorId;
     ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
   }
@@ -566,38 +599,53 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     }
     return null;
   }
+Future<void> _completePrescription() async {
+  final error = _validate();
+  if (error != null) { _showSnack(error, isError: true); return; }
 
-  Future<void> _completePrescription() async {
-    final error = _validate();
-    if (error != null) { _showSnack(error, isError: true); return; }
-
-    String? followUpStr;
-    if (_followDate != null) {
-      followUpStr =
-          '${_followDate!.year}-${_followDate!.month.toString().padLeft(2, '0')}-${_followDate!.day.toString().padLeft(2, '0')}';
-    }
-
-    final prescription = PrescriptionModel(
-      patientId:    widget.patientId,
-      doctorId:     widget.doctorId,
-      symptoms:     _sympCtrl.text.trim(),
-      diagnosis:    _diagCtrl.text.trim(),
-      clinicalNotes: _clinCtrl.text.trim().isEmpty ? null : _clinCtrl.text.trim(),
-      followUpDate: followUpStr,
-      advice:       _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
-      medicines:    _meds.map((e) => e.toApiModel()).toList(),
-    );
-
-    await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription);
-    if (!mounted) return;
-
-    final state = ref.read(prescriptionViewModelProvider);
-    if (state.error == null) {
-      _showSnack('Prescription saved!');
-    } else {
-      _showSnack(state.error ?? 'Something went wrong', isError: true);
-    }
+  String? followUpStr;
+  if (_followDate != null) {
+    followUpStr =
+        '${_followDate!.year}-${_followDate!.month.toString().padLeft(2, '0')}-${_followDate!.day.toString().padLeft(2, '0')}';
   }
+
+  final prescription = PrescriptionModel(
+    patientId:     widget.patientId,
+    doctorId:      widget.doctorId,
+    symptoms:      _sympCtrl.text.trim(),
+    diagnosis:     _diagCtrl.text.trim(),
+    clinicalNotes: _clinCtrl.text.trim().isEmpty ? null : _clinCtrl.text.trim(),
+    userType:      widget.userTypeId,
+    appointmentId: widget.appointmentId,
+    followUpDate:  followUpStr,
+    advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
+    medicines:     _meds.map((e) => e.toApiModel()).toList(),
+  );
+
+  await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription);
+  if (!mounted) return;
+
+  final state = ref.read(prescriptionViewModelProvider);
+  if (state.error != null) {
+    _showSnack(state.error ?? 'Something went wrong', isError: true);
+    return;
+  }
+
+  // ✅ Success dialog
+  await showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _SuccessDialog(
+      patientName: widget.patientName,   
+      medicineCount: _meds.length,
+      followUpDate: followUpStr,
+      onBackToList: () {
+        Navigator.pop(context); 
+        Navigator.pop(context);       },
+    ),
+  );
+}
+
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -613,14 +661,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(doctorLoginViewModelProvider.select((s) => s.doctorId), (_, next) {
-      _maybeFetchMedicines(next ?? 0);
-    });
-
     final state       = ref.watch(prescriptionViewModelProvider);
     final doctorState = ref.watch(doctorLoginViewModelProvider);
-    final doctorId    = doctorState.doctorId ?? 0;
-    _maybeFetchMedicines(doctorId);
     final medicines   = doctorState.medicines?.value ?? const <Medicine>[];
 
     return Stack(children: [
@@ -704,25 +746,27 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       _bottomBar(),
     ]);
   }
-
-  Widget _patientCard() => _card(child: Row(children: [
-    Container(
-      width: 52, height: 52,
-      decoration: BoxDecoration(color: kPrimaryBg, borderRadius: BorderRadius.circular(14)),
-      child: const Icon(Icons.person_rounded, color: kPrimary, size: 28),
-    ),
-    const SizedBox(width: 14),
-    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Rajesh Kumar', style: TextStyle(
-        fontSize: 16, fontWeight: FontWeight.w700, color: kTextDark,
-      )),
-      const SizedBox(height: 5),
-      Wrap(spacing: 6, runSpacing: 4, children: [
-        _chip('45 yrs'), _chip('Male'), _chip('Token #5', blue: true),
-      ]),
-    ])),
-    _statusBadge('Active', kGreen),
-  ]));
+Widget _patientCard() => _card(child: Row(children: [
+  Container(
+    width: 52, height: 52,
+    decoration: BoxDecoration(color: kPrimaryBg, borderRadius: BorderRadius.circular(14)),
+    child: const Icon(Icons.person_rounded, color: kPrimary, size: 28),
+  ),
+  const SizedBox(width: 14),
+  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(widget.patientName, style: const TextStyle(   // ← real name
+      fontSize: 16, fontWeight: FontWeight.w700, color: kTextDark,
+    )),
+    const SizedBox(height: 5),
+    Wrap(spacing: 6, runSpacing: 4, children: [
+      if (widget.patientAge != null) _chip(widget.patientAge!),
+      if (widget.patientGender != null) _chip(widget.patientGender!),
+      if (widget.queueNumber != null)
+        _chip('Queue #${widget.queueNumber}', blue: true),
+    ]),
+  ])),
+  _statusBadge('Active', kGreen),
+]));
 
   Widget _textSection(String label, TextEditingController ctrl, String hint) =>
       _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -831,17 +875,17 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, -4))],
         ),
         child: Row(children: [
-          Expanded(child: OutlinedButton(
-            onPressed: isLoading ? null : () {},
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: kPrimary, width: 1.5),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            child: const Text('Save Draft', style: TextStyle(
-              color: kPrimary, fontWeight: FontWeight.w600, fontSize: 15,
-            )),
-          )),
+          // Expanded(child: OutlinedButton(
+          //   onPressed: isLoading ? null : () {},
+          //   style: OutlinedButton.styleFrom(
+          //     side: const BorderSide(color: kPrimary, width: 1.5),
+          //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          //     padding: const EdgeInsets.symmetric(vertical: 14),
+          //   ),
+          //   child: const Text('Save Draft', style: TextStyle(
+          //     color: kPrimary, fontWeight: FontWeight.w600, fontSize: 15,
+          //   )),
+          // )),
           const SizedBox(width: 12),
           Expanded(flex: 2, child: ElevatedButton(
             onPressed: isLoading ? null : _completePrescription,
@@ -1336,4 +1380,188 @@ class _TypePill extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SuccessDialog extends StatelessWidget {
+  final String patientName;
+  final int medicineCount;
+  final String? followUpDate;
+  final VoidCallback onBackToList;
+
+  const _SuccessDialog({
+    required this.patientName,
+    required this.medicineCount,
+    required this.followUpDate,
+    required this.onBackToList,
+  });
+
+  String _formatDate(String? d) {
+    if (d == null) return 'Not scheduled';
+    final parts = d.split('-');
+    if (parts.length < 3) return d;
+    const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                    'Jul','Aug','Sep','Oct','Nov','Dec'];
+    final month = int.tryParse(parts[1]);
+    final mLabel = (month != null && month >= 1 && month <= 12)
+        ? months[month - 1] : parts[1];
+    return '${parts[2]} $mLabel ${parts[0]}';
+  }
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      backgroundColor: kCardBg,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+
+          // ✅ Success icon
+          Container(
+            width: 68, height: 68,
+            decoration: BoxDecoration(
+              color: kGreen.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_circle_rounded, color: kGreen, size: 40),
+          ),
+          const SizedBox(height: 16),
+
+          const Text('Prescription Saved!',
+              style: TextStyle(
+                fontSize: 19, fontWeight: FontWeight.w700, color: kTextDark)),
+          const SizedBox(height: 6),
+
+          // Patient name
+          RichText(text: TextSpan(
+            style: const TextStyle(fontSize: 13, color: kTextMid),
+            children: [
+              TextSpan(
+                text: patientName,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600, color: kTextDark),
+              ),
+              const TextSpan(text: "'s prescription has been completed successfully."),
+            ],
+          )),
+
+          const SizedBox(height: 20),
+
+          // Patient avatar + summary card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: kBg,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kBorder),
+            ),
+            child: Column(children: [
+
+              // Patient avatar row
+              Row(children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundColor: kPrimaryBg,
+                  child: Text(_initials(patientName),
+                      style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700, color: kPrimary)),
+                ),
+                const SizedBox(width: 12),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(patientName,
+                      style: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
+                  const SizedBox(height: 2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: kGreen.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text('Prescription Complete',
+                        style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w600, color: kGreen)),
+                  ),
+                ]),
+              ]),
+
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: kBorder),
+              const SizedBox(height: 12),
+
+              // Medicines count
+              _summaryRow(
+                Icons.medication_rounded,
+                'Medicines',
+                '$medicineCount medicine${medicineCount > 1 ? 's' : ''} prescribed',
+                const Color(0xFF2B7FFF),
+              ),
+              const SizedBox(height: 10),
+
+              // Follow-up date
+              _summaryRow(
+                Icons.event_rounded,
+                'Follow-up',
+                _formatDate(followUpDate),
+                kPrimary,
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Back to Patient List button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onBackToList,
+              icon: const Icon(Icons.people_rounded, size: 16, color: Colors.white),
+              label: const Text('Back to Patient List',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: Colors.white,
+                  )),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+    
+  }
+
+  Widget _summaryRow(IconData icon, String label, String value, Color iconColor) =>
+      Row(children: [
+        Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: iconColor),
+        ),
+        const SizedBox(width: 10),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: const TextStyle(fontSize: 11, color: kTextMid)),
+          Text(value,
+              style: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w600, color: kTextDark)),
+        ]),
+      ]);
 }

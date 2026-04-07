@@ -17,6 +17,7 @@ AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
       dob: json['DOB'] as String?,
       queueNumber: (json['queue_number'] as num?)?.toInt(),
       status: json['status'] as String?,
+      userType: (json['user_type'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
@@ -30,4 +31,5 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'DOB': instance.dob,
       'queue_number': instance.queueNumber,
       'status': instance.status,
+      'user_type': instance.userType,
     };

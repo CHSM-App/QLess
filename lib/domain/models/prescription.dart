@@ -45,6 +45,9 @@ class PrescriptionMedicineModel {
 
   @JsonKey(name: 'spray_usage')
   final String? sprayUsage;
+  
+  @JsonKey(name: 'lotion_usage')
+  final String? lotionUsage;
 
   const PrescriptionMedicineModel({
     this.prescMedId,
@@ -63,6 +66,7 @@ class PrescriptionMedicineModel {
     this.lotionApplyArea,
     this.sprayPuffs,
     this.sprayUsage,
+    this.lotionUsage,
   });
   factory PrescriptionMedicineModel.fromJson(Map<String, dynamic> json) =>
    _$PrescriptionMedicineModelFromJson(json);
@@ -141,6 +145,11 @@ class PrescriptionModel {
 
   @JsonKey(name: 'spray_usage')
   final String? sprayUsage;
+
+
+  
+  @JsonKey(name: 'lotion_usage')
+  final String? lotionUsage;
   @JsonKey(name: 'prescription_id')
   final int? prescriptionId;
 
@@ -167,6 +176,12 @@ class PrescriptionModel {
   @JsonKey(name: 'created_at')
   final String? createdAt;
 
+   @JsonKey(name: 'user_type')
+  final int? userType;
+
+
+  @JsonKey(name: 'appointment_id')
+  final int? appointmentId;
   // List of medicines — sent together in one request
   final List<PrescriptionMedicineModel>? medicines;
 
@@ -196,6 +211,7 @@ class PrescriptionModel {
     this.lotionApplyArea,
     this.sprayPuffs,
     this.sprayUsage,
+      this.lotionUsage,
     this.prescriptionId,
     this.patientId,
     this.doctorId,
@@ -207,6 +223,8 @@ class PrescriptionModel {
     this.advice,
     this.createdAt,
     this.medicines,
+    this.userType,
+      this.appointmentId,
   });
 
   factory PrescriptionModel.fromJson(Map<String, dynamic> json) =>

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 
 // ------------------------- Main Screen -------------------------
 
@@ -67,22 +69,51 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     return v == 'completed' || v == 'done' || v == 'closed';
   }
 
-  List<AppointmentList> _filtered(
-    List<AppointmentList> list, {
-    required bool isCompleted,
-  }) {
-    return list.where((a) {
-      final completed = _isCompletedStatus(a.status);
-      if (isCompleted != completed) return false;
-      if (_searchQuery.isEmpty) return true;
-      final name = a.name?.toLowerCase() ?? '';
-      final status = a.status?.toLowerCase() ?? '';
-      final queue = a.queueNumber?.toString() ?? '';
-      return name.contains(_searchQuery) ||
-          status.contains(_searchQuery) ||
-          queue.contains(_searchQuery);
-    }).toList();
+  DateTime _todayDateOnly() {
+    final now = DateTime.now();
+    return DateTime(now.year, now.month, now.day);
   }
+
+  DateTime? _dateOnlyFromAppt(String? appt) {
+    if (appt == null || appt.trim().isEmpty) return null;
+    final parsed = DateTime.tryParse(appt);
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  bool _isUpcomingByDate(String? appt) {
+    final d = _dateOnlyFromAppt(appt);
+    if (d == null) return true; // Keep unknown dates in Upcoming
+    return !d.isBefore(_todayDateOnly());
+  }
+
+  bool _isCompletedByDate(String? appt) {
+    final d = _dateOnlyFromAppt(appt);
+    if (d == null) return false;
+    return d.isBefore(_todayDateOnly());
+  }
+// In _PatientListScreenState — replace _filtered():
+List<AppointmentList> _filtered(
+  List<AppointmentList> list, {
+  required bool isCompleted,
+}) {
+  return list.where((a) {
+    final status = a.status?.toLowerCase().trim() ?? '';
+    // Upcoming tab: show only 'booked' status
+    // Completed tab: show only 'completed' / 'done' / 'closed' status
+    if (!isCompleted) {
+      if (status != 'booked') return false;
+    } else {
+      if (status != 'completed' && status != 'done' && status != 'closed') return false;
+    }
+    if (_searchQuery.isEmpty) return true;
+    final name = a.name?.toLowerCase() ?? '';
+    final queue = a.queueNumber?.toString() ?? '';
+    return name.contains(_searchQuery) ||
+        status.contains(_searchQuery) ||
+        queue.contains(_searchQuery);
+  }).toList();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -286,38 +317,51 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
               isCompleted: isCompleted,
               onStart: () => _onStartSession(patients[index]),
               onView: () => _onViewPatient(patients[index]),
+              onPrescription: () => _onPrescription(patients[index]),
             ),
           );
         },
       ),
     );
   }
-
   void _onStartSession(AppointmentList p) {
-    final name = p.name ?? 'Patient';
-    final appt = p.appointmentDate ?? '-';
-    final queue = p.queueNumber?.toString() ?? '-';
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Start Session',
-            style: TextStyle(color: primary, fontWeight: FontWeight.w600)),
-        content: Text(
-            'Starting consultation for $name.\nAppointment: $appt - Queue: $queue'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: primary, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Start'),
-          ),
-        ],
-      ),
+  final patientId = p.patientId ?? 0;
+  final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+  if (patientId == 0 || doctorId == 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Patient or doctor info missing')),
     );
+    return;
   }
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => PrescriptionScreen(
+        patientId: patientId,
+        doctorId: doctorId,
+        userTypeId: p.userType ?? 1,
+        appointmentId: p.appointmentId ?? 0,
+        patientName: p.name ?? 'Patient',       
+        patientAge: _ageString(p.dob),            
+        patientGender: p.gender,                   
+        queueNumber: p.queueNumber,                
+      ),
+    ),
+  );
+}
 
+
+String? _ageString(String? dob) {
+  if (dob == null || dob.trim().isEmpty) return null;
+  final parsed = DateTime.tryParse(dob);
+  if (parsed == null) return null;
+  final now = DateTime.now();
+  var years = now.year - parsed.year;
+  final hadBirthday = (now.month > parsed.month) ||
+      (now.month == parsed.month && now.day >= parsed.day);
+  if (!hadBirthday) years -= 1;
+  return years < 0 ? null : '$years yrs';
+}
   void _onViewPatient(AppointmentList p) {
     showModalBottomSheet(
       context: context,
@@ -327,7 +371,33 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       builder: (_) => PatientDetailSheet(patient: p),
     );
   }
+void _onPrescription(AppointmentList p) {
+  final patientId = p.patientId ?? 0;
+  final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
 
+  if (patientId == 0) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Patient info missing')),
+    );
+    return;
+  }
+
+  final appointmentID = p.appointmentId ?? 0;
+
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => DoctorPrescriptionDetailScreen(
+        appointmentId: appointmentID,
+        patientId: patientId,
+        patientName: p.name ?? 'Patient',
+        patientAge: _ageString(p.dob),
+        patientGender: p.gender,
+        queueNumber: p.queueNumber,
+      ),
+    ),
+  );
+}
   String _monthLabel(int month) {
     const months = [
       'Jan',
@@ -355,6 +425,7 @@ class PatientCard extends StatelessWidget {
   final bool isCompleted;
   final VoidCallback onStart;
   final VoidCallback onView;
+  final VoidCallback onPrescription;
 
   const PatientCard({
     super.key,
@@ -362,6 +433,7 @@ class PatientCard extends StatelessWidget {
     required this.isCompleted,
     required this.onStart,
     required this.onView,
+    required this.onPrescription,
   });
 
   static const Color primary = Color(0xFF1A56A0);
@@ -389,23 +461,22 @@ class PatientCard extends StatelessWidget {
     ];
     return colors[(patient.appointmentId ?? 0) % colors.length];
   }
-
-  ({Color bg, Color text}) get statusStyle {
-    switch ((patient.status ?? '').toLowerCase().trim()) {
-      case 'confirmed':
-        return (bg: const Color(0xFFD4F4EC), text: const Color(0xFF0F6E56));
-      case 'pending':
-        return (bg: const Color(0xFFFAEEDA), text: const Color(0xFF854F0B));
-      case 'urgent':
-        return (bg: const Color(0xFFFCEBEB), text: const Color(0xFFA32D2D));
-      case 'completed':
-      case 'done':
-      case 'closed':
-        return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
-      default:
-        return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
-    }
+({Color bg, Color text}) get statusStyle {
+  switch ((patient.status ?? '').toLowerCase().trim()) {
+    case 'booked':
+      return (bg: const Color(0xFFE6F1FB), text: const Color(0xFF0C447C));
+    case 'confirmed':
+      return (bg: const Color(0xFFD4F4EC), text: const Color(0xFF0F6E56));
+    case 'pending':
+      return (bg: const Color(0xFFFAEEDA), text: const Color(0xFF854F0B));
+    case 'completed':
+    case 'done':
+    case 'closed':
+      return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
+    default:
+      return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
   }
+}
 
   String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return '?';
@@ -432,6 +503,7 @@ class PatientCard extends StatelessWidget {
     if (!hadBirthday) years -= 1;
     return years < 0 ? null : years;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -515,16 +587,18 @@ class PatientCard extends StatelessWidget {
           ),
 
           // Action Buttons
-          Row(children: [
-            _outlineBtn('View', Icons.visibility_outlined, onView),
-            const SizedBox(width: 8),
-            _outlineBtn('Share', Icons.share_outlined, () {}),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: isCompleted ? _completedBtn() : _startBtn(),
-            ),
-          ]),
+         // In PatientCard build() — replace the Action Buttons Row:
+Row(children: [
+  _outlineBtn('View', Icons.visibility_outlined, onView),
+  const SizedBox(width: 8),
+  if (isCompleted) ...[
+    _outlineBtn('Prescription', Icons.receipt_outlined, onPrescription),
+    const SizedBox(width: 8),
+    Expanded(flex: 2, child: _completedBtn()),
+  ] else ...[
+    Expanded(flex: 2, child: _startBtn()),
+  ],
+]),
         ]),
       ),
     );

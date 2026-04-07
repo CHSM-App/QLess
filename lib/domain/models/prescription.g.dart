@@ -25,6 +25,7 @@ PrescriptionMedicineModel _$PrescriptionMedicineModelFromJson(
   lotionApplyArea: json['lotion_apply_area'] as String?,
   sprayPuffs: json['spray_puffs'] as String?,
   sprayUsage: json['spray_usage'] as String?,
+  lotionUsage: json['lotion_usage'] as String?,
 );
 
 Map<String, dynamic> _$PrescriptionMedicineModelToJson(
@@ -46,6 +47,7 @@ Map<String, dynamic> _$PrescriptionMedicineModelToJson(
   'lotion_apply_area': instance.lotionApplyArea,
   'spray_puffs': instance.sprayPuffs,
   'spray_usage': instance.sprayUsage,
+  'lotion_usage': instance.lotionUsage,
 };
 
 PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
@@ -75,6 +77,7 @@ PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
       lotionApplyArea: json['lotion_apply_area'] as String?,
       sprayPuffs: json['spray_puffs'] as String?,
       sprayUsage: json['spray_usage'] as String?,
+      lotionUsage: json['lotion_usage'] as String?,
       prescriptionId: (json['prescription_id'] as num?)?.toInt(),
       patientId: (json['patient_id'] as num?)?.toInt(),
       doctorId: (json['doctor_id'] as num?)?.toInt(),
@@ -91,6 +94,8 @@ PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
                 PrescriptionMedicineModel.fromJson(e as Map<String, dynamic>),
           )
           .toList(),
+      userType: (json['user_type'] as num?)?.toInt(),
+      appointmentId: (json['appointment_id'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
@@ -120,6 +125,7 @@ Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
       'lotion_apply_area': instance.lotionApplyArea,
       'spray_puffs': instance.sprayPuffs,
       'spray_usage': instance.sprayUsage,
+      'lotion_usage': instance.lotionUsage,
       'prescription_id': instance.prescriptionId,
       'patient_id': instance.patientId,
       'doctor_id': instance.doctorId,
@@ -130,5 +136,7 @@ Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
       'follow_up_date': instance.followUpDate,
       'advice': instance.advice,
       'created_at': instance.createdAt,
+      'user_type': instance.userType,
+      'appointment_id': instance.appointmentId,
       'medicines': instance.medicines?.map((e) => e.toJson()).toList(),
     };

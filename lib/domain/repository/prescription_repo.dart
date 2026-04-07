@@ -13,5 +13,6 @@ abstract class PrescriptionRepository {
   //PATIENT PRESCRIPTION API
   Future<List<PrescriptionModel>> patientPrescriptionList(int patientId);
   Future<List<PrescriptionModel>> patientPrescriptionDetails(int prescriptionId);
+  Future<List<PrescriptionModel>> appointmentWisePrescription(int appointmentId);
 }
 
