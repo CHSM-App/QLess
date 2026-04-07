@@ -92,23 +92,28 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     if (d == null) return false;
     return d.isBefore(_todayDateOnly());
   }
-
-  List<AppointmentList> _filtered(
-    List<AppointmentList> list, {
-    required bool isCompleted,
-  }) {
-    return list.where((a) {
-      final completed = _isCompletedByDate(a.appointmentDate);
-      if (isCompleted != completed) return false;
-      if (_searchQuery.isEmpty) return true;
-      final name = a.name?.toLowerCase() ?? '';
-      final status = a.status?.toLowerCase() ?? '';
-      final queue = a.queueNumber?.toString() ?? '';
-      return name.contains(_searchQuery) ||
-          status.contains(_searchQuery) ||
-          queue.contains(_searchQuery);
-    }).toList();
-  }
+// In _PatientListScreenState — replace _filtered():
+List<AppointmentList> _filtered(
+  List<AppointmentList> list, {
+  required bool isCompleted,
+}) {
+  return list.where((a) {
+    final status = a.status?.toLowerCase().trim() ?? '';
+    // Upcoming tab: show only 'booked' status
+    // Completed tab: show only 'completed' / 'done' / 'closed' status
+    if (!isCompleted) {
+      if (status != 'booked') return false;
+    } else {
+      if (status != 'completed' && status != 'done' && status != 'closed') return false;
+    }
+    if (_searchQuery.isEmpty) return true;
+    final name = a.name?.toLowerCase() ?? '';
+    final queue = a.queueNumber?.toString() ?? '';
+    return name.contains(_searchQuery) ||
+        status.contains(_searchQuery) ||
+        queue.contains(_searchQuery);
+  }).toList();
+}
 
   @override
   Widget build(BuildContext context) {
@@ -456,23 +461,22 @@ class PatientCard extends StatelessWidget {
     ];
     return colors[(patient.appointmentId ?? 0) % colors.length];
   }
-
-  ({Color bg, Color text}) get statusStyle {
-    switch ((patient.status ?? '').toLowerCase().trim()) {
-      case 'confirmed':
-        return (bg: const Color(0xFFD4F4EC), text: const Color(0xFF0F6E56));
-      case 'pending':
-        return (bg: const Color(0xFFFAEEDA), text: const Color(0xFF854F0B));
-      case 'urgent':
-        return (bg: const Color(0xFFFCEBEB), text: const Color(0xFFA32D2D));
-      case 'completed':
-      case 'done':
-      case 'closed':
-        return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
-      default:
-        return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
-    }
+({Color bg, Color text}) get statusStyle {
+  switch ((patient.status ?? '').toLowerCase().trim()) {
+    case 'booked':
+      return (bg: const Color(0xFFE6F1FB), text: const Color(0xFF0C447C));
+    case 'confirmed':
+      return (bg: const Color(0xFFD4F4EC), text: const Color(0xFF0F6E56));
+    case 'pending':
+      return (bg: const Color(0xFFFAEEDA), text: const Color(0xFF854F0B));
+    case 'completed':
+    case 'done':
+    case 'closed':
+      return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
+    default:
+      return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
   }
+}
 
   String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return '?';
@@ -499,6 +503,7 @@ class PatientCard extends StatelessWidget {
     if (!hadBirthday) years -= 1;
     return years < 0 ? null : years;
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -582,16 +587,18 @@ class PatientCard extends StatelessWidget {
           ),
 
           // Action Buttons
-          Row(children: [
-            _outlineBtn('View', Icons.visibility_outlined, onView),
-            const SizedBox(width: 8),
-            _outlineBtn('Prescription', Icons.receipt_outlined, onPrescription),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 2,
-              child: isCompleted ? _completedBtn() : _startBtn(),
-            ),
-          ]),
+         // In PatientCard build() — replace the Action Buttons Row:
+Row(children: [
+  _outlineBtn('View', Icons.visibility_outlined, onView),
+  const SizedBox(width: 8),
+  if (isCompleted) ...[
+    _outlineBtn('Prescription', Icons.receipt_outlined, onPrescription),
+    const SizedBox(width: 8),
+    Expanded(flex: 2, child: _completedBtn()),
+  ] else ...[
+    Expanded(flex: 2, child: _startBtn()),
+  ],
+]),
         ]),
       ),
     );
