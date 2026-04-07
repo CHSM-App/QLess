@@ -333,9 +333,7 @@ class _PatientPrescriptionListScreenState
   Widget _buildAppBar(int total) => Container(
     decoration: const BoxDecoration(
       color: kCardBg,
-      border: Border(
-        bottom: BorderSide(color: kBorder, width: 0.5),
-      ),
+      border: Border(bottom: BorderSide(color: kBorder, width: 0.5)),
     ),
     child: SafeArea(
       bottom: false,
@@ -368,10 +366,7 @@ class _PatientPrescriptionListScreenState
                   const SizedBox(height: 2),
                   Text(
                     '$total records',
-                    style: TextStyle(
-                      color: kTextMid,
-                      fontSize: 12,
-                    ),
+                    style: TextStyle(color: kTextMid, fontSize: 12),
                   ),
                 ],
               ),
@@ -1567,7 +1562,7 @@ class _PatientPrescriptionViewScreenState
         children: [
           Column(
             children: [
-              _buildHeader(), // फक्त white bar fixed
+              _buildHeader(),
               Expanded(
                 child: ListView(
                   padding: const EdgeInsets.only(bottom: 100),
@@ -1937,8 +1932,7 @@ class _PatientPrescriptionViewScreenState
       ],
     ),
   );
-
-  // ── Medicines Table ─────────────────────────────────────────────
+  // ── Replace entire _buildMedicinesCard ──────────────────────────
   Widget _buildMedicinesCard() => _card(
     padding: EdgeInsets.zero,
     child: Column(
@@ -1948,38 +1942,115 @@ class _PatientPrescriptionViewScreenState
           padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
           child: _sectionLabel('MEDICINES'),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-          color: kBg,
-          child: const Row(
-            children: [
-              Expanded(flex: 4, child: _ColHead('MEDICINE')),
-              Expanded(flex: 4, child: _ColHead('FREQUENCY/DOSE')),
-              Expanded(flex: 2, child: _ColHead('TIMING')),
-              Expanded(flex: 2, child: _ColHead('DURATION')),
-            ],
-          ),
-        ),
-        const Divider(height: 1, color: kBorder),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _rx.medicines.length,
-          separatorBuilder: (_, __) =>
-              const Divider(height: 1, color: kBorder, indent: 14),
-          itemBuilder: (_, i) {
-            final m = _rx.medicines[i];
-            final c = _typeColor[m.medicineTypeId] ?? kTextMid;
-            final lbl =
-                _typeLabel[m.medicineTypeId] ?? m.mediTypeName ?? 'Unknown';
-            final ic = _typeIcon[m.medicineTypeId] ?? Icons.medication_rounded;
-            return _MedRow(med: m, color: c, typeLabel: lbl, typeIcon: ic);
+        // ── Table with fixed column widths ───────────────────────
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final w = constraints.maxWidth - 24; // ← 24px padding subtract
+            final c1 = w * 0.28;
+            final c2 = w * 0.30;
+            final c3 = w * 0.24;
+            final c4 = w * 0.18;
+
+            return Column(
+              children: [
+                // ── Header ───────────────────────────────────────
+                Container(
+                  color: kBg,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(width: c1, child: const _ColHead('MEDICINE')),
+                   
+                      SizedBox(
+                        width: c2,
+                        child: const Text(
+                          'FREQ/DOSE',
+                          textAlign: TextAlign.center, // ← center
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: kTextMid,
+                            letterSpacing: 0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ), // c3 — TIMING
+                      SizedBox(
+                        width: c3,
+                        child: const Text(
+                          'TIMING',
+                          textAlign: TextAlign.center, // ← center
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: kTextMid,
+                            letterSpacing: 0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+
+                      // c4 — DURATION
+                      SizedBox(
+                        width: c4,
+                        child: const Text(
+                          'DURATION',
+                          textAlign: TextAlign.center, // ← center
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: kTextMid,
+                            letterSpacing: 0.3,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, color: kBorder),
+
+                // ── Rows ─────────────────────────────────────────
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _rx.medicines.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: kBorder, indent: 12),
+                  itemBuilder: (_, i) {
+                    final m = _rx.medicines[i];
+                    final c = _typeColor[m.medicineTypeId] ?? kTextMid;
+                    final lbl =
+                        _typeLabel[m.medicineTypeId] ??
+                        m.mediTypeName ??
+                        'Unknown';
+                    final ic =
+                        _typeIcon[m.medicineTypeId] ?? Icons.medication_rounded;
+                    return _MedRow(
+                      med: m,
+                      color: c,
+                      typeLabel: lbl,
+                      typeIcon: ic,
+                      c1: c1,
+                      c2: c2,
+                      c3: c3,
+                      c4: c4,
+                    );
+                  },
+                ),
+              ],
+            );
           },
         ),
       ],
     ),
   );
-
   // ── Notes Row: Spray Instructions + Doctor's Advice ─────────────
   Widget _buildNotesRow() {
     final hasClinical = _rx.clinicalNotes?.isNotEmpty == true;
@@ -2324,196 +2395,133 @@ class _PatientPrescriptionViewScreenState
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  MEDICINE ROW
+//  MEDICINE ROW  — compact redesign
 // ════════════════════════════════════════════════════════════════════
 class _MedRow extends StatelessWidget {
   final PrescriptionMedicineItem med;
   final Color color;
   final String typeLabel;
   final IconData typeIcon;
+  final double c1, c2, c3, c4; // exact widths from LayoutBuilder
 
   const _MedRow({
     required this.med,
     required this.color,
     required this.typeLabel,
     required this.typeIcon,
+    required this.c1,
+    required this.c2,
+    required this.c3,
+    required this.c4,
   });
-
-  List<bool> get _dots {
-    final freq = med.frequency ?? '0-0-0';
-    final parts = freq.split('-');
-    return List.generate(
-      3,
-      (i) =>
-          i < parts.length &&
-          parts[i].trim() != '0' &&
-          parts[i].trim().isNotEmpty,
-    );
-  }
 
   List<String> _splitSlots(String? raw, {String fallback = '-'}) {
     final parts = (raw ?? '').split('-').map((p) => p.trim()).toList();
-    while (parts.length < 3) {
-      parts.add(fallback);
-    }
+    while (parts.length < 3) parts.add(fallback);
     return parts.take(3).map((p) => p.isEmpty ? fallback : p).toList();
   }
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          flex: 4,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                med.medicineName != null && med.medicineName!.isNotEmpty
-                    ? med.medicineName!
-                    : 'Medicine #${med.medicineId ?? '-'}',
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: kTextDark,
-                ),
-              ),
-              if (med.extraInfo != null) ...[
-                const SizedBox(height: 2),
+  Widget build(BuildContext context) {
+    final dose = _splitSlots(med.doseDisplay);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // ── Col 1: Medicine ──────────────────────────────────
+          SizedBox(
+            width: c1,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  med.extraInfo!,
-                  style: TextStyle(fontSize: 11, color: color),
+                  med.medicineName?.isNotEmpty == true
+                      ? med.medicineName!
+                      : 'Med #${med.medicineId ?? '-'}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: kTextDark,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (med.extraInfo?.isNotEmpty == true) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    med.extraInfo!,
+                    style: TextStyle(fontSize: 10, color: color),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(typeIcon, color: color, size: 9),
+                      const SizedBox(width: 3),
+                      Flexible(
+                        child: Text(
+                          typeLabel,
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: color,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-              const SizedBox(height: 5),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(typeIcon, color: color, size: 10),
-                    const SizedBox(width: 4),
-                    Text(
-                      typeLabel,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          flex: 4,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _doseFreqTable(),
-              const SizedBox(height: 5),
-            ],
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            med.timing ?? '-',
-            style: const TextStyle(fontSize: 12, color: kTextMid),
-          ),
-        ),
-        Expanded(
-          flex: 2,
-          child: Text(
-            med.duration ?? '-',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: kTextDark,
             ),
           ),
-        ),
-      ],
-    ),
-  );
 
-  Widget _rowLabelValue(String label, String value) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(
-        width: 74,
-        child: Text(
-          '$label :',
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: kTextMid,
-          ),
-        ),
-      ),
-      Expanded(
-        child: Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: kTextDark,
-          ),
-        ),
-      ),
-    ],
-  );
-
-  Widget _doseFreqTable() {
-    final freq = _splitSlots(med.frequency);
-    final dose = _splitSlots(med.doseDisplay);
-    return LayoutBuilder(
-      builder: (context, c) {
-        final maxW = c.maxWidth.isFinite ? c.maxWidth : 140.0;
-        final tableW = maxW < 140 ? maxW : 140.0;
-        return Align(
-          alignment: Alignment.center,
-          child: SizedBox(
-            width: tableW,
+          // ── Col 2: Dose table ────────────────────────────────
+          // ── Col 2: Dose table ────────────────────────────────
+          SizedBox(
+            width: c2,
             child: Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
               decoration: BoxDecoration(
                 color: kBg,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: kBorder),
               ),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Row(
-                    children: [
-                  
-                      SizedBox(width: 18),
-                      Expanded(child: _SlotHead('M')),
-                      Expanded(child: _SlotHead('A')),
-                      Expanded(child: _SlotHead('N')),
-                    ],
+                  // Header: M  A  N — exactly under FREQ/DOSE header
+                  IntrinsicHeight(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: const [
+                        Expanded(child: _SlotHead('M')),
+                        Expanded(child: _SlotHead('A')),
+                        Expanded(child: _SlotHead('N')),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 6),
-                  // Row(
-                  //   children: [
-                  //     _rowTag('F'),
-                  //     Expanded(child: _SlotVal(freq[0])),
-                  //     Expanded(child: _SlotVal(freq[1] == '0' ? '-' : freq[1])),
-                  //     Expanded(child: _SlotVal(freq[2])),
-                  //   ],
-                  // ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
+                  const Divider(height: 1, thickness: 0.8, color: kBorder),
+                  const SizedBox(height: 3),
+                  // Values: same spaceEvenly
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _rowTag('D'),
                       Expanded(child: _SlotVal(dose[0])),
                       Expanded(child: _SlotVal(dose[1])),
                       Expanded(child: _SlotVal(dose[2])),
@@ -2523,23 +2531,77 @@ class _MedRow extends StatelessWidget {
               ),
             ),
           ),
-        );
-      },
+          // ── Col 3: Timing ────────────────────────────────────
+          // ── Col 3: Timing ────────────────────────────────────
+          SizedBox(
+            width: c3,
+            child: Text(
+              med.timing ?? '-',
+              textAlign: TextAlign.center, // ← center
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: kTextDark,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+
+          // ── Col 4: Duration ──────────────────────────────────
+          SizedBox(
+            width: c4,
+            child: Text(
+              med.duration ?? '-',
+              textAlign: TextAlign.center, // ← center
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: kTextDark,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _rowTag(String t) => SizedBox(
-    width: 18,
-    child: Text(
-      t,
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        color: kTextMid,
+  Widget _doseTable(List<String> dose) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      decoration: BoxDecoration(
+        color: kBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: kBorder),
       ),
-      textAlign: TextAlign.center,
-    ),
-  );
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header row: M  A  N
+          Row(
+            children: const [
+              Expanded(child: _SlotHead('M')),
+              Expanded(child: _SlotHead('A')),
+              Expanded(child: _SlotHead('N')),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Divider(height: 1, color: kBorder),
+          const SizedBox(height: 4),
+          // Dose row
+          Row(
+            children: [
+              Expanded(child: _SlotVal(dose[0])),
+              Expanded(child: _SlotVal(dose[1])),
+              Expanded(child: _SlotVal(dose[2])),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SlotHead extends StatelessWidget {
@@ -2561,13 +2623,17 @@ class _SlotVal extends StatelessWidget {
   final String text;
   const _SlotVal(this.text);
   @override
-  Widget build(BuildContext context) => Text(
-    text,
-    textAlign: TextAlign.center,
-    style: const TextStyle(
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-      color: kTextDark,
+  Widget build(BuildContext context) => FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: Alignment.center,
+    child: Text(
+      text,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w700,
+        color: kTextDark,
+      ),
     ),
   );
 }
@@ -2582,11 +2648,13 @@ class _ColHead extends StatelessWidget {
   Widget build(BuildContext context) => Text(
     text,
     style: const TextStyle(
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: FontWeight.w700,
       color: kTextMid,
-      letterSpacing: 0.5,
+      letterSpacing: 0.3,
     ),
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
   );
 }
 
@@ -2761,6 +2829,7 @@ class PrescriptionMedicineItem {
   final String? lotionApplyArea;
   final String? sprayPuffs;
   final String? sprayUsage;
+  final String? lotionUsage;
 
   const PrescriptionMedicineItem({
     required this.medicineId,
@@ -2779,6 +2848,7 @@ class PrescriptionMedicineItem {
     required this.lotionApplyArea,
     required this.sprayPuffs,
     required this.sprayUsage,
+    required this.lotionUsage,  
   });
 
   String? get extraInfo {
@@ -2795,7 +2865,7 @@ class PrescriptionMedicineItem {
     if (injDosage?.trim().isNotEmpty == true) return injDosage!;
     if (dropsCount?.trim().isNotEmpty == true) return dropsCount!;
     if (sprayPuffs?.trim().isNotEmpty == true) return sprayPuffs!;
-    if (lotionApplyArea?.trim().isNotEmpty == true) return lotionApplyArea!;
+    if (lotionUsage?.trim().isNotEmpty == true) return lotionUsage!;
     return '-';
   }
 
@@ -2817,6 +2887,7 @@ class PrescriptionMedicineItem {
       lotionApplyArea: model.lotionApplyArea,
       sprayPuffs: model.sprayPuffs,
       sprayUsage: model.sprayUsage,
+      lotionUsage: model.lotionUsage,
     );
   }
 
@@ -2838,6 +2909,7 @@ class PrescriptionMedicineItem {
       lotionApplyArea: model.lotionApplyArea,
       sprayPuffs: model.sprayPuffs,
       sprayUsage: model.sprayUsage,
+      lotionUsage: model.lotionUsage,
     );
   }
 }

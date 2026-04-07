@@ -36,4 +36,9 @@ class Prescriptionmpl implements PrescriptionRepository {
     return apiService.patientPrescriptionList(patientId);
   }
 
+  @override
+  Future<List<PrescriptionModel>> appointmentWisePrescription(int appointmentId) {
+    return apiService.appointmentWisePrescription(appointmentId);
+  }
+
 }

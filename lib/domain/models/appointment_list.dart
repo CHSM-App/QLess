@@ -31,6 +31,9 @@ class AppointmentList {
 
   @JsonKey(name: 'status')
   String? status;
+  @JsonKey(name: 'user_type')
+  int? userType;
+
 
   AppointmentList({
     this.appointmentId,
@@ -42,6 +45,7 @@ class AppointmentList {
     this.dob,
     this.queueNumber,
     this.status,
+    this.userType,
   });
 
   factory AppointmentList.fromJson(Map<String, dynamic> json) =>

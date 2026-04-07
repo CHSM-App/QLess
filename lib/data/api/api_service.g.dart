@@ -236,6 +236,40 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<List<PrescriptionModel>> appointmentWisePrescription(
+    int appointmentId,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<PrescriptionModel>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'doctor/users/appointmentWisePrescription/${appointmentId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<PrescriptionModel> _value;
+    try {
+      _value = _result.data!
+          .map(
+            (dynamic i) =>
+                PrescriptionModel.fromJson(i as Map<String, dynamic>),
+          )
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<List<AppointmentList>> fetchPatientAppointments(int doctorId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -575,7 +609,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
@@ -677,7 +712,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
@@ -706,7 +742,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
@@ -735,7 +772,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(

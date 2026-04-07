@@ -9,6 +9,7 @@ class PrescriptionState {
   final String? error;
 final List<PrescriptionModel>? prescriptionsListPatient;
 final List<PrescriptionModel>? prescriptionDetailsPatient;
+final List<PrescriptionModel>? appointmentWisePrescriptions;
 
 
   const PrescriptionState({
@@ -16,6 +17,7 @@ final List<PrescriptionModel>? prescriptionDetailsPatient;
     this.error,
     this.prescriptionsListPatient,
     this.prescriptionDetailsPatient,
+      this.appointmentWisePrescriptions,
 
 
   });
@@ -25,6 +27,7 @@ final List<PrescriptionModel>? prescriptionDetailsPatient;
     String? error,
     List<PrescriptionModel>? prescriptionsListPatient,
     List<PrescriptionModel>? prescriptionDetailsPatient,
+    List<PrescriptionModel>? appointmentWisePrescriptions,
 
 
   }) {
@@ -33,6 +36,7 @@ final List<PrescriptionModel>? prescriptionDetailsPatient;
       error: error ?? this.error,
       prescriptionsListPatient: prescriptionsListPatient ?? this.prescriptionsListPatient,
       prescriptionDetailsPatient: prescriptionDetailsPatient ?? this.prescriptionDetailsPatient,
+      appointmentWisePrescriptions: appointmentWisePrescriptions ?? this.appointmentWisePrescriptions,
 
     );
   }
@@ -95,6 +99,18 @@ class PrescriptionViewmodel extends StateNotifier<PrescriptionState> {
     try {
       final details = await usecase.patientPrescriptionDetails(prescriptionId);
       state = state.copyWith(isLoading: false, prescriptionDetailsPatient: details);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractError(e));
+    }
+
+
+  }
+
+  Future<void> appointmentWisePrescription(int appointmentId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final prescriptions = await usecase.appointmentWisePrescription(appointmentId);
+      state = state.copyWith(isLoading: false, appointmentWisePrescriptions: prescriptions);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
     }

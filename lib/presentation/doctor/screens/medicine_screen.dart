@@ -215,11 +215,17 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Fetch handled in initState listener.
-
+    final doctorState = ref.watch(doctorLoginViewModelProvider);
     final medicinesAsync =
-        ref.watch(doctorLoginViewModelProvider).medicines ??
-        const AsyncValue<List<Medicine>>.loading();
+        doctorState.medicines ?? const AsyncValue<List<Medicine>>.loading();
+    final doctorId = doctorState.doctorId ?? 0;
+
+    if (doctorId > 0 && medicinesAsync.isLoading && !_hasFetched) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _refreshMedicines(force: false);
+      });
+    }
 
     return Scaffold(
       backgroundColor: kSurface,
