@@ -2339,17 +2339,7 @@ class _MedRow extends StatelessWidget {
     required this.typeIcon,
   });
 
-  List<bool> get _dots {
-    final freq = med.frequency ?? '0-0-0';
-    final parts = freq.split('-');
-    return List.generate(
-      3,
-      (i) =>
-          i < parts.length &&
-          parts[i].trim() != '0' &&
-          parts[i].trim().isNotEmpty,
-    );
-  }
+
 
   List<String> _splitSlots(String? raw, {String fallback = '-'}) {
     final parts = (raw ?? '').split('-').map((p) => p.trim()).toList();
@@ -2445,35 +2435,7 @@ class _MedRow extends StatelessWidget {
     ),
   );
 
-  Widget _rowLabelValue(String label, String value) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      SizedBox(
-        width: 74,
-        child: Text(
-          '$label :',
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: kTextMid,
-          ),
-        ),
-      ),
-      Expanded(
-        child: Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: kTextDark,
-          ),
-        ),
-      ),
-    ],
-  );
-
   Widget _doseFreqTable() {
-    final freq = _splitSlots(med.frequency);
     final dose = _splitSlots(med.doseDisplay);
     return LayoutBuilder(
       builder: (context, c) {

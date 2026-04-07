@@ -1,6 +1,5 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/domain/usecase/auth_usecase.dart';
 import 'package:qless/domain/usecase/master_usecase.dart';
 import 'package:qless/presentation/shared/providers/repository_provider.dart';

@@ -5,7 +5,6 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
-import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ── Colour palette ────────────────────────────────────────────────
 const kPrimary   = Color(0xFF1A73E8);

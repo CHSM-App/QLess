@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/domain/usecase/prescription_usecase.dart';
 

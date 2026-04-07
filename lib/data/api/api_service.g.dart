@@ -575,7 +575,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
@@ -677,7 +678,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
@@ -706,7 +708,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
@@ -735,7 +738,8 @@ class _ApiService implements ApiService {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
-    final _data = appointmentRequest.toJson();
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
     final _options = _setStreamType<AppointmentResponseModel>(
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(

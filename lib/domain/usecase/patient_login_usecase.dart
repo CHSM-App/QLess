@@ -1,4 +1,3 @@
-import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/repository/patient_login_repo.dart';
 

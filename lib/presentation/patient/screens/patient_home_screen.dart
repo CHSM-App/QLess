@@ -249,8 +249,7 @@ Widget _doctorAvatar(String image, {double size = 56}) {
 class _ShimmerBox extends StatefulWidget {
   final double width;
   final double height;
-  final double radius;
-  const _ShimmerBox({required this.width, required this.height, this.radius = 5});
+  const _ShimmerBox({required this.width, required this.height});
 
   @override
   State<_ShimmerBox> createState() => _ShimmerBoxState();
@@ -281,7 +280,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
           width: widget.width, height: widget.height,
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(_anim.value),
-            borderRadius: BorderRadius.circular(widget.radius),
+            borderRadius: BorderRadius.circular(5),
           ),
         ),
       );
@@ -693,94 +692,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 }
-  // ── Banner Card ─────────────────────────────
-  Widget _buildBannerCard() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1A73E8), Color(0xFF1557B0)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF1A73E8).withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            )
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text('🏥 Special Offer',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600)),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text('Book Your\nConsultation Today',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          height: 1.3)),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                   // onTap: () => _showBookingSheet(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text('Book Now',
-                          style: TextStyle(
-                              color: Color(0xFF1A73E8),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.local_hospital_rounded,
-                  color: Colors.white, size: 48),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-// ─── LOCATION PICKER SHEET ────────────────────────────────────────────────────
-// Extracted into its own StatefulWidget so it owns search state cleanly.
-// FIX 2: search field filters the city list live; tapping any row sets it.
-// FIX 3: maxHeight + Flexible prevent bottom sheet from overflowing.
 
 class _LocationPickerSheet extends StatefulWidget {
   final bool isDark;

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/screens/home_screen.dart';
-
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
 import 'package:qless/presentation/doctor/screens/profile_screen.dart';
@@ -31,7 +29,6 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
 
   // Doctor theme — navy/dark
   static const _primary = Color(0xFF0F172A);
-  static const _accent  = Color(0xFF3B82F6);
   static const _slate   = Color(0xFF64748B);
   static const _border  = Color(0xFFE2E8F0);
 
@@ -44,8 +41,6 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
     _NavItem(icon: Icons.medication_rounded,        label: 'Medicines'),
     _NavItem(icon: Icons.person_rounded,            label: 'Profile'),
   ];
-
-  static const _titles = ['', 'Patients', 'My Medicines', 'Profile'];
 
   @override
   void initState() {
