@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/family_member.dart';
-import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
-import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ── Colour palette ────────────────────────────────────────────────

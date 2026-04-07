@@ -34,8 +34,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   bool _emailAlerts = false;
   bool _smsAlerts = true;
   bool _darkMode = false;
-  bool _availableForConsultation = true;
-  int _selectedNavIndex = 3; // Settings tab
+  bool _availableForConsultation = true;// Settings tab
   bool _didFetchProfile = false;
   late final ProviderSubscription<DoctorLoginState> _doctorLoginSub;
 
@@ -158,50 +157,6 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       ],
     );
   }
-
-  // ── Top Bar ───────────────────────────────────────────────────────────────
-
-
-  Widget _buildAvatarChip(bool isTablet, DoctorLoginState doctorState) {
-    final initials = _initials(doctorState.name);
-    final displayName = doctorState.name ?? 'Doctor';
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: kLightBlue,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1A73E8), Color(0xFF0D47A1)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Center(
-                  child: Text(initials, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              if (isTablet) ...[
-                const SizedBox(width: 8),
-                Text(displayName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPrimaryBlue)),
-              ],
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── Scroll Content ────────────────────────────────────────────────────────
 
   Widget _buildScrollContent({
     required bool isTablet,
@@ -845,125 +800,6 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  // ── Side Rail ─────────────────────────────────────────────────────────────
-
-  Widget _buildSideRail() {
-    final navItems = [
-      _NavItem(icon: Icons.home_outlined, label: 'Home'),
-      _NavItem(icon: Icons.calendar_month_outlined, label: 'Schedule'),
-      _NavItem(icon: Icons.people_outline, label: 'Patients'),
-      _NavItem(icon: Icons.settings_outlined, label: 'Settings'),
-    ];
-
-    return Container(
-      width: 80,
-      decoration: const BoxDecoration(
-        color: kCardBg,
-        border: Border(right: BorderSide(color: kDivider)),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 40),
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [kPrimaryBlue, Color(0xFF0D47A1)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 22),
-          ),
-          const SizedBox(height: 32),
-          ...navItems.asMap().entries.map((e) {
-            final selected = e.key == _selectedNavIndex;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedNavIndex = e.key),
-              child: Container(
-                margin: const EdgeInsets.symmetric(vertical: 4),
-                width: 56,
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: selected ? kLightBlue : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  children: [
-                    Icon(e.value.icon, color: selected ? kPrimaryBlue : kTextMuted, size: 22),
-                    const SizedBox(height: 4),
-                    Text(
-                      e.value.label,
-                      style: TextStyle(fontSize: 9, color: selected ? kPrimaryBlue : kTextMuted, fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  // ── Bottom Navigation ─────────────────────────────────────────────────────
-
-  Widget _buildBottomNav() {
-    return Container(
-      decoration: const BoxDecoration(
-        color: kCardBg,
-        border: Border(top: BorderSide(color: kDivider)),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _bottomNavItem(0, Icons.home_outlined, Icons.home_rounded, 'Home'),
-              _bottomNavItem(1, Icons.calendar_month_outlined, Icons.calendar_month_rounded, 'Schedule'),
-              _bottomNavItem(2, Icons.people_outline, Icons.people_rounded, 'Patients'),
-              _bottomNavItem(3, Icons.settings_outlined, Icons.settings_rounded, 'Settings'),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _bottomNavItem(int index, IconData icon, IconData activeIcon, String label) {
-    final selected = _selectedNavIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedNavIndex = index),
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: selected ? kLightBlue : Colors.transparent,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(selected ? activeIcon : icon, color: selected ? kPrimaryBlue : kTextMuted, size: 22),
-            ),
-            Text(
-              label,
-              style: TextStyle(fontSize: 10, color: selected ? kPrimaryBlue : kTextMuted, fontWeight: selected ? FontWeight.w600 : FontWeight.normal),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
   BoxDecoration _cardDecoration() => BoxDecoration(
     color: kCardBg,
     borderRadius: BorderRadius.circular(16),
@@ -991,8 +827,3 @@ class _SettingItem {
   const _SettingItem({required this.icon, required this.label, this.subtitle, this.trailing});
 }
 
-class _NavItem {
-  final IconData icon;
-  final String label;
-  const _NavItem({required this.icon, required this.label});
-}

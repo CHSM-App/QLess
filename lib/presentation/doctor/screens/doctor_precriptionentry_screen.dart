@@ -67,15 +67,6 @@ const _kDosageOpts = {
   'spray':     ['0', '1 puff', '2 puffs', '3 puffs', '4 puffs'],
 };
 
-const _kFreqOpts = {
-  'tablet':    ['0', '1', '2', '3'],
-  'syrup':     ['0', '1', '2', '3'],
-  'injection': ['0', '1', '2', '3'],
-  'drops':     ['0', '1', '2', '3'],
-  'lotion':    ['0', '1', '2', '3'],
-  'spray':     ['0', '1', '2', '3'],
-};
-
 // ════════════════════════════════════════════════════════════════════
 //  SlotPickerField  — reusable inline drum picker
 //  Used for both dosage and frequency
@@ -1114,18 +1105,6 @@ class _MedCardState extends State<_MedCard> {
       // Derive frequency from dosage: any non-zero dose counts as 1 time.
       e.frequency = _freqFromDosage(val);
     }),
-  );
-
-  // ── frequency picker helper ──────────────────────────────────────
-  Widget _freqPicker() => SlotPickerField(
-    key: ValueKey('freq_${e.type.name}'),
-    label: 'Frequency per slot',
-    subLabel: 'Times – Morning – Afternoon – Night',
-    typeKey: e.type.name,
-    accentColor: e.type.color,
-    initialValue: e.frequency,
-    optsMap: _kFreqOpts,
-    onChanged: (val) => setState(() => e.frequency = val),
   );
 
   Widget _commonBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

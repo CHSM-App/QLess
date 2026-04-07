@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/usecase/appointment_usecase.dart';

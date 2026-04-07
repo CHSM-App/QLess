@@ -1,4 +1,3 @@
-import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/patients.dart';
 
 abstract class PatientLoginRepository {

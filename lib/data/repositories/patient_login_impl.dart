@@ -1,6 +1,5 @@
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/data/api/api_service.dart';
-import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/repository/patient_login_repo.dart';
 

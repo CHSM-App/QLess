@@ -224,6 +224,29 @@ class _DoctorAvailabilityPageState
   // ── Save ─────────────────────────────────────────────────────────────────────
 
   Future<void> _saveSchedule() async {
+    // Validation: overlapping slots within the same day
+    for (final day in _days) {
+      if (!day.isEnabled) continue;
+      final slots = day.timeSlots;
+      for (int i = 0; i < slots.length; i++) {
+        for (int j = i + 1; j < slots.length; j++) {
+          final aStart = slots[i].startTime.hour * 60 + slots[i].startTime.minute;
+          final aEnd   = slots[i].endTime.hour   * 60 + slots[i].endTime.minute;
+          final bStart = slots[j].startTime.hour * 60 + slots[j].startTime.minute;
+          final bEnd   = slots[j].endTime.hour   * 60 + slots[j].endTime.minute;
+          if (aStart < bEnd && bStart < aEnd) {
+            setState(() => day.isExpanded = true);
+            _showSnackBar(
+              '${day.dayName} has overlapping time slots. '
+              'Please fix them before saving.',
+              isError: true,
+            );
+            return;
+          }
+        }
+      }
+    }
+
     // Validation: every enabled day must have ≥1 slot
     final invalidDays =
         _days.where((d) => d.isEnabled && d.timeSlots.isEmpty).toList();
@@ -712,6 +735,7 @@ class _DayCard extends StatelessWidget {
             return _TimeSlotCard(
               index: entry.key,
               slot: entry.value,
+              allSlots: schedule.timeSlots,
               onRemove: () => onRemoveSlot(entry.key),
               onUpdate: (updated) => onUpdateSlot(entry.key, updated),
             );
@@ -746,12 +770,14 @@ class _DayCard extends StatelessWidget {
 class _TimeSlotCard extends StatefulWidget {
   final int index;
   final TimeSlot slot;
+  final List<TimeSlot> allSlots;
   final VoidCallback onRemove;
   final ValueChanged<TimeSlot> onUpdate;
 
   const _TimeSlotCard({
     required this.index,
     required this.slot,
+    required this.allSlots,
     required this.onRemove,
     required this.onUpdate,
   });
@@ -776,6 +802,20 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
 
   void _update() => widget.onUpdate(_local);
 
+  int _toMin(TimeOfDay t) => t.hour * 60 + t.minute;
+
+  bool _overlapsWithOther(TimeOfDay start, TimeOfDay end) {
+    final s = _toMin(start);
+    final e = _toMin(end);
+    for (int i = 0; i < widget.allSlots.length; i++) {
+      if (i == widget.index) continue;
+      final os = _toMin(widget.allSlots[i].startTime);
+      final oe = _toMin(widget.allSlots[i].endTime);
+      if (s < oe && os < e) return true;
+    }
+    return false;
+  }
+
   Future<void> _pickTime(bool isStart) async {
     final picked = await showTimePicker(
       context: context,
@@ -789,6 +829,35 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
       ),
     );
     if (picked != null) {
+      final newStart = isStart ? picked : _local.startTime;
+      final newEnd   = isStart ? _local.endTime : picked;
+      if (_overlapsWithOther(newStart, newEnd)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Colors.white, size: 18),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'This time overlaps with another slot.',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: const Color(0xFFE05C3A),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 3),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+        return;
+      }
       setState(() =>
           isStart ? _local.startTime = picked : _local.endTime = picked);
       _update();
