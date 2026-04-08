@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
@@ -14,6 +15,7 @@ class AppointmentState {
   final AppointmentResponseModel? cancelResponse;
   final AppointmentResponseModel? queueStatusResponse;
   final List<MonthSlotData> bookedSlots;
+  final AsyncValue<List<AppointmentList>>?  patientAppointmentsList;
 
   const AppointmentState({
     this.isLoading = false,
@@ -24,6 +26,7 @@ class AppointmentState {
     this.cancelResponse,
     this.queueStatusResponse,
     this.bookedSlots = const [],
+    this.patientAppointmentsList,
   });
 
   AppointmentState copyWith({
@@ -36,6 +39,7 @@ class AppointmentState {
     AppointmentResponseModel? cancelResponse,
     AppointmentResponseModel? queueStatusResponse,
     List<MonthSlotData>? bookedSlots,
+    AsyncValue<List<AppointmentList>>?  patientAppointmentsList,
   }) {
     return AppointmentState(
       isLoading: isLoading ?? this.isLoading,
@@ -46,6 +50,7 @@ class AppointmentState {
       cancelResponse: cancelResponse ?? this.cancelResponse,
       queueStatusResponse: queueStatusResponse ?? this.queueStatusResponse,
       bookedSlots: bookedSlots ?? this.bookedSlots,
+      patientAppointmentsList: patientAppointmentsList ?? this.patientAppointmentsList,
     );
   }
 }
@@ -68,6 +73,20 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
+    }
+  }
+
+
+  Future<void> getPatientAppointments(int patientId) async {
+    state = state.copyWith(
+      patientAppointmentsList: const AsyncValue.loading(),
+      error: null,
+    );
+    try {
+      final result = await usecase.getPatientAppointments(patientId);
+      state = state.copyWith(patientAppointmentsList: AsyncValue.data(result));
+    } catch (e, st) {
+      state = state.copyWith(patientAppointmentsList: AsyncValue.error(e, st));
     }
   }
 

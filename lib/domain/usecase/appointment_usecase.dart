@@ -40,4 +40,8 @@ class AppointmentUsecase {
   Future<List<AppointmentList>> fetchPatientAppointments(int doctorId) {
     return appointmentRepository.fetchPatientAppointments(doctorId);
   }
+
+  Future<List<AppointmentList>> getPatientAppointments(int patientId) {
+    return appointmentRepository.getPatientAppointments(patientId);
+  }
 }
