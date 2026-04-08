@@ -14,6 +14,18 @@ class AppointmentList {
   @JsonKey(name: 'doctor_id')
   int? doctorId;
 
+  @JsonKey(name: 'doctor_name')
+  String? doctorName;
+
+  @JsonKey(name: 'specialization')
+  String? specialization;
+  
+  @JsonKey(name: 'experience')
+  int? experience;
+
+  @JsonKey(name: 'clinic_id')
+  String? clinicId;
+
   @JsonKey(name: 'name')
   String? name;
 
@@ -31,14 +43,21 @@ class AppointmentList {
 
   @JsonKey(name: 'status')
   String? status;
+
   @JsonKey(name: 'user_type')
   int? userType;
+
+
 
 
   AppointmentList({
     this.appointmentId,
     this.patientId,
     this.doctorId,
+    this.doctorName,
+    this.specialization,
+    this.experience,
+    this.clinicId,
     this.name,
     this.gender,
     this.appointmentDate,
