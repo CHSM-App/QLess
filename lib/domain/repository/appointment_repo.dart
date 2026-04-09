@@ -23,7 +23,9 @@ abstract class AppointmentRepository {
   Future<List<MonthSlotData>> getBookedSlots(int doctorId);
 
   Future<List<AppointmentList>> fetchPatientAppointments(int doctorId);
-  
+
   Future<List<AppointmentList>> getPatientAppointments(int patientId);
+  
+
   
 }
