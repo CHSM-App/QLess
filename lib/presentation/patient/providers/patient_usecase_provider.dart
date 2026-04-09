@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/usecase/appointment_usecase.dart';
 import 'package:qless/domain/usecase/doctors_usecase.dart';
+import 'package:qless/domain/usecase/favorite_usecase.dart';
 import 'package:qless/domain/usecase/family_usecase.dart';
 import 'package:qless/domain/usecase/patient_login_usecase.dart';
 import 'package:qless/presentation/patient/providers/patient_repository_provider.dart';
@@ -18,6 +19,11 @@ final doctorsUsecaseProvider = Provider<DoctorsUseCase>((ref) {
 final familyUsecaseProvider = Provider<FamilyUsecase>((ref) {
   final repo = ref.watch(familyRepositoryProvider);
   return FamilyUsecase(repo);
+});
+
+final favoriteUsecaseProvider = Provider<FavoriteUsecase>((ref) {
+  final repo = ref.watch(favoriteRepositoryProvider);
+  return FavoriteUsecase(repo);
 });
 
 final appointmentUsecaseProvider = Provider<AppointmentUsecase>((ref) {
