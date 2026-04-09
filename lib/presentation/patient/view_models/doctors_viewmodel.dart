@@ -41,7 +41,7 @@ class DoctorsViewmodel extends StateNotifier<DoctorsState> {
     if (state.isLoading) return;
     state = state.copyWith(isLoading: true);
     try {
-      final doctors = await doctorsUseCase.execute();
+      final doctors = await doctorsUseCase.fetchDoctors();
       state = state.copyWith(doctors: doctors, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false);

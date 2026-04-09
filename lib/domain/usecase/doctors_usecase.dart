@@ -9,7 +9,7 @@ class DoctorsUseCase {
 
   DoctorsUseCase(this.doctorsRepository);
 
-  Future<List<DoctorDetails>> execute() {
+  Future<List<DoctorDetails>> fetchDoctors() {
     return doctorsRepository.fetchDoctors();
   }
 
