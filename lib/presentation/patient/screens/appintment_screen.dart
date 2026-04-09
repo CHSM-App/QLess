@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
 
 // ── THEME ──
 const kPrimary = Color(0xFF0D9488); // teal-600
@@ -139,7 +141,7 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
   List<AppointmentList> _applyFilters(List<AppointmentList> appointments) {
     return appointments.where((a) {
       final matchSearch = searchQuery.isEmpty ||
-          (a.name?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
+          (a.patientName?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false);
 
       final bool matchFilter;
       if (filterStatus == "all") {
@@ -186,6 +188,22 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
       }
       if (_idMissing && nextId != 0) {
         setState(() => _idMissing = false);
+      }
+    });
+
+    ref.listen<ReviewState>(reviewViewModelProvider, (prev, next) {
+      if (next.error != null && next.error != prev?.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!), backgroundColor: kRed),
+        );
+      }
+      if (next.isSuccess && next.isSuccess != prev?.isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thanks for your review!'),
+            backgroundColor: kGreen,
+          ),
+        );
       }
     });
 
@@ -431,9 +449,36 @@ class _AppointmentScreenState extends ConsumerState<AppointmentScreen> {
                 : null,
             formattedDob:
                 a.dob != null ? _formatDate(a.dob!) : null,
+            onReview: _canReview(a)
+                ? () => _handleReview(context, a)
+                : null,
           );
         },
       ),
+    );
+  }
+
+  bool _canReview(AppointmentList a) {
+    return a.status?.toLowerCase() == 'completed' &&
+        a.appointmentId != null &&
+        a.doctorId != null &&
+        a.patientId != null;
+  }
+
+  Future<void> _handleReview(BuildContext context, AppointmentList a) async {
+    final input = await showAppointmentReviewDialog(
+      context,
+      doctorName: a.doctorName ?? 'Doctor',
+    );
+    if (input == null) return;
+    await ref.read(reviewViewModelProvider.notifier).submitReview(
+      ReviewRequestModel(
+        appointmentId: a.appointmentId!,
+        doctorId: a.doctorId!,
+        patientId: a.patientId!,
+        rating: input.rating,
+        comment: input.comment,
+      )
     );
   }
 
@@ -561,6 +606,7 @@ class _AppointmentCard extends StatelessWidget {
   final String? formattedDate;
   final String? relativeDate;
   final String? formattedDob;
+  final VoidCallback? onReview;
 
   const _AppointmentCard({
     required this.appointment,
@@ -570,6 +616,7 @@ class _AppointmentCard extends StatelessWidget {
     this.formattedDate,
     this.relativeDate,
     this.formattedDob,
+    this.onReview,
   });
 
   @override
@@ -620,7 +667,7 @@ class _AppointmentCard extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          (appointment.name ?? "?")[0].toUpperCase(),
+                          (appointment.patientName ?? "?")[0].toUpperCase(),
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -637,7 +684,7 @@ class _AppointmentCard extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            appointment.name ?? "Unknown",
+                            appointment.patientName ?? "Unknown",
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               color: kTextDark,
@@ -805,14 +852,42 @@ class _AppointmentCard extends StatelessWidget {
                           onPressed: () {
                             // navigate to detail
                           },
-                          child: const Text("View Details",
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13)),
+                          child: const Text(
+                            "View Details",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
                         ),
                       ),
                     ),
+                    if (onReview != null) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 42,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kPrimary,
+                              side: const BorderSide(color: kPrimary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                            ),
+                            onPressed: onReview,
+                            child: const Text(
+                              "Review",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     Container(
                       height: 42,

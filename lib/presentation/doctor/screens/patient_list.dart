@@ -107,7 +107,7 @@ List<AppointmentList> _filtered(
       if (status != 'completed' && status != 'done' && status != 'closed') return false;
     }
     if (_searchQuery.isEmpty) return true;
-    final name = a.name?.toLowerCase() ?? '';
+    final name = a.patientName?.toLowerCase() ?? '';
     final queue = a.queueNumber?.toString() ?? '';
     return name.contains(_searchQuery) ||
         status.contains(_searchQuery) ||
@@ -341,7 +341,7 @@ List<AppointmentList> _filtered(
         doctorId: doctorId,
         userTypeId: p.userType ?? 1,
         appointmentId: p.appointmentId ?? 0,
-        patientName: p.name ?? 'Patient',       
+        patientName: p.patientName ?? 'Patient',       
         patientAge: _ageString(p.dob),            
         patientGender: p.gender,                   
         queueNumber: p.queueNumber,                
@@ -390,7 +390,7 @@ void _onPrescription(AppointmentList p) {
       builder: (_) => DoctorPrescriptionDetailScreen(
         appointmentId: appointmentID,
         patientId: patientId,
-        patientName: p.name ?? 'Patient',
+        patientName: p.patientName ?? 'Patient',
         patientAge: _ageString(p.dob),
         patientGender: p.gender,
         queueNumber: p.queueNumber,
@@ -508,7 +508,7 @@ class PatientCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ss = statusStyle;
-    final name = patient.name ?? 'Patient';
+    final name = patient.patientName ?? 'Patient';
     final status = patient.status ?? 'Unknown';
     return Card(
       elevation: 0,
@@ -693,7 +693,7 @@ class PatientDetailSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = patient.name ?? 'Patient';
+    final name = patient.patientName ?? 'Patient';
     return DraggableScrollableSheet(
       initialChildSize: 0.6,
       minChildSize: 0.4,

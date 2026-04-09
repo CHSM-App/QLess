@@ -48,6 +48,8 @@ class AppointmentList {
   int? userType;
 
 
+  @JsonKey(name: 'patient_name')
+  String? patientName;
 
 
   AppointmentList({

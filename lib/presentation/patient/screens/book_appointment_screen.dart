@@ -1487,9 +1487,120 @@ class _BaNoAvail extends StatelessWidget {
           style: ElevatedButton.styleFrom(backgroundColor: kPrimary, foregroundColor: Colors.white,
             elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-          child: const Text('Go Back'),
+      child: const Text('Go Back'),
         ),
       ]),
+    ),
+  );
+}
+
+class AppointmentReviewInput {
+  final int rating;
+  final String comment;
+  const AppointmentReviewInput({required this.rating, required this.comment});
+}
+
+Future<AppointmentReviewInput?> showAppointmentReviewDialog(
+  BuildContext context, {
+  required String doctorName,
+}) {
+  final commentCtrl = TextEditingController();
+  int rating = 0;
+
+  Future<void> showRatingError() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please select a rating'),
+        backgroundColor: kRed,
+      ),
+    );
+  }
+
+  return showDialog<AppointmentReviewInput>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Rate your visit',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How was your appointment with Dr. $doctorName?',
+              style: const TextStyle(fontSize: 12.5, color: kTextMid),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: List.generate(5, (i) {
+                final idx = i + 1;
+                return IconButton(
+                  onPressed: () => setState(() => rating = idx),
+                  icon: Icon(
+                    idx <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: idx <= rating ? kOrange : kBorder,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: commentCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Write a short review (optional)',
+                hintStyle: const TextStyle(fontSize: 12.5, color: kTextMid),
+                filled: true,
+                fillColor: kBg,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: kPrimary, width: 1.2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              if (rating <= 0) {
+                showRatingError();
+                return;
+              }
+              Navigator.pop(
+                ctx,
+                AppointmentReviewInput(
+                  rating: rating,
+                  comment: commentCtrl.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
     ),
   );
 }

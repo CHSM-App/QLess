@@ -22,7 +22,7 @@ AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
       queueNumber: (json['queue_number'] as num?)?.toInt(),
       status: json['status'] as String?,
       userType: (json['user_type'] as num?)?.toInt(),
-    );
+    )..patientName = json['patient_name'] as String?;
 
 Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
     <String, dynamic>{
@@ -40,4 +40,5 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'queue_number': instance.queueNumber,
       'status': instance.status,
       'user_type': instance.userType,
+      'patient_name': instance.patientName,
     };
