@@ -64,34 +64,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         .fetchPatientAppointments(doctorId);
   }
 
-  bool _isCompletedStatus(String? status) {
-    final v = status?.toLowerCase().trim();
-    return v == 'completed' || v == 'done' || v == 'closed';
-  }
 
-  DateTime _todayDateOnly() {
-    final now = DateTime.now();
-    return DateTime(now.year, now.month, now.day);
-  }
-
-  DateTime? _dateOnlyFromAppt(String? appt) {
-    if (appt == null || appt.trim().isEmpty) return null;
-    final parsed = DateTime.tryParse(appt);
-    if (parsed == null) return null;
-    return DateTime(parsed.year, parsed.month, parsed.day);
-  }
-
-  bool _isUpcomingByDate(String? appt) {
-    final d = _dateOnlyFromAppt(appt);
-    if (d == null) return true; // Keep unknown dates in Upcoming
-    return !d.isBefore(_todayDateOnly());
-  }
-
-  bool _isCompletedByDate(String? appt) {
-    final d = _dateOnlyFromAppt(appt);
-    if (d == null) return false;
-    return d.isBefore(_todayDateOnly());
-  }
 // In _PatientListScreenState — replace _filtered():
 List<AppointmentList> _filtered(
   List<AppointmentList> list, {
@@ -373,7 +346,6 @@ String? _ageString(String? dob) {
   }
 void _onPrescription(AppointmentList p) {
   final patientId = p.patientId ?? 0;
-  final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
 
   if (patientId == 0) {
     ScaffoldMessenger.of(context).showSnackBar(
