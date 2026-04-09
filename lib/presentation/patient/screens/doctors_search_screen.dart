@@ -7,33 +7,57 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
-// ─── Colour tokens (matches app palette) ─────────────────────────────────────
-const _kNavy = Color(0xFF0F172A);
-const _kBlue = Color(0xFF3B82F6);
-const _kSlate = Color(0xFF64748B);
-const _kBorder = Color(0xFFE2E8F0);
-const _kSurface = Color(0xFFF8FAFC);
+// ─── Colour palette ───────────────────────────────────────────────────────────
+const kPrimary   = Color(0xFF1A73E8);
+const kPrimaryBg = Color(0xFFE8F0FE);
+const kBg        = Color(0xFFF4F6FB);
+const kCardBg    = Colors.white;
+const kTextDark  = Color(0xFF1F2937);
+const kTextMid   = Color(0xFF6B7280);
+const kBorder    = Color(0xFFE5E7EB);
+const kRed       = Color(0xFFEA4335);
+const kGreen     = Color(0xFF34A853);
+const kOrange    = Color(0xFFF59E0B);
+const kPurple    = Color(0xFF8B5CF6);
+const kCyan      = Color(0xFF06B6D4);
 
-// ─── Specialty → colour map ───────────────────────────────────────────────────
-const _specialtyColors = <String, Color>{
-  'cardiology': Color(0xFFEF4444),
-  'dermatology': Color(0xFFF59E0B),
-  'pediatrics': Color(0xFF10B981),
-  'orthopedics': Color(0xFF8B5CF6),
-  'neurology': Color(0xFF3B82F6),
-  'general': Color(0xFF06B6D4),
-  'gynecology': Color(0xFFEC4899),
+// ─── Dark mode surfaces ───────────────────────────────────────────────────────
+const _kDarkSurface = Color(0xFF1E293B);
+const _kDarkBg      = Color(0xFF0F172A);
+
+// ─── Specialty → accent colour ────────────────────────────────────────────────
+const _specialtyAccent = <String, Color>{
+  'cardiology':    Color(0xFFEF4444),
+  'dermatology':   Color(0xFFF59E0B),
+  'pediatrics':    Color(0xFF10B981),
+  'orthopedics':   Color(0xFF8B5CF6),
+  'neurology':     Color(0xFF8B5CF6),
+  'general':       Color(0xFF06B6D4),
+  'gynecology':    Color(0xFFEC4899),
   'ophthalmology': Color(0xFF14B8A6),
 };
 
-Color _colorFor(String? spec) =>
-    spec == null ? _kBlue : (_specialtyColors[spec.toLowerCase()] ?? _kBlue);
+const _specialtyBgMap = <String, Color>{
+  'cardiology':    Color(0xFFFEE2E2),
+  'dermatology':   Color(0xFFFEF3C7),
+  'pediatrics':    Color(0xFFD1FAE5),
+  'orthopedics':   Color(0xFFEDE9FE),
+  'neurology':     Color(0xFFEDE9FE),
+  'general':       Color(0xFFCFFAFE),
+  'gynecology':    Color(0xFFFCE7F3),
+  'ophthalmology': Color(0xFFCCFBF1),
+};
 
-String _capitalize(String s) =>
-    s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1)}';
+Color _dssAccentFor(String? spec) =>
+    _specialtyAccent[spec?.toLowerCase()] ?? kPrimary;
+
+Color _dssSpecBgFor(String? spec) =>
+    _specialtyBgMap[spec?.toLowerCase()] ?? kPrimaryBg;
+
+String _dssCapitalize(String s) =>
+    s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
-
 class DoctorSearchScreen extends ConsumerStatefulWidget {
   const DoctorSearchScreen({super.key});
 
@@ -43,11 +67,11 @@ class DoctorSearchScreen extends ConsumerStatefulWidget {
 
 class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   final _searchController = TextEditingController();
-  String? _selectedSpecialty; // null = All
-  int? _selectedMemberId; // null = patient themselves
-  bool _hasFetchedDoctors = false;
-  bool _hasFetchedFamily = false;
-  ProviderSubscription<TokenState>? _tokenSub;
+  String? _selectedSpecialty;
+  int?    _selectedMemberId;
+  bool    _hasFetchedDoctors = false;
+  bool    _hasFetchedFamily  = false;
+  ProviderSubscription<TokenState>?        _tokenSub;
   ProviderSubscription<PatientLoginState>? _patientSub;
 
   @override
@@ -68,20 +92,19 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     final tokenState = ref.read(tokenProvider);
     final tokenReady = !tokenState.isLoading &&
         (tokenState.accessToken ?? '').isNotEmpty;
+
     if (tokenReady && !_hasFetchedDoctors) {
       _hasFetchedDoctors = true;
       ref.read(doctorsViewModelProvider.notifier).fetchDoctors();
     }
 
-    final patientId =
-        ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     if (tokenReady && patientId > 0 && !_hasFetchedFamily) {
       _hasFetchedFamily = true;
-      ref
-          .read(familyViewModelProvider.notifier)
-          .fetchAllFamilyMembers(patientId);
+      ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(patientId);
     }
   }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -90,18 +113,14 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     super.dispose();
   }
 
-  // ── Filtered list ─────────────────────────────────────────────────────────
-
   List<DoctorDetails> _filtered(List<DoctorDetails> all) {
     return all.where((d) {
-      final q = _searchController.text.toLowerCase();
-      final matchesQuery =
-          _searchController.text.isEmpty ||
+      final q           = _searchController.text.toLowerCase();
+      final matchesQuery = _searchController.text.isEmpty ||
           (d.name?.toLowerCase().contains(q) ?? false) ||
           (d.specialization?.toLowerCase().contains(q) ?? false) ||
           (d.clinicName?.toLowerCase().contains(q) ?? false);
-      final matchesSpec =
-          _selectedSpecialty == null ||
+      final matchesSpec  = _selectedSpecialty == null ||
           d.specialization?.toLowerCase() == _selectedSpecialty!.toLowerCase();
       return matchesQuery && matchesSpec;
     }).toList();
@@ -119,26 +138,25 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   Widget build(BuildContext context) {
     final doctorsState = ref.watch(doctorsViewModelProvider);
     final patientState = ref.watch(patientLoginViewModelProvider);
-    final familyState = ref.watch(familyViewModelProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF0F172A) : _kSurface;
+    final familyState  = ref.watch(familyViewModelProvider);
+    final isDark       = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: isDark ? _kDarkBg : kBg,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ───────────────────────────────────────────────────────
+            // ── Header ───────────────────────────────────────────────────
             _Header(isDark: isDark),
 
-            // ── "Booking for" dropdown ────────────────────────────────────
+            // ── Booking for ───────────────────────────────────────────────
             familyState.allfamilyMembers.maybeWhen(
               data: (members) => _BookingForDropdown(
-                patientState: patientState,
-                members: members,
+                patientState:     patientState,
+                members:          members,
                 selectedMemberId: _selectedMemberId,
-                onSelected: (id) => setState(() => _selectedMemberId = id),
-                isDark: isDark,
+                onSelected:       (id) => setState(() => _selectedMemberId = id),
+                isDark:           isDark,
               ),
               orElse: () => const SizedBox.shrink(),
             ),
@@ -146,21 +164,23 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
             // ── Search bar ────────────────────────────────────────────────
             _SearchBar(
               controller: _searchController,
-              isDark: isDark,
-              onChanged: (_) => setState(() {}),
+              isDark:     isDark,
+              onChanged:  (_) => setState(() {}),
             ),
 
             // ── Specialty chips ───────────────────────────────────────────
-            if (doctorsState.doctors.isNotEmpty)
+            if (doctorsState.doctors.isNotEmpty) ...[
               _SpecialtyChips(
                 specialties: _uniqueSpecialties(doctorsState.doctors),
-                selected: _selectedSpecialty,
-                onSelected: (s) => setState(
+                selected:    _selectedSpecialty,
+                onSelected:  (s) => setState(
                   () => _selectedSpecialty = s == _selectedSpecialty ? null : s,
                 ),
               ),
+              _ResultsBar(count: _filtered(doctorsState.doctors).length),
+            ],
 
-            // ── List / states ─────────────────────────────────────────────
+            // ── List / loading / empty ────────────────────────────────────
             Expanded(
               child: doctorsState.isLoading
                   ? const _LoadingList()
@@ -189,7 +209,6 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
 // ─────────────────────────────────────────────────────────────────────────────
 // HEADER
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _Header extends StatelessWidget {
   final bool isDark;
   const _Header({required this.isDark});
@@ -197,29 +216,59 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+      color: isDark ? _kDarkSurface : kCardBg,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
       child: Row(
         children: [
-          const Text(
-            'Find Doctors',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-              color: _kNavy,
-              letterSpacing: -0.4,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Good morning',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? Colors.white54 : kTextMid,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Find Doctors',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? Colors.white : kTextDark,
+                  letterSpacing: -0.3,
+                ),
+              ),
+            ],
           ),
-          const Spacer(),
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: _kBlue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.tune_rounded, color: _kBlue, size: 20),
-          ),
+         // const Spacer(),
+          // Container(
+          //   width: 36,
+          //   height: 36,
+          //   decoration: BoxDecoration(
+          //     color: kPrimaryBg,
+          //     borderRadius: BorderRadius.circular(10),
+          //   ),
+          //   child: const Icon(
+          //     Icons.notifications_outlined,
+          //     color: kPrimary,
+          //     size: 18,
+          //   ),
+          // ),
+          // const SizedBox(width: 8),
+          // CircleAvatar(
+          //   radius: 18,
+          //   backgroundColor: kPrimary,
+          //   child: const Text(
+          //     'A',
+          //     style: TextStyle(
+          //       fontSize: 14,
+          //       fontWeight: FontWeight.w700,
+          //       color: Colors.white,
+          //     ),
+          //   ),
+          // ),
         ],
       ),
     );
@@ -229,13 +278,12 @@ class _Header extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOKING-FOR DROPDOWN
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _BookingForDropdown extends StatelessWidget {
-  final PatientLoginState patientState;
+  final PatientLoginState  patientState;
   final List<FamilyMember> members;
-  final int? selectedMemberId;
+  final int?               selectedMemberId;
   final ValueChanged<int?> onSelected;
-  final bool isDark;
+  final bool               isDark;
 
   const _BookingForDropdown({
     required this.patientState,
@@ -247,15 +295,14 @@ class _BookingForDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Build items: patient first, then family members
     final items = <DropdownMenuItem<int?>>[
       DropdownMenuItem<int?>(
         value: null,
         child: Row(
           children: [
             CircleAvatar(
-              radius: 12,
-              backgroundColor: _kNavy.withValues(alpha: 0.12),
+              radius: 13,
+              backgroundColor: kPrimary.withOpacity(0.15),
               child: Text(
                 (patientState.name?.isNotEmpty ?? false)
                     ? patientState.name![0].toUpperCase()
@@ -263,7 +310,7 @@ class _BookingForDropdown extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: _kNavy,
+                  color: kPrimary,
                 ),
               ),
             ),
@@ -274,15 +321,18 @@ class _BookingForDropdown extends StatelessWidget {
               children: [
                 Text(
                   patientState.name ?? 'Me',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: _kNavy,
+                    color: isDark ? Colors.white : kTextDark,
                   ),
                 ),
-                const Text(
+                Text(
                   'You',
-                  style: TextStyle(fontSize: 10, color: _kSlate),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark ? Colors.white38 : kTextMid,
+                  ),
                 ),
               ],
             ),
@@ -290,14 +340,14 @@ class _BookingForDropdown extends StatelessWidget {
         ),
       ),
       ...members.map((m) {
-        final color = _colorFor(m.relationName);
+        final color = _dssAccentFor(m.relationName);
         return DropdownMenuItem<int?>(
           value: m.memberId,
           child: Row(
             children: [
               CircleAvatar(
-                radius: 12,
-                backgroundColor: color.withValues(alpha: 0.12),
+                radius: 13,
+                backgroundColor: color.withOpacity(0.15),
                 child: Text(
                   m.memberName?.isNotEmpty == true
                       ? m.memberName![0].toUpperCase()
@@ -316,16 +366,19 @@ class _BookingForDropdown extends StatelessWidget {
                 children: [
                   Text(
                     m.memberName ?? '?',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: _kNavy,
+                      color: isDark ? Colors.white : kTextDark,
                     ),
                   ),
                   if (m.relationName?.isNotEmpty == true)
                     Text(
                       m.relationName!,
-                      style: const TextStyle(fontSize: 10, color: _kSlate),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: isDark ? Colors.white38 : kTextMid,
+                      ),
                     ),
                 ],
               ),
@@ -336,20 +389,23 @@ class _BookingForDropdown extends StatelessWidget {
     ];
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 2),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
-        color: _kBlue.withValues(alpha: 0.07),
+        color: kPrimaryBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kBlue.withValues(alpha: 0.2)),
+        border: Border.all(color: kPrimary.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.person_pin_circle_rounded, color: _kBlue, size: 18),
+          const Icon(Icons.location_on_outlined, color: kPrimary, size: 16),
           const SizedBox(width: 8),
-          const Text(
+          Text(
             'Booking for',
-            style: TextStyle(fontSize: 13, color: _kSlate),
+            style: TextStyle(
+              fontSize: 12,
+              color: isDark ? Colors.white54 : kTextMid,
+            ),
           ),
           const SizedBox(width: 4),
           Expanded(
@@ -361,18 +417,17 @@ class _BookingForDropdown extends StatelessWidget {
                 icon: const Icon(
                   Icons.keyboard_arrow_down_rounded,
                   size: 18,
-                  color: _kBlue,
+                  color: kPrimary,
                 ),
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: _kBlue,
+                  color: kPrimary,
                 ),
-                dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                dropdownColor: isDark ? _kDarkSurface : Colors.white,
                 items: items,
-                onChanged: (val) => onSelected(val),
+                onChanged: onSelected,
                 selectedItemBuilder: (_) => [
-                  // patient
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -380,11 +435,10 @@ class _BookingForDropdown extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _kBlue,
+                        color: kPrimary,
                       ),
                     ),
                   ),
-                  // family members
                   ...members.map(
                     (m) => Align(
                       alignment: Alignment.centerLeft,
@@ -393,7 +447,7 @@ class _BookingForDropdown extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: _kBlue,
+                          color: kPrimary,
                         ),
                       ),
                     ),
@@ -411,11 +465,10 @@ class _BookingForDropdown extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // SEARCH BAR
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final bool isDark;
+  final ValueChanged<String>  onChanged;
+  final bool                  isDark;
 
   const _SearchBar({
     required this.controller,
@@ -426,49 +479,63 @@ class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Container(
-        height: 48,
+        height: 46,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          color: isDark ? _kDarkSurface : const Color(0xFFF9FAFB),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kBorder),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          border: Border.all(color: kBorder),
         ),
-        child: TextField(
-          controller: controller,
-          onChanged: onChanged,
-          style: const TextStyle(fontSize: 14, color: _kNavy),
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 14),
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              color: _kSlate,
-              size: 20,
+        child: Row(
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
+              child: Icon(Icons.search_rounded, color: kTextMid, size: 18),
             ),
-            hintText: 'Search by name, specialty, clinic…',
-            hintStyle: const TextStyle(fontSize: 13.5, color: _kSlate),
-            suffixIcon: controller.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: _kSlate,
-                    ),
-                    onPressed: () {
-                      controller.clear();
-                      onChanged('');
-                    },
-                  )
-                : null,
-          ),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                onChanged: onChanged,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white : kTextDark,
+                ),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Search name, specialty, clinic…',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white30 : const Color(0xFF9CA3AF),
+                  ),
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ),
+            if (controller.text.isNotEmpty)
+              GestureDetector(
+                onTap: () {
+                  controller.clear();
+                  onChanged('');
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: Icon(Icons.close_rounded, size: 16, color: kTextMid),
+                ),
+              )
+            else
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: kPrimary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.tune_rounded, color: Colors.white, size: 14),
+              ),
+          ],
         ),
       ),
     );
@@ -478,10 +545,9 @@ class _SearchBar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // SPECIALTY CHIPS
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _SpecialtyChips extends StatelessWidget {
-  final List<String> specialties;
-  final String? selected;
+  final List<String>     specialties;
+  final String?          selected;
   final ValueChanged<String> onSelected;
 
   const _SpecialtyChips({
@@ -493,39 +559,103 @@ class _SpecialtyChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 42,
-      child: ListView.separated(
+      height: 44,
+      child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: specialties.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, i) {
-          final spec = specialties[i];
-          final isSelected = selected == spec;
-          final color = _colorFor(spec);
-          return GestureDetector(
-            onTap: () => onSelected(spec),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-              decoration: BoxDecoration(
-                color: isSelected ? color : color.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected ? color : color.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Text(
-                _capitalize(spec),
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : color,
-                ),
-              ),
+        children: [
+          _Chip(
+            label:    'All',
+            selected: selected == null,
+            accent:   kPrimary,
+            bgColor:  kPrimaryBg,
+            onTap:    () => onSelected('__all__'),
+          ),
+          ...specialties.map((s) => _Chip(
+                label:    _dssCapitalize(s),
+                selected: selected == s,
+                accent:   _dssAccentFor(s),
+                bgColor:  _dssSpecBgFor(s),
+                onTap:    () => onSelected(s),
+              )),
+        ],
+      ),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final String       label;
+  final bool         selected;
+  final Color        accent;
+  final Color        bgColor;
+  final VoidCallback onTap;
+
+  const _Chip({
+    required this.label,
+    required this.selected,
+    required this.accent,
+    required this.bgColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        margin: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? accent : bgColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? accent : accent.withOpacity(0.35),
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : accent,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESULTS BAR
+// ─────────────────────────────────────────────────────────────────────────────
+class _ResultsBar extends StatelessWidget {
+  final int count;
+  const _ResultsBar({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+      child: Row(
+        children: [
+          Text(
+            '$count doctors available',
+            style: const TextStyle(fontSize: 12, color: kTextMid),
+          ),
+          const Spacer(),
+          const Icon(Icons.sort_rounded, size: 14, color: kPrimary),
+          const SizedBox(width: 3),
+          const Text(
+            'Sort',
+            style: TextStyle(
+              fontSize: 12,
+              color: kPrimary,
+              fontWeight: FontWeight.w500,
             ),
-          );
-        },
+          ),
+        ],
       ),
     );
   }
@@ -534,7 +664,6 @@ class _SpecialtyChips extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // DOCTOR LIST
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _DoctorList extends StatelessWidget {
   final List<DoctorDetails>     doctors;
   final bool                    isDark;
@@ -558,12 +687,12 @@ class _DoctorList extends StatelessWidget {
             Icon(
               Icons.search_off_rounded,
               size: 52,
-              color: _kSlate.withValues(alpha: 0.4),
+              color: kTextMid.withOpacity(0.4),
             ),
             const SizedBox(height: 12),
             const Text(
               'No doctors match your search',
-              style: TextStyle(fontSize: 15, color: _kSlate),
+              style: TextStyle(fontSize: 15, color: kTextMid),
             ),
           ],
         ),
@@ -572,14 +701,15 @@ class _DoctorList extends StatelessWidget {
 
     return RefreshIndicator(
       onRefresh: onRefresh,
-      color: _kBlue,
+      color: kPrimary,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         itemCount: doctors.length,
         itemBuilder: (_, i) => _DoctorCard(
           doctor:           doctors[i],
           isDark:           isDark,
           selectedMemberId: selectedMemberId,
+          isTopRated:       i == 0,
         ),
       ),
     );
@@ -589,215 +719,270 @@ class _DoctorList extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // DOCTOR CARD
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _DoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
   final bool          isDark;
   final int?          selectedMemberId;
+  final bool          isTopRated;
 
   const _DoctorCard({
     required this.doctor,
     required this.isDark,
     required this.selectedMemberId,
+    this.isTopRated = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final specColor = _colorFor(doctor.specialization);
+    final accent  = _dssAccentFor(doctor.specialization);
+    final specBg  = _dssSpecBgFor(doctor.specialization);
     final initial = (doctor.name?.isNotEmpty ?? false)
         ? doctor.name![0].toUpperCase()
         : 'D';
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+    final queue = doctor.queueLength ?? 0;
+    final Color  queueColor;
+    final String queueLabel;
+    if (queue == 0) {
+      queueColor = kGreen;
+      queueLabel = 'No queue';
+    } else if (queue <= 5) {
+      queueColor = kOrange;
+      queueLabel = '$queue in queue';
+    } else {
+      queueColor = kRed;
+      queueLabel = '$queue in queue';
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // ── Card body ────────────────────────────────────────────────────
+        Container(
+          margin: EdgeInsets.only(
+            bottom: 10,
+            top: isTopRated ? 10 : 0,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Avatar
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [specColor, specColor.withValues(alpha: 0.6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
+          decoration: BoxDecoration(
+            color: isDark ? _kDarkSurface : kCardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isTopRated ? kPrimary : kBorder,
+              width: isTopRated ? 1.5 : 0.5,
+            ),
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 13, 12, 13),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Avatar
+              CircleAvatar(
+                radius: 25,
+                backgroundColor: accent,
                 child: Text(
                   initial,
                   style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            // Info column
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Dr. ${doctor.name ?? 'Unknown'}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: _kNavy,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (doctor.consultationFee != null)
-                        Text(
-                          '₹${doctor.consultationFee!.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF059669),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      if (doctor.specialization != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: specColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(5),
-                          ),
-                          child: Text(
-                            _capitalize(doctor.specialization!),
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w600,
-                              color: specColor,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      if (doctor.experience != null)
-                        Text(
-                          '${doctor.experience} yrs',
-                          style: const TextStyle(fontSize: 11, color: _kSlate),
-                        ),
-                    ],
-                  ),
-                  if (doctor.clinicName != null ||
-                      doctor.clinicAddress != null) ...[
-                    const SizedBox(height: 3),
+              const SizedBox(width: 11),
+
+              // Info column
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Name + fee
                     Row(
                       children: [
-                        const Icon(
-                          Icons.local_hospital_rounded,
-                          size: 11,
-                          color: _kSlate,
-                        ),
-                        const SizedBox(width: 3),
                         Expanded(
                           child: Text(
-                            [doctor.clinicName, doctor.clinicAddress]
-                                .where((s) => s != null && s.isNotEmpty)
-                                .join(' · '),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: _kSlate,
+                            'Dr. ${doctor.name ?? 'Unknown'}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : kTextDark,
                             ),
-                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (doctor.consultationFee != null)
+                          Text(
+                            '₹${doctor.consultationFee!.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kGreen,
+                            ),
+                          ),
                       ],
                     ),
-                  ],
-                  if (doctor.queueLength != null) ...[
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 4),
+
+                    // Specialty badge + experience
                     Row(
                       children: [
-                        const Icon(
-                          Icons.people_alt_rounded,
-                          size: 11,
-                          color: Color(0xFFF59E0B),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          doctor.queueLength == 0
-                              ? 'No queue'
-                              : '${doctor.queueLength} in queue',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFF59E0B),
+                        if (doctor.specialization != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: specBg,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: Text(
+                              _dssCapitalize(doctor.specialization!),
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: accent,
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 7),
+                        ],
+                        if (doctor.experience != null)
+                          Text(
+                            '${doctor.experience} yrs exp',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark ? Colors.white54 : kTextMid,
+                            ),
+                          ),
                       ],
                     ),
+
+                    // Clinic + queue
+                    if (doctor.clinicName != null ||
+                        doctor.clinicAddress != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.local_hospital_rounded,
+                            size: 11,
+                            color: isDark ? Colors.white38 : kTextMid,
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Text(
+                              [doctor.clinicName, doctor.clinicAddress]
+                                  .where((s) => s != null && s.isNotEmpty)
+                                  .join(' · '),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? Colors.white54 : kTextMid,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (doctor.queueLength != null) ...[
+                            const SizedBox(width: 8),
+                            Icon(
+                              Icons.people_alt_rounded,
+                              size: 11,
+                              color: queueColor,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              queueLabel,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: queueColor,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ] else if (doctor.queueLength != null) ...[
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.people_alt_rounded,
+                            size: 11,
+                            color: queueColor,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            queueLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: queueColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            // Book button
-            SizedBox(
-              height: 34,
-              child: ElevatedButton(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BookAppointmentScreen(
-                      doctor:           doctor,
-                      bookingForMemberId: selectedMemberId,
+              const SizedBox(width: 10),
+
+              // Book button
+              SizedBox(
+                height: 34,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => BookAppointmentScreen(
+                        doctor:             doctor,
+                        bookingForMemberId: selectedMemberId,
+                      ),
                     ),
                   ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kNavy,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isTopRated ? kPrimary : kTextDark,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  textStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  child: const Text('Book'),
                 ),
-                child: const Text('Book'),
+              ),
+            ],
+          ),
+        ),
+
+        // ── "Top rated" badge ─────────────────────────────────────────────
+        if (isTopRated)
+          Positioned(
+            top: 0,
+            left: 14,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: kPrimary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Top rated',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }
@@ -805,7 +990,6 @@ class _DoctorCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // LOADING SHIMMER
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _LoadingList extends StatelessWidget {
   const _LoadingList();
 
@@ -814,55 +998,42 @@ class _LoadingList extends StatelessWidget {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
       itemCount: 5,
-      itemBuilder: (_, __) => _ShimmerCard(),
+      itemBuilder: (_, __) => const _ShimmerCard(),
     );
   }
 }
 
 class _ShimmerCard extends StatelessWidget {
+  const _ShimmerCard();
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: kBorder, width: 0.5),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              _ShimmerBox(width: 60, height: 60, radius: 30),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _ShimmerBox(width: 140, height: 14, radius: 4),
-                    const SizedBox(height: 8),
-                    _ShimmerBox(width: 90, height: 22, radius: 6),
-                    const SizedBox(height: 8),
-                    _ShimmerBox(width: 110, height: 10, radius: 4),
-                  ],
-                ),
-              ),
-            ],
+          const _ShimmerBox(width: 50, height: 50, radius: 25),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _ShimmerBox(width: 140, height: 13, radius: 4),
+                SizedBox(height: 8),
+                _ShimmerBox(width: 90, height: 20, radius: 5),
+                SizedBox(height: 8),
+                _ShimmerBox(width: 160, height: 10, radius: 4),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _ShimmerBox(width: double.infinity, height: 1, radius: 0),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              _ShimmerBox(width: 90, height: 28, radius: 8),
-              const SizedBox(width: 8),
-              _ShimmerBox(width: 130, height: 28, radius: 8),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _ShimmerBox(width: double.infinity, height: 44, radius: 10),
+          const SizedBox(width: 10),
+          const _ShimmerBox(width: 58, height: 34, radius: 10),
         ],
       ),
     );
@@ -882,19 +1053,18 @@ class _ShimmerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    width: width,
-    height: height,
-    decoration: BoxDecoration(
-      color: const Color(0xFFE2E8F0),
-      borderRadius: BorderRadius.circular(radius),
-    ),
-  );
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE5E7EB),
+          borderRadius: BorderRadius.circular(radius),
+        ),
+      );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // EMPTY / ERROR STATE
 // ─────────────────────────────────────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
   final VoidCallback onRetry;
   const _EmptyState({required this.onRetry});
@@ -910,14 +1080,14 @@ class _EmptyState extends StatelessWidget {
             Container(
               width: 80,
               height: 80,
-              decoration: BoxDecoration(
-                color: _kBlue.withValues(alpha: 0.08),
+              decoration: const BoxDecoration(
+                color: kPrimaryBg,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.medical_services_outlined,
                 size: 36,
-                color: _kBlue,
+                color: kPrimary,
               ),
             ),
             const SizedBox(height: 18),
@@ -926,14 +1096,18 @@ class _EmptyState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
-                color: _kNavy,
+                color: kTextDark,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
               'We couldn\'t load the doctors list.\nCheck your connection and try again.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 13.5, color: _kSlate, height: 1.5),
+              style: TextStyle(
+                fontSize: 13.5,
+                color: kTextMid,
+                height: 1.5,
+              ),
             ),
             const SizedBox(height: 24),
             ElevatedButton.icon(
@@ -941,7 +1115,7 @@ class _EmptyState extends StatelessWidget {
               icon: const Icon(Icons.refresh_rounded, size: 18),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _kNavy,
+                backgroundColor: kPrimary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(

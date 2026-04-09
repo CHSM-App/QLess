@@ -26,4 +26,6 @@ abstract class AppointmentRepository {
 
   Future<List<AppointmentList>> getPatientAppointments(int patientId);
   
+  Future<List<AppointmentList>> getPatientAppointments(int patientId);
+  
 }

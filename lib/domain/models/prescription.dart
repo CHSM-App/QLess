@@ -235,6 +235,27 @@ class PrescriptionModel {
 }
 
 Map<String, dynamic> _normalizePrescriptionJson(Map<String, dynamic> json) {
+  String? _pickFirstString(Map<String, dynamic> src, List<String> keys) {
+    for (final k in keys) {
+      final v = src[k];
+      if (v is String && v.trim().isNotEmpty) return v;
+    }
+    return null;
+  }
+
+  // Normalize doctor name keys so UI doesn't fallback to "Doctor"
+  if (json['name'] == null || (json['name'] is String && (json['name'] as String).trim().isEmpty)) {
+    final altName = _pickFirstString(
+      json,
+      const ['doctor_name', 'doctorName', 'doctor', 'dr_name'],
+    );
+    if (altName != null) {
+      final normalized = Map<String, dynamic>.from(json);
+      normalized['name'] = altName;
+      json = normalized;
+    }
+  }
+
   if (json['medicines'] != null) return json;
   final alt = json['prescription_medicines'] ??
       json['prescription_medicine'] ??

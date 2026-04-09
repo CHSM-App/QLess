@@ -15,7 +15,7 @@ class AppointmentState {
   final AppointmentResponseModel? cancelResponse;
   final AppointmentResponseModel? queueStatusResponse;
   final List<MonthSlotData> bookedSlots;
-  final AsyncValue<List<AppointmentList>>? patientAppointmentsList;
+  final AsyncValue<List<AppointmentList>>?  patientAppointmentsList;
 
   const AppointmentState({
     this.isLoading = false,
@@ -39,7 +39,7 @@ class AppointmentState {
     AppointmentResponseModel? cancelResponse,
     AppointmentResponseModel? queueStatusResponse,
     List<MonthSlotData>? bookedSlots,
-    AsyncValue<List<AppointmentList>>? patientAppointmentsList,
+    AsyncValue<List<AppointmentList>>?  patientAppointmentsList,
   }) {
     return AppointmentState(
       isLoading: isLoading ?? this.isLoading,
@@ -77,9 +77,9 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   }
 
 
-    Future<void> getPatientAppointments(int patientId) async {
+  Future<void> getPatientAppointments(int patientId) async {
     state = state.copyWith(
-      patientAppointmentsList: AsyncValue.loading(),
+      patientAppointmentsList: const AsyncValue.loading(),
       error: null,
     );
     try {
