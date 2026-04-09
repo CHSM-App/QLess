@@ -26,6 +26,9 @@ abstract class AppointmentRepository {
 
   Future<List<AppointmentList>> getPatientAppointments(int patientId);
   
+  Future<AppointmentResponseModel> queueNext(
+    AppointmentRequestModel appointmentRequest,
+  );
 
   
 }

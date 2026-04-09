@@ -12,6 +12,8 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/models/prescription.dart';
+import 'package:qless/domain/models/review_model.dart';
+import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:retrofit/retrofit.dart';
 part 'api_service.g.dart';
@@ -73,6 +75,12 @@ abstract class ApiService {
     @Body() DoctorScheduleModel doctorSchedule,
   );
 
+  
+  @POST("doctor/insert/appointment/queueNext")
+Future<AppointmentResponseModel> queueNext(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
   // DELETE API
   @DELETE("doctor/index/deleteMedicine/{medicine_id}")
   Future<Medicine> deleteMedicine(@Path("medicine_id") int medicineId);
@@ -125,6 +133,16 @@ abstract class ApiService {
   @GET("patient/users/appointment/getBookedSlots/{doctor_id}")
   Future<List<MonthSlotData>> getBookedSlots(@Path("doctor_id") int doctorId);
 
+  @GET("patient/users/review/appointment/{appointment_id}")
+  Future<List<ReviewModel>> getAppointmentReviews(
+    @Path("appointment_id") int appointmentId,
+  );
+
+  @GET("patient/users/review/doctor/{doctor_id}")
+  Future<List<ReviewModel>> getDoctorReviews(
+    @Path("doctor_id") int doctorId,
+  );
+
   // POST API
   @POST("login/addPatientDetails")
   Future<dynamic> addPatient(@Body() Patients patient);
@@ -147,12 +165,16 @@ abstract class ApiService {
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+
+
+
   @POST("patient/insert/favoriteDoctor/add")
   Future<dynamic> addFavoriteDoctor(@Body() Map<String, dynamic> body);
 
+  // REVIEW API (appointment-based)
+  @POST("patient/insert/review/add")
+  Future<dynamic> addAppointmentReview(@Body() ReviewRequestModel reviewRequest);
 
-
-  
   //DELETE API
   @DELETE("patient/index/deleteFamilyMember/{member_id}")
   Future<FamilyMember> deleteFamilyMember(@Path("member_id") int memberId);

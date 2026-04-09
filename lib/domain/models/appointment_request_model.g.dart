@@ -9,6 +9,7 @@ part of 'appointment_request_model.dart';
 AppointmentRequestModel _$AppointmentRequestModelFromJson(
   Map<String, dynamic> json,
 ) => AppointmentRequestModel(
+  operation: json['operation'] as String?,
   doctorId: (json['doctor_id'] as num?)?.toInt(),
   patientId: (json['patient_id'] as num?)?.toInt(),
   appointmentId: (json['appointment_id'] as num?)?.toInt(),
@@ -20,6 +21,7 @@ AppointmentRequestModel _$AppointmentRequestModelFromJson(
 Map<String, dynamic> _$AppointmentRequestModelToJson(
   AppointmentRequestModel instance,
 ) => <String, dynamic>{
+  'operation': instance.operation,
   'doctor_id': instance.doctorId,
   'patient_id': instance.patientId,
   'appointment_id': instance.appointmentId,

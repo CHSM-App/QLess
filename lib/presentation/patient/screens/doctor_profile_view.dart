@@ -6,6 +6,7 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/domain/models/review_model.dart';
 
 // Uses same palette constants from book_appointment_screen.dart
 // (kPrimary, kGreen, kOrange, kTextDark, kTextMid, kBorder, kBg, kCardBg,
@@ -50,21 +51,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   int? _favFetchedForDoctorId;
   int? _favFetchedForPatientId;
   bool _didRouteRefresh = false;
-
-  static const _demoReviews = <_Review>[
-    _Review(
-      name: 'Anita S.', rating: 5, date: 'Mar 2025',
-      comment: 'Very experienced doctor. My child felt comfortable immediately. Highly recommend!',
-    ),
-    _Review(
-      name: 'Priya M.', rating: 4, date: 'Feb 2025',
-      comment: 'Good doctor, explained everything clearly. Wait time was a bit long.',
-    ),
-    _Review(
-      name: 'Rahul K.', rating: 5, date: 'Jan 2025',
-      comment: 'Excellent diagnosis and very patient with kids. Will visit again.',
-    ),
-  ];
+  bool _didFetchReviews = false;
 
   @override
   void initState() {
@@ -76,6 +63,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     _isFavorite = cached ?? widget.initialFavorite;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryFetchFavorite();
+      _tryFetchReviews();
     });
   }
 
@@ -90,6 +78,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     _favFetchedForDoctorId = null;
     _favFetchedForPatientId = null;
     _tryFetchFavorite();
+    _tryFetchReviews(force: true);
   }
 
   void _showFavSnack(bool added) {
@@ -156,6 +145,10 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
         _showErrorSnack(next.error!);
       }
     });
+
+    final reviewState = ref.watch(reviewViewModelProvider);
+    final reviews = reviewState.reviews ?? <ReviewModel>[];
+    final avgRating = _avgRating(reviews);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF4F6FB),
@@ -364,17 +357,28 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                   trailing: Row(children: [
                     const Icon(Icons.star_rounded, color: kOrange, size: 14),
                     const SizedBox(width: 3),
-                    const Text('4.8', style: TextStyle(
+                    Text(
+                      avgRating == 0 ? '--' : avgRating.toStringAsFixed(1),
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: kTextDark)),
-                    const Text('  (128 reviews)',
-                        style: TextStyle(fontSize: 11, color: kTextMid)),
+                        color: kTextDark,
+                      ),
+                    ),
+                    Text(
+                      '  (${reviews.length} reviews)',
+                      style: const TextStyle(fontSize: 11, color: kTextMid),
+                    ),
                   ]),
                   child: Column(
-                    children: _demoReviews
-                        .map((r) => _ReviewCard(review: r))
-                        .toList(),
+                    children: reviews.isEmpty
+                        ? [
+                            const _EmptyReviews(),
+                          ]
+                        : reviews
+                            .map(_toUiReview)
+                            .map((r) => _ReviewCard(review: r))
+                            .toList(),
                   ),
                 ),
               ]),
@@ -430,6 +434,14 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     _favFetchedForDoctorId = did;
     _favFetchedForPatientId = pid;
     ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did);
+  }
+
+  void _tryFetchReviews({bool force = false}) {
+    final did = widget.doctor.doctorId ?? 0;
+    if (did <= 0) return;
+    if (_didFetchReviews && !force) return;
+    _didFetchReviews = true;
+    ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did);
   }
 
   Future<void> _handleFavoriteToggle(bool v) async {
@@ -752,6 +764,42 @@ Color _dpAccent(String? s) {
 String _dpCap(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
 
+double _avgRating(List<ReviewModel> reviews) {
+  if (reviews.isEmpty) return 0;
+  final sum = reviews.fold<double>(
+    0,
+    (acc, r) => acc + (r.rating?.toDouble() ?? 0),
+  );
+  return sum / reviews.length;
+}
+
+_Review _toUiReview(ReviewModel r) {
+  final name = (r.patientName?.isNotEmpty ?? false)
+      ? r.patientName!
+      : (r.name?.isNotEmpty ?? false)
+          ? r.name!
+          : 'Patient';
+  return _Review(
+    name: name,
+    rating: (r.rating ?? 0).toDouble(),
+    comment: r.comment?.isNotEmpty == true
+        ? r.comment!
+        : 'No comment provided.',
+    date: _fmtReviewDate(r.createdAt),
+  );
+}
+
+String _fmtReviewDate(String? iso) {
+  if (iso == null || iso.trim().isEmpty) return '';
+  final dt = DateTime.tryParse(iso);
+  if (dt == null) return '';
+  const months = [
+    'Jan','Feb','Mar','Apr','May','Jun',
+    'Jul','Aug','Sep','Oct','Nov','Dec',
+  ];
+  return '${months[dt.month - 1]} ${dt.year}';
+}
+
 // Sub-widgets
 class _HeroStat extends StatelessWidget {
   final String   label;
@@ -899,6 +947,24 @@ class _ReviewCard extends StatelessWidget {
       Text(review.comment, style: const TextStyle(
           fontSize: 11.5, color: kTextMid, height: 1.5)),
     ]),
+  );
+}
+
+class _EmptyReviews extends StatelessWidget {
+  const _EmptyReviews();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: kBg,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: kBorder, width: 0.5),
+    ),
+    child: const Text(
+      'No reviews yet. Be the first to share your experience.',
+      style: TextStyle(fontSize: 11.5, color: kTextMid, height: 1.5),
+    ),
   );
 }
 
