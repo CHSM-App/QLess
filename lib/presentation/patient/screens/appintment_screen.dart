@@ -4,8 +4,6 @@ import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
-import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
-import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';

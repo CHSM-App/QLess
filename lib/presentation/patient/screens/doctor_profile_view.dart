@@ -670,13 +670,6 @@ class _FavouritePillState extends State<_FavouritePill>
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
 
-  void _toggle() {
-    HapticFeedback.lightImpact();
-    setState(() => _isFav = !_isFav);
-    widget.onToggle(_isFav);
-    _ctrl.forward(from: 0);
-  }
-
   @override
   Widget build(BuildContext context) => GestureDetector(
   //  onTap: _toggle,
