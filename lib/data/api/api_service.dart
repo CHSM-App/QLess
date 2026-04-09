@@ -115,10 +115,6 @@ abstract class ApiService {
     @Path("patient_id") int patientId,
   );
 
-  @GET("patient/users/getPatientAppointments/{patient_id}")
-  Future<List<AppointmentList>> getPatientAppointments(
-    @Path("patient_id") int patientId,
-  );
 
 
   @GET("patient/insert/appointment/getAvailability")
