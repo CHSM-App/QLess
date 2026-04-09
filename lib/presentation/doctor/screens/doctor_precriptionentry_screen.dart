@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
+import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -606,7 +608,19 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
   }
 
-  Future<bool> _queueNextIfNeeded() async {
+  String? _ageString(String? dob) {
+    if (dob == null || dob.trim().isEmpty) return null;
+    final dt = DateTime.tryParse(dob.trim());
+    if (dt == null) return null;
+    final now = DateTime.now();
+    int age = now.year - dt.year;
+    if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
+      age--;
+    }
+    return '$age y';
+  }
+
+  Future<AppointmentResponseModel?> _queueNextIfNeeded() async {
     try {
       final req = AppointmentRequestModel(
         operation: 'QUEUE_NEXT',
@@ -618,21 +632,138 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           .read(appointmentViewModelProvider.notifier)
           .queueNext(req);
       debugPrint('QueueNext response: ${result.toJson()}');
-      if (result.success == true) return true;
+      if (result.success == true) return result;
       _showSnack(result.message ?? 'Queue next failed', isError: true);
-      return false;
+      return null;
     } catch (e) {
       debugPrint('QueueNext error: $e');
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
-      return false;
+      return null;
     }
   }
 
   Future<void> _handleNextPatient() async {
-    final ok = await _queueNextIfNeeded();
-    if (!mounted || !ok) return;
-    Navigator.pop(context);
-    Navigator.pop(context);
+    final result = await _queueNextIfNeeded();
+    if (!mounted || result == null) return;
+
+    final nextToken = result.data?.isNotEmpty == true
+        ? result.data!.first.nextToken
+        : null;
+
+    // refresh list so patient_list shows latest when user goes back
+    await ref
+        .read(appointmentViewModelProvider.notifier)
+        .fetchPatientAppointments(widget.doctorId);
+    if (!mounted) return;
+
+    final allAppointments =
+        ref.read(appointmentViewModelProvider).patientAppointmentsList.maybeWhen(
+              data: (list) => list,
+              orElse: () => const <AppointmentList>[],
+            );
+    var candidatesSource = allAppointments;
+    if (candidatesSource.isEmpty) {
+      await ref
+          .read(appointmentViewModelProvider.notifier)
+          .fetchPatientAppointments(widget.doctorId);
+      if (!mounted) return;
+      candidatesSource = ref
+          .read(appointmentViewModelProvider)
+          .patientAppointmentsList
+          .maybeWhen(
+            data: (list) => list,
+            orElse: () => const <AppointmentList>[],
+          );
+    }
+
+    final next =
+        _pickNextAppointment(candidatesSource, preferredQueue: nextToken);
+    if (next == null) {
+      _showSnack('No next patient found', isError: true);
+      Navigator.pop(context);
+      return;
+    }
+
+    final patientId = next.patientId ?? 0;
+    final appointmentId = next.appointmentId ?? 0;
+    if (patientId == 0 || appointmentId == 0) {
+      _showSnack('Next patient info missing', isError: true);
+      Navigator.pop(context);
+      return;
+    }
+
+    _showSnack(
+      'Prescription completed. Opening next patient...',
+      isError: false,
+    );
+
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PrescriptionScreen(
+          patientId: patientId,
+          doctorId: next.doctorId ?? widget.doctorId,
+          userTypeId: next.userType ?? widget.userTypeId,
+          appointmentId: appointmentId,
+          patientName: next.patientName ?? 'Patient',
+          patientAge: _ageString(next.dob),
+          patientGender: next.gender,
+          queueNumber: next.queueNumber,
+        ),
+      ),
+    );
+  }
+
+  AppointmentList? _pickNextAppointment(
+    List<AppointmentList> list, {
+    int? preferredQueue,
+  }) {
+    final candidates = list.where((a) {
+      final status = a.status?.toLowerCase().trim() ?? '';
+      if (status != 'booked') return false;
+      final d = _parseAppointmentDate(a.appointmentDate);
+      if (!_isToday(d)) return false;
+      if (a.appointmentId == widget.appointmentId) return false;
+      return true;
+    }).toList();
+
+    if (preferredQueue != null) {
+      final match = candidates
+          .where((a) => a.queueNumber != null && a.queueNumber == preferredQueue)
+          .toList();
+      if (match.isNotEmpty) return match.first;
+    }
+
+    candidates.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
+    return candidates.isEmpty ? null : candidates.first;
+  }
+
+  int _sortKey(AppointmentList a) {
+    if (a.queueNumber != null) return a.queueNumber!;
+    final t = _timeMinutes(a.startTime);
+    if (t != null) return 100000 + t;
+    return 200000;
+  }
+
+  int? _timeMinutes(String? iso) {
+    if (iso == null || iso.trim().isEmpty) return null;
+    final dt = DateTime.tryParse(iso);
+    if (dt == null) return null;
+    return dt.hour * 60 + dt.minute;
+  }
+
+  DateTime? _parseAppointmentDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    return DateTime.tryParse(raw.trim());
+  }
+
+  bool _isToday(DateTime? d) {
+    if (d == null) return false;
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
   }
 Future<void> _completePrescription() async {
   final error = _validate();
@@ -666,19 +797,8 @@ Future<void> _completePrescription() async {
     return;
   }
 
-  // ✅ Success dialog
-  await showDialog(
-    context: context,
-    barrierDismissible: false,
-    builder: (_) => _SuccessDialog(
-      patientName: widget.patientName,   
-      medicineCount: _meds.length,
-      followUpDate: followUpStr,
-      onBackToList: () {
-        _handleNextPatient();
-      },
-    ),
-  );
+  // No dialog: directly queue next and return to list
+  await _handleNextPatient();
 }
 
 
