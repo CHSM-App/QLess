@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
 
 // ── THEME ──
 const kPrimary = Color(0xFF0D9488);
@@ -165,7 +167,7 @@ List<AppointmentList> applyFilter(
   return list.where((a) {
     // search
     final matchSearch = search.isEmpty ||
-        (a.name?.toLowerCase().contains(search.toLowerCase()) ?? false);
+        (a.patientName?.toLowerCase().contains(search.toLowerCase()) ?? false);
 
     // tab filter
     final bool matchFilter;
@@ -285,7 +287,25 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         _didFetch = false;
         _ensurePatientIdAndFetch();
       }
-      if (_idMissing && nextId != 0) setState(() => _idMissing = false);
+      if (_idMissing && nextId != 0) {
+        setState(() => _idMissing = false);
+      }
+    });
+
+    ref.listen<ReviewState>(reviewViewModelProvider, (prev, next) {
+      if (next.error != null && next.error != prev?.error) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!), backgroundColor: kRed),
+        );
+      }
+      if (next.isSuccess && next.isSuccess != prev?.isSuccess) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Thanks for your review!'),
+            backgroundColor: kGreen,
+          ),
+        );
+      }
     });
 
     final vmState = ref.watch(appointmentViewModelProvider);
@@ -536,11 +556,51 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: filtered.length,
-        itemBuilder: (_, i) => _AppointmentCard(
-          appointment: filtered[i],
-          onViewDetails: () => _openDetail(filtered[i]),
-        ),
+        itemBuilder: (context, index) {
+          final a = filtered[index];
+          return _AppointmentCard(
+            appointment: a,
+            statusColor: getStatusColor(a.status),
+            statusBgColor: getStatusBgColor(a.status),
+            statusIcon: getStatusIcon(a.status),
+            formattedDate: a.appointmentDate != null
+                ? _formatDate(a.appointmentDate!)
+                : null,
+            relativeDate: a.appointmentDate != null
+                ? _formatDateRelative(a.appointmentDate!)
+                : null,
+            formattedDob:
+                a.dob != null ? _formatDate(a.dob!) : null,
+            onReview: _canReview(a)
+                ? () => _handleReview(context, a)
+                : null,
+          );
+        },
       ),
+    );
+  }
+
+  bool _canReview(AppointmentList a) {
+    return a.status?.toLowerCase() == 'completed' &&
+        a.appointmentId != null &&
+        a.doctorId != null &&
+        a.patientId != null;
+  }
+
+  Future<void> _handleReview(BuildContext context, AppointmentList a) async {
+    final input = await showAppointmentReviewDialog(
+      context,
+      doctorName: a.doctorName ?? 'Doctor',
+    );
+    if (input == null) return;
+    await ref.read(reviewViewModelProvider.notifier).submitReview(
+      ReviewRequestModel(
+        appointmentId: a.appointmentId!,
+        doctorId: a.doctorId!,
+        patientId: a.patientId!,
+        rating: input.rating,
+        comment: input.comment,
+      )
     );
   }
 
@@ -659,9 +719,18 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
 class _AppointmentCard extends StatelessWidget {
   final AppointmentList appointment;
   final VoidCallback onViewDetails;
+  final VoidCallback? onReview;
 
-  const _AppointmentCard(
-      {required this.appointment, required this.onViewDetails});
+  const _AppointmentCard({
+    required this.appointment,
+    required this.statusColor,
+    required this.statusBgColor,
+    required this.statusIcon,
+    this.formattedDate,
+    this.relativeDate,
+    this.formattedDob,
+    this.onReview,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -713,7 +782,7 @@ class _AppointmentCard extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          (a.name ?? "?")[0].toUpperCase(),
+                          (appointment.patientName ?? "?")[0].toUpperCase(),
                           style: const TextStyle(
                               fontSize: 19,
                               fontWeight: FontWeight.w700,
@@ -726,13 +795,14 @@ class _AppointmentCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(a.name ?? "Unknown",
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: kTextDark,
-                                  fontSize: 14),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis),
+                          Text(
+                            appointment.patientName ?? "Unknown",
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: kTextDark,
+                              fontSize: 15,
+                            ),
+                          ),
                           const SizedBox(height: 2),
                           Row(
                             children: [
@@ -1046,203 +1116,64 @@ class _AppointmentDetailSheet extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 24),
+                const SizedBox(height: 14),
 
-                  // ── SCHEDULE ──
-                  _sheetSection("Schedule"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _scheduleChip(
-                            icon: Icons.calendar_today_rounded,
-                            color: kBlue,
-                            bg: kBlueLight,
-                            label: "Date",
-                            value: formatDate(a.appointmentDate),
-                            sub: formatDateRelative(a.appointmentDate),
+                // ── ACTIONS ──
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 42,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimary,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(11)),
+                          ),
+                          onPressed: () {
+                            // navigate to detail
+                          },
+                          child: const Text(
+                            "View Details",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _scheduleChip(
-                            icon: Icons.access_time_filled_rounded,
-                            color: kGreen,
-                            bg: kGreenLight,
-                            label: "Time",
-                            value: formatTime(a.startTime),
-                            sub: a.endTime != null
-                                ? "Ends ${formatTime(a.endTime)}"
-                                : "",
+                      ),
+                    ),
+                    if (onReview != null) ...[
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 42,
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: kPrimary,
+                              side: const BorderSide(color: kPrimary),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(11),
+                              ),
+                            ),
+                            onPressed: onReview,
+                            child: const Text(
+                              "Review",
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── DOCTOR ──
-                  _sheetSection("Doctor"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: kBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: kDivider),
                       ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  kPrimary.withValues(alpha: 0.15),
-                                  kPrimary.withValues(alpha: 0.04),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(Icons.person_rounded,
-                                color: kPrimary, size: 26),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(a.doctorName ?? "—",
-                                    style: const TextStyle(
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w700,
-                                        color: kTextDark)),
-                                const SizedBox(height: 3),
-                                Text(a.specialization ?? "—",
-                                    style: const TextStyle(
-                                        color: kPrimary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500)),
-                                if (a.experience != null) ...[
-                                  const SizedBox(height: 3),
-                                  Text("${a.experience} yrs experience",
-                                      style: const TextStyle(
-                                          color: kTextMid,
-                                          fontSize: 11)),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── CLINIC ──
-                  _sheetSection("Clinic"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: kBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: kDivider),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: kAmberLight,
-                                  borderRadius:
-                                      BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                    Icons.local_hospital_rounded,
-                                    color: kAmber,
-                                    size: 22),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      a.clinicName ?? "—",
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w700,
-                                          color: kTextDark),
-                                    ),
-                                    if (a.clinicAddress != null) ...[
-                                      const SizedBox(height: 2),
-                                      Text(a.clinicAddress!,
-                                          style: const TextStyle(
-                                              color: kTextMid,
-                                              fontSize: 12)),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (hasMap) ...[
-                            const SizedBox(height: 14),
-                            const Divider(height: 1, color: kDivider),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 42,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kBlueLight,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(11)),
-                                ),
-                                onPressed: () => openMap(a.latitude!,
-                                    a.longitude!, a.clinicName),
-                                icon: const Icon(Icons.map_rounded,
-                                    color: kBlue, size: 18),
-                                label: const Text(
-                                  "Open in Google Maps",
-                                  style: TextStyle(
-                                      color: kBlue,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── DETAILS ──
-                  _sheetSection("Details"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
+                    ],
+                    const SizedBox(width: 8),
+                    Container(
+                      height: 42,
+                      width: 42,
                       decoration: BoxDecoration(
                         color: kBg,
                         borderRadius: BorderRadius.circular(16),
@@ -1362,37 +1293,4 @@ class _AppointmentDetailSheet extends StatelessWidget {
       ),
     );
   }
-
-  Widget _detailRow(
-      IconData icon, Color bg, Color color, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-                color: bg, borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, size: 14, color: color),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(label,
-                style: const TextStyle(
-                    color: kTextMid,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500)),
-          ),
-          Text(value,
-              style: const TextStyle(
-                  color: kTextDark,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  Widget _dividerLine() =>
-      const Divider(height: 1, color: kDivider, indent: 14, endIndent: 14);
 }

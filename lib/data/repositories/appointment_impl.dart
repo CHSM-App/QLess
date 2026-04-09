@@ -52,4 +52,11 @@ class AppointmentImpl implements AppointmentRepository {
   Future<List<AppointmentList>> getPatientAppointments(int familyId) {
     return apiService.getPatientAppointments(familyId);
   }
+
+  @override
+  Future<AppointmentResponseModel> queueNext(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.queueNext(appointmentRequest);
+  }
 }

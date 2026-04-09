@@ -60,6 +60,15 @@ class AppointmentList {
   @JsonKey(name: 'queue_number')
   int? queueNumber;
 
+  @JsonKey(name: 'booking_type')
+  int? bookingType;
+
+  @JsonKey(name: 'start_time')
+  String? startTime;
+
+  @JsonKey(name: 'end_time')
+  String? endTime;
+
   @JsonKey(name: 'status')
   String? status;
 
@@ -76,6 +85,8 @@ class AppointmentList {
   int? userType;
 
 
+  @JsonKey(name: 'patient_name')
+  String? patientName;
 
 
   AppointmentList({
@@ -92,6 +103,9 @@ class AppointmentList {
     this.appointmentDate,
     this.dob,
     this.queueNumber,
+    this.bookingType,
+    this.startTime,
+    this.endTime,
     this.status,
     this.userType,
     this.bookingFor,

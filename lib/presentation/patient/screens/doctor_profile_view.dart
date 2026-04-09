@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/domain/models/review_model.dart';
 
 // Uses same palette constants from book_appointment_screen.dart
 // (kPrimary, kGreen, kOrange, kTextDark, kTextMid, kBorder, kBg, kCardBg,
@@ -24,7 +29,7 @@ class _Review {
 // ─────────────────────────────────────────────────────────────────────────────
 // DOCTOR PROFILE SCREEN
 // ─────────────────────────────────────────────────────────────────────────────
-class DoctorProfileScreen extends StatefulWidget {
+class DoctorProfileScreen extends ConsumerStatefulWidget {
   final DoctorDetails doctor;
   final int?          bookingForMemberId;
   final bool          initialFavorite;   // ← pass from parent if available
@@ -37,31 +42,43 @@ class DoctorProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<DoctorProfileScreen> createState() => _DoctorProfileScreenState();
+  ConsumerState<DoctorProfileScreen> createState() =>
+      _DoctorProfileScreenState();
 }
 
-class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
+class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   late bool _isFavorite;
-
-  static const _demoReviews = <_Review>[
-    _Review(
-      name: 'Anita S.', rating: 5, date: 'Mar 2025',
-      comment: 'Very experienced doctor. My child felt comfortable immediately. Highly recommend!',
-    ),
-    _Review(
-      name: 'Priya M.', rating: 4, date: 'Feb 2025',
-      comment: 'Good doctor, explained everything clearly. Wait time was a bit long.',
-    ),
-    _Review(
-      name: 'Rahul K.', rating: 5, date: 'Jan 2025',
-      comment: 'Excellent diagnosis and very patient with kids. Will visit again.',
-    ),
-  ];
+  int? _favFetchedForDoctorId;
+  int? _favFetchedForPatientId;
+  bool _didRouteRefresh = false;
+  bool _didFetchReviews = false;
 
   @override
   void initState() {
     super.initState();
-    _isFavorite = widget.initialFavorite;
+    final did = widget.doctor.doctorId;
+    final cached = did == null
+        ? null
+        : ref.read(favoriteViewModelProvider).doctorFavorites[did];
+    _isFavorite = cached ?? widget.initialFavorite;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tryFetchFavorite();
+      _tryFetchReviews();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // When returning to this screen, allow a fresh fetch.
+    if (!_didRouteRefresh) {
+      _didRouteRefresh = true;
+      return;
+    }
+    _favFetchedForDoctorId = null;
+    _favFetchedForPatientId = null;
+    _tryFetchFavorite();
+    _tryFetchReviews(force: true);
   }
 
   void _showFavSnack(bool added) {
@@ -100,6 +117,38 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
     final initial = (widget.doctor.name?.isNotEmpty ?? false)
         ? widget.doctor.name![0].toUpperCase()
         : 'D';
+    final did = widget.doctor.doctorId;
+    final cached = did == null
+        ? null
+        : ref.watch(favoriteViewModelProvider).doctorFavorites[did];
+    if (cached != null && cached != _isFavorite) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _isFavorite = cached);
+      });
+    }
+
+    ref.listen<PatientLoginState>(patientLoginViewModelProvider, (prev, next) {
+      if (prev?.patientId != next.patientId) {
+        _tryFetchFavorite();
+      }
+    });
+
+    ref.listen<FavoriteState>(favoriteViewModelProvider, (prev, next) {
+      final did = widget.doctor.doctorId;
+      if (did == null) return;
+      final prevFav = prev?.doctorFavorites[did];
+      final nextFav = next.doctorFavorites[did];
+      if (nextFav != null && nextFav != prevFav && mounted) {
+        setState(() => _isFavorite = nextFav);
+      }
+      if (next.error != null && next.error != prev?.error && mounted) {
+        _showErrorSnack(next.error!);
+      }
+    });
+
+    final reviewState = ref.watch(reviewViewModelProvider);
+    final reviews = reviewState.reviews ?? <ReviewModel>[];
+    final avgRating = _avgRating(reviews);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF4F6FB),
@@ -129,10 +178,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 child: _FavoriteButton(
                   initialFav: _isFavorite,
                   onWhite:    true,   // on blue AppBar → use white style
-                  onToggle: (v) {
-                    setState(() => _isFavorite = v);
-                    _showFavSnack(v);
-                  },
+                  onToggle: _handleFavoriteToggle,
                 ),
               ),
             ],
@@ -251,10 +297,7 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                 // Shown inline below hero so user can also tap here
                 _FavouritePill(
                   isFav: _isFavorite,
-                  onToggle: (v) {
-                    setState(() => _isFavorite = v);
-                    _showFavSnack(v);
-                  },
+                  onToggle: _handleFavoriteToggle,
                 ),
                 const SizedBox(height: 14),
 
@@ -314,17 +357,28 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   trailing: Row(children: [
                     const Icon(Icons.star_rounded, color: kOrange, size: 14),
                     const SizedBox(width: 3),
-                    const Text('4.8', style: TextStyle(
+                    Text(
+                      avgRating == 0 ? '--' : avgRating.toStringAsFixed(1),
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: kTextDark)),
-                    const Text('  (128 reviews)',
-                        style: TextStyle(fontSize: 11, color: kTextMid)),
+                        color: kTextDark,
+                      ),
+                    ),
+                    Text(
+                      '  (${reviews.length} reviews)',
+                      style: const TextStyle(fontSize: 11, color: kTextMid),
+                    ),
                   ]),
                   child: Column(
-                    children: _demoReviews
-                        .map((r) => _ReviewCard(review: r))
-                        .toList(),
+                    children: reviews.isEmpty
+                        ? [
+                            const _EmptyReviews(),
+                          ]
+                        : reviews
+                            .map(_toUiReview)
+                            .map((r) => _ReviewCard(review: r))
+                            .toList(),
                   ),
                 ),
               ]),
@@ -365,6 +419,71 @@ class _DoctorProfileScreenState extends State<DoctorProfileScreen> {
                   borderRadius: BorderRadius.circular(14)),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  void _tryFetchFavorite() {
+    final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    final did = widget.doctor.doctorId ?? 0;
+    if (pid <= 0 || did <= 0) return;
+    if (_favFetchedForDoctorId == did && _favFetchedForPatientId == pid) {
+      return;
+    }
+    _favFetchedForDoctorId = did;
+    _favFetchedForPatientId = pid;
+    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did);
+  }
+
+  void _tryFetchReviews({bool force = false}) {
+    final did = widget.doctor.doctorId ?? 0;
+    if (did <= 0) return;
+    if (_didFetchReviews && !force) return;
+    _didFetchReviews = true;
+    ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did);
+  }
+
+  Future<void> _handleFavoriteToggle(bool v) async {
+    final prev = _isFavorite;
+    setState(() => _isFavorite = v);
+
+    final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    final did = widget.doctor.doctorId ?? 0;
+    if (pid <= 0 || did <= 0) {
+      setState(() => _isFavorite = prev);
+      _showErrorSnack('Please login to use favourites');
+      return;
+    }
+
+    final notifier = ref.read(favoriteViewModelProvider.notifier);
+    final ok = v
+        ? await notifier.addFavoriteDoctor(pid, did)
+        : await notifier.deleteFavoriteDoctor(pid, did);
+
+    if (!ok) {
+      setState(() => _isFavorite = prev);
+      final err = ref.read(favoriteViewModelProvider).error ??
+          'Failed to update favourites';
+      _showErrorSnack(err);
+      return;
+    }
+
+    _showFavSnack(v);
+  }
+
+  void _showErrorSnack(String message) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: kRed,
+        duration: const Duration(seconds: 2),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -425,6 +544,14 @@ class _FavoriteButtonState extends State<_FavoriteButton>
 
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  void didUpdateWidget(_FavoriteButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialFav != widget.initialFav) {
+      setState(() => _isFav = widget.initialFav);
+    }
+  }
 
   void _toggle() {
     HapticFeedback.mediumImpact();
@@ -493,6 +620,10 @@ class _FavoriteButtonState extends State<_FavoriteButton>
 // ─────────────────────────────────────────────────────────────────────────────
 // FAVOURITE PILL  — inline row below hero section
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FAVOURITE PILL  — inline row below hero section
+// ─────────────────────────────────────────────────────────────────────────────
 class _FavouritePill extends StatefulWidget {
   final bool isFav;
   final void Function(bool) onToggle;
@@ -538,13 +669,6 @@ class _FavouritePillState extends State<_FavouritePill>
 
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
-
-  void _toggle() {
-    HapticFeedback.lightImpact();
-    setState(() => _isFav = !_isFav);
-    widget.onToggle(_isFav);
-    _ctrl.forward(from: 0);
-  }
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -621,7 +745,8 @@ class _FavouritePillState extends State<_FavouritePill>
   );
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
 Color _dpAccent(String? s) {
   const m = <String, Color>{
     'cardiology':    Color(0xFFEF4444),
@@ -639,7 +764,43 @@ Color _dpAccent(String? s) {
 String _dpCap(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
 
-// ─── Sub-widgets ─────────────────────────────────────────────────────────────
+double _avgRating(List<ReviewModel> reviews) {
+  if (reviews.isEmpty) return 0;
+  final sum = reviews.fold<double>(
+    0,
+    (acc, r) => acc + (r.rating?.toDouble() ?? 0),
+  );
+  return sum / reviews.length;
+}
+
+_Review _toUiReview(ReviewModel r) {
+  final name = (r.patientName?.isNotEmpty ?? false)
+      ? r.patientName!
+      : (r.name?.isNotEmpty ?? false)
+          ? r.name!
+          : 'Patient';
+  return _Review(
+    name: name,
+    rating: (r.rating ?? 0).toDouble(),
+    comment: r.comment?.isNotEmpty == true
+        ? r.comment!
+        : 'No comment provided.',
+    date: _fmtReviewDate(r.createdAt),
+  );
+}
+
+String _fmtReviewDate(String? iso) {
+  if (iso == null || iso.trim().isEmpty) return '';
+  final dt = DateTime.tryParse(iso);
+  if (dt == null) return '';
+  const months = [
+    'Jan','Feb','Mar','Apr','May','Jun',
+    'Jul','Aug','Sep','Oct','Nov','Dec',
+  ];
+  return '${months[dt.month - 1]} ${dt.year}';
+}
+
+// Sub-widgets
 class _HeroStat extends StatelessWidget {
   final String   label;
   final String   value;
@@ -788,3 +949,23 @@ class _ReviewCard extends StatelessWidget {
     ]),
   );
 }
+
+class _EmptyReviews extends StatelessWidget {
+  const _EmptyReviews();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: kBg,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: kBorder, width: 0.5),
+    ),
+    child: const Text(
+      'No reviews yet. Be the first to share your experience.',
+      style: TextStyle(fontSize: 11.5, color: kTextMid, height: 1.5),
+    ),
+  );
+}
+
+

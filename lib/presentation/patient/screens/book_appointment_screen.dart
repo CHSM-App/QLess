@@ -9,6 +9,7 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 
 // ─── Colour palette ───────────────────────────────────────────────────────────
 const kPrimary   = Color(0xFF1A73E8);
@@ -125,6 +126,14 @@ class _FavoriteButtonState extends State<_FavoriteButton>
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
 
+  @override
+  void didUpdateWidget(_FavoriteButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialFav != widget.initialFav) {
+      setState(() => _isFav = widget.initialFav);
+    }
+  }
+
   void _toggle() {
     HapticFeedback.mediumImpact();
     setState(() => _isFav = !_isFav);
@@ -220,11 +229,18 @@ class _BookAppointmentScreenState
   bool      _isBooking   = false;
   int?      _selectedMemberId;
   bool      _isFavorite  = false;   // ← favorite state
+  int?      _favFetchedForDoctorId;
+  int?      _favFetchedForPatientId;
+  bool      _didRouteRefresh = false;
 
   @override
   void initState() {
     super.initState();
-    _isFavorite      = widget.initialFavorite;
+    final did = widget.doctor.doctorId;
+    final cached = did == null
+        ? null
+        : ref.read(favoriteViewModelProvider).doctorFavorites[did];
+    _isFavorite      = cached ?? widget.initialFavorite;
     _selectedMemberId = widget.bookingForMemberId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final id = widget.doctor.doctorId;
@@ -236,7 +252,20 @@ class _BookAppointmentScreenState
       if (pid > 0) {
         ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
       }
+      _tryFetchFavorite();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_didRouteRefresh) {
+      _didRouteRefresh = true;
+      return;
+    }
+    _favFetchedForDoctorId = null;
+    _favFetchedForPatientId = null;
+    _tryFetchFavorite();
   }
 
   String _fmtDateApi(DateTime dt) =>
@@ -324,6 +353,15 @@ class _BookAppointmentScreenState
     final members    = famState.allfamilyMembers.maybeWhen(
       data: (m) => m, orElse: () => <FamilyMember>[],
     );
+    final did = widget.doctor.doctorId;
+    final cached = did == null
+        ? null
+        : ref.watch(favoriteViewModelProvider).doctorFavorites[did];
+    if (cached != null && cached != _isFavorite) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _isFavorite = cached);
+      });
+    }
 
     final bookedTimes = <String>{};
     if (_selectedDate != null) {
@@ -355,6 +393,25 @@ class _BookAppointmentScreenState
       }
     });
 
+    ref.listen<PatientLoginState>(patientLoginViewModelProvider, (prev, next) {
+      if (prev?.patientId != next.patientId) {
+        _tryFetchFavorite();
+      }
+    });
+
+    ref.listen<FavoriteState>(favoriteViewModelProvider, (prev, next) {
+      final did = widget.doctor.doctorId;
+      if (did == null) return;
+      final prevFav = prev?.doctorFavorites[did];
+      final nextFav = next.doctorFavorites[did];
+      if (nextFav != null && nextFav != prevFav && mounted) {
+        setState(() => _isFavorite = nextFav);
+      }
+      if (next.error != null && next.error != prev?.error && mounted) {
+        _showErrorSnack(next.error!);
+      }
+    });
+
     final enabled      = state.doctorAvailabilities.where((a) => a.isEnabled == true).toList();
     final grouped      = _grouped(enabled);
     final selAvail     = _selectedSlotId == null
@@ -377,10 +434,7 @@ class _BookAppointmentScreenState
             isDark:     isDark,
             isFavorite: _isFavorite,
             onBack:     () => Navigator.pop(context),
-            onFavToggle: (v) {
-              setState(() => _isFavorite = v);
-              _showFavSnack(v);
-            },
+            onFavToggle: _handleFavoriteToggle,
           ),
           SliverToBoxAdapter(
             child: _DoctorStatsRow(doctor: widget.doctor, isDark: isDark),
@@ -464,6 +518,63 @@ class _BookAppointmentScreenState
         ]),
       ),
     );
+  }
+
+  void _showErrorSnack(String message) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: kRed,
+        duration: const Duration(seconds: 2),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
+  void _tryFetchFavorite() {
+    final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    final did = widget.doctor.doctorId ?? 0;
+    if (pid <= 0 || did <= 0) return;
+    if (_favFetchedForDoctorId == did && _favFetchedForPatientId == pid) {
+      return;
+    }
+    _favFetchedForDoctorId = did;
+    _favFetchedForPatientId = pid;
+    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did);
+  }
+
+  Future<void> _handleFavoriteToggle(bool v) async {
+    final prev = _isFavorite;
+    setState(() => _isFavorite = v);
+
+    final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    final did = widget.doctor.doctorId ?? 0;
+    if (pid <= 0 || did <= 0) {
+      setState(() => _isFavorite = prev);
+      _showErrorSnack('Please login to use favourites');
+      return;
+    }
+
+    final notifier = ref.read(favoriteViewModelProvider.notifier);
+    final ok = v
+        ? await notifier.addFavoriteDoctor(pid, did)
+        : await notifier.deleteFavoriteDoctor(pid, did);
+
+    if (!ok) {
+      setState(() => _isFavorite = prev);
+      final err = ref.read(favoriteViewModelProvider).error ??
+          'Failed to update favourites';
+      _showErrorSnack(err);
+      return;
+    }
+
+    _showFavSnack(v);
   }
 
   void _onConfirm() {
@@ -1376,9 +1487,120 @@ class _BaNoAvail extends StatelessWidget {
           style: ElevatedButton.styleFrom(backgroundColor: kPrimary, foregroundColor: Colors.white,
             elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-          child: const Text('Go Back'),
+      child: const Text('Go Back'),
         ),
       ]),
+    ),
+  );
+}
+
+class AppointmentReviewInput {
+  final int rating;
+  final String comment;
+  const AppointmentReviewInput({required this.rating, required this.comment});
+}
+
+Future<AppointmentReviewInput?> showAppointmentReviewDialog(
+  BuildContext context, {
+  required String doctorName,
+}) {
+  final commentCtrl = TextEditingController();
+  int rating = 0;
+
+  Future<void> showRatingError() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Please select a rating'),
+        backgroundColor: kRed,
+      ),
+    );
+  }
+
+  return showDialog<AppointmentReviewInput>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Rate your visit',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'How was your appointment with Dr. $doctorName?',
+              style: const TextStyle(fontSize: 12.5, color: kTextMid),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: List.generate(5, (i) {
+                final idx = i + 1;
+                return IconButton(
+                  onPressed: () => setState(() => rating = idx),
+                  icon: Icon(
+                    idx <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
+                    color: idx <= rating ? kOrange : kBorder,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: commentCtrl,
+              maxLines: 3,
+              decoration: InputDecoration(
+                hintText: 'Write a short review (optional)',
+                hintStyle: const TextStyle(fontSize: 12.5, color: kTextMid),
+                filled: true,
+                fillColor: kBg,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: kPrimary, width: 1.2),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              if (rating <= 0) {
+                showRatingError();
+                return;
+              }
+              Navigator.pop(
+                ctx,
+                AppointmentReviewInput(
+                  rating: rating,
+                  comment: commentCtrl.text.trim(),
+                ),
+              );
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
     ),
   );
 }

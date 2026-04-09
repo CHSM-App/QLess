@@ -2,8 +2,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/doctors_viewmodel.dart';
+import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
 
 final patientLoginViewModelProvider =
     StateNotifierProvider<PatientLoginViewmodel, PatientLoginState>((ref) {
@@ -26,8 +28,20 @@ final familyViewModelProvider =
   return FamilyViewmodel(usecase);
 });
 
+final favoriteViewModelProvider =
+    StateNotifierProvider<FavoriteViewmodel, FavoriteState>((ref) {
+  final usecase = ref.watch(favoriteUsecaseProvider);
+  return FavoriteViewmodel(usecase);
+});
+
 final appointmentViewModelProvider =
     StateNotifierProvider<AppointmentViewmodel, AppointmentState>((ref) {
   final usecase = ref.watch(appointmentUsecaseProvider);
   return AppointmentViewmodel(usecase);
+});
+
+final reviewViewModelProvider =
+    StateNotifierProvider<ReviewViewmodel, ReviewState>((ref) {
+  final usecase = ref.watch(reviewUsecaseProvider);
+  return ReviewViewmodel(usecase);
 });

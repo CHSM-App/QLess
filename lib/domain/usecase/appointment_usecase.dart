@@ -44,4 +44,10 @@ class AppointmentUsecase {
   Future<List<AppointmentList>> getPatientAppointments(int familyId) {
     return appointmentRepository.getPatientAppointments(familyId);
   }
+
+  Future<AppointmentResponseModel> queueNext(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queueNext(appointmentRequest);
+  }
 }
