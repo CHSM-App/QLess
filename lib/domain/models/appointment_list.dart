@@ -44,8 +44,6 @@ class AppointmentList {
   @JsonKey(name: 'longitude')
   double? longitude;
 
-  @JsonKey(name: 'patient_name')
-  String? name;
 
   @JsonKey(name: 'gender')
   String? gender;
@@ -72,11 +70,6 @@ class AppointmentList {
   @JsonKey(name: 'status')
   String? status;
 
-  @JsonKey(name: 'start_time')
-  String? startTime;
-
-  @JsonKey(name: 'end_time')
-  String? endTime;
 
   @JsonKey(name: 'booking_for')
   String? bookingFor;
@@ -98,7 +91,6 @@ class AppointmentList {
     this.specialization,
     this.experience,
     this.clinicId,
-    this.name,
     this.gender,
     this.appointmentDate,
     this.dob,
@@ -111,10 +103,9 @@ class AppointmentList {
     this.bookingFor,
     this.clinicAddress,
     this.clinicName,
-    this.endTime,
     this.latitude,
     this.longitude,
-    this.startTime,
+
     this.clinicContact,
   });
 

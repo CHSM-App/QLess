@@ -8,6 +8,7 @@ import 'package:qless/presentation/patient/screens/book_appointment_screen.dart'
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ── THEME ──
 const kPrimary = Color(0xFF0D9488);
@@ -32,11 +33,11 @@ const kDivider = Color(0xFFE5E7EB);
 
 // ── FILTER TABS ──
 const _filters = [
-  _FilterTab("all",       "All",       Icons.list_rounded,            kPrimary, kPrimaryLight),
-  _FilterTab("today",     "Today",     Icons.today_rounded,            kPrimary,   kBlueLight),
-  _FilterTab("upcoming",  "Upcoming",  Icons.schedule_rounded,         kPrimary, kPurpleLight),
-  _FilterTab("completed", "Completed", Icons.check_circle_rounded,     kPrimary,  kGreenLight),
-  _FilterTab("cancelled", "Cancelled", Icons.cancel_rounded,           kPrimary,    kRedLight),
+  _FilterTab("all",       "All",       Icons.list_rounded,         kPrimary, kPrimaryLight),
+  _FilterTab("today",     "Today",     Icons.today_rounded,         kPrimary, kBlueLight),
+  _FilterTab("upcoming",  "Upcoming",  Icons.schedule_rounded,      kPrimary, kPurpleLight),
+  _FilterTab("completed", "Completed", Icons.check_circle_rounded,  kPrimary, kGreenLight),
+  _FilterTab("cancelled", "Cancelled", Icons.cancel_rounded,        kPrimary, kRedLight),
 ];
 
 class _FilterTab {
@@ -156,20 +157,14 @@ bool _isUpcoming(AppointmentList a) {
   return apptDay.isAfter(todayDay);
 }
 
-bool _isCompleted(AppointmentList a) =>
-    a.status?.toLowerCase() == "completed";
-
-bool _isCancelled(AppointmentList a) =>
-    a.status?.toLowerCase() == "cancelled";
+bool _isCompleted(AppointmentList a) => a.status?.toLowerCase() == "completed";
+bool _isCancelled(AppointmentList a) => a.status?.toLowerCase() == "cancelled";
 
 List<AppointmentList> applyFilter(
     List<AppointmentList> list, String filter, String search) {
   return list.where((a) {
-    // search
     final matchSearch = search.isEmpty ||
         (a.patientName?.toLowerCase().contains(search.toLowerCase()) ?? false);
-
-    // tab filter
     final bool matchFilter;
     switch (filter) {
       case "today":
@@ -184,10 +179,9 @@ List<AppointmentList> applyFilter(
       case "cancelled":
         matchFilter = _isCancelled(a);
         break;
-      default: // "all"
+      default:
         matchFilter = true;
     }
-
     return matchSearch && matchFilter;
   }).toList();
 }
@@ -278,6 +272,30 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     );
   }
 
+  bool _canReview(AppointmentList a) {
+    return a.status?.toLowerCase() == 'completed' &&
+        a.appointmentId != null &&
+        a.doctorId != null &&
+        a.patientId != null;
+  }
+
+  Future<void> _handleReview(BuildContext context, AppointmentList a) async {
+    final input = await showAppointmentReviewDialog(
+      context,
+      doctorName: a.doctorName ?? 'Doctor',
+    );
+    if (input == null) return;
+    await ref.read(reviewViewModelProvider.notifier).submitReview(
+          ReviewRequestModel(
+            appointmentId: a.appointmentId!,
+            doctorId: a.doctorId!,
+            patientId: a.patientId!,
+            rating: input.rating,
+            comment: input.comment,
+          ),
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<PatientLoginState>(patientLoginViewModelProvider, (prev, next) {
@@ -287,9 +305,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         _didFetch = false;
         _ensurePatientIdAndFetch();
       }
-      if (_idMissing && nextId != 0) {
-        setState(() => _idMissing = false);
-      }
+      if (_idMissing && nextId != 0) setState(() => _idMissing = false);
     });
 
     ref.listen<ReviewState>(reviewViewModelProvider, (prev, next) {
@@ -373,7 +389,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       ),
       child: Column(
         children: [
-          // Title row
           Padding(
             padding: EdgeInsets.fromLTRB(
                 20, MediaQuery.of(context).padding.top + 16, 20, 0),
@@ -407,10 +422,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
               ],
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // Search bar
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
@@ -439,10 +451,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // Tab bar
           TabBar(
             controller: _tabController,
             isScrollable: true,
@@ -469,8 +478,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
                 decoration: BoxDecoration(
                   color: isSelected ? f.color : kBg,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: isSelected ? f.color : kDivider),
+                  border:
+                      Border.all(color: isSelected ? f.color : kDivider),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -481,8 +490,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
                     const SizedBox(width: 6),
                     Text(f.label,
                         style: TextStyle(
-                            color:
-                                isSelected ? Colors.white : kTextMid,
+                            color: isSelected ? Colors.white : kTextMid,
                             fontSize: 12,
                             fontWeight: isSelected
                                 ? FontWeight.w700
@@ -492,7 +500,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
               );
             }).toList(),
           ),
-
           const SizedBox(height: 4),
         ],
       ),
@@ -519,8 +526,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
           children: [
             Container(
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                  color: tab.bg, shape: BoxShape.circle),
+              decoration:
+                  BoxDecoration(color: tab.bg, shape: BoxShape.circle),
               child: Icon(tab.icon, size: 36, color: tab.color),
             ),
             const SizedBox(height: 16),
@@ -560,47 +567,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
           final a = filtered[index];
           return _AppointmentCard(
             appointment: a,
-            statusColor: getStatusColor(a.status),
-            statusBgColor: getStatusBgColor(a.status),
-            statusIcon: getStatusIcon(a.status),
-            formattedDate: a.appointmentDate != null
-                ? _formatDate(a.appointmentDate!)
-                : null,
-            relativeDate: a.appointmentDate != null
-                ? _formatDateRelative(a.appointmentDate!)
-                : null,
-            formattedDob:
-                a.dob != null ? _formatDate(a.dob!) : null,
-            onReview: _canReview(a)
-                ? () => _handleReview(context, a)
-                : null,
+            onViewDetails: () => _openDetail(a),
+            onReview: _canReview(a) ? () => _handleReview(context, a) : null,
           );
         },
       ),
-    );
-  }
-
-  bool _canReview(AppointmentList a) {
-    return a.status?.toLowerCase() == 'completed' &&
-        a.appointmentId != null &&
-        a.doctorId != null &&
-        a.patientId != null;
-  }
-
-  Future<void> _handleReview(BuildContext context, AppointmentList a) async {
-    final input = await showAppointmentReviewDialog(
-      context,
-      doctorName: a.doctorName ?? 'Doctor',
-    );
-    if (input == null) return;
-    await ref.read(reviewViewModelProvider.notifier).submitReview(
-      ReviewRequestModel(
-        appointmentId: a.appointmentId!,
-        doctorId: a.doctorId!,
-        patientId: a.patientId!,
-        rating: input.rating,
-        comment: input.comment,
-      )
     );
   }
 
@@ -648,8 +619,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
               const Text(
                   "Couldn't load your appointments.\nPlease try again.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: kTextMid, fontSize: 13, height: 1.5)),
+                  style:
+                      TextStyle(color: kTextMid, fontSize: 13, height: 1.5)),
               const SizedBox(height: 20),
               SizedBox(
                 width: 140,
@@ -704,8 +675,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
               const Text(
                   "Please login again to\nview your appointments.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                      color: kTextMid, fontSize: 13, height: 1.5)),
+                  style:
+                      TextStyle(color: kTextMid, fontSize: 13, height: 1.5)),
             ],
           ),
         ),
@@ -723,12 +694,7 @@ class _AppointmentCard extends StatelessWidget {
 
   const _AppointmentCard({
     required this.appointment,
-    required this.statusColor,
-    required this.statusBgColor,
-    required this.statusIcon,
-    this.formattedDate,
-    this.relativeDate,
-    this.formattedDob,
+    required this.onViewDetails,
     this.onReview,
   });
 
@@ -782,7 +748,7 @@ class _AppointmentCard extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          (appointment.patientName ?? "?")[0].toUpperCase(),
+                          (a.patientName ?? "?")[0].toUpperCase(),
                           style: const TextStyle(
                               fontSize: 19,
                               fontWeight: FontWeight.w700,
@@ -795,14 +761,13 @@ class _AppointmentCard extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            appointment.patientName ?? "Unknown",
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: kTextDark,
-                              fontSize: 15,
-                            ),
-                          ),
+                          Text(a.patientName ?? "Unknown",
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: kTextDark,
+                                  fontSize: 14),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
                           Row(
                             children: [
@@ -879,7 +844,7 @@ class _AppointmentCard extends StatelessWidget {
 
                 const SizedBox(height: 10),
 
-                // ── ROW 3: View Details | Map | Call ──
+                // ── ROW 3: View Details | Review | Map | Call ──
                 Row(
                   children: [
                     Expanded(
@@ -901,14 +866,33 @@ class _AppointmentCard extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (onReview != null) ...[
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: 38,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kPrimary,
+                            side: const BorderSide(color: kPrimary),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: onReview,
+                          child: const Text("Review",
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13)),
+                        ),
+                      ),
+                    ],
                     const SizedBox(width: 8),
                     if (hasMap) ...[
                       _iconBtn(
                         icon: Icons.map_rounded,
                         bg: kBlueLight,
                         iconColor: kBlue,
-                        onTap: () => openMap(
-                            a.latitude!, a.longitude!, a.clinicName),
+                        onTap: () =>
+                            openMap(a.latitude!, a.longitude!, a.clinicName),
                       ),
                       const SizedBox(width: 8),
                     ],
@@ -1020,8 +1004,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                  color: kDivider,
-                  borderRadius: BorderRadius.circular(2)),
+                  color: kDivider, borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(height: 16),
             Expanded(
@@ -1055,7 +1038,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
                           ),
                           child: Center(
                             child: Text(
-                              (a.name ?? "?")[0].toUpperCase(),
+                              (a.patientName ?? "?")[0].toUpperCase(),
                               style: const TextStyle(
                                   fontSize: 28,
                                   fontWeight: FontWeight.w800,
@@ -1068,7 +1051,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(a.name ?? "Unknown",
+                              Text(a.patientName ?? "Unknown",
                                   style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
@@ -1078,18 +1061,17 @@ class _AppointmentDetailSheet extends StatelessWidget {
                                 "${a.gender ?? "—"}  ·  DOB: ${formatDate(a.dob)}",
                                 style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.white
-                                        .withValues(alpha: 0.8)),
+                                    color:
+                                        Colors.white.withValues(alpha: 0.8)),
                               ),
                               const SizedBox(height: 10),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: Colors.white
-                                      .withValues(alpha: 0.18),
-                                  borderRadius:
-                                      BorderRadius.circular(20),
+                                  color:
+                                      Colors.white.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                       color: Colors.white
                                           .withValues(alpha: 0.3)),
@@ -1104,8 +1086,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
                                         style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 12,
-                                            fontWeight:
-                                                FontWeight.w600)),
+                                            fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                               ),
@@ -1116,64 +1097,200 @@ class _AppointmentDetailSheet extends StatelessWidget {
                     ),
                   ),
 
-                const SizedBox(height: 14),
+                  const SizedBox(height: 24),
 
-                // ── ACTIONS ──
-                Row(
-                  children: [
-                    Expanded(
-                      child: SizedBox(
-                        height: 42,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(11)),
-                          ),
-                          onPressed: () {
-                            // navigate to detail
-                          },
-                          child: const Text(
-                            "View Details",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
+                  // ── SCHEDULE ──
+                  _sheetSection("Schedule"),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: _scheduleChip(
+                            icon: Icons.calendar_today_rounded,
+                            color: kBlue,
+                            bg: kBlueLight,
+                            label: "Date",
+                            value: formatDate(a.appointmentDate),
+                            sub: formatDateRelative(a.appointmentDate),
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _scheduleChip(
+                            icon: Icons.access_time_filled_rounded,
+                            color: kGreen,
+                            bg: kGreenLight,
+                            label: "Time",
+                            value: formatTime(a.startTime),
+                            sub: a.endTime != null
+                                ? "Ends ${formatTime(a.endTime)}"
+                                : "",
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── DOCTOR ──
+                  _sheetSection("Doctor"),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: kBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: kDivider),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  kPrimary.withValues(alpha: 0.15),
+                                  kPrimary.withValues(alpha: 0.04),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(Icons.person_rounded,
+                                color: kPrimary, size: 26),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(a.doctorName ?? "—",
+                                    style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        color: kTextDark)),
+                                const SizedBox(height: 3),
+                                Text(a.specialization ?? "—",
+                                    style: const TextStyle(
+                                        color: kPrimary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500)),
+                                if (a.experience != null) ...[
+                                  const SizedBox(height: 3),
+                                  Text("${a.experience} yrs experience",
+                                      style: const TextStyle(
+                                          color: kTextMid, fontSize: 11)),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    if (onReview != null) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: SizedBox(
-                          height: 42,
-                          child: OutlinedButton(
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: kPrimary,
-                              side: const BorderSide(color: kPrimary),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(11),
-                              ),
-                            ),
-                            onPressed: onReview,
-                            child: const Text(
-                              "Review",
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── CLINIC ──
+                  _sheetSection("Clinic"),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: kBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: kDivider),
                       ),
-                    ],
-                    const SizedBox(width: 8),
-                    Container(
-                      height: 42,
-                      width: 42,
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: kAmberLight,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                    Icons.local_hospital_rounded,
+                                    color: kAmber,
+                                    size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      a.clinicName ?? "—",
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: kTextDark),
+                                    ),
+                                    if (a.clinicAddress != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(a.clinicAddress!,
+                                          style: const TextStyle(
+                                              color: kTextMid,
+                                              fontSize: 12)),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (hasMap) ...[
+                            const SizedBox(height: 14),
+                            const Divider(height: 1, color: kDivider),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 42,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kBlueLight,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.circular(11)),
+                                ),
+                                onPressed: () => openMap(
+                                    a.latitude!, a.longitude!, a.clinicName),
+                                icon: const Icon(Icons.map_rounded,
+                                    color: kBlue, size: 18),
+                                label: const Text(
+                                  "Open in Google Maps",
+                                  style: TextStyle(
+                                      color: kBlue,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // ── DETAILS ──
+                  _sheetSection("Details"),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
                       decoration: BoxDecoration(
                         color: kBg,
                         borderRadius: BorderRadius.circular(16),
@@ -1182,7 +1299,7 @@ class _AppointmentDetailSheet extends StatelessWidget {
                       child: Column(
                         children: [
                           _detailRow(Icons.badge_rounded, kBlueLight,
-                              kBlue, "Patient Name", a.name ?? "—"),
+                              kBlue, "Patient Name", a.patientName ?? "—"),
                           _dividerLine(),
                           _detailRow(Icons.wc_rounded, kPurpleLight,
                               kPurple, "Gender", a.gender ?? "—"),
@@ -1293,4 +1410,37 @@ class _AppointmentDetailSheet extends StatelessWidget {
       ),
     );
   }
+
+  Widget _detailRow(
+      IconData icon, Color bg, Color color, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+                color: bg, borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 14, color: color),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(label,
+                style: const TextStyle(
+                    color: kTextMid,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500)),
+          ),
+          Text(value,
+              style: const TextStyle(
+                  color: kTextDark,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  Widget _dividerLine() =>
+      const Divider(height: 1, color: kDivider, indent: 14, endIndent: 14);
 }

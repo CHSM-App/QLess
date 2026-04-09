@@ -16,7 +16,6 @@ AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
       specialization: json['specialization'] as String?,
       experience: (json['experience'] as num?)?.toInt(),
       clinicId: json['clinic_id'] as String?,
-      name: json['patient_name'] as String?,
       gender: json['gender'] as String?,
       appointmentDate: json['appointment_date'] as String?,
       dob: json['DOB'] as String?,
@@ -29,12 +28,10 @@ AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
       bookingFor: json['booking_for'] as String?,
       clinicAddress: json['clinic_address'] as String?,
       clinicName: json['clinic_name'] as String?,
-      endTime: json['end_time'] as String?,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
-      startTime: json['start_time'] as String?,
       clinicContact: json['clinic_contact'] as String?,
-    );
+    )..patientName = json['patient_name'] as String?;
 
 Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
     <String, dynamic>{
@@ -51,7 +48,6 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'clinic_contact': instance.clinicContact,
       'latitude': instance.latitude,
       'longitude': instance.longitude,
-      'patient_name': instance.name,
       'gender': instance.gender,
       'appointment_date': instance.appointmentDate,
       'DOB': instance.dob,
@@ -60,8 +56,6 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'start_time': instance.startTime,
       'end_time': instance.endTime,
       'status': instance.status,
-      'start_time': instance.startTime,
-      'end_time': instance.endTime,
       'booking_for': instance.bookingFor,
       'user_type': instance.userType,
       'patient_name': instance.patientName,
