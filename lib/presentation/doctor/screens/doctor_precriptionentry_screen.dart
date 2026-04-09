@@ -1,5 +1,6 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -599,6 +600,40 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     }
     return null;
   }
+
+  String _todayApi() {
+    final now = DateTime.now();
+    return '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+  }
+
+  Future<bool> _queueNextIfNeeded() async {
+    try {
+      final req = AppointmentRequestModel(
+        operation: 'QUEUE_NEXT',
+        doctorId: widget.doctorId,
+        appointmentDate: _todayApi(),
+      );
+      debugPrint('QueueNext request: ${req.toJson()}');
+      final result = await ref
+          .read(appointmentViewModelProvider.notifier)
+          .queueNext(req);
+      debugPrint('QueueNext response: ${result.toJson()}');
+      if (result.success == true) return true;
+      _showSnack(result.message ?? 'Queue next failed', isError: true);
+      return false;
+    } catch (e) {
+      debugPrint('QueueNext error: $e');
+      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      return false;
+    }
+  }
+
+  Future<void> _handleNextPatient() async {
+    final ok = await _queueNextIfNeeded();
+    if (!mounted || !ok) return;
+    Navigator.pop(context);
+    Navigator.pop(context);
+  }
 Future<void> _completePrescription() async {
   final error = _validate();
   if (error != null) { _showSnack(error, isError: true); return; }
@@ -640,8 +675,8 @@ Future<void> _completePrescription() async {
       medicineCount: _meds.length,
       followUpDate: followUpStr,
       onBackToList: () {
-        Navigator.pop(context); 
-        Navigator.pop(context);       },
+        _handleNextPatient();
+      },
     ),
   );
 }
@@ -1524,7 +1559,7 @@ class _SuccessDialog extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: onBackToList,
               icon: const Icon(Icons.people_rounded, size: 16, color: Colors.white),
-              label: const Text('Back to Patient List',
+              label: const Text('Next Patient',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,

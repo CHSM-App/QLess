@@ -5,6 +5,8 @@ part 'appointment_request_model.g.dart';
 @JsonSerializable()
 class AppointmentRequestModel {
 
+  @JsonKey(name: 'operation')
+  String? operation;
 
   @JsonKey(name: 'doctor_id')
   int? doctorId;
@@ -25,6 +27,7 @@ class AppointmentRequestModel {
   int? userType;
 
   AppointmentRequestModel({
+    this.operation,
     this.doctorId,
     this.patientId,
     this.appointmentId,

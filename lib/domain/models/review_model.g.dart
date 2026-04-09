@@ -7,16 +7,16 @@ part of 'review_model.dart';
 // **************************************************************************
 
 ReviewModel _$ReviewModelFromJson(Map<String, dynamic> json) => ReviewModel(
-      reviewId: (json['review_id'] as num?)?.toInt(),
-      appointmentId: (json['appointment_id'] as num?)?.toInt(),
-      doctorId: (json['doctor_id'] as num?)?.toInt(),
-      patientId: (json['patient_id'] as num?)?.toInt(),
-      patientName: json['patient_name'] as String?,
-      name: json['name'] as String?,
-      rating: json['rating'] as num?,
-      comment: json['comment'] as String?,
-      createdAt: json['created_at'] as String?,
-    );
+  reviewId: (json['review_id'] as num?)?.toInt(),
+  appointmentId: (json['appointment_id'] as num?)?.toInt(),
+  doctorId: (json['doctor_id'] as num?)?.toInt(),
+  patientId: (json['patient_id'] as num?)?.toInt(),
+  patientName: json['patient_name'] as String?,
+  name: json['name'] as String?,
+  rating: json['rating'] as num?,
+  comment: json['comment'] as String?,
+  createdAt: json['created_at'] as String?,
+);
 
 Map<String, dynamic> _$ReviewModelToJson(ReviewModel instance) =>
     <String, dynamic>{

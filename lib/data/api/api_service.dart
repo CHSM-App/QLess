@@ -75,6 +75,12 @@ abstract class ApiService {
     @Body() DoctorScheduleModel doctorSchedule,
   );
 
+  
+  @POST("doctor/insert/appointment/queueNext")
+Future<AppointmentResponseModel> queueNext(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
   // DELETE API
   @DELETE("doctor/index/deleteMedicine/{medicine_id}")
   Future<Medicine> deleteMedicine(@Path("medicine_id") int medicineId);
@@ -158,6 +164,9 @@ abstract class ApiService {
   Future<AppointmentResponseModel> updateQueueStatus(
     @Body() AppointmentRequestModel appointmentRequest,
   );
+
+
+
 
   @POST("patient/insert/favoriteDoctor/add")
   Future<dynamic> addFavoriteDoctor(@Body() Map<String, dynamic> body);
