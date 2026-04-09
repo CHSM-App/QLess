@@ -18,8 +18,19 @@ class PatientBottomNav extends StatefulWidget {
 
 class _PatientBottomNavState extends State<PatientBottomNav> {
   int _tab = 0;
+  final GlobalKey<AppointmentScreenState> _appointmentsKey =
+      GlobalKey<AppointmentScreenState>();
 
   late final List<Widget> _screens;
+
+  void _setTab(int i) {
+    if (_tab != i) {
+      setState(() => _tab = i);
+    }
+    if (i == 2) {
+      _appointmentsKey.currentState?.refreshOnVisible();
+    }
+  }
 
   @override
   void initState() {
@@ -28,10 +39,10 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
       HomeScreen(
         onToggleTheme: widget.onToggleTheme,
         themeMode: widget.themeMode,
-        onTabChange: (i) => setState(() => _tab = i),
+        onTabChange: _setTab,
       ),
-       const DoctorSearchScreen(),
-        AppointmentScreen(),
+      const DoctorSearchScreen(),
+      AppointmentScreen(key: _appointmentsKey),
       const PatientProfilePage(),
     ];
   }
@@ -54,7 +65,7 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
         ),
         child: NavigationBar(
           selectedIndex: _tab,
-          onDestinationSelected: (i) => setState(() => _tab = i),
+          onDestinationSelected: _setTab,
           backgroundColor: Colors.transparent,
           elevation: 0,
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,

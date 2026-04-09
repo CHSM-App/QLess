@@ -14,6 +14,9 @@ class AppointmentList {
   @JsonKey(name: 'doctor_id')
   int? doctorId;
 
+  @JsonKey(name: 'family_id')
+  int? familyId;
+
   @JsonKey(name: 'doctor_name')
   String? doctorName;
 
@@ -26,7 +29,22 @@ class AppointmentList {
   @JsonKey(name: 'clinic_id')
   String? clinicId;
 
-  @JsonKey(name: 'name')
+  @JsonKey(name: 'clinic_name')
+  String? clinicName;
+
+  @JsonKey(name: 'clinic_address')
+  String? clinicAddress;
+
+  @JsonKey(name: 'clinic_contact')
+  String? clinicContact;
+
+  @JsonKey(name: 'latitude')
+  double? latitude;
+
+  @JsonKey(name: 'longitude')
+  double? longitude;
+
+  @JsonKey(name: 'patient_name')
   String? name;
 
   @JsonKey(name: 'gender')
@@ -38,11 +56,21 @@ class AppointmentList {
   @JsonKey(name: 'DOB')
   String? dob;
 
+
   @JsonKey(name: 'queue_number')
   int? queueNumber;
 
   @JsonKey(name: 'status')
   String? status;
+
+  @JsonKey(name: 'start_time')
+  String? startTime;
+
+  @JsonKey(name: 'end_time')
+  String? endTime;
+
+  @JsonKey(name: 'booking_for')
+  String? bookingFor;
 
   @JsonKey(name: 'user_type')
   int? userType;
@@ -54,6 +82,7 @@ class AppointmentList {
     this.appointmentId,
     this.patientId,
     this.doctorId,
+    this.familyId,
     this.doctorName,
     this.specialization,
     this.experience,
@@ -65,6 +94,14 @@ class AppointmentList {
     this.queueNumber,
     this.status,
     this.userType,
+    this.bookingFor,
+    this.clinicAddress,
+    this.clinicName,
+    this.endTime,
+    this.latitude,
+    this.longitude,
+    this.startTime,
+    this.clinicContact,
   });
 
   factory AppointmentList.fromJson(Map<String, dynamic> json) =>

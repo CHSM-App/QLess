@@ -49,7 +49,7 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
-  Future<List<AppointmentList>> getPatientAppointments(int patientId) {
-    return apiService.getPatientAppointments(patientId);
+  Future<List<AppointmentList>> getPatientAppointments(int familyId) {
+    return apiService.getPatientAppointments(familyId);
   }
 }

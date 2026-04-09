@@ -98,9 +98,9 @@ abstract class ApiService {
     @Path("doctor_id") int doctorId,
   );
 
-    @GET("patient/users/getPatientAppointments/{patient_id}")
+    @GET("patient/users/getPatientAppointments/{family_id}")
   Future<List<AppointmentList>> getPatientAppointments(
-    @Path("patient_id") int patientId,
+    @Path("family_id") int familyId,
   );
 
   

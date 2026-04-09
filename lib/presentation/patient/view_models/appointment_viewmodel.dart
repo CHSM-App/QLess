@@ -77,13 +77,13 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   }
 
 
-  Future<void> getPatientAppointments(int patientId) async {
+  Future<void> getPatientAppointments(int familyId) async {
     state = state.copyWith(
       patientAppointmentsList: const AsyncValue.loading(),
       error: null,
     );
     try {
-      final result = await usecase.getPatientAppointments(patientId);
+      final result = await usecase.getPatientAppointments(familyId);
       state = state.copyWith(patientAppointmentsList: AsyncValue.data(result));
     } catch (e, st) {
       state = state.copyWith(patientAppointmentsList: AsyncValue.error(e, st));
