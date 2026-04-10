@@ -923,7 +923,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   List<AppointmentList> _todayList(List<AppointmentList> list) {
     return list.where((a) {
       final status = a.status?.toLowerCase().trim() ?? '';
-      if (status != 'booked') return false;
+      if (status != 'booked' && status != 'skipped') return false;
       final d = _parseAppointmentDate(a.appointmentDate);
       if (!_isToday(d)) return false;
       return _matchesSearch(a);
