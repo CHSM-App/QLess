@@ -9,6 +9,7 @@ enum QueueState { idle, running, paused, stopped }
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
+
 class AppointmentListState {
   final bool isLoading;
   final String? error;
