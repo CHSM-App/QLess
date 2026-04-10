@@ -6,6 +6,7 @@ import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
+import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
 
 // ------------------------- Main Screen -------------------------
@@ -132,8 +133,9 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
 
   @override
   Widget build(BuildContext context) {
-    final appointmentsAsync =
-        ref.watch(appointmentViewModelProvider).patientAppointmentsList;
+    final vmState = ref.watch(appointmentViewModelProvider);
+    final appointmentsAsync = vmState.patientAppointmentsList;
+    final queueState = vmState.queueState;
     final allAppointments = appointmentsAsync.maybeWhen(
       data: (list) => list,
       orElse: () => const <AppointmentList>[],
@@ -166,16 +168,19 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
               _buildPatientListAsync(
                 appointmentsAsync,
                 tabType: _TabType.today,
+                queueState: queueState,
               ),
               // Upcoming tab — View + Cancel
               _buildPatientListAsync(
                 appointmentsAsync,
                 tabType: _TabType.upcoming,
+                queueState: queueState,
               ),
               // Completed tab — View + Prescription
               _buildPatientListAsync(
                 appointmentsAsync,
                 tabType: _TabType.completed,
+                queueState: queueState,
               ),
             ],
           ),
@@ -303,6 +308,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   Widget _buildPatientListAsync(
     AsyncValue<List<AppointmentList>> appointmentsAsync, {
     required _TabType tabType,
+    required QueueState queueState,
   }) {
     return appointmentsAsync.when(
       loading: () => const Center(
@@ -317,7 +323,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           _TabType.upcoming => _upcomingList(list),
           _TabType.completed => _completedList(list),
         };
-        return _buildPatientList(filtered, tabType: tabType);
+        return _buildPatientList(filtered, tabType: tabType, queueState: queueState);
       },
     );
   }
@@ -325,6 +331,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   Widget _buildPatientList(
     List<AppointmentList> patients, {
     required _TabType tabType,
+    required QueueState queueState,
   }) {
     if (patients.isEmpty) {
       return Center(
@@ -367,10 +374,15 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           bool isAccessible = true;
           if (tabType == _TabType.today) {
             final status = p.status?.toLowerCase() ?? '';
-            if (status == 'booked') {
+            // Queue must be running or paused for any patient to be accessible
+            final queueActive = queueState == QueueState.running ||
+                queueState == QueueState.paused;
+            if (!queueActive) {
+              isAccessible = false;
+            } else if (status == 'booked') {
               isAccessible = p.queueNumber == currentQueueNo;
             }
-            // skipped patients are always accessible — can be recalled anytime
+            // skipped patients accessible when queue is active
           }
 
           return Padding(
@@ -397,7 +409,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
 
   // ------------------------- Actions -------------------------
 
-  void _onStartSession(AppointmentList p) {
+  Future<void> _onStartSession(AppointmentList p) async {
     final patientId = p.patientId ?? 0;
     final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
     if (patientId == 0 || doctorId == 0) {
@@ -406,6 +418,21 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       );
       return;
     }
+
+    // Call START_SESSION API before navigating
+    try {
+      await ref.read(appointmentViewModelProvider.notifier).startSession(
+        AppointmentRequestModel(
+          doctorId: doctorId,
+          patientId: patientId,
+          appointmentId: p.appointmentId ?? 0,
+        ),
+      );
+    } catch (_) {
+      // Non-blocking — navigate even if API fails
+    }
+
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(

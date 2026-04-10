@@ -80,4 +80,14 @@ class AppointmentUsecase {
   ) {
     return appointmentRepository.queueRecall(appointmentRequest);
   }
+  Future<AppointmentResponseModel> startSession(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.startSession(appointmentRequest);
+  }
+  Future<AppointmentResponseModel> endSession(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.endSession(appointmentRequest);
+}
 }

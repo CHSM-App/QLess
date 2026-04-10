@@ -453,6 +453,113 @@ class _DrumPickerState extends State<_DrumPicker> {
 //  dosage  → per-slot dose    e.g. "½-0-1"   → API: tabletDosage etc.
 //  frequency → per-slot times e.g. "1-0-1"   → API: frequency
 // ════════════════════════════════════════════════════════════════════
+// ── Complete Split Button ─────────────────────────────────────────────────────
+// Selecting from dropdown CHANGES the main button's action.
+// Main button always reflects the currently selected action.
+
+class _CompleteDropdown extends StatefulWidget {
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  const _CompleteDropdown({required this.onNext, required this.onBack});
+
+  @override
+  State<_CompleteDropdown> createState() => _CompleteDropdownState();
+}
+
+class _CompleteDropdownState extends State<_CompleteDropdown> {
+  // 0 = Complete & Next (default), 1 = Complete & Back
+  int _selected = 0;
+
+  static const _options = [
+    (icon: Icons.arrow_forward_rounded, label: 'Complete & Next'),
+    (icon: Icons.arrow_back_rounded,    label: 'Complete & Back'),
+  ];
+
+  VoidCallback get _action => _selected == 0 ? widget.onNext : widget.onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final opt = _options[_selected];
+    return Row(
+      children: [
+        // Main button — runs the currently selected action
+        Expanded(
+          child: ElevatedButton(
+            onPressed: _action,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(opt.label,
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              const SizedBox(width: 4),
+              Icon(opt.icon, size: 15),
+            ]),
+          ),
+        ),
+        // Divider
+        Container(width: 1, height: 48,
+            color: Colors.white.withValues(alpha: 0.3)),
+        // Dropdown — switches which action the main button will run
+        PopupMenuButton<int>(
+          onSelected: (v) => setState(() => _selected = v),
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          color: Colors.white,
+          offset: const Offset(0, -110),
+          itemBuilder: (_) => [
+            _menuItem(0, Icons.arrow_forward_rounded, 'Complete & Next'),
+            _menuItem(1, Icons.arrow_back_rounded,    'Complete & Back'),
+          ],
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: const BoxDecoration(
+              color: kPrimary,
+              borderRadius: BorderRadius.only(
+                topRight: Radius.circular(12),
+                bottomRight: Radius.circular(12),
+              ),
+            ),
+            child: const Icon(Icons.keyboard_arrow_up_rounded,
+                color: Colors.white, size: 20),
+          ),
+        ),
+      ],
+    );
+  }
+
+  PopupMenuItem<int> _menuItem(int value, IconData icon, String label) {
+    final isActive = _selected == value;
+    return PopupMenuItem<int>(
+      value: value,
+      child: Row(children: [
+        Icon(icon, size: 16, color: isActive ? kPrimary : Colors.grey),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(
+          fontSize: 13,
+          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+          color: isActive ? kPrimary : kTextDark,
+        )),
+        if (isActive) ...[
+          const Spacer(),
+          const Icon(Icons.check_rounded, size: 14, color: kPrimary),
+        ],
+      ]),
+    );
+  }
+}
+
 class MedicineEntry {
   MedicineType type;
   int? medicineId;
@@ -597,11 +704,11 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   String? _validate() {
     if (_sympCtrl.text.trim().isEmpty) return 'Please enter symptoms';
     if (_diagCtrl.text.trim().isEmpty) return 'Please enter diagnosis';
-    // if (_meds.isEmpty) return 'Please add at least one medicine';
-    // for (int i = 0; i < _meds.length; i++) {
-    //   if (_meds[i].selectedName == null || _meds[i].medicineId == null)
-    //     return 'Please select medicine name for Medicine ${i + 1}';
-    // }
+    if (_meds.isEmpty) return 'Please add at least one medicine';
+    for (int i = 0; i < _meds.length; i++) {
+      if (_meds[i].selectedName == null || _meds[i].medicineId == null)
+        return 'Please select medicine name for Medicine ${i + 1}';
+    }
     return null;
   }
 
@@ -796,6 +903,55 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     final now = DateTime.now();
     return d.year == now.year && d.month == now.month && d.day == now.day;
   }
+Future<void> _completeAndBack() async {
+  final error = _validate();
+  if (error != null) { _showSnack(error, isError: true); return; }
+
+  String? followUpStr;
+  if (_followDate != null) {
+    followUpStr =
+        '${_followDate!.year}-${_followDate!.month.toString().padLeft(2, '0')}-${_followDate!.day.toString().padLeft(2, '0')}';
+  }
+
+  final prescription = PrescriptionModel(
+    patientId:     widget.patientId,
+    doctorId:      widget.doctorId,
+    symptoms:      _sympCtrl.text.trim(),
+    diagnosis:     _diagCtrl.text.trim(),
+    clinicalNotes: _clinCtrl.text.trim().isEmpty ? null : _clinCtrl.text.trim(),
+    userType:      widget.userTypeId,
+    appointmentId: widget.appointmentId,
+    followUpDate:  followUpStr,
+    advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
+    medicines:     _meds.map((e) => e.toApiModel()).toList(),
+  );
+
+  await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription);
+  if (!mounted) return;
+
+  final state = ref.read(prescriptionViewModelProvider);
+  if (state.error != null) {
+    _showSnack(state.error ?? 'Something went wrong', isError: true);
+    return;
+  }
+
+  // Call endSession API
+  try {
+    await ref.read(appointmentViewModelProvider.notifier).endSession(
+      AppointmentRequestModel(doctorId: widget.doctorId),
+    );
+  } catch (_) {
+    // Non-blocking
+  }
+
+  if (!mounted) return;
+  _showSnack('Prescription saved', isError: false);
+  await Future.delayed(const Duration(milliseconds: 300));
+  if (!mounted) return;
+  // Pop back to patient list
+  Navigator.pop(context);
+}
+
 Future<void> _completePrescription() async {
   final error = _validate();
   if (error != null) { _showSnack(error, isError: true); return; }
@@ -1061,40 +1217,90 @@ Widget _patientCard() => _card(child: Row(children: [
           boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, -4))],
         ),
         child: Row(children: [
-          // Expanded(child: OutlinedButton(
-          //   onPressed: isLoading ? null : () {},
-          //   style: OutlinedButton.styleFrom(
-          //     side: const BorderSide(color: kPrimary, width: 1.5),
-          //     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          //     padding: const EdgeInsets.symmetric(vertical: 14),
-          //   ),
-          //   child: const Text('Save Draft', style: TextStyle(
-          //     color: kPrimary, fontWeight: FontWeight.w600, fontSize: 15,
-          //   )),
-          // )),
-          const SizedBox(width: 12),
-          Expanded(flex: 2, child: ElevatedButton(
-            onPressed: isLoading ? null : _completePrescription,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary, foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(vertical: 14),
+          // ── Skip button ───────────────────────────────────────────────
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: isLoading ? null : _onSkip,
+              icon: const Icon(Icons.skip_next_rounded, size: 16, color: Color(0xFFF57F17)),
+              label: const Text('Skip & Next', style: TextStyle(
+                color: Color(0xFFF57F17), fontWeight: FontWeight.w600, fontSize: 13,
+              )),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Color(0xFFFFCC80), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
             ),
+          ),
+          const SizedBox(width: 10),
+          // ── Complete dropdown (Complete & Next | Complete & Back) ──────
+          Expanded(
+            flex: 3,
             child: isLoading
-                ? const SizedBox(height: 20, width: 20,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                : const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Text('Complete & Next', style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 15,
-                    )),
-                    SizedBox(width: 6),
-                    Icon(Icons.arrow_forward_rounded, size: 18),
-                  ]),
-          )),
+                ? ElevatedButton(
+                    onPressed: null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const SizedBox(height: 20, width: 20,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                  )
+                : _CompleteDropdown(
+                    onNext: _completePrescription,
+                    onBack: _completeAndBack,
+                  ),
+          ),
         ]),
       ),
     );
+  }
+
+  Future<void> _onSkip() async {
+    try {
+      await ref.read(appointmentViewModelProvider.notifier).queueSkip(
+        AppointmentRequestModel(doctorId: widget.doctorId),
+      );
+      if (!mounted) return;
+
+      // Refresh list and navigate to next patient
+      await ref
+          .read(appointmentViewModelProvider.notifier)
+          .fetchPatientAppointments(widget.doctorId);
+      if (!mounted) return;
+
+      final allList = ref
+          .read(appointmentViewModelProvider)
+          .patientAppointmentsList
+          .maybeWhen(data: (l) => l, orElse: () => <AppointmentList>[]);
+
+      final next = _pickNextAppointment(allList);
+      if (next == null) {
+        _showSnack('No next patient', isError: false);
+        Navigator.pop(context);
+        return;
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PrescriptionScreen(
+            patientId: next.patientId ?? 0,
+            doctorId: next.doctorId ?? widget.doctorId,
+            userTypeId: next.userType ?? widget.userTypeId,
+            appointmentId: next.appointmentId ?? 0,
+            patientName: next.patientName ?? 'Patient',
+            patientAge: _ageString(next.dob),
+            patientGender: next.gender,
+            queueNumber: next.queueNumber,
+            patientStatus: next.status ?? 'booked',
+          ),
+        ),
+      );
+    } catch (e) {
+      _showSnack('Skip failed: $e', isError: true);
+    }
   }
 
   Widget _card({required Widget child}) => Container(

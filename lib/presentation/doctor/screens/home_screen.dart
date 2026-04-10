@@ -105,6 +105,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
+
   Future<void> _onQueueStop() async {
     if (_doctorId == 0) return;
     try {

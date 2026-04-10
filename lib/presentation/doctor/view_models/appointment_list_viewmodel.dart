@@ -161,4 +161,35 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       rethrow;
     }
   }
+
+Future<AppointmentResponseModel> startSession(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await usecase.startSession(appointmentRequest);
+      await fetchPatientAppointments(appointmentRequest.doctorId!);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  Future<AppointmentResponseModel> endSession(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await usecase.endSession(appointmentRequest);
+      await fetchPatientAppointments(appointmentRequest.doctorId!);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+    }
+
 }

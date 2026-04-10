@@ -106,6 +106,16 @@ abstract class ApiService {
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("doctor/insert/appointment/startSession")
+Future<AppointmentResponseModel> startSession(
+  @Body() AppointmentRequestModel appointmentRequest,
+);
+
+@POST("doctor/insert/appointment/endSession")
+Future<AppointmentResponseModel> endSession(
+  @Body() AppointmentRequestModel appointmentRequest,
+);
+
 
   // DELETE API
   @DELETE("doctor/index/deleteMedicine/{medicine_id}")
