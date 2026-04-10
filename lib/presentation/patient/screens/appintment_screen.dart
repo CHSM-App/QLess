@@ -57,6 +57,7 @@ Color statusColor(String? s) {
     case "confirmed":
     case "booked":
       return kBlue;
+    case "complete":
     case "completed":
       return kGreen;
     case "cancelled":
@@ -72,6 +73,7 @@ Color statusBgColor(String? s) {
     case "confirmed":
     case "booked":
       return kBlueLight;
+    case "complete":
     case "completed":
       return kGreenLight;
     case "cancelled":
@@ -87,6 +89,7 @@ IconData statusIcon(String? s) {
     case "confirmed":
     case "booked":
       return Icons.schedule_rounded;
+    case "complete":
     case "completed":
       return Icons.check_circle_rounded;
     case "cancelled":
@@ -157,7 +160,10 @@ bool _isUpcoming(AppointmentList a) {
   return apptDay.isAfter(todayDay);
 }
 
-bool _isCompleted(AppointmentList a) => a.status?.toLowerCase() == "completed";
+bool _isCompleted(AppointmentList a) {
+  final s = a.status?.toLowerCase();
+  return s == "completed" || s == "complete";
+}
 bool _isCancelled(AppointmentList a) => a.status?.toLowerCase() == "cancelled";
 
 List<AppointmentList> applyFilter(
@@ -273,7 +279,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
   bool _canReview(AppointmentList a) {
-    return a.status?.toLowerCase() == 'completed' &&
+    final s = a.status?.toLowerCase();
+    return (s == 'completed' || s == 'complete') &&
         a.appointmentId != null &&
         a.doctorId != null &&
         a.patientId != null;

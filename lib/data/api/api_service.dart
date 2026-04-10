@@ -141,9 +141,8 @@ Future<AppointmentResponseModel> endSession(
   );
 
   @GET("patient/users/getPatientAppointments/{family_id}")
-  @GET("patient/users/getPatientAppointments/{patient_id}")
   Future<List<AppointmentList>> getPatientAppointments(
-    @Path("patient_id") int patientId,
+    @Path("family_id") int familyId,
   );
 
   @GET("patient/users/favoriteDoctor/{patient_id}/{doctor_id}")
@@ -185,7 +184,7 @@ Future<AppointmentResponseModel> endSession(
   @POST("patient/insert/insertFamilyMember")
   Future<dynamic> addFamilyMember(@Body() FamilyMember member);
 
-  @POST("patient/insert/appointment//book")
+  @POST("patient/insert/appointment/book")
   Future<AppointmentResponseModel> bookAppointment(
     @Body() AppointmentRequestModel appointmentRequest,
   );

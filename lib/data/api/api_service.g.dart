@@ -777,7 +777,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<AppointmentList>> getPatientAppointments(int patientId) async {
+  Future<List<AppointmentList>> getPatientAppointments(int familyId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -786,7 +786,7 @@ class _ApiService implements ApiService {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'patient/users/getPatientAppointments/{family_id}',
+            'patient/users/getPatientAppointments/${familyId}',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -1068,7 +1068,7 @@ class _ApiService implements ApiService {
       Options(method: 'POST', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'patient/insert/appointment//book',
+            'patient/insert/appointment/book',
             queryParameters: queryParameters,
             data: _data,
           )
