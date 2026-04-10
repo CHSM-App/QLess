@@ -59,4 +59,32 @@ class AppointmentImpl implements AppointmentRepository {
   ) {
     return apiService.queueNext(appointmentRequest);
   }
+
+  @override
+  Future<AppointmentResponseModel> queueStart(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.queueStart(appointmentRequest);
+  }
+
+  @override
+  Future<AppointmentResponseModel> queuePause(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.queuePause(appointmentRequest);
+  }
+
+  @override
+  Future<AppointmentResponseModel> queueStop(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.queueStop(appointmentRequest);
+  }
+
+  @override
+  Future<AppointmentResponseModel> queueSkip(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.queueSkip(appointmentRequest);
+  }
 }

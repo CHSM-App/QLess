@@ -1,26 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/home_screen.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
 import 'package:qless/presentation/doctor/screens/profile_screen.dart';
 
 
-class DoctorBottomNav extends StatefulWidget {
-  final String doctorName;
-  final int businessId;
-
-  const DoctorBottomNav({
-    super.key,
-    this.doctorName = 'Doctor',
-    this.businessId = 0,
-  });
+class DoctorBottomNav extends ConsumerStatefulWidget {
+  const DoctorBottomNav({super.key});
 
   @override
-  State<DoctorBottomNav> createState() => _DoctorMainScreenState();
+  ConsumerState<DoctorBottomNav> createState() => _DoctorMainScreenState();
 }
 
-class _DoctorMainScreenState extends State<DoctorBottomNav>
+class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
 
@@ -119,9 +114,10 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
 
   // ── Shared AppBar ─────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
-    final initial = widget.doctorName.isNotEmpty
-        ? widget.doctorName[0].toUpperCase()
-        : 'D';
+    final doctorName = ref.watch(
+      doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'),
+    );
+    final initial = doctorName.isNotEmpty ? doctorName[0].toUpperCase() : 'D';
 
     return AppBar(
       backgroundColor: Colors.white,
@@ -164,7 +160,7 @@ class _DoctorMainScreenState extends State<DoctorBottomNav>
                   ),
                 ),
                 Text(
-                  'Dr. ${widget.doctorName}',
+                  'Dr. $doctorName',
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,

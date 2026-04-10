@@ -1,142 +1,158 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/domain/models/appointment_request_model.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 
+// ─── Home Page ────────────────────────────────────────────────────────────────
 
-// ─── Data Models ────────────────────────────────────────────────────────────
-
-enum QueueStatus { running, paused, waiting, completed }
-
-class Patient {
-  final int token;
-  final String name;
-  final String gender;
-  final int age;
-  final String reason;
-  final QueueStatus status;
-  final String initials;
-  final Color avatarColor;
-  final Color avatarTextColor;
-
-  const Patient({
-    required this.token,
-    required this.name,
-    required this.gender,
-    required this.age,
-    required this.reason,
-    required this.status,
-    required this.initials,
-    required this.avatarColor,
-    required this.avatarTextColor,
-  });
+class QueueHomePage extends ConsumerStatefulWidget {
+  const QueueHomePage({super.key});
+  @override
+  ConsumerState<QueueHomePage> createState() => _QueueHomePageState();
 }
 
-// ─── Sample Data ─────────────────────────────────────────────────────────────
+class _QueueHomePageState extends ConsumerState<QueueHomePage> {
+  bool _hasFetched = false;
+  late final ProviderSubscription<int?> _doctorIdSub;
 
-final List<Patient> waitingPatients = [
-  Patient(
-    token: 9,
-    name: 'Rahul Singh',
-    gender: 'M',
-    age: 28,
-    reason: 'Fever & Cold',
-    status: QueueStatus.waiting,
-    initials: 'RS',
-    avatarColor: const Color(0xFFE3F2FD),
-    avatarTextColor: const Color(0xFF1565C0),
-  ),
-  Patient(
-    token: 10,
-    name: 'Anita Mehra',
-    gender: 'F',
-    age: 52,
-    reason: 'Diabetes Review',
-    status: QueueStatus.waiting,
-    initials: 'AM',
-    avatarColor: const Color(0xFFF3E5F5),
-    avatarTextColor: const Color(0xFF7B1FA2),
-  ),
-  Patient(
-    token: 11,
-    name: 'Vijay Kumar',
-    gender: 'M',
-    age: 67,
-    reason: 'BP Checkup',
-    status: QueueStatus.paused,
-    initials: 'VK',
-    avatarColor: const Color(0xFFE8F5E9),
-    avatarTextColor: const Color(0xFF2E7D32),
-  ),
-  Patient(
-    token: 12,
-    name: 'Sunita Patil',
-    gender: 'F',
-    age: 41,
-    reason: 'Skin Allergy',
-    status: QueueStatus.waiting,
-    initials: 'SP',
-    avatarColor: const Color(0xFFFFF3E0),
-    avatarTextColor: const Color(0xFFE65100),
-  ),
-  Patient(
-    token: 13,
-    name: 'Nikhil Joshi',
-    gender: 'M',
-    age: 19,
-    reason: 'Eye Infection',
-    status: QueueStatus.waiting,
-    initials: 'NJ',
-    avatarColor: const Color(0xFFFCE4EC),
-    avatarTextColor: const Color(0xFF880E4F),
-  ),
-  Patient(
-    token: 14,
-    name: 'Kavitha Rao',
-    gender: 'F',
-    age: 58,
-    reason: 'Follow-up Visit',
-    status: QueueStatus.waiting,
-    initials: 'KR',
-    avatarColor: const Color(0xFFE0F7FA),
-    avatarTextColor: const Color(0xFF006064),
-  ),
-];
-
-const Patient currentPatient = Patient(
-  token: 8,
-  name: 'Priya Sharma',
-  gender: 'F',
-  age: 34,
-  reason: 'General Checkup',
-  status: QueueStatus.running,
-  initials: 'PS',
-  avatarColor: Color(0xFFE3F2FD),
-  avatarTextColor: Color(0xFF1565C0),
-);
-
-// ─── Home Page ───────────────────────────────────────────────────────────────
-
-class QueueHomePage extends StatefulWidget {
-  const QueueHomePage({super.key});
+  // ─── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
-  State<QueueHomePage> createState() => _QueueHomePageState();
-}
-
-class _QueueHomePageState extends State<QueueHomePage> {
-  QueueStatus _currentStatus = QueueStatus.running;
-
-  void _showSnack(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        duration: const Duration(seconds: 2),
-      ),
+  void initState() {
+    super.initState();
+    _doctorIdSub = ref.listenManual<int?>(
+      doctorLoginViewModelProvider.select((s) => s.doctorId),
+      (_, next) {
+        if (next != null && next > 0) _loadData();
+      },
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _loadData();
+    });
   }
 
   @override
+  void dispose() {
+    _doctorIdSub.close();
+    super.dispose();
+  }
+
+  // ─── Data ──────────────────────────────────────────────────────────────────
+
+  int get _doctorId =>
+      ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+
+  void _loadData() {
+    if (_hasFetched) return;
+    if (_doctorId == 0) return;
+    _hasFetched = true;
+    ref
+        .read(appointmentViewModelProvider.notifier)
+        .fetchPatientAppointments(_doctorId);
+  }
+
+  /// Returns today's queue appointments sorted by queue_number ascending.
+  List<AppointmentList> _todayQueue(List<AppointmentList> all) {
+    final today = DateTime.now();
+    return all.where((a) {
+      if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
+      if (a.bookingType != 1) return false;
+      final d = DateTime.tryParse(a.appointmentDate ?? '');
+      if (d == null) return false;
+      return d.year == today.year &&
+          d.month == today.month &&
+          d.day == today.day;
+    }).toList()
+      ..sort((a, b) =>
+          (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+  }
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  Future<void> _onQueueStart() async {
+    if (_doctorId == 0) return;
+    try {
+      final res = await ref
+          .read(appointmentViewModelProvider.notifier)
+          .queueStart(AppointmentRequestModel(doctorId: _doctorId));
+      _snack(res.message ?? 'Queue started');
+    } catch (_) {
+      _snack('Failed to start queue');
+    }
+  }
+
+  Future<void> _onQueuePause() async {
+    if (_doctorId == 0) return;
+    try {
+      final res = await ref
+          .read(appointmentViewModelProvider.notifier)
+          .queuePause(AppointmentRequestModel(doctorId: _doctorId));
+      _snack(res.message ?? 'Queue paused');
+    } catch (_) {
+      _snack('Failed to pause queue');
+    }
+  }
+
+  Future<void> _onQueueStop() async {
+    if (_doctorId == 0) return;
+    try {
+      final res = await ref
+          .read(appointmentViewModelProvider.notifier)
+          .queueStop(AppointmentRequestModel(doctorId: _doctorId));
+      _snack(res.message ?? 'Queue stopped');
+    } catch (_) {
+      _snack('Failed to stop queue');
+    }
+  }
+
+  Future<void> _onQueueNext(AppointmentList current) async {
+    if (_doctorId == 0) return;
+    try {
+      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      final res = await ref
+          .read(appointmentViewModelProvider.notifier)
+          .queueNext(AppointmentRequestModel(
+            doctorId: _doctorId,
+            appointmentDate: today,
+          ));
+      _snack(res.message ?? 'Next patient');
+    } catch (_) {
+      _snack('Failed');
+    }
+  }
+
+  Future<void> _onQueueSkip() async {
+    if (_doctorId == 0) return;
+    try {
+      final res = await ref
+          .read(appointmentViewModelProvider.notifier)
+          .queueSkip(AppointmentRequestModel(doctorId: _doctorId));
+      _snack(res.message ?? 'Patient skipped');
+    } catch (_) {
+      _snack('Failed to skip');
+    }
+  }
+
+  // ─── Build ─────────────────────────────────────────────────────────────────
+
+  @override
   Widget build(BuildContext context) {
+    final vmState = ref.watch(appointmentViewModelProvider);
+    final queueState = vmState.queueState;
+    final appointmentsAsync = vmState.patientAppointmentsList;
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -159,20 +175,60 @@ class _QueueHomePageState extends State<QueueHomePage> {
                   ),
                   child: Container(
                     color: const Color(0xFFF0F4F8),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 20),
-                          _buildQueueCard(),
-                          const SizedBox(height: 14),
-                          _buildQuickActions(),
-                          const SizedBox(height: 6),
-                          _buildWaitingHeader(),
-                          _buildPatientList(),
-                        ],
+                    child: appointmentsAsync.when(
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(color: Color(0xFF1565C0)),
                       ),
+                      error: (e, _) => Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.error_outline, color: Color(0xFFC62828), size: 40),
+                            const SizedBox(height: 8),
+                            Text('$e', style: const TextStyle(color: Color(0xFF90A4AE))),
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: () {
+                                _hasFetched = false;
+                                _loadData();
+                              },
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      data: (list) {
+                        final todayQueue = _todayQueue(list);
+                        final current =
+                            todayQueue.isNotEmpty ? todayQueue.first : null;
+                        final waiting = todayQueue.length > 1
+                            ? todayQueue.skip(1).toList()
+                            : <AppointmentList>[];
+                        final nextNo = waiting.isNotEmpty
+                            ? waiting.first.queueNumber
+                            : null;
+
+                        return SingleChildScrollView(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 20),
+                              _buildQueueCard(
+                                current: current,
+                                nextQueueNo: nextNo,
+                                total: todayQueue.length,
+                                queueState: queueState,
+                              ),
+                              const SizedBox(height: 14),
+                              _buildQuickActions(current),
+                              const SizedBox(height: 6),
+                              _buildWaitingHeader(waiting.length),
+                              _buildPatientList(waiting),
+                            ],
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -187,6 +243,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
   // ─── Header ────────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
+    final today = DateFormat('EEEE, d MMMM').format(DateTime.now());
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       child: Row(
@@ -205,7 +262,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
               ),
               const SizedBox(height: 2),
               Text(
-                'Monday, 30 March',
+                today,
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.white.withOpacity(0.75),
@@ -213,24 +270,6 @@ class _QueueHomePageState extends State<QueueHomePage> {
               ),
             ],
           ),
-          // Container(
-          //   width: 42,
-          //   height: 42,
-          //   decoration: BoxDecoration(
-          //     color: Colors.white.withOpacity(0.25),
-          //     shape: BoxShape.circle,
-          //     border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
-          //   ),
-          //   alignment: Alignment.center,
-          //   child: const Text(
-          //     'DM',
-          //     style: TextStyle(
-          //       color: Colors.white,
-          //       fontWeight: FontWeight.w700,
-          //       fontSize: 14,
-          //     ),
-          //   ),
-          // ),
         ],
       ),
     );
@@ -238,7 +277,12 @@ class _QueueHomePageState extends State<QueueHomePage> {
 
   // ─── Queue Card ────────────────────────────────────────────────────────────
 
-  Widget _buildQueueCard() {
+  Widget _buildQueueCard({
+    required AppointmentList? current,
+    required int? nextQueueNo,
+    required int total,
+    required QueueState queueState,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -267,23 +311,31 @@ class _QueueHomePageState extends State<QueueHomePage> {
               ),
             ),
             const SizedBox(height: 12),
-            _buildTokenRow(),
+            _buildTokenRow(
+              currentNo: current?.queueNumber ?? 0,
+              nextNo: nextQueueNo ?? 0,
+              total: total,
+            ),
             const SizedBox(height: 14),
-            _buildPatientInfoRow(),
+            _buildCurrentPatientRow(current, queueState),
             const SizedBox(height: 14),
-            _buildActionButtons(),
+            _buildActionButtons(queueState),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTokenRow() {
+  Widget _buildTokenRow({
+    required int currentNo,
+    required int nextNo,
+    required int total,
+  }) {
     return Row(
       children: [
         _tokenBox(
           label: 'Current',
-          value: '08',
+          value: currentNo.toString().padLeft(2, '0'),
           gradient: const LinearGradient(
             colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
           ),
@@ -293,7 +345,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
         const SizedBox(width: 10),
         _tokenBox(
           label: 'Up Next',
-          value: '09',
+          value: nextNo > 0 ? nextNo.toString().padLeft(2, '0') : '--',
           color: const Color(0xFFF0F4F8),
           labelColor: const Color(0xFF90A4AE),
           valueColor: const Color(0xFF37474F),
@@ -301,7 +353,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
         const SizedBox(width: 10),
         _tokenBox(
           label: 'Total',
-          value: '14',
+          value: total.toString().padLeft(2, '0'),
           color: const Color(0xFFE8F5E9),
           labelColor: const Color(0xFF81C784),
           valueColor: const Color(0xFF2E7D32),
@@ -353,7 +405,22 @@ class _QueueHomePageState extends State<QueueHomePage> {
     );
   }
 
-  Widget _buildPatientInfoRow() {
+  Widget _buildCurrentPatientRow(
+      AppointmentList? patient, QueueState queueState) {
+    if (patient == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'No patients in queue today',
+          style: TextStyle(color: Color(0xFF90A4AE)),
+        ),
+      );
+    }
+
+    final age = _calcAge(patient.dob);
+    final name =
+        patient.patientName ?? patient.bookingFor ?? 'Unknown';
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: const BoxDecoration(
@@ -364,31 +431,40 @@ class _QueueHomePageState extends State<QueueHomePage> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Priya Sharma',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF1A237E),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A237E),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                'F · 34 yrs · General Checkup',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              ),
-            ],
+                const SizedBox(height: 3),
+                Text(
+                  [
+                    if (patient.gender != null) patient.gender!,
+                    if (age != null) '$age yrs',
+                  ].join(' · '),
+                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                ),
+              ],
+            ),
           ),
-          _statusBadge(_currentStatus),
+          _queueStateBadge(queueState),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons() {
+  Widget _buildActionButtons(QueueState queueState) {
+    final isRunning = queueState == QueueState.running;
+    final isStopped = queueState == QueueState.stopped;
+
     return Row(
       children: [
         _actionBtn(
@@ -397,10 +473,8 @@ class _QueueHomePageState extends State<QueueHomePage> {
             colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
           ),
           textColor: Colors.white,
-          onTap: () {
-            setState(() => _currentStatus = QueueStatus.running);
-            _showSnack('Queue started');
-          },
+          onTap: _onQueueStart,
+          enabled: !isRunning && !isStopped,
         ),
         const SizedBox(width: 8),
         _actionBtn(
@@ -408,10 +482,8 @@ class _QueueHomePageState extends State<QueueHomePage> {
           color: const Color(0xFFFFF8E1),
           textColor: const Color(0xFFF57F17),
           border: Border.all(color: const Color(0xFFFFE082), width: 1.5),
-          onTap: () {
-            setState(() => _currentStatus = QueueStatus.paused);
-            _showSnack('Queue paused');
-          },
+          onTap: _onQueuePause,
+          enabled: isRunning,
         ),
         const SizedBox(width: 8),
         _actionBtn(
@@ -419,7 +491,8 @@ class _QueueHomePageState extends State<QueueHomePage> {
           color: const Color(0xFFFFEBEE),
           textColor: const Color(0xFFC62828),
           border: Border.all(color: const Color(0xFFFFCDD2), width: 1.5),
-          onTap: () => _showSnack('Queue closed'),
+          onTap: _onQueueStop,
+          enabled: !isStopped,
         ),
       ],
     );
@@ -432,25 +505,29 @@ class _QueueHomePageState extends State<QueueHomePage> {
     Color? color,
     required Color textColor,
     Border? border,
+    bool enabled = true,
   }) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          decoration: BoxDecoration(
-            gradient: gradient,
-            color: color,
-            borderRadius: BorderRadius.circular(12),
-            border: border,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: textColor,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.4,
+        child: GestureDetector(
+          onTap: enabled ? onTap : null,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            decoration: BoxDecoration(
+              gradient: gradient,
+              color: color,
+              borderRadius: BorderRadius.circular(12),
+              border: border,
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
             ),
           ),
         ),
@@ -460,7 +537,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
 
   // ─── Quick Actions ─────────────────────────────────────────────────────────
 
-  Widget _buildQuickActions() {
+  Widget _buildQuickActions(AppointmentList? current) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
@@ -495,14 +572,15 @@ class _QueueHomePageState extends State<QueueHomePage> {
                   label: '✓  Mark Complete',
                   color: const Color(0xFFE8F5E9),
                   textColor: const Color(0xFF2E7D32),
-                  onTap: () => _showSnack('Patient marked complete'),
+                  onTap:
+                      current != null ? () => _onQueueNext(current) : null,
                 ),
                 const SizedBox(width: 10),
                 _quickBtn(
                   label: '⏭  Skip Patient',
                   color: const Color(0xFFFBE9E7),
                   textColor: const Color(0xFFBF360C),
-                  onTap: () => _showSnack('Patient skipped'),
+                  onTap: current != null ? _onQueueSkip : null,
                 ),
               ],
             ),
@@ -516,24 +594,27 @@ class _QueueHomePageState extends State<QueueHomePage> {
     required String label,
     required Color color,
     required Color textColor,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
     return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: textColor,
+      child: Opacity(
+        opacity: onTap != null ? 1.0 : 0.4,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
             ),
           ),
         ),
@@ -543,7 +624,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
 
   // ─── Waiting List ──────────────────────────────────────────────────────────
 
-  Widget _buildWaitingHeader() {
+  Widget _buildWaitingHeader(int count) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
       child: Row(
@@ -558,7 +639,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
             ),
           ),
           Text(
-            '${waitingPatients.length} remaining',
+            '$count remaining',
             style: const TextStyle(fontSize: 12, color: Color(0xFF90A4AE)),
           ),
         ],
@@ -566,18 +647,37 @@ class _QueueHomePageState extends State<QueueHomePage> {
     );
   }
 
-  Widget _buildPatientList() {
+  Widget _buildPatientList(List<AppointmentList> patients) {
+    if (patients.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32),
+        child: Center(
+          child: Text(
+            'No patients waiting',
+            style: TextStyle(color: Color(0xFF90A4AE)),
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        children: waitingPatients
-            .map((p) => _patientCard(p))
-            .toList(),
+        children: patients.map(_patientCard).toList(),
       ),
     );
   }
 
-  Widget _patientCard(Patient patient) {
+  Widget _patientCard(AppointmentList p) {
+    final name = p.patientName ?? p.bookingFor ?? 'Unknown';
+    final initials = name
+        .trim()
+        .split(' ')
+        .take(2)
+        .map((w) => w.isNotEmpty ? w[0] : '')
+        .join()
+        .toUpperCase();
+    final age = _calcAge(p.dob);
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -594,14 +694,14 @@ class _QueueHomePageState extends State<QueueHomePage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          _avatarCircle(patient.initials, patient.avatarColor, patient.avatarTextColor),
+          _avatarCircle(initials),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  patient.name,
+                  name,
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -611,11 +711,15 @@ class _QueueHomePageState extends State<QueueHomePage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${patient.gender} · ${patient.age} yrs · ${patient.reason}',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF90A4AE)),
+                  [
+                    if (p.gender != null) p.gender!,
+                    if (age != null) '$age yrs',
+                  ].join(' · '),
+                  style: const TextStyle(
+                      fontSize: 12, color: Color(0xFF90A4AE)),
                 ),
                 const SizedBox(height: 6),
-                _statusBadge(patient.status),
+                _statusChip(p.status ?? 'booked'),
               ],
             ),
           ),
@@ -624,7 +728,7 @@ class _QueueHomePageState extends State<QueueHomePage> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                patient.token.toString().padLeft(2, '0'),
+                (p.queueNumber ?? 0).toString().padLeft(2, '0'),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
@@ -643,59 +747,94 @@ class _QueueHomePageState extends State<QueueHomePage> {
     );
   }
 
-  Widget _avatarCircle(String initials, Color bg, Color fg) {
+  // ─── Helpers ───────────────────────────────────────────────────────────────
+
+  int? _calcAge(String? dob) {
+    if (dob == null) return null;
+    final d = DateTime.tryParse(dob);
+    if (d == null) return null;
+    return DateTime.now().year - d.year;
+  }
+
+  Widget _avatarCircle(String initials) {
     return Container(
       width: 44,
       height: 44,
-      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      decoration: const BoxDecoration(
+        color: Color(0xFFE3F2FD),
+        shape: BoxShape.circle,
+      ),
       alignment: Alignment.center,
       child: Text(
         initials,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w700,
-          color: fg,
+          color: Color(0xFF1565C0),
         ),
       ),
     );
   }
 
-  Widget _statusBadge(QueueStatus status) {
-    late String label;
-    late Color bg;
-    late Color fg;
-    late Color dot;
+  Widget _statusChip(String status) {
+    Color bg, fg, dot;
+    switch (status.toLowerCase()) {
+      case 'skipped':
+        bg = const Color(0xFFFFF8E1);
+        fg = const Color(0xFFF57F17);
+        dot = const Color(0xFFFFB300);
+        break;
+      case 'completed':
+        bg = const Color(0xFFE3F2FD);
+        fg = const Color(0xFF1565C0);
+        dot = const Color(0xFF1E88E5);
+        break;
+      default: // booked / waiting
+        bg = const Color(0xFFFFEBEE);
+        fg = const Color(0xFFC62828);
+        dot = const Color(0xFFE53935);
+    }
+    final label = status[0].toUpperCase() + status.substring(1);
+    return _badge(label, bg, fg, dot);
+  }
 
-    switch (status) {
-      case QueueStatus.running:
+  Widget _queueStateBadge(QueueState state) {
+    late String label;
+    late Color bg, fg, dot;
+    switch (state) {
+      case QueueState.running:
         label = 'Running';
         bg = const Color(0xFFE8F5E9);
         fg = const Color(0xFF2E7D32);
         dot = const Color(0xFF43A047);
         break;
-      case QueueStatus.paused:
+      case QueueState.paused:
         label = 'Paused';
         bg = const Color(0xFFFFF8E1);
         fg = const Color(0xFFF57F17);
         dot = const Color(0xFFFFB300);
         break;
-      case QueueStatus.waiting:
+      case QueueState.stopped:
+        label = 'Closed';
+        bg = const Color(0xFFEFEFEF);
+        fg = const Color(0xFF616161);
+        dot = const Color(0xFF9E9E9E);
+        break;
+      case QueueState.idle:
         label = 'Waiting';
         bg = const Color(0xFFFFEBEE);
         fg = const Color(0xFFC62828);
         dot = const Color(0xFFE53935);
         break;
-      case QueueStatus.completed:
-        label = 'Completed';
-        bg = const Color(0xFFE3F2FD);
-        fg = const Color(0xFF1565C0);
-        dot = const Color(0xFF1E88E5);
-        break;
     }
+    return _badge(label, bg, fg, dot);
+  }
 
+  Widget _badge(String label, Color bg, Color fg, Color dot) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

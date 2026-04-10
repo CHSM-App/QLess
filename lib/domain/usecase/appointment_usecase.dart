@@ -50,4 +50,28 @@ class AppointmentUsecase {
   ) {
     return appointmentRepository.queueNext(appointmentRequest);
   }
+
+  Future<AppointmentResponseModel> queueStart(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queueStart(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> queuePause(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queuePause(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> queueStop(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queueStop(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> queueSkip(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queueSkip(appointmentRequest);
+  }
 }

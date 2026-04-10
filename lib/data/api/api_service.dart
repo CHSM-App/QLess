@@ -60,6 +60,7 @@ abstract class ApiService {
     @Path("doctor_id") int doctorId,
   );
 
+
   //  POST API
   @POST("login/addDoctorDetails")
   Future<dynamic> addDoctorDetails(@Body() DoctorDetails doctorLogin);
@@ -75,11 +76,31 @@ abstract class ApiService {
     @Body() DoctorScheduleModel doctorSchedule,
   );
 
-  
   @POST("doctor/insert/appointment/queueNext")
-Future<AppointmentResponseModel> queueNext(
+  Future<AppointmentResponseModel> queueNext(
     @Body() AppointmentRequestModel appointmentRequest,
   );
+
+  @POST("doctor/insert/appointment/queueStart")
+  Future<AppointmentResponseModel> queueStart(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+  @POST("doctor/insert/appointment/queuePause")
+  Future<AppointmentResponseModel> queuePause(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+  @POST("doctor/insert/appointment/queueStop")
+  Future<AppointmentResponseModel> queueStop(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+  @POST("doctor/insert/appointment/queueSkip")
+  Future<AppointmentResponseModel> queueSkip(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
 
   // DELETE API
   @DELETE("doctor/index/deleteMedicine/{medicine_id}")
@@ -104,7 +125,7 @@ Future<AppointmentResponseModel> queueNext(
     @Path("doctor_id") int doctorId,
   );
 
-    @GET("patient/users/getPatientAppointments/{family_id}")
+  @GET("patient/users/getPatientAppointments/{family_id}")
   @GET("patient/users/getPatientAppointments/{patient_id}")
   Future<List<AppointmentList>> getPatientAppointments(
     @Path("patient_id") int patientId,
@@ -140,9 +161,7 @@ Future<AppointmentResponseModel> queueNext(
   );
 
   @GET("patient/users/review/doctor/{doctor_id}")
-  Future<List<ReviewModel>> getDoctorReviews(
-    @Path("doctor_id") int doctorId,
-  );
+  Future<List<ReviewModel>> getDoctorReviews(@Path("doctor_id") int doctorId);
 
   // POST API
   @POST("login/addPatientDetails")
@@ -166,15 +185,14 @@ Future<AppointmentResponseModel> queueNext(
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
-
-
-
   @POST("patient/insert/favoriteDoctor/add")
   Future<dynamic> addFavoriteDoctor(@Body() Map<String, dynamic> body);
 
   // REVIEW API (appointment-based)
   @POST("patient/insert/review/add")
-  Future<dynamic> addAppointmentReview(@Body() ReviewRequestModel reviewRequest);
+  Future<dynamic> addAppointmentReview(
+    @Body() ReviewRequestModel reviewRequest,
+  );
 
   //DELETE API
   @DELETE("patient/index/deleteFamilyMember/{member_id}")
