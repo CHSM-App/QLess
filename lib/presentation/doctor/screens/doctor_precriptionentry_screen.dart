@@ -512,11 +512,12 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
   final int doctorId;
   final int userTypeId;
   final int appointmentId;
-   final String patientName;     
-  final String? patientAge;      // ← optional
-  final String? patientGender;   // ← optional
-  final int? queueNumber;        // ← optional
-
+  final String patientName;
+  final String? patientAge;
+  final String? patientGender;
+  final int? queueNumber;
+  /// 'booked' → QUEUE_NEXT after prescription  |  'skipped' → QUEUE_RECALL
+  final String patientStatus;
 
   const PrescriptionScreen({
     super.key,
@@ -524,10 +525,11 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
     required this.doctorId,
     required this.userTypeId,
     required this.appointmentId,
-       required this.patientName, 
+    required this.patientName,
     this.patientAge,
     this.patientGender,
     this.queueNumber,
+    this.patientStatus = 'booked',
   });
 
   @override
@@ -620,31 +622,60 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     return '$age y';
   }
 
-  Future<AppointmentResponseModel?> _queueNextIfNeeded() async {
+  /// Calls QUEUE_RECALL for skipped patients, QUEUE_NEXT for booked patients.
+  Future<AppointmentResponseModel?> _completeQueueAction() async {
     try {
-      final req = AppointmentRequestModel(
-        operation: 'QUEUE_NEXT',
-        doctorId: widget.doctorId,
-        appointmentDate: _todayApi(),
-      );
-      debugPrint('QueueNext request: ${req.toJson()}');
-      final result = await ref
-          .read(appointmentViewModelProvider.notifier)
-          .queueNext(req);
-      debugPrint('QueueNext response: ${result.toJson()}');
+      final isSkipped =
+          widget.patientStatus.toLowerCase().trim() == 'skipped';
+
+      final AppointmentResponseModel result;
+
+      if (isSkipped) {
+        // Skipped patient → recall (mark as completed directly)
+        final req = AppointmentRequestModel(
+          appointmentId: widget.appointmentId,
+          doctorId: widget.doctorId,
+        );
+        debugPrint('QueueRecall request: ${req.toJson()}');
+        result = await ref
+            .read(appointmentViewModelProvider.notifier)
+            .queueRecall(req);
+        debugPrint('QueueRecall response: ${result.toJson()}');
+      } else {
+        // Booked patient → advance queue
+        final req = AppointmentRequestModel(
+          operation: 'QUEUE_NEXT',
+          doctorId: widget.doctorId,
+          appointmentDate: _todayApi(),
+        );
+        debugPrint('QueueNext request: ${req.toJson()}');
+        result = await ref
+            .read(appointmentViewModelProvider.notifier)
+            .queueNext(req);
+        debugPrint('QueueNext response: ${result.toJson()}');
+      }
+
       if (result.success == true) return result;
-      _showSnack(result.message ?? 'Queue next failed', isError: true);
+      _showSnack(result.message ?? 'Queue action failed', isError: true);
       return null;
     } catch (e) {
-      debugPrint('QueueNext error: $e');
+      debugPrint('Queue action error: $e');
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
       return null;
     }
   }
 
   Future<void> _handleNextPatient() async {
-    final result = await _queueNextIfNeeded();
+    final result = await _completeQueueAction();
     if (!mounted || result == null) return;
+
+    // Recalled skipped patient → just go back to patient list
+    if (widget.patientStatus.toLowerCase().trim() == 'skipped') {
+      _showSnack(result.message ?? 'Patient attended', isError: false);
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) Navigator.pop(context);
+      return;
+    }
 
     final nextToken = result.data?.isNotEmpty == true
         ? result.data!.first.nextToken

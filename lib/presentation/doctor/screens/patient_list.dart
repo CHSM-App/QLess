@@ -1170,6 +1170,21 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       );
     }
 
+    // ── Today tab: accessibility logic ──────────────────────────────────────
+    // Current = first booked patient (lowest queue_number).
+    // While a current exists, only that patient is accessible.
+    // Skipped patients become accessible only when no current booked patient exists.
+    int? currentQueueNo;
+    if (tabType == _TabType.today) {
+      final bookedSorted = patients
+          .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+          .toList()
+        ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+      currentQueueNo = bookedSorted.isNotEmpty
+          ? bookedSorted.first.queueNumber
+          : null;
+    }
+
     return RefreshIndicator(
       color: primary,
       onRefresh: () async => _refreshAppointments(force: true),
@@ -1178,11 +1193,22 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         itemCount: patients.length,
         itemBuilder: (context, index) {
           final p = patients[index];
+
+          bool isAccessible = true;
+          if (tabType == _TabType.today) {
+            final status = p.status?.toLowerCase() ?? '';
+            if (status == 'booked') {
+              isAccessible = p.queueNumber == currentQueueNo;
+            }
+            // skipped patients are always accessible — can be recalled anytime
+          }
+
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: PatientCard(
               patient: p,
               tabType: tabType,
+              isAccessible: isAccessible,
               onStart: () => _onStartSession(p),
               onView: () => _onViewPatient(p),
               onPrescription: () => _onPrescription(p),
@@ -1217,6 +1243,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           patientAge: _ageString(p.dob),
           patientGender: p.gender,
           queueNumber: p.queueNumber,
+          patientStatus: p.status ?? 'booked',
         ),
       ),
     );
@@ -1323,6 +1350,7 @@ enum _TabType { today, upcoming, completed }
 class PatientCard extends StatelessWidget {
   final AppointmentList patient;
   final _TabType tabType;
+  final bool isAccessible;
   final VoidCallback onStart;
   final VoidCallback onView;
   final VoidCallback onPrescription;
@@ -1332,6 +1360,7 @@ class PatientCard extends StatelessWidget {
     super.key,
     required this.patient,
     required this.tabType,
+    this.isAccessible = true,
     required this.onStart,
     required this.onView,
     required this.onPrescription,
@@ -1579,16 +1608,19 @@ class PatientCard extends StatelessWidget {
       );
 
   Widget _startBtn() => ElevatedButton.icon(
-        onPressed: onStart,
-        icon: const Icon(Icons.play_arrow_rounded,
-            size: 15, color: Colors.white),
-        label: const Text('Start Session',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: Colors.white)),
+        onPressed: isAccessible ? onStart : null,
+        icon: Icon(
+          isAccessible ? Icons.play_arrow_rounded : Icons.lock_outline,
+          size: 15,
+          color: Colors.white,
+        ),
+        label: Text(
+          isAccessible ? 'Start Session' : 'Waiting',
+          style: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+        ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: primary,
+          backgroundColor: isAccessible ? primary : Colors.grey.shade400,
           padding: const EdgeInsets.symmetric(vertical: 9),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),

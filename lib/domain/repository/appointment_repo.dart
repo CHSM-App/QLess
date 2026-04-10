@@ -45,4 +45,8 @@ abstract class AppointmentRepository {
   Future<AppointmentResponseModel> queueSkip(
     AppointmentRequestModel appointmentRequest,
   );
+
+  Future<AppointmentResponseModel> queueRecall(
+    AppointmentRequestModel appointmentRequest,
+  );
 }

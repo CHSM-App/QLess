@@ -74,4 +74,10 @@ class AppointmentUsecase {
   ) {
     return appointmentRepository.queueSkip(appointmentRequest);
   }
+
+  Future<AppointmentResponseModel> queueRecall(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queueRecall(appointmentRequest);
+  }
 }

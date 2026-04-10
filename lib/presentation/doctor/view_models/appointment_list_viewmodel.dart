@@ -144,4 +144,21 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       rethrow;
     }
   }
+
+  // ── Queue Recall (attend a skipped patient) ────────────────────────────────
+
+  Future<AppointmentResponseModel> queueRecall(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await usecase.queueRecall(appointmentRequest);
+      await fetchPatientAppointments(appointmentRequest.doctorId!);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
 }

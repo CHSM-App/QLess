@@ -101,6 +101,11 @@ abstract class ApiService {
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("doctor/insert/appointment/queueRecall")
+  Future<AppointmentResponseModel> queueRecall(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
 
   // DELETE API
   @DELETE("doctor/index/deleteMedicine/{medicine_id}")
