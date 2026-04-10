@@ -597,11 +597,11 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   String? _validate() {
     if (_sympCtrl.text.trim().isEmpty) return 'Please enter symptoms';
     if (_diagCtrl.text.trim().isEmpty) return 'Please enter diagnosis';
-    if (_meds.isEmpty) return 'Please add at least one medicine';
-    for (int i = 0; i < _meds.length; i++) {
-      if (_meds[i].selectedName == null || _meds[i].medicineId == null)
-        return 'Please select medicine name for Medicine ${i + 1}';
-    }
+    // if (_meds.isEmpty) return 'Please add at least one medicine';
+    // for (int i = 0; i < _meds.length; i++) {
+    //   if (_meds[i].selectedName == null || _meds[i].medicineId == null)
+    //     return 'Please select medicine name for Medicine ${i + 1}';
+    // }
     return null;
   }
 
