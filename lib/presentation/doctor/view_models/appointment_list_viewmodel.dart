@@ -53,9 +53,24 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     );
     try {
       final result = await usecase.fetchPatientAppointments(doctorId);
-      state = state.copyWith(patientAppointmentsList: AsyncValue.data(result));
+      // Derive queue state from backend data so it survives app restarts
+      final derivedQueueState = _deriveQueueState(result.isNotEmpty ? result.first.queueStatus : null);
+
+      state = state.copyWith(
+        patientAppointmentsList: AsyncValue.data(result),
+        queueState: derivedQueueState,
+      );
     } catch (e, st) {
       state = state.copyWith(patientAppointmentsList: AsyncValue.error(e, st));
+    }
+  }
+
+  QueueState _deriveQueueState(int? queueStatus) {
+    switch (queueStatus) {
+      case 1: return QueueState.running;  // QUEUE_START
+      case 2: return QueueState.paused;   // QUEUE_PAUSE
+      case 3: return QueueState.stopped;  // QUEUE_STOP
+      default: return QueueState.idle;    // no queue row yet
     }
   }
 

@@ -81,6 +81,8 @@ class AppointmentList {
   @JsonKey(name: 'patient_name')
   String? patientName;
 
+  @JsonKey(name: 'queue_status')
+  int? queueStatus;
 
   AppointmentList({
     this.appointmentId,
@@ -107,6 +109,7 @@ class AppointmentList {
     this.longitude,
 
     this.clinicContact,
+    this.queueStatus,
   });
 
   factory AppointmentList.fromJson(Map<String, dynamic> json) =>
