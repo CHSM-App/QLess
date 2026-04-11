@@ -121,12 +121,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   Future<void> _onQueueNext(AppointmentList current) async {
     if (_doctorId == 0) return;
     try {
-      final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
           .queueNext(AppointmentRequestModel(
             doctorId: _doctorId,
-            appointmentDate: today,
+            appointmentId: current.appointmentId ?? 0,
           ));
       _snack(res.message ?? 'Next patient');
     } catch (_) {
@@ -134,12 +133,15 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
-  Future<void> _onQueueSkip() async {
+  Future<void> _onQueueSkip(AppointmentList current) async {
     if (_doctorId == 0) return;
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queueSkip(AppointmentRequestModel(doctorId: _doctorId));
+          .queueSkip(AppointmentRequestModel(
+            doctorId: _doctorId,
+            appointmentId: current.appointmentId ?? 0,
+          ));
       _snack(res.message ?? 'Patient skipped');
     } catch (_) {
       _snack('Failed to skip');
@@ -582,7 +584,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   label: '⏭  Skip Patient',
                   color: const Color(0xFFFBE9E7),
                   textColor: const Color(0xFFBF360C),
-                  onTap: current != null ? _onQueueSkip : null,
+                  onTap: current != null ? () => _onQueueSkip(current) : null,
                 ),
               ],
             ),
