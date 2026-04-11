@@ -704,7 +704,6 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   String? _validate() {
     if (_sympCtrl.text.trim().isEmpty) return 'Please enter symptoms';
     if (_diagCtrl.text.trim().isEmpty) return 'Please enter diagnosis';
-    if (_meds.isEmpty) return 'Please add at least one medicine';
     for (int i = 0; i < _meds.length; i++) {
       if (_meds[i].selectedName == null || _meds[i].medicineId == null)
         return 'Please select medicine name for Medicine ${i + 1}';
@@ -753,6 +752,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         final req = AppointmentRequestModel(
           operation: 'QUEUE_NEXT',
           doctorId: widget.doctorId,
+          appointmentId: widget.appointmentId,
+          patientId: widget.patientId,
           appointmentDate: _todayApi(),
         );
         debugPrint('QueueNext request: ${req.toJson()}');
@@ -923,7 +924,7 @@ Future<void> _completeAndBack() async {
     appointmentId: widget.appointmentId,
     followUpDate:  followUpStr,
     advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
-    medicines:     _meds.map((e) => e.toApiModel()).toList(),
+    medicines:     _meds.isEmpty ? [] : _meds.map((e) => e.toApiModel()).toList(),
   );
 
   await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription);
@@ -962,7 +963,7 @@ Future<void> _completePrescription() async {
         '${_followDate!.year}-${_followDate!.month.toString().padLeft(2, '0')}-${_followDate!.day.toString().padLeft(2, '0')}';
   }
 
-  final prescription = PrescriptionModel(
+  final prescription2 = PrescriptionModel(
     patientId:     widget.patientId,
     doctorId:      widget.doctorId,
     symptoms:      _sympCtrl.text.trim(),
@@ -972,15 +973,15 @@ Future<void> _completePrescription() async {
     appointmentId: widget.appointmentId,
     followUpDate:  followUpStr,
     advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
-    medicines:     _meds.map((e) => e.toApiModel()).toList(),
+    medicines:     _meds.isEmpty ? [] : _meds.map((e) => e.toApiModel()).toList(),
   );
 
-  await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription);
+  await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription2);
   if (!mounted) return;
 
-  final state = ref.read(prescriptionViewModelProvider);
-  if (state.error != null) {
-    _showSnack(state.error ?? 'Something went wrong', isError: true);
+  final state2 = ref.read(prescriptionViewModelProvider);
+  if (state2.error != null) {
+    _showSnack(state2.error ?? 'Something went wrong', isError: true);
     return;
   }
 

@@ -87,9 +87,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
           .queueStart(AppointmentRequestModel(doctorId: _doctorId));
-      _snack(res.message ?? 'Queue started');
+      _snack(res.message ?? 'Start Serving Patients');
     } catch (_) {
-      _snack('Failed to start queue');
+      _snack('Failed to start serving patients');
     }
   }
 
@@ -99,7 +99,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId));
-      _snack(res.message ?? 'Queue paused');
+      _snack(res.message ?? 'Paused Patient Serving');
     } catch (_) {
       _snack('Failed to pause queue');
     }
@@ -112,7 +112,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
           .queueStop(AppointmentRequestModel(doctorId: _doctorId));
-      _snack(res.message ?? 'Queue stopped');
+      _snack(res.message ?? 'Stopped Patient Serving');
     } catch (_) {
       _snack('Failed to stop queue');
     }
@@ -412,7 +412,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 12),
         child: Text(
-          'No patients in queue today',
+          'No patients in today',
           style: TextStyle(color: Color(0xFF90A4AE)),
         ),
       );
