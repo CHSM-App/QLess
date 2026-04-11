@@ -443,7 +443,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     }
 
     if (!mounted) return;
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PrescriptionScreen(
@@ -455,10 +455,13 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           patientAge: _ageString(p.dob),
           patientGender: p.gender,
           queueNumber: p.queueNumber,
-          patientStatus: p.status ?? 'booked',
+          patientStatus: 'booked', // START_SESSION already called; patient is in_progress → use NEXT_SESSION flow
         ),
       ),
     );
+    if (!mounted) return;
+    _hasFetched = false;
+    _refreshAppointments(force: true);
   }
 
   void _onViewPatient(AppointmentList p) {
@@ -506,6 +509,8 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
             patientId: p.patientId ?? 0,
           ));
       if (!mounted) return;
+      _hasFetched = false;
+      _refreshAppointments(force: true);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(result.message ?? 'Patient skipped'),
         behavior: SnackBarBehavior.floating,

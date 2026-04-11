@@ -34,11 +34,12 @@ class _PatientBottomNavState extends State<PatientBottomNav>
   late final List<Animation<double>> _iconScales;
 
   // ── Palette ────────────────────────────────────────────────────
-  static const _accent      = Color(0xFF3730A3); // deep indigo active
-  static const _inactiveClr = Color(0xFF334155); // dark slate inactive
-static const _pillBg     = Color(0x55FFFFFF); // ← 33% white, very see-through
-static const _pillBorder = Color(0x80FFFFFF); // ← 50% white border
-  static const _activePill  = Color(0x1A3730A3); // 10% indigo tint
+// ── Palette (update these to match doctor) ─────────────────────
+static const _accent      = Color(0xFF6366F1); // match doctor indigo
+static const _inactiveClr = Color(0xFF1E293B); // match doctor dark slate
+static const _pillBg      = Color(0xC0FFFFFF); // match doctor 75% white
+static const _pillBorder  = Color(0xF0FFFFFF); // match doctor near-opaque white
+static const _activePill  = Color(0x1A6366F1); // match doctor 10% indigo tint
 
   static const _navItems = [
     _NavItem(
