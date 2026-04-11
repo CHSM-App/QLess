@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -748,15 +749,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
               Row(
                 children: [
-                  _inlineWheel(
-                    value: _leadHours,
-                    max: 24,
-                    onChanged: (v) {
-                      setState(() => _leadHours = v);
-                      _onLeadTimeChanged();
-                    },
-                  ),
-
+                _WheelPicker(
+  value: _leadHours,
+  max: 24,
+  onChanged: (v) {
+    setState(() => _leadHours = v);
+    _onLeadTimeChanged();
+  },
+),
                   const SizedBox(width: 6),
 
                   const Text(
@@ -769,15 +769,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                   ),
 
                   const SizedBox(width: 6),
-
-                  _inlineWheel(
-                    value: _leadMinutes,
-                    max: 60,
-                    onChanged: (v) {
-                      setState(() => _leadMinutes = v);
-                      _onLeadTimeChanged();
-                    },
-                  ),
+_WheelPicker(
+  value: _leadMinutes,
+  max: 60,
+  onChanged: (v) {
+    setState(() => _leadMinutes = v);
+    _onLeadTimeChanged();
+  },
+),
                 ],
               ),
             ],
@@ -787,77 +786,44 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  Widget _inlineWheel({
-    required int value,
-    required int max,
-    required ValueChanged<int> onChanged,
-  }) {
-    return SizedBox(
-      width: 50,
-      height: 40,
-      child: ListWheelScrollView.useDelegate(
-        itemExtent: 30,
-        diameterRatio: 1.8,
-        perspective: 0.003,
-        physics: const FixedExtentScrollPhysics(),
-        controller: FixedExtentScrollController(initialItem: value),
-        onSelectedItemChanged: onChanged,
-        childDelegate: ListWheelChildBuilderDelegate(
-          childCount: max,
-          builder: (context, index) {
-            final isSelected = index == value;
-
-            return Center(
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 150),
-                style: TextStyle(
-                  fontSize: isSelected ? 16 : 13,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                  color: isSelected ? kPrimaryBlue : kTextMuted,
-                ),
-                child: Text(index.toString().padLeft(2, '0')),
+Widget _inlineWheel({
+  required int value,
+  required int max,
+  required ValueChanged<int> onChanged,
+}) {
+  return SizedBox(
+    width: 50,
+    height: 40,
+    child: ListWheelScrollView.useDelegate(
+      itemExtent: 30,
+      diameterRatio: 1.8,
+      perspective: 0.003,
+      physics: const FixedExtentScrollPhysics(),
+      controller: FixedExtentScrollController(initialItem: value),
+onSelectedItemChanged: (index) {
+  HapticFeedback.mediumImpact(); // stronger vibration per step
+  onChanged(index);
+},
+      childDelegate: ListWheelChildBuilderDelegate(
+        childCount: max,
+        builder: (context, index) {
+          final isSelected = index == value;
+          return Center(
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 150),
+              style: TextStyle(
+                fontSize: isSelected ? 16 : 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                color: isSelected ? kPrimaryBlue : kTextMuted,
               ),
-            );
-          },
-        ),
+              child: Text(index.toString().padLeft(2, '0')),
+            ),
+          );
+        },
       ),
-    );
-  }
-
-  Widget _smallWheel({
-    required int value,
-    required int max,
-    required ValueChanged<int> onChanged,
-  }) {
-    return SizedBox(
-      width: 50,
-      height: 40,
-      child: ListWheelScrollView.useDelegate(
-        itemExtent: 30,
-        diameterRatio: 1.8,
-        perspective: 0.003,
-        physics: const FixedExtentScrollPhysics(),
-        controller: FixedExtentScrollController(initialItem: value),
-        onSelectedItemChanged: onChanged,
-        childDelegate: ListWheelChildBuilderDelegate(
-          childCount: max,
-          builder: (context, index) {
-            final isSelected = index == value;
-            return Center(
-              child: Text(
-                index.toString().padLeft(2, '0'),
-                style: TextStyle(
-                  fontSize: isSelected ? 16 : 13,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
-                  color: isSelected ? kPrimaryBlue : kTextMuted,
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildDayRow(String day, String hours, bool active) {
     return Row(
@@ -1321,4 +1287,79 @@ class _SettingItem {
     this.subtitle,
     this.trailing,
   });
+}
+
+
+
+
+//============================================================================
+class _WheelPicker extends StatefulWidget {
+  final int value;
+  final int max;
+  final ValueChanged<int> onChanged;
+
+  const _WheelPicker({
+    required this.value,
+    required this.max,
+    required this.onChanged,
+  });
+
+  @override
+  State<_WheelPicker> createState() => _WheelPickerState();
+}
+
+class _WheelPickerState extends State<_WheelPicker> {
+  late final FixedExtentScrollController _controller;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.value;
+    _controller = FixedExtentScrollController(initialItem: widget.value);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 50,
+      height: 40,
+      child: ListWheelScrollView.useDelegate(
+        itemExtent: 30,
+        diameterRatio: 1.8,
+        perspective: 0.003,
+        physics: const FixedExtentScrollPhysics(),
+        controller: _controller,
+        onSelectedItemChanged: (index) {
+          HapticFeedback.lightImpact(); // ✅ fires correctly now
+          setState(() => _currentIndex = index);
+          widget.onChanged(index);
+        },
+        childDelegate: ListWheelChildBuilderDelegate(
+          childCount: widget.max,
+          builder: (context, index) {
+            final isSelected = index == _currentIndex;
+            return Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 150),
+                style: TextStyle(
+                  fontSize: isSelected ? 16 : 13,
+                  fontWeight:
+                      isSelected ? FontWeight.w700 : FontWeight.w400,
+                  color: isSelected ? kPrimaryBlue : kTextMuted,
+                ),
+                child: Text(index.toString().padLeft(2, '0')),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
 }

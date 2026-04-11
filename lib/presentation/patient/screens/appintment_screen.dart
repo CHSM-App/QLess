@@ -363,36 +363,39 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
 
     return Scaffold(
       backgroundColor: kBg,
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: kPrimary,
-        elevation: 4,
-        onPressed: () {
-          final onTabChange = widget.onTabChange;
-          if (onTabChange != null) {
-            onTabChange(1);
-            return;
-          }
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PatientBottomNav(
-                onToggleTheme: () {},
-                themeMode: ThemeMode.system,
-                initialTab: 1,
-              ),
-            ),
-          );
-        },
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text(
-          "Book",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
+      floatingActionButton: Padding(
+  padding: const EdgeInsets.only(bottom: 20.0), // adjust value as needed
+  child: FloatingActionButton.extended(
+    backgroundColor: kPrimary,
+    elevation: 4,
+    onPressed: () {
+      final onTabChange = widget.onTabChange;
+      if (onTabChange != null) {
+        onTabChange(1);
+        return;
+      }
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PatientBottomNav(
+            onToggleTheme: () {},
+            themeMode: ThemeMode.system,
+            initialTab: 1,
           ),
         ),
+      );
+    },
+    icon: const Icon(Icons.add_rounded, color: Colors.white),
+    label: const Text(
+      "Book",
+      style: TextStyle(
+        color: Colors.white,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.5,
       ),
+    ),
+  ),
+),
       body: SafeArea(
         top: false,
         child: Column(
