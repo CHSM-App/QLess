@@ -36,8 +36,8 @@ class _PatientBottomNavState extends State<PatientBottomNav>
   // ── Palette ────────────────────────────────────────────────────
   static const _accent      = Color(0xFF3730A3); // deep indigo active
   static const _inactiveClr = Color(0xFF334155); // dark slate inactive
-  static const _pillBg      = Color(0xC8FFFFFF); // 78% white
-  static const _pillBorder  = Color(0xFFFFFFFF);
+static const _pillBg     = Color(0x55FFFFFF); // ← 33% white, very see-through
+static const _pillBorder = Color(0x80FFFFFF); // ← 50% white border
   static const _activePill  = Color(0x1A3730A3); // 10% indigo tint
 
   static const _navItems = [
@@ -119,18 +119,19 @@ class _PatientBottomNavState extends State<PatientBottomNav>
   void dispose() {
     for (final c in _iconControllers) c.dispose();
     super.dispose();
+
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,           // page draws behind the floating pill
-      backgroundColor: Colors.transparent,
-      body: IndexedStack(index: _tab, children: _screens),
-      bottomNavigationBar: _buildBottomNav(),
-    );
-  }
-
+Widget build(BuildContext context) {
+  return Scaffold(
+    extendBody: true,
+    extendBodyBehindAppBar: true,
+    backgroundColor: const Color(0xFFEEF2FF), // ← real bg, not transparent
+    body: IndexedStack(index: _tab, children: _screens),
+    bottomNavigationBar: _buildBottomNav(),
+  );
+}
   // ── Floating Glass Pill ───────────────────────────────────────
   Widget _buildBottomNav() {
     return SafeArea(

@@ -4,6 +4,8 @@ import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/patient/screens/family_members_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/patient_edit_profile.dart'
     show PatientEditProfilePage;
 import 'package:qless/presentation/shared/screens/continue_as.dart';
@@ -93,7 +95,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
             const SizedBox(height: 12),
             _buildEditButton(context),
             const SizedBox(height: 16),
-            _buildAccountSection(context, ref),
+            _buildAccountSection(context, ref, patientState, patientDetails),
             const SizedBox(height: 32),
           ],
         ),
@@ -277,6 +279,47 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     );
   }
 
+  // ——— Personal Info Popup ————————————————————————————————
+  void _showPersonalInfoSheet(
+    BuildContext context,
+    PatientLoginState state,
+    Patients? details,
+  ) {
+    final name = details?.name ?? state.name ?? '—';
+    final mobile = details?.mobileNo ?? state.mobileNo ?? '—';
+    final email = details?.email ?? state.email ?? '—';
+    final gender = _displayGender(details);
+    final genderText = gender.isNotEmpty ? gender : '—';
+    final dob = _formatDob(details?.DOB) ?? '—';
+    final age = _ageFromDob(details?.DOB);
+    final ageText = age != null ? '$age' : '—';
+    final blood = details?.bloodGroup?.trim();
+    final bloodText = (blood != null && blood.isNotEmpty) ? blood : '—';
+    final weight = details?.weight?.trim();
+    final weightText =
+        (weight != null && weight.isNotEmpty) ? '$weight kg' : '—';
+    final address = details?.address?.trim();
+    final addressText =
+        (address != null && address.isNotEmpty) ? address : '—';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PersonalInfoSheet(
+        name: name,
+        mobile: mobile,
+        email: email,
+        gender: genderText,
+        dob: dob,
+        age: ageText,
+        bloodGroup: bloodText,
+        weight: weightText,
+        address: addressText,
+      ),
+    );
+  }
+
   // ── Stats Row ──────────────────────────────────────────────────
   Widget _buildStatsRow(Patients? details) {
     final blood = details?.bloodGroup;
@@ -367,7 +410,12 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   }
 
   // ── Account Section ────────────────────────────────────────────
-  Widget _buildAccountSection(BuildContext context, WidgetRef ref) {
+  Widget _buildAccountSection(
+    BuildContext context,
+    WidgetRef ref,
+    PatientLoginState state,
+    Patients? details,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -398,20 +446,21 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                 iconBg: kPrimaryBg,
                 title: 'Personal information',
                 subtitle: 'Name, DOB, gender',
+                onTap: () => _showPersonalInfoSheet(context, state, details),
               ),
-              _menuRow(
-                icon: Icons.location_on_outlined,
-                iconColor: kOrange,
-                iconBg: kOrangeBg,
-                title: 'Address',
-                subtitle: 'Home, city, ZIP',
-              ),
+    
               _menuRow(
                 icon: Icons.description_outlined,
                 iconColor: kCyan,
                 iconBg: kCyanBg,
                 title: 'Medical records',
                 subtitle: 'Reports, prescriptions',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PatientPrescriptionListScreen(),
+                  ),
+                ),
               ),
               _menuRow(
                 icon: Icons.group_outlined,
@@ -419,6 +468,12 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                 iconBg: kPurpleBg,
                 title: 'Family members',
                 subtitle: '3 members added',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FamilyMembersScreen(),
+                  ),
+                ),
               ),
               _menuRow(
                 icon: Icons.notifications_outlined,
@@ -610,6 +665,233 @@ class _Divider extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.symmetric(vertical: 14),
       child: Divider(height: 0.5, thickness: 0.5, color: kBorder),
+    );
+  }
+}
+
+// ——— Personal Info Bottom Sheet —————————————————————————————
+class _PersonalInfoSheet extends StatelessWidget {
+  const _PersonalInfoSheet({
+    required this.name,
+    required this.mobile,
+    required this.email,
+    required this.gender,
+    required this.dob,
+    required this.age,
+    required this.bloodGroup,
+    required this.weight,
+    required this.address,
+  });
+
+  final String name;
+  final String mobile;
+  final String email;
+  final String gender;
+  final String dob;
+  final String age;
+  final String bloodGroup;
+  final String weight;
+  final String address;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: kBorder,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: kPrimaryBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.person_outline,
+                      size: 18, color: kPrimary),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Personal Information',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: kTextDark,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: kCardBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: const Icon(Icons.close_rounded,
+                        size: 16, color: kTextMid),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: kBorder),
+          const SizedBox(height: 8),
+
+          _SheetInfoRow(
+            icon: Icons.person,
+            iconColor: kPrimary,
+            iconBg: kPrimaryBg,
+            label: 'Name',
+            value: name,
+          ),
+          _SheetInfoRow(
+            icon: Icons.phone_outlined,
+            iconColor: kGreen,
+            iconBg: kGreenBg,
+            label: 'Mobile',
+            value: mobile,
+          ),
+          _SheetInfoRow(
+            icon: Icons.email_outlined,
+            iconColor: kCyan,
+            iconBg: kCyanBg,
+            label: 'Email',
+            value: email,
+          ),
+          _SheetInfoRow(
+            icon: Icons.wc_outlined,
+            iconColor: kPurple,
+            iconBg: kPurpleBg,
+            label: 'Gender',
+            value: gender,
+          ),
+          _SheetInfoRow(
+            icon: Icons.calendar_today_rounded,
+            iconColor: kPrimary,
+            iconBg: kPrimaryBg,
+            label: 'Date of birth',
+            value: dob,
+          ),
+          _SheetInfoRow(
+            icon: Icons.cake_outlined,
+            iconColor: kOrange,
+            iconBg: kOrangeBg,
+            label: 'Age',
+            value: age,
+          ),
+          _SheetInfoRow(
+            icon: Icons.bloodtype_outlined,
+            iconColor: kRed,
+            iconBg: kRedBg,
+            label: 'Blood group',
+            value: bloodGroup,
+          ),
+          _SheetInfoRow(
+            icon: Icons.monitor_weight_outlined,
+            iconColor: kOrange,
+            iconBg: kOrangeBg,
+            label: 'Weight',
+            value: weight,
+          ),
+          _SheetInfoRow(
+            icon: Icons.location_on_outlined,
+            iconColor: kGreen,
+            iconBg: kGreenBg,
+            label: 'Address',
+            value: address,
+            isLast: true,
+          ),
+
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetInfoRow extends StatelessWidget {
+  const _SheetInfoRow({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String label;
+  final String value;
+  final bool isLast;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: Icon(icon, size: 14, color: iconColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label,
+                        style:
+                            const TextStyle(fontSize: 11, color: kTextMid)),
+                    const SizedBox(height: 2),
+                    Text(value,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kTextDark,
+                        )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (!isLast)
+          const Divider(height: 0.5, thickness: 0.5, color: kBorder),
+      ],
     );
   }
 }
