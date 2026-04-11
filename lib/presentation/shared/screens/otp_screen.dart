@@ -148,6 +148,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     }
 
     await _printFcmToken();
+    await _storeFcmToken();
 
     final roleId = ref.read(tokenProvider).roleId ?? 0;
     if (1 == roleId) {
@@ -179,6 +180,25 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       debugPrint('FCM token fetch failed (OTP verify): $e');
     }
   }
+
+  Future<void> _storeFcmToken() async {
+  try {
+    await _ensureFirebaseInitialized();
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token == null) return;
+    final body = TokenResponse(
+        firebaseToken: token,
+        role: widget.role,
+        mobile: widget.mobileNumber
+    );
+    // Send token to your backende
+    await ref
+        .read(authViewModelProvider.notifier)
+        .saveFirebaseToken(body); 
+  } catch (e) {
+    debugPrint('FCM token store failed: $e');
+  }
+}
 
   Future<void> _ensureFirebaseInitialized() async {
     if (Firebase.apps.isNotEmpty) return;

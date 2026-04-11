@@ -10,6 +10,7 @@ class TokenResponse {
   final String? deviceDetails;
   final int? roleId;
   final String? role;
+  final String? firebaseToken;
 
   TokenResponse({
      this.accessToken,
@@ -18,6 +19,7 @@ class TokenResponse {
     this.deviceDetails,
      this.roleId,
      this.role,
+     this.firebaseToken
 
   });
 
