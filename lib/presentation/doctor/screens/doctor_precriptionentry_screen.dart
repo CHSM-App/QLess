@@ -939,7 +939,9 @@ Future<void> _completeAndBack() async {
   // Call endSession API
   try {
     await ref.read(appointmentViewModelProvider.notifier).endSession(
-      AppointmentRequestModel(doctorId: widget.doctorId),
+      AppointmentRequestModel(doctorId: widget.doctorId,
+          appointmentId: widget.appointmentId,
+          patientId: widget.patientId),
     );
   } catch (_) {
     // Non-blocking

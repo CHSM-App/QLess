@@ -45,6 +45,7 @@ class DoctorAvailabilityModel {
     this.endTime,
     this.bookingMode,
     this.slotDuration,
+    
   });
 
   factory DoctorAvailabilityModel.fromJson(Map<String, dynamic> json) =>
