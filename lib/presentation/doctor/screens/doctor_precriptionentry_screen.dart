@@ -939,7 +939,9 @@ Future<void> _completeAndBack() async {
   // Call endSession API
   try {
     await ref.read(appointmentViewModelProvider.notifier).endSession(
-      AppointmentRequestModel(doctorId: widget.doctorId),
+      AppointmentRequestModel(doctorId: widget.doctorId,
+          appointmentId: widget.appointmentId,
+          patientId: widget.patientId),
     );
   } catch (_) {
     // Non-blocking
@@ -1261,7 +1263,8 @@ Widget _patientCard() => _card(child: Row(children: [
   Future<void> _onSkip() async {
     try {
       await ref.read(appointmentViewModelProvider.notifier).queueSkip(
-        AppointmentRequestModel(doctorId: widget.doctorId),
+        AppointmentRequestModel(doctorId: widget.doctorId
+            , appointmentId: widget.appointmentId, patientId: widget.patientId),
       );
       if (!mounted) return;
 

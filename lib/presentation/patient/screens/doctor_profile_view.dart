@@ -7,6 +7,7 @@ import 'package:qless/presentation/patient/screens/book_appointment_screen.dart'
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/domain/models/review_model.dart';
+import 'package:qless/domain/models/doctor_availability_model.dart';
 
 // Uses same palette constants from book_appointment_screen.dart
 // (kPrimary, kGreen, kOrange, kTextDark, kTextMid, kBorder, kBg, kCardBg,
@@ -52,6 +53,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   int? _favFetchedForPatientId;
   bool _didRouteRefresh = false;
   bool _didFetchReviews = false;
+  bool _didFetchAvailability = false;
 
   @override
   void initState() {
@@ -64,6 +66,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryFetchFavorite();
       _tryFetchReviews();
+      _tryFetchAvailability();
     });
   }
 
@@ -79,6 +82,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     _favFetchedForPatientId = null;
     _tryFetchFavorite();
     _tryFetchReviews(force: true);
+    _tryFetchAvailability(force: true);
   }
 
   void _showFavSnack(bool added) {
@@ -148,6 +152,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
     final reviewState = ref.watch(reviewViewModelProvider);
     final reviews = reviewState.reviews ?? <ReviewModel>[];
+    final availabilities = ref.watch(doctorsViewModelProvider).doctorAvailabilities;
     final avgRating = _avgRating(reviews);
 
     return Scaffold(
@@ -329,13 +334,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                         subtitle: widget.doctor.clinicAddress ?? '',
                       ),
                     const SizedBox(height: 10),
-                    _InfoRow(
-                      icon: Icons.access_time_rounded,
-                      iconColor: const Color(0xFF065F46),
-                      iconBg: const Color(0xFFD1FAE5),
-                      title: 'Mon – Sat',
-                      subtitle: '09:00 AM – 07:00 PM',
-                    ),
+                    _buildWorkingHoursSection(availabilities),
                     if (widget.doctor.consultationFee != null) ...[
                       const SizedBox(height: 10),
                       _InfoRow(
@@ -442,6 +441,14 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     if (_didFetchReviews && !force) return;
     _didFetchReviews = true;
     ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did);
+  }
+
+  void _tryFetchAvailability({bool force = false}) {
+    final did = widget.doctor.doctorId ?? 0;
+    if (did <= 0) return;
+    if (_didFetchAvailability && !force) return;
+    _didFetchAvailability = true;
+    ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did);
   }
 
   Future<void> _handleFavoriteToggle(bool v) async {
@@ -798,6 +805,85 @@ String _fmtReviewDate(String? iso) {
     'Jul','Aug','Sep','Oct','Nov','Dec',
   ];
   return '${months[dt.month - 1]} ${dt.year}';
+}
+
+// ── Working-hours helpers ────────────────────────────────────────────────────
+
+String _fmtTime(String? t) {
+  if (t == null || t.isEmpty) return '';
+  final parts = t.split(':');
+  if (parts.length < 2) return t;
+  final h = int.tryParse(parts[0]) ?? 0;
+  final m = int.tryParse(parts[1]) ?? 0;
+  final period = h >= 12 ? 'PM' : 'AM';
+  final h12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+  return '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+}
+
+Widget _buildWorkingHoursSection(List<DoctorAvailabilityModel> avail) {
+  const dayOrder = [
+    'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
+  ];
+  const shortDay = {
+    'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed',
+    'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun',
+  };
+
+  // Per day: min start_time, max end_time among enabled slots
+  final Map<String, (String, String)> byDay = {};
+  for (final a in avail) {
+    if (a.isEnabled != true || a.dayOfWeek == null) continue;
+    final day  = a.dayOfWeek!;
+    final s    = a.startTime ?? '';
+    final e    = a.endTime   ?? '';
+    if (!byDay.containsKey(day)) {
+      byDay[day] = (s, e);
+    } else {
+      final cur = byDay[day]!;
+      byDay[day] = (
+        s.compareTo(cur.$1) < 0 ? s : cur.$1,
+        e.compareTo(cur.$2) > 0 ? e : cur.$2,
+      );
+    }
+  }
+
+  if (byDay.isEmpty) {
+    return _InfoRow(
+      icon: Icons.access_time_rounded,
+      iconColor: const Color(0xFF065F46),
+      iconBg: const Color(0xFFD1FAE5),
+      title: 'Working Hours',
+      subtitle: 'Schedule not available',
+    );
+  }
+
+  // Group days that share the same (start, end) → show "Mon, Tue: HH:MM – HH:MM"
+  final Map<String, List<String>> byTime = {};
+  for (final day in dayOrder) {
+    if (!byDay.containsKey(day)) continue;
+    final r   = byDay[day]!;
+    final key = '${r.$1}|${r.$2}';
+    byTime.putIfAbsent(key, () => []).add(day);
+  }
+
+  final rows = <Widget>[];
+  bool first = true;
+  for (final entry in byTime.entries) {
+    final parts    = entry.key.split('|');
+    final timeStr  = '${_fmtTime(parts[0])} – ${_fmtTime(parts[1])}';
+    final dayLabel = entry.value.map((d) => shortDay[d] ?? d).join(', ');
+    if (!first) rows.add(const SizedBox(height: 10));
+    rows.add(_InfoRow(
+      icon: Icons.access_time_rounded,
+      iconColor: const Color(0xFF065F46),
+      iconBg: const Color(0xFFD1FAE5),
+      title: dayLabel,
+      subtitle: timeStr,
+    ));
+    first = false;
+  }
+
+  return Column(children: rows);
 }
 
 // Sub-widgets
