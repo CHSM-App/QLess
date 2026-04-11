@@ -1,7 +1,6 @@
-
-// ─── MAIN SHELL (Bottom Nav) ──────────────────────────────────────────────────
-
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_home_screen.dart';
@@ -11,26 +10,65 @@ class PatientBottomNav extends StatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
   final int initialTab;
-  const PatientBottomNav(
-      {super.key,
-      required this.onToggleTheme,
-      required this.themeMode,
-      this.initialTab = 0});
+
+  const PatientBottomNav({
+    super.key,
+    required this.onToggleTheme,
+    required this.themeMode,
+    this.initialTab = 0,
+  });
+
   @override
   State<PatientBottomNav> createState() => _PatientBottomNavState();
 }
 
-class _PatientBottomNavState extends State<PatientBottomNav> {
+class _PatientBottomNavState extends State<PatientBottomNav>
+    with TickerProviderStateMixin {
   int _tab = 0;
+
   final GlobalKey<AppointmentScreenState> _appointmentsKey =
       GlobalKey<AppointmentScreenState>();
 
   late final List<Widget> _screens;
+  late final List<AnimationController> _iconControllers;
+  late final List<Animation<double>> _iconScales;
+
+  // ── Palette ────────────────────────────────────────────────────
+  static const _accent      = Color(0xFF3730A3); // deep indigo active
+  static const _inactiveClr = Color(0xFF334155); // dark slate inactive
+  static const _pillBg      = Color(0xC8FFFFFF); // 78% white
+  static const _pillBorder  = Color(0xFFFFFFFF);
+  static const _activePill  = Color(0x1A3730A3); // 10% indigo tint
+
+  static const _navItems = [
+    _NavItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Home',
+    ),
+    _NavItem(
+      icon: Icons.search_outlined,
+      activeIcon: Icons.search_rounded,
+      label: 'Doctors',
+    ),
+    _NavItem(
+      icon: Icons.calendar_today_outlined,
+      activeIcon: Icons.calendar_today_rounded,
+      label: 'Appointments',
+    ),
+    _NavItem(
+      icon: Icons.person_outline,
+      activeIcon: Icons.person_rounded,
+      label: 'Profile',
+    ),
+  ];
 
   void _setTab(int i) {
-    if (_tab != i) {
-      setState(() => _tab = i);
-    }
+    if (_tab == i) return;
+    _iconControllers[_tab].reverse();
+    setState(() => _tab = i);
+    _iconControllers[i].forward(from: 0);
+    HapticFeedback.selectionClick();
     if (i == 2) {
       _appointmentsKey.currentState?.refreshOnVisible();
     }
@@ -39,14 +77,26 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
   @override
   void initState() {
     super.initState();
-    final requestedTab = widget.initialTab;
-    if (requestedTab < 0) {
-      _tab = 0;
-    } else if (requestedTab > 3) {
-      _tab = 3;
-    } else {
-      _tab = requestedTab;
-    }
+
+    // clamp initial tab
+    _tab = widget.initialTab.clamp(0, 3);
+
+    // animation controllers
+    _iconControllers = List.generate(
+      _navItems.length,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 380),
+      ),
+    );
+    _iconScales = _iconControllers
+        .map((c) => Tween<double>(begin: 1.0, end: 1.18).animate(
+              CurvedAnimation(parent: c, curve: Curves.elasticOut),
+            ))
+        .toList();
+    _iconControllers[_tab].forward();
+
+    // screens
     _screens = [
       HomeScreen(
         onToggleTheme: widget.onToggleTheme,
@@ -57,6 +107,7 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
       AppointmentScreen(key: _appointmentsKey, onTabChange: _setTab),
       const PatientProfilePage(),
     ];
+
     if (_tab == 2) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _appointmentsKey.currentState?.refreshOnVisible();
@@ -65,51 +116,143 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
   }
 
   @override
+  void dispose() {
+    for (final c in _iconControllers) c.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      extendBody: true,           // page draws behind the floating pill
+      backgroundColor: Colors.transparent,
       body: IndexedStack(index: _tab, children: _screens),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+      bottomNavigationBar: _buildBottomNav(),
+    );
+  }
+
+  // ── Floating Glass Pill ───────────────────────────────────────
+  Widget _buildBottomNav() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              // deep black shadow
+              BoxShadow(
+                color: Colors.black.withOpacity(0.18),
+                blurRadius: 32,
+                spreadRadius: 0,
+                offset: const Offset(0, 10),
+              ),
+              // indigo colour shadow
+              BoxShadow(
+                color: const Color(0xFF3730A3).withOpacity(0.14),
+                blurRadius: 24,
+                spreadRadius: -2,
+                offset: const Offset(0, 8),
+              ),
+              // top white highlight
+              BoxShadow(
+                color: Colors.white.withOpacity(0.9),
+                blurRadius: 0,
+                spreadRadius: 0,
+                offset: const Offset(0, -1),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+              child: Container(
+                height: 64,
+                decoration: BoxDecoration(
+                  color: _pillBg,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: _pillBorder, width: 1.2),
+                ),
+                child: Row(
+                  children: List.generate(_navItems.length, (i) {
+                    final selected = _tab == i;
+                    return Expanded(
+                      child: GestureDetector(
+                        onTap: () => _setTab(i),
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedBuilder(
+                          animation: _iconScales[i],
+                          builder: (context, _) => AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeInOut,
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: selected
+                                  ? _activePill
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Transform.scale(
+                                  scale: _iconScales[i].value,
+                                  child: Icon(
+                                    selected
+                                        ? _navItems[i].activeIcon
+                                        : _navItems[i].icon,
+                                    size: 22,
+                                    color: selected
+                                        ? _accent
+                                        : _inactiveClr,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 200),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: selected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: selected
+                                        ? _accent
+                                        : _inactiveClr,
+                                    letterSpacing: 0.1,
+                                  ),
+                                  child: Text(_navItems[i].label),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ),
             ),
-          ],
-        ),
-        child: NavigationBar(
-          selectedIndex: _tab,
-          onDestinationSelected: _setTab,
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.search_outlined),
-              selectedIcon: Icon(Icons.search_rounded),
-              label: 'Doctors',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.calendar_today_outlined),
-              selectedIcon: Icon(Icons.calendar_today_rounded),
-              label: 'Appointments',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person_rounded),
-              label: 'Profile',
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
+}
+
+// ── Helper ─────────────────────────────────────────────────────
+
+class _NavItem {
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
 }
