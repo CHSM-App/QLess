@@ -15,6 +15,7 @@ class DoctorLoginState {
   final String? token;
   final String? clinic_name;
   final String? clinic_id;
+  final int? leadTimeMinutes;
   final AsyncValue<List<DoctorDetails>> phoneCheckResult;
     final AsyncValue<List<Medicine>>? medicines;
   final AsyncValue<List<Medicine>>? medicineTypes;
@@ -30,6 +31,7 @@ class DoctorLoginState {
     this.doctorId,
     this.clinic_id,
     this.clinic_name,
+    this.leadTimeMinutes,
     this.phoneCheckResult = const AsyncValue.data([]),
     this.medicineTypes,
     this.medicines
@@ -47,6 +49,7 @@ class DoctorLoginState {
     int? doctorId,
     String? clinicId,
     String? clinic_name,
+    int? leadTimeMinutes,
     AsyncValue<List<DoctorDetails>>? phoneCheckResult,
       final AsyncValue<List<Medicine>>? medicines,
   final AsyncValue<List<Medicine>>? medicineTypes,
@@ -62,6 +65,7 @@ class DoctorLoginState {
       roleId: roleId ?? this.roleId,
       token: token ?? this.token,
       clinic_id: clinicId ?? this.clinic_id,
+      leadTimeMinutes: leadTimeMinutes ?? this.leadTimeMinutes,
       clinic_name: clinic_name ?? this.clinic_name,
       phoneCheckResult: phoneCheckResult ?? this.phoneCheckResult,
       medicineTypes: medicineTypes ?? this.medicineTypes,
@@ -229,6 +233,42 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     await TokenStorage.clear();
     state = const DoctorLoginState();
   }
+
+  // Future<void> updateLeadTime(int minutes) async {
+  //       state = state.copyWith(isLoading: true, error: null);
+  //   try {
+  //     await usecase.addDoctorDetails(doctorLogin);
+  //     state = state.copyWith(isLoading: false);
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: e.toString());
+  //   }
+  // }
+
+  Future<void> updateLeadTime( int doctorId, int minutes) async {
+  try {
+    // Optional: set loading state
+    state = state.copyWith(isLoading: true);
+
+    await usecase.updateLeadTime(doctorId, minutes);
+
+    // ✅ Update local state (if you store it)
+    state = state.copyWith(
+      isLoading: false,
+      leadTimeMinutes: minutes,
+    );
+
+  } catch (e) {
+    // ❌ Handle error
+    state = state.copyWith(
+      isLoading: false,
+      error: e.toString(),
+    );
+  }
+}
+
+
+
+
 
 }
 

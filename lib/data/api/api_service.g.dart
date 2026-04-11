@@ -11,7 +11,7 @@ part of 'api_service.dart';
 // ignore_for_file: unnecessary_brace_in_string_interps,no_leading_underscores_for_local_identifiers,unused_element,unnecessary_string_interpolations,unused_element_parameter,avoid_unused_constructor_parameters,unreachable_from_main
 
 class _ApiService implements ApiService {
-  _ApiService(this._dio, {this.baseUrl, this.errorLogger}) {
+  _ApiService(this._dio, {this.baseUrl, this.errorLogger}) { 
     baseUrl ??= 'https://qless.vengurlatech.com/';
   }
 
@@ -539,6 +539,36 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<AppointmentResponseModel> updateLeadTime(
+    int doctorId,
+    int leadTime,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<AppointmentResponseModel>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'doctor/insert/addQueueStartTime/${doctorId}/${leadTime}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late AppointmentResponseModel _value;
+    try {
+      _value = AppointmentResponseModel.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<Medicine> deleteMedicine(int medicineId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -687,7 +717,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<AppointmentList>> getPatientAppointments(int patientId) async {
+  Future<List<AppointmentList>> getPatientAppointments(int familyId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -696,7 +726,7 @@ class _ApiService implements ApiService {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'patient/users/getPatientAppointments/{family_id}',
+            'patient/users/getPatientAppointments/${familyId}',
             queryParameters: queryParameters,
             data: _data,
           )

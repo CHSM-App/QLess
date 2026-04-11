@@ -10,8 +10,12 @@ import 'package:qless/presentation/patient/screens/profile.dart';
 class PatientBottomNav extends StatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
+  final int initialTab;
   const PatientBottomNav(
-      {super.key, required this.onToggleTheme, required this.themeMode});
+      {super.key,
+      required this.onToggleTheme,
+      required this.themeMode,
+      this.initialTab = 0});
   @override
   State<PatientBottomNav> createState() => _PatientBottomNavState();
 }
@@ -35,6 +39,14 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
   @override
   void initState() {
     super.initState();
+    final requestedTab = widget.initialTab;
+    if (requestedTab < 0) {
+      _tab = 0;
+    } else if (requestedTab > 3) {
+      _tab = 3;
+    } else {
+      _tab = requestedTab;
+    }
     _screens = [
       HomeScreen(
         onToggleTheme: widget.onToggleTheme,
@@ -42,9 +54,14 @@ class _PatientBottomNavState extends State<PatientBottomNav> {
         onTabChange: _setTab,
       ),
       const DoctorSearchScreen(),
-      AppointmentScreen(key: _appointmentsKey),
+      AppointmentScreen(key: _appointmentsKey, onTabChange: _setTab),
       const PatientProfilePage(),
     ];
+    if (_tab == 2) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _appointmentsKey.currentState?.refreshOnVisible();
+      });
+    }
   }
 
   @override

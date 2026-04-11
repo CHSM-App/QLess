@@ -101,6 +101,11 @@ abstract class ApiService {
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("doctor/insert/addQueueStartTime/{doctor_id}/{q_start_before}")
+  Future<AppointmentResponseModel> updateLeadTime(
+     @Path("doctor_id") int doctorId, @Path("q_start_before") int leadTime
+  );
+
 
   // DELETE API
   @DELETE("doctor/index/deleteMedicine/{medicine_id}")
@@ -126,9 +131,8 @@ abstract class ApiService {
   );
 
   @GET("patient/users/getPatientAppointments/{family_id}")
-  @GET("patient/users/getPatientAppointments/{patient_id}")
   Future<List<AppointmentList>> getPatientAppointments(
-    @Path("patient_id") int patientId,
+    @Path("family_id") int familyId,
   );
 
   @GET("patient/users/favoriteDoctor/{patient_id}/{doctor_id}")

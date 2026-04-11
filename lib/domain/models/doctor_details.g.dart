@@ -31,6 +31,7 @@ DoctorDetails _$DoctorDetailsFromJson(Map<String, dynamic> json) =>
       roleId: (json['role_id'] as num?)?.toInt(),
       Token: json['token'] as String?,
       genderId: (json['gender_id'] as num?)?.toInt(),
+      leadTime: (json['q_start_time'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
@@ -57,5 +58,6 @@ Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
       'clinic_contact': instance.clinicContact,
       'image_url': instance.imageUrl,
       'gender_id': instance.genderId,
+      'q_start_time': instance.leadTime,
       'queue_length': instance.queueLength,
     };

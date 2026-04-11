@@ -4,7 +4,6 @@ part 'appointment_list.g.dart';
 
 @JsonSerializable()
 class AppointmentList {
-
   @JsonKey(name: 'appointment_id')
   int? appointmentId;
 
@@ -22,7 +21,7 @@ class AppointmentList {
 
   @JsonKey(name: 'specialization')
   String? specialization;
-  
+
   @JsonKey(name: 'experience')
   int? experience;
 
@@ -44,7 +43,6 @@ class AppointmentList {
   @JsonKey(name: 'longitude')
   double? longitude;
 
-
   @JsonKey(name: 'gender')
   String? gender;
 
@@ -53,7 +51,6 @@ class AppointmentList {
 
   @JsonKey(name: 'DOB')
   String? dob;
-
 
   @JsonKey(name: 'queue_number')
   int? queueNumber;
@@ -70,17 +67,14 @@ class AppointmentList {
   @JsonKey(name: 'status')
   String? status;
 
-
   @JsonKey(name: 'booking_for')
   String? bookingFor;
 
   @JsonKey(name: 'user_type')
   int? userType;
 
-
   @JsonKey(name: 'patient_name')
   String? patientName;
-
 
   AppointmentList({
     this.appointmentId,
@@ -113,5 +107,4 @@ class AppointmentList {
       _$AppointmentListFromJson(json);
 
   Map<String, dynamic> toJson() => _$AppointmentListToJson(this);
-
 }

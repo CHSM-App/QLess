@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -11,14 +13,14 @@ import 'package:qless/core/network/token_provider.dart';
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const kPrimaryBlue = Color(0xFF1A73E8);
-const kLightBlue   = Color(0xFFE8F0FE);
+const kLightBlue = Color(0xFFE8F0FE);
 const kAccentGreen = Color(0xFF34A853);
-const kRedAccent   = Color(0xFFEA4335);
-const kSurface     = Color(0xFFF8F9FA);
-const kCardBg      = Color(0xFFFFFFFF);
-const kTextDark    = Color(0xFF1F2937);
-const kTextMuted   = Color(0xFF6B7280);
-const kDivider     = Color(0xFFE5E7EB);
+const kRedAccent = Color(0xFFEA4335);
+const kSurface = Color(0xFFF8F9FA);
+const kCardBg = Color(0xFFFFFFFF);
+const kTextDark = Color(0xFF1F2937);
+const kTextMuted = Color(0xFF6B7280);
+const kDivider = Color(0xFFE5E7EB);
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -34,9 +36,17 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   bool _emailAlerts = false;
   bool _smsAlerts = true;
   bool _darkMode = false;
-  bool _availableForConsultation = true;// Settings tab
+  bool _availableForConsultation = true;
   bool _didFetchProfile = false;
+  Timer? _debounce;
+  bool _hasLeadTimeChanged = false;
+  int? _lastSavedMinutes;
+
   late final ProviderSubscription<DoctorLoginState> _doctorLoginSub;
+
+  // Lead time — hours & minutes before queue opens
+  int _leadHours = 0;
+  int _leadMinutes = 0;
 
   @override
   void initState() {
@@ -44,21 +54,52 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     _doctorLoginSub = ref.listenManual<DoctorLoginState>(
       doctorLoginViewModelProvider,
       (prev, next) {
-      if (_didFetchProfile) return;
-      final mobile = next.mobile;
-      if (mobile != null && mobile.trim().isNotEmpty) {
-        _didFetchProfile = true;
-        ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(mobile);
-      }
-    },
+        if (_didFetchProfile) return;
+        final mobile = next.mobile;
+        if (mobile != null && mobile.trim().isNotEmpty) {
+          _didFetchProfile = true;
+          ref
+              .read(doctorLoginViewModelProvider.notifier)
+              .checkPhoneDoctor(mobile);
+        }
+      },
     );
     Future.microtask(() {
       final mobile = ref.read(doctorLoginViewModelProvider).mobile;
       if (mobile != null && mobile.trim().isNotEmpty) {
         _didFetchProfile = true;
-        ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(mobile);
+        ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .checkPhoneDoctor(mobile);
       }
     });
+  }
+
+  void _onLeadTimeChanged() {
+    _hasLeadTimeChanged = true;
+
+    // cancel previous debounce
+    _debounce?.cancel();
+
+    // auto-save after user stops scrolling
+    _debounce = Timer(const Duration(milliseconds: 800), () {
+      _saveLeadTime();
+    });
+  }
+
+  Future<void> _saveLeadTime() async {
+    final minutes = (_leadHours * 60) + _leadMinutes;
+
+    if (_lastSavedMinutes == minutes) return; // 🔥 avoid duplicate call
+
+    _lastSavedMinutes = minutes;
+
+    await ref
+        .read(doctorLoginViewModelProvider.notifier)
+        .updateLeadTime(
+          ref.read(doctorLoginViewModelProvider).doctorId ?? 0,  
+          minutes
+        );
   }
 
   @override
@@ -81,24 +122,19 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       data: (list) => list.isNotEmpty ? list.first : null,
       orElse: () => null,
     );
-    final screenWidth  = MediaQuery.of(context).size.width;
-    final isTablet     = screenWidth >= 600;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth >= 600;
     final isLargeTablet = screenWidth >= 900;
 
     return Scaffold(
       backgroundColor: kSurface,
-      // appBar: PreferredSize(
-      //   preferredSize: Size.fromHeight(isTablet ? 72 : 64),
-      //   child: _buildTopBar(isTablet: isTablet, doctorState: doctorState),
-      // ),
       body: isLargeTablet
           ? _buildLargeTabletLayout(doctorState, doctorDetails)
           : _buildMobileLayout(isTablet, doctorState, doctorDetails),
-      // bottomNavigationBar: isLargeTablet ? null : _buildBottomNav(),
     );
   }
 
-  // ── Large Tablet (Side Rail) ──────────────────────────────────────────────
+  // ── Large Tablet Layout ───────────────────────────────────────────────────
 
   Widget _buildLargeTabletLayout(
     DoctorLoginState doctorState,
@@ -106,11 +142,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   ) {
     return Row(
       children: [
-        // _buildSideRail(),
         Expanded(
           child: Column(
             children: [
-             // _buildTopBar(isTablet: true, doctorState: doctorState),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -123,10 +157,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                         doctorDetails: doctorDetails,
                       ),
                     ),
-                    SizedBox(
-                      width: 320,
-                      child: _buildRightPanel(),
-                    ),
+                    SizedBox(width: 320, child: _buildRightPanel()),
                   ],
                 ),
               ),
@@ -146,7 +177,6 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   ) {
     return Column(
       children: [
-     //   _buildTopBar(isTablet: isTablet, doctorState: doctorState),
         Expanded(
           child: _buildScrollContent(
             isTablet: isTablet,
@@ -205,11 +235,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final clinicName = details?.clinicName ?? doctorState.clinic_name ?? '';
     final specialization = details?.specialization ?? 'Cardiologist';
     final qualification = details?.qualification ?? 'MBBS, MD, DM';
+
     return Container(
       decoration: _cardDecoration(),
       child: Column(
         children: [
-          // Header gradient
           Container(
             height: 80,
             decoration: const BoxDecoration(
@@ -228,7 +258,6 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: Column(
               children: [
-                // Avatar overlapping header
                 Transform.translate(
                   offset: const Offset(0, -40),
                   child: Stack(
@@ -273,7 +302,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: const Icon(Icons.edit, color: Colors.white, size: 12),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                          size: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -296,12 +329,22 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           ),
                           const SizedBox(width: 6),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: kLightBlue,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text('Verified', style: TextStyle(fontSize: 10, color: kPrimaryBlue, fontWeight: FontWeight.w600)),
+                            child: const Text(
+                              'Verified',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: kPrimaryBlue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -312,12 +355,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                       ),
                       const SizedBox(height: 4),
                       if (clinicName.isNotEmpty)
-                      Text(
-                        clinicName,
-                        style: const TextStyle(fontSize: 13, color: kTextMuted),
-                      ),
+                        Text(
+                          clinicName,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: kTextMuted,
+                          ),
+                        ),
                       const SizedBox(height: 16),
-                      // Stats row
                       isTablet
                           ? _buildStatsRowTablet(details)
                           : _buildStatsRowMobile(details),
@@ -337,7 +382,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           style: OutlinedButton.styleFrom(
                             foregroundColor: kPrimaryBlue,
                             side: const BorderSide(color: kPrimaryBlue),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                           ),
                         ),
@@ -390,27 +437,51 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   Widget _statItem(String value, String label) {
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextDark)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: kTextDark,
+          ),
+        ),
         const SizedBox(height: 2),
         Text(label, style: const TextStyle(fontSize: 11, color: kTextMuted)),
       ],
     );
   }
 
-  Widget _vDivider() {
-    return Container(height: 32, width: 1, color: kDivider);
-  }
+  Widget _vDivider() => Container(height: 32, width: 1, color: kDivider);
 
   // ── Account Section ───────────────────────────────────────────────────────
 
   Widget _buildAccountSection(bool isTablet) {
     final items = [
-      _SettingItem(icon: Icons.person_outline, label: 'Personal Information', subtitle: 'Name, DOB, Gender', trailing: null),
-      _SettingItem(icon: Icons.medical_information_outlined, label: 'Professional Details', subtitle: 'Specialization, License', trailing: null),
-      _SettingItem(icon: Icons.lock_outline, label: 'Password & Security', subtitle: 'Change password, 2FA', trailing: null),
-      _SettingItem(icon: Icons.payment_outlined, label: 'Payment & Earnings', subtitle: 'Bank account, payouts', trailing: null),
+      _SettingItem(
+        icon: Icons.person_outline,
+        label: 'Personal Information',
+        subtitle: 'Name, DOB, Gender',
+        trailing: null,
+      ),
+      _SettingItem(
+        icon: Icons.medical_information_outlined,
+        label: 'Professional Details',
+        subtitle: 'Specialization, License',
+        trailing: null,
+      ),
+      _SettingItem(
+        icon: Icons.lock_outline,
+        label: 'Password & Security',
+        subtitle: 'Change password, 2FA',
+        trailing: null,
+      ),
+      _SettingItem(
+        icon: Icons.payment_outlined,
+        label: 'Payment & Earnings',
+        subtitle: 'Bank account, payouts',
+        trailing: null,
+      ),
     ];
-
     return Container(
       decoration: _cardDecoration(),
       child: Column(
@@ -418,7 +489,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           return Column(
             children: [
               _buildNavTile(e.value),
-              if (e.key < items.length - 1) const Divider(height: 1, indent: 56, color: kDivider),
+              if (e.key < items.length - 1)
+                const Divider(height: 1, indent: 56, color: kDivider),
             ],
           );
         }).toList(),
@@ -437,7 +509,10 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(color: kLightBlue, borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                color: kLightBlue,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Icon(item.icon, color: kPrimaryBlue, size: 18),
             ),
             const SizedBox(width: 14),
@@ -445,9 +520,19 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
+                  Text(
+                    item.label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: kTextDark,
+                    ),
+                  ),
                   if (item.subtitle != null)
-                    Text(item.subtitle!, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                    Text(
+                      item.subtitle!,
+                      style: const TextStyle(fontSize: 12, color: kTextMuted),
+                    ),
                 ],
               ),
             ),
@@ -467,12 +552,16 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── toggle row (unchanged) ──
           Row(
             children: [
               Container(
-                width: 36, height: 36,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: _availableForConsultation ? const Color(0xFFE6F4EA) : const Color(0xFFFCE8E6),
+                  color: _availableForConsultation
+                      ? const Color(0xFFE6F4EA)
+                      : const Color(0xFFFCE8E6),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
@@ -486,9 +575,18 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Available for Consultation', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
+                    const Text(
+                      'Available for Consultation',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: kTextDark,
+                      ),
+                    ),
                     Text(
-                      _availableForConsultation ? 'Patients can book appointments' : 'Currently not accepting patients',
+                      _availableForConsultation
+                          ? 'Patients can book appointments'
+                          : 'Currently not accepting patients',
                       style: const TextStyle(fontSize: 12, color: kTextMuted),
                     ),
                   ],
@@ -501,10 +599,46 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
               ),
             ],
           ),
+
+          // ── lead time — slides in only when available ──
+          AnimatedSize(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            child: _availableForConsultation
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      const Divider(height: 1, color: kDivider),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Booking lead time',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kTextDark,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildLeadTimeRow(),
+                      const SizedBox(height: 4),
+                    ],
+                  )
+                : const SizedBox.shrink(),
+          ),
+
+          // ── working hours (unchanged) ──
           const SizedBox(height: 16),
           const Divider(height: 1, color: kDivider),
           const SizedBox(height: 16),
-          const Text('Working Hours', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextDark)),
+          const Text(
+            'Working Hours',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: kTextDark,
+            ),
+          ),
           const SizedBox(height: 10),
           _buildDayRow('Mon – Fri', '9:00 AM – 5:00 PM', true),
           const SizedBox(height: 6),
@@ -518,15 +652,209 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()),
+                  MaterialPageRoute(
+                    builder: (_) => const DoctorAvailabilityPage(),
+                  ),
                 );
               },
               icon: const Icon(Icons.edit_calendar_outlined, size: 14),
               label: const Text('Edit Schedule'),
-              style: TextButton.styleFrom(foregroundColor: kPrimaryBlue, textStyle: const TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(
+                foregroundColor: kPrimaryBlue,
+                textStyle: const TextStyle(fontSize: 12),
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ── Lead Time Row ─────────────────────────────────────────────────────────
+
+  Widget _buildLeadTimeRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Icon
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE6F4EA),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.access_time_outlined,
+              color: kAccentGreen,
+              size: 16,
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Title + Subtitle
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Queue booking',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kTextDark,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'How early patients can join the queue',
+                  style: TextStyle(fontSize: 11, color: kTextMuted),
+                ),
+              ],
+            ),
+          ),
+
+          // 🔥 INLINE TIME PICKER (RIGHT SIDE)
+          Column(
+            children: [
+              const Row(
+                children: [
+                  SizedBox(
+                    width: 40,
+                    child: Center(
+                      child: Text(
+                        'HH',
+                        style: TextStyle(fontSize: 10, color: kTextMuted),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  SizedBox(
+                    width: 40,
+                    child: Center(
+                      child: Text(
+                        'MM',
+                        style: TextStyle(fontSize: 10, color: kTextMuted),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 4),
+
+              Row(
+                children: [
+                  _inlineWheel(
+                    value: _leadHours,
+                    max: 24,
+                    onChanged: (v) {
+                      setState(() => _leadHours = v);
+                      _onLeadTimeChanged();
+                    },
+                  ),
+
+                  const SizedBox(width: 6),
+
+                  const Text(
+                    ':',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: kTextDark,
+                    ),
+                  ),
+
+                  const SizedBox(width: 6),
+
+                  _inlineWheel(
+                    value: _leadMinutes,
+                    max: 60,
+                    onChanged: (v) {
+                      setState(() => _leadMinutes = v);
+                      _onLeadTimeChanged();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _inlineWheel({
+    required int value,
+    required int max,
+    required ValueChanged<int> onChanged,
+  }) {
+    return SizedBox(
+      width: 50,
+      height: 40,
+      child: ListWheelScrollView.useDelegate(
+        itemExtent: 30,
+        diameterRatio: 1.8,
+        perspective: 0.003,
+        physics: const FixedExtentScrollPhysics(),
+        controller: FixedExtentScrollController(initialItem: value),
+        onSelectedItemChanged: onChanged,
+        childDelegate: ListWheelChildBuilderDelegate(
+          childCount: max,
+          builder: (context, index) {
+            final isSelected = index == value;
+
+            return Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 150),
+                style: TextStyle(
+                  fontSize: isSelected ? 16 : 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                  color: isSelected ? kPrimaryBlue : kTextMuted,
+                ),
+                child: Text(index.toString().padLeft(2, '0')),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _smallWheel({
+    required int value,
+    required int max,
+    required ValueChanged<int> onChanged,
+  }) {
+    return SizedBox(
+      width: 50,
+      height: 40,
+      child: ListWheelScrollView.useDelegate(
+        itemExtent: 30,
+        diameterRatio: 1.8,
+        perspective: 0.003,
+        physics: const FixedExtentScrollPhysics(),
+        controller: FixedExtentScrollController(initialItem: value),
+        onSelectedItemChanged: onChanged,
+        childDelegate: ListWheelChildBuilderDelegate(
+          childCount: max,
+          builder: (context, index) {
+            final isSelected = index == value;
+            return Center(
+              child: Text(
+                index.toString().padLeft(2, '0'),
+                style: TextStyle(
+                  fontSize: isSelected ? 16 : 13,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w400,
+                  color: isSelected ? kPrimaryBlue : kTextMuted,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -535,15 +863,28 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     return Row(
       children: [
         Container(
-          width: 8, height: 8,
+          width: 8,
+          height: 8,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: active ? kAccentGreen : kRedAccent,
           ),
         ),
         const SizedBox(width: 10),
-        SizedBox(width: 100, child: Text(day, style: const TextStyle(fontSize: 13, color: kTextDark))),
-        Text(hours, style: TextStyle(fontSize: 13, color: active ? kTextDark : kTextMuted)),
+        SizedBox(
+          width: 100,
+          child: Text(
+            day,
+            style: const TextStyle(fontSize: 13, color: kTextDark),
+          ),
+        ),
+        Text(
+          hours,
+          style: TextStyle(
+            fontSize: 13,
+            color: active ? kTextDark : kTextMuted,
+          ),
+        ),
       ],
     );
   }
@@ -603,8 +944,12 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       child: Row(
         children: [
           Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(icon, color: iconColor, size: 18),
           ),
           const SizedBox(width: 14),
@@ -612,12 +957,26 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
-                Text(subtitle, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: kTextDark,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 12, color: kTextMuted),
+                ),
               ],
             ),
           ),
-          Switch.adaptive(value: value, activeColor: kPrimaryBlue, onChanged: onChanged),
+          Switch.adaptive(
+            value: value,
+            activeColor: kPrimaryBlue,
+            onChanged: onChanged,
+          ),
         ],
       ),
     );
@@ -640,9 +999,23 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             iconColor: const Color(0xFF7B1FA2),
           ),
           const Divider(height: 1, indent: 56, color: kDivider),
-          _buildNavTile(_SettingItem(icon: Icons.language_outlined, label: 'Language', subtitle: 'English (India)', trailing: null)),
+          _buildNavTile(
+            _SettingItem(
+              icon: Icons.language_outlined,
+              label: 'Language',
+              subtitle: 'English (India)',
+              trailing: null,
+            ),
+          ),
           const Divider(height: 1, indent: 56, color: kDivider),
-          _buildNavTile(_SettingItem(icon: Icons.text_fields_outlined, label: 'Text Size', subtitle: 'Medium', trailing: null)),
+          _buildNavTile(
+            _SettingItem(
+              icon: Icons.text_fields_outlined,
+              label: 'Text Size',
+              subtitle: 'Medium',
+              trailing: null,
+            ),
+          ),
         ],
       ),
     );
@@ -652,13 +1025,37 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
   Widget _buildSupportCard() {
     final items = [
-      _SettingItem(icon: Icons.help_outline, label: 'Help Center', subtitle: 'FAQs & documentation', trailing: null),
-      _SettingItem(icon: Icons.chat_bubble_outline, label: 'Contact Support', subtitle: 'Chat, Email, Phone', trailing: null),
-      _SettingItem(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy', subtitle: null, trailing: null),
-      _SettingItem(icon: Icons.description_outlined, label: 'Terms of Service', subtitle: null, trailing: null),
-      _SettingItem(icon: Icons.info_outline, label: 'App Version', subtitle: 'v2.4.1 (Build 204)', trailing: null),
+      _SettingItem(
+        icon: Icons.help_outline,
+        label: 'Help Center',
+        subtitle: 'FAQs & documentation',
+        trailing: null,
+      ),
+      _SettingItem(
+        icon: Icons.chat_bubble_outline,
+        label: 'Contact Support',
+        subtitle: 'Chat, Email, Phone',
+        trailing: null,
+      ),
+      _SettingItem(
+        icon: Icons.privacy_tip_outlined,
+        label: 'Privacy Policy',
+        subtitle: null,
+        trailing: null,
+      ),
+      _SettingItem(
+        icon: Icons.description_outlined,
+        label: 'Terms of Service',
+        subtitle: null,
+        trailing: null,
+      ),
+      _SettingItem(
+        icon: Icons.info_outline,
+        label: 'App Version',
+        subtitle: 'v2.4.1 (Build 204)',
+        trailing: null,
+      ),
     ];
-
     return Container(
       decoration: _cardDecoration(),
       child: Column(
@@ -666,7 +1063,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           return Column(
             children: [
               _buildNavTile(e.value),
-              if (e.key < items.length - 1) const Divider(height: 1, indent: 56, color: kDivider),
+              if (e.key < items.length - 1)
+                const Divider(height: 1, indent: 56, color: kDivider),
             ],
           );
         }).toList(),
@@ -684,24 +1082,44 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           showDialog(
             context: context,
             builder: (_) => AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: const Text('Confirm logout', style: TextStyle(fontWeight: FontWeight.w700)),
-              content: const Text('You will be signed out and returned to the Continue As screen.'),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: const Text(
+                'Confirm logout',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              content: const Text(
+                'You will be signed out and returned to the Continue As screen.',
+              ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
                 ElevatedButton(
                   onPressed: () async {
                     Navigator.pop(context);
                     await ref.read(tokenProvider.notifier).clearTokens();
-                    await ref.read(doctorLoginViewModelProvider.notifier).logout();
+                    await ref
+                        .read(doctorLoginViewModelProvider.notifier)
+                        .logout();
                     if (mounted) {
-                      Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const ContinueAsScreen()),
+                      Navigator.of(
+                        context,
+                        rootNavigator: true,
+                      ).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const ContinueAsScreen(),
+                        ),
                         (_) => false,
                       );
                     }
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: kRedAccent, foregroundColor: Colors.white),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kRedAccent,
+                    foregroundColor: Colors.white,
+                  ),
                   child: const Text('Log out'),
                 ),
               ],
@@ -714,7 +1132,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           backgroundColor: const Color(0xFFFCE8E6),
           foregroundColor: kRedAccent,
           elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           padding: const EdgeInsets.symmetric(vertical: 14),
           textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
@@ -732,15 +1152,44 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Quick Stats', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextDark)),
+          const Text(
+            'Quick Stats',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: kTextDark,
+            ),
+          ),
           const SizedBox(height: 16),
-          _quickStatCard('Today\'s Appointments', '8', Icons.calendar_today_outlined, kPrimaryBlue),
+          _quickStatCard(
+            'Today\'s Appointments',
+            '8',
+            Icons.calendar_today_outlined,
+            kPrimaryBlue,
+          ),
           const SizedBox(height: 12),
-          _quickStatCard('Pending Reports', '3', Icons.assignment_outlined, const Color(0xFFE65100)),
+          _quickStatCard(
+            'Pending Reports',
+            '3',
+            Icons.assignment_outlined,
+            const Color(0xFFE65100),
+          ),
           const SizedBox(height: 12),
-          _quickStatCard('New Messages', '12', Icons.message_outlined, kAccentGreen),
+          _quickStatCard(
+            'New Messages',
+            '12',
+            Icons.message_outlined,
+            kAccentGreen,
+          ),
           const SizedBox(height: 24),
-          const Text('Account Health', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
+          const Text(
+            'Account Health',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: kTextDark,
+            ),
+          ),
           const SizedBox(height: 12),
           _healthRow('Profile Completion', 0.85),
           const SizedBox(height: 8),
@@ -752,7 +1201,12 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  Widget _quickStatCard(String label, String value, IconData icon, Color color) {
+  Widget _quickStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -763,13 +1217,29 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       child: Row(
         children: [
           Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(color: color.withOpacity(0.12), borderRadius: BorderRadius.circular(10)),
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(icon, color: color, size: 18),
           ),
           const SizedBox(width: 12),
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 12, color: kTextMuted))),
-          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: color)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: kTextMuted),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
         ],
       ),
     );
@@ -782,8 +1252,18 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: kTextMuted)),
-            Text('${(value * 100).toInt()}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kTextDark)),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: kTextMuted),
+            ),
+            Text(
+              '${(value * 100).toInt()}%',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kTextDark,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -792,7 +1272,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           child: LinearProgressIndicator(
             value: value,
             backgroundColor: kDivider,
-            valueColor: AlwaysStoppedAnimation<Color>(value == 1.0 ? kAccentGreen : kPrimaryBlue),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              value == 1.0 ? kAccentGreen : kPrimaryBlue,
+            ),
             minHeight: 6,
           ),
         ),
@@ -804,7 +1286,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     color: kCardBg,
     borderRadius: BorderRadius.circular(16),
     boxShadow: [
-      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 2)),
+      BoxShadow(
+        color: Colors.black.withOpacity(0.05),
+        blurRadius: 10,
+        offset: const Offset(0, 2),
+      ),
     ],
   );
 
@@ -812,7 +1298,12 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     padding: const EdgeInsets.only(left: 4, bottom: 10),
     child: Text(
       title.toUpperCase(),
-      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kTextMuted, letterSpacing: 1.2),
+      style: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        color: kTextMuted,
+        letterSpacing: 1.2,
+      ),
     ),
   );
 }
@@ -824,6 +1315,10 @@ class _SettingItem {
   final String label;
   final String? subtitle;
   final Widget? trailing;
-  const _SettingItem({required this.icon, required this.label, this.subtitle, this.trailing});
+  const _SettingItem({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.trailing,
+  });
 }
-
