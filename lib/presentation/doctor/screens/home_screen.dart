@@ -105,6 +105,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
+
   Future<void> _onQueueStop() async {
     if (_doctorId == 0) return;
     try {
@@ -465,25 +466,26 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final isRunning = queueState == QueueState.running;
     final isStopped = queueState == QueueState.stopped;
 
+    // Single toggle: shows Pause when running, Start otherwise
+    final toggleLabel = isRunning ? '⏸  Pause' : '▶  Start';
+    final toggleTap   = isRunning ? _onQueuePause : _onQueueStart;
+
     return Row(
       children: [
         _actionBtn(
-          label: '▶  Start',
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
-          ),
-          textColor: Colors.white,
-          onTap: _onQueueStart,
-          enabled: !isRunning && !isStopped,
-        ),
-        const SizedBox(width: 8),
-        _actionBtn(
-          label: '⏸  Pause',
-          color: const Color(0xFFFFF8E1),
-          textColor: const Color(0xFFF57F17),
-          border: Border.all(color: const Color(0xFFFFE082), width: 1.5),
-          onTap: _onQueuePause,
-          enabled: isRunning,
+          label: toggleLabel,
+          gradient: isRunning
+              ? null
+              : const LinearGradient(
+                  colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+                ),
+          color: isRunning ? const Color(0xFFFFF8E1) : null,
+          textColor: isRunning ? const Color(0xFFF57F17) : Colors.white,
+          border: isRunning
+              ? Border.all(color: const Color(0xFFFFE082), width: 1.5)
+              : null,
+          onTap: toggleTap,
+          enabled: true,
         ),
         const SizedBox(width: 8),
         _actionBtn(

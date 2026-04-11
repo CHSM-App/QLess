@@ -101,6 +101,21 @@ abstract class ApiService {
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("doctor/insert/appointment/queueRecall")
+  Future<AppointmentResponseModel> queueRecall(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+  @POST("doctor/insert/appointment/startSession")
+Future<AppointmentResponseModel> startSession(
+  @Body() AppointmentRequestModel appointmentRequest,
+);
+
+@POST("doctor/insert/appointment/endSession")
+Future<AppointmentResponseModel> endSession(
+  @Body() AppointmentRequestModel appointmentRequest,
+);
+
   @POST("doctor/insert/addQueueStartTime/{doctor_id}/{q_start_before}")
   Future<AppointmentResponseModel> updateLeadTime(
      @Path("doctor_id") int doctorId, @Path("q_start_before") int leadTime
@@ -174,7 +189,7 @@ abstract class ApiService {
   @POST("patient/insert/insertFamilyMember")
   Future<dynamic> addFamilyMember(@Body() FamilyMember member);
 
-  @POST("patient/insert/appointment//book")
+  @POST("patient/insert/appointment/book")
   Future<AppointmentResponseModel> bookAppointment(
     @Body() AppointmentRequestModel appointmentRequest,
   );
