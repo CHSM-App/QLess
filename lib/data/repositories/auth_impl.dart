@@ -21,5 +21,9 @@ class AuthImpl implements AuthRepository {
     print("AuthImpl: Refresh access token result: ${result.accessToken}, ${result.refreshToken}, roleId: ${result.roleId}");
     return result;
   }
+
+  Future<dynamic> saveFcmToken(TokenResponse token) {
+      return apiService.saveFcmToken(token);
+  }
   
 }

@@ -14,6 +14,7 @@ TokenResponse _$TokenResponseFromJson(Map<String, dynamic> json) =>
       deviceDetails: json['deviceDetails'] as String?,
       roleId: (json['roleId'] as num?)?.toInt(),
       role: json['role'] as String?,
+      firebaseToken: json['firebaseToken'] as String?,
     );
 
 Map<String, dynamic> _$TokenResponseToJson(TokenResponse instance) =>
@@ -24,4 +25,5 @@ Map<String, dynamic> _$TokenResponseToJson(TokenResponse instance) =>
       'deviceDetails': instance.deviceDetails,
       'roleId': instance.roleId,
       'role': instance.role,
+      'firebaseToken': instance.firebaseToken,
     };

@@ -31,6 +31,9 @@ abstract class ApiService {
   @POST("login/refreshAccessToken")
   Future<TokenResponse> refreshAccessToken(@Body() TokenResponse tokenResponse);
 
+  @POST("login/saveFirebaseToken")
+  Future<dynamic> saveFcmToken(@Body() TokenResponse token);
+
   @POST("login/logout")
   Future<dynamic> logOut(@Body() TokenResponse tokenResponse);
   //---------------------------------------------------------------------------------------------------------------------------------------//

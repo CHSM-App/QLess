@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/data/repositories/auth_impl.dart';
@@ -28,5 +29,13 @@ class AuthViewModel extends StateNotifier<AsyncValue<void>> {
       state = AsyncValue.error(e, st);
       return null;
     }
+  }
+
+  Future<void> saveFirebaseToken(TokenResponse token) async {
+    try {
+    await authRepository.saveFcmToken(token); // POST/PUT to your API
+  } catch (e) {
+    debugPrint('Failed to save FCM token: $e');
+  }
   }
 }
