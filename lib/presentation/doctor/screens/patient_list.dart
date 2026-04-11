@@ -348,18 +348,23 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     }
 
     // ── Today tab: accessibility logic ──────────────────────────────────────
-    // Current = first booked patient (lowest queue_number).
-    // While a current exists, only that patient is accessible.
-    // Skipped patients become accessible only when no current booked patient exists.
+    // If any patient is in_progress → they are the active session, all others wait.
+    // If no in_progress → first booked patient (lowest queue_number) is accessible.
+    // Skipped patients become accessible only when no active session exists.
     int? currentQueueNo;
+    bool hasInProgress = false;
     if (tabType == _TabType.today) {
-      final bookedSorted = patients
-          .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
-          .toList()
-        ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
-      currentQueueNo = bookedSorted.isNotEmpty
-          ? bookedSorted.first.queueNumber
-          : null;
+      hasInProgress = patients
+          .any((p) => (p.status?.toLowerCase() ?? '') == 'in_progress');
+      if (!hasInProgress) {
+        final bookedSorted = patients
+            .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+            .toList()
+          ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+        currentQueueNo = bookedSorted.isNotEmpty
+            ? bookedSorted.first.queueNumber
+            : null;
+      }
     }
 
     return RefreshIndicator(
@@ -374,15 +379,20 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           bool isAccessible = true;
           if (tabType == _TabType.today) {
             final status = p.status?.toLowerCase() ?? '';
-            // Queue must be running or paused for any patient to be accessible
             final queueActive = queueState == QueueState.running ||
                 queueState == QueueState.paused;
-            if (!queueActive) {
+            if (status == 'in_progress') {
+              // in_progress patient is always accessible — their session is running
+              isAccessible = true;
+            } else if (!queueActive) {
               isAccessible = false;
             } else if (status == 'booked') {
-              isAccessible = p.queueNumber == currentQueueNo;
+              // Locked if someone else is already in_progress, or not the first in queue
+              isAccessible = !hasInProgress && p.queueNumber == currentQueueNo;
+            } else if (status == 'skipped') {
+              // Skipped patients locked while someone is in_progress
+              isAccessible = !hasInProgress;
             }
-            // skipped patients accessible when queue is active
           }
 
           return Padding(
@@ -490,7 +500,11 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     try {
       final result = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queueSkip(AppointmentRequestModel(doctorId: doctorId));
+          .queueSkip(AppointmentRequestModel(
+            doctorId: doctorId,
+            appointmentId: p.appointmentId ?? 0,
+            patientId: p.patientId ?? 0,
+          ));
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(result.message ?? 'Patient skipped'),
@@ -620,6 +634,8 @@ class PatientCard extends StatelessWidget {
         return (bg: const Color(0xFFD4F4EC), text: const Color(0xFF0F6E56));
       case 'pending':
         return (bg: const Color(0xFFFAEEDA), text: const Color(0xFF854F0B));
+      case 'in_progress':
+        return (bg: const Color(0xFFE8F5E9), text: const Color(0xFF2E7D32));
       case 'completed':
       case 'done':
       case 'closed':
@@ -855,26 +871,47 @@ class PatientCard extends StatelessWidget {
         ),
       );
 
-  Widget _startBtn() => ElevatedButton.icon(
-        onPressed: isAccessible ? onStart : null,
-        icon: Icon(
-          isAccessible ? Icons.play_arrow_rounded : Icons.lock_outline,
-          size: 15,
-          color: Colors.white,
-        ),
-        label: Text(
-          isAccessible ? 'Start Session' : 'Waiting',
-          style: const TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+  Widget _startBtn() {
+    final status = patient.status?.toLowerCase() ?? '';
+    final isInProgress = status == 'in_progress';
+
+    if (isInProgress) {
+      return ElevatedButton.icon(
+        onPressed: onStart,
+        icon: const Icon(Icons.play_arrow_rounded, size: 15, color: Colors.white),
+        label: const Text(
+          'Start Session',
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isAccessible ? primary : Colors.grey.shade400,
+          backgroundColor: const Color(0xFF2E7D32),
           padding: const EdgeInsets.symmetric(vertical: 9),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
           elevation: 0,
         ),
       );
+    }
+
+    return ElevatedButton.icon(
+      onPressed: isAccessible ? onStart : null,
+      icon: Icon(
+        isAccessible ? Icons.play_arrow_rounded : Icons.lock_outline,
+        size: 15,
+        color: Colors.white,
+      ),
+      label: Text(
+        isAccessible ? 'Start Session' : 'Waiting',
+        style: const TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isAccessible ? primary : Colors.grey.shade400,
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        elevation: 0,
+      ),
+    );
+  }
 
   Widget _cancelBtn() => ElevatedButton.icon(
         onPressed: onCancel,
