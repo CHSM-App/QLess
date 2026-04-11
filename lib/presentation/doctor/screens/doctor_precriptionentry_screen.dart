@@ -860,6 +860,21 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     List<AppointmentList> list, {
     int? preferredQueue,
   }) {
+    // First: if backend auto-started next patient (in_progress), prefer them
+    final inProgressNext = list.where((a) {
+      final status = a.status?.toLowerCase().trim() ?? '';
+      if (status != 'in_progress') return false;
+      if (a.appointmentId == widget.appointmentId) return false;
+      final d = _parseAppointmentDate(a.appointmentDate);
+      return _isToday(d);
+    }).toList();
+
+    if (inProgressNext.isNotEmpty) {
+      inProgressNext.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
+      return inProgressNext.first;
+    }
+
+    // Fallback: pick next booked patient
     final candidates = list.where((a) {
       final status = a.status?.toLowerCase().trim() ?? '';
       if (status != 'booked') return false;
