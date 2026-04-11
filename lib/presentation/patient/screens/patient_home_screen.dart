@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import 'package:qless/core/theme/patient_theme.dart';
+import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
@@ -31,32 +35,6 @@ class Doctor {
     required this.address,
     required this.isAvailable,
     required this.availableSlots,
-  });
-}
-
-class Appointment {
-  final String id, doctorName, specialty, date, time, status;
-  final String doctorImage;
-  Appointment({
-    required this.id,
-    required this.doctorName,
-    required this.specialty,
-    required this.date,
-    required this.time,
-    required this.status,
-    required this.doctorImage,
-  });
-}
-
-class FamilyMember {
-  String name, relation, bloodGroup, gender;
-  int age;
-  FamilyMember({
-    required this.name,
-    required this.relation,
-    required this.age,
-    required this.gender,
-    required this.bloodGroup,
   });
 }
 
@@ -131,50 +109,6 @@ final List<Doctor> sampleDoctors = [
     isAvailable: true,
     availableSlots: ['9:00 AM', '9:30 AM', '3:00 PM', '3:30 PM', '4:00 PM'],
   ),
-];
-
-final List<Appointment> sampleAppointments = [
-  Appointment(
-    id: '1',
-    doctorName: 'Dr. Anika Sharma',
-    specialty: 'Cardiologist',
-    date: 'Tomorrow, 28 Mar',
-    time: '10:00 AM',
-    status: 'Upcoming',
-    doctorImage: 'cardio',
-  ),
-  Appointment(
-    id: '2',
-    doctorName: 'Dr. Priya Nair',
-    specialty: 'Dermatologist',
-    date: '2 Apr 2025',
-    time: '11:30 AM',
-    status: 'Upcoming',
-    doctorImage: 'derm',
-  ),
-  Appointment(
-    id: '3',
-    doctorName: 'Dr. Rajesh Kumar',
-    specialty: 'Orthopedist',
-    date: '15 Mar 2025',
-    time: '9:00 AM',
-    status: 'Completed',
-    doctorImage: 'ortho',
-  ),
-  Appointment(
-    id: '4',
-    doctorName: 'Dr. Mohan Verma',
-    specialty: 'Neurologist',
-    date: '5 Mar 2025',
-    time: '4:00 PM',
-    status: 'Cancelled',
-    doctorImage: 'neuro',
-  ),
-];
-
-final List<FamilyMember> sampleFamily = [
-  FamilyMember(name: 'Ravi Mehta', relation: 'Father', age: 62, gender: 'Male', bloodGroup: 'B+'),
-  FamilyMember(name: 'Sunita Mehta', relation: 'Mother', age: 58, gender: 'Female', bloodGroup: 'O+'),
 ];
 
 // ─── SPECIALTY DATA ───────────────────────────────────────────────────────────
@@ -288,7 +222,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
 
 // ─── HOME SCREEN ─────────────────────────────────────────────────────────────
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
   final Function(int) onTabChange;
@@ -299,16 +233,18 @@ class HomeScreen extends StatefulWidget {
     required this.onTabChange,
   });
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
+class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animCtrl;
   late List<Animation<double>> _itemAnims;
 
   String _location = '';
   bool   _locationLoaded = false; // drives shimmer vs real text
+  bool   _didFetch       = false;
+  bool   _isFetching     = false;
 
   @override
   void initState() {
@@ -323,6 +259,27 @@ class _HomeScreenState extends State<HomeScreen>
     ));
     _animCtrl.forward();
     _ensureLocationPermission(); // ask permission on first run, then fetch
+    Future.microtask(_ensurePatientIdAndFetch);
+  }
+
+  Future<void> _ensurePatientIdAndFetch() async {
+    if (_isFetching || _didFetch) return;
+    _isFetching = true;
+    try {
+      final loginNotifier = ref.read(patientLoginViewModelProvider.notifier);
+      var patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      if (patientId == 0) {
+        await loginNotifier.loadFromStoragePatient();
+        patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      }
+      if (patientId == 0) return;
+      _didFetch = true;
+      await ref
+          .read(appointmentViewModelProvider.notifier)
+          .getPatientAppointments(patientId);
+    } finally {
+      _isFetching = false;
+    }
   }
 
   @override
@@ -427,6 +384,81 @@ class _HomeScreenState extends State<HomeScreen>
     }
     final coordRegex = RegExp(r'^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$');
     return coordRegex.hasMatch(v);
+  }
+
+  // ── Appointment helpers ───────────────────────────────────────────────────
+  bool _isToday(AppointmentList a) {
+    final p = DateTime.tryParse(a.appointmentDate ?? '');
+    if (p == null) return false;
+    final now = DateTime.now();
+    return p.year == now.year && p.month == now.month && p.day == now.day;
+  }
+
+  bool _isUpcoming(AppointmentList a) {
+    final p = DateTime.tryParse(a.appointmentDate ?? '');
+    if (p == null) return false;
+    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    return DateTime(p.year, p.month, p.day).isAfter(today);
+  }
+
+  Widget _buildAppointmentsSection() {
+    final asyncAppts = ref.watch(appointmentViewModelProvider).patientAppointmentsList;
+
+    return asyncAppts == null || asyncAppts is AsyncLoading
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SectionTitle('Today\'s Appointments',
+                  action: 'See All', onAction: () => widget.onTabChange(2)),
+              const SizedBox(height: 14),
+              const Center(child: CircularProgressIndicator()),
+            ],
+          )
+        : asyncAppts.when(
+            loading: () => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionTitle('Today\'s Appointments',
+                    action: 'See All', onAction: () => widget.onTabChange(2)),
+                const SizedBox(height: 14),
+                const Center(child: CircularProgressIndicator()),
+              ],
+            ),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (list) {
+              final todayList    = list.where(_isToday).toList();
+              final upcomingList = list.where(_isUpcoming).toList();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Today ──
+                  _SectionTitle('Today\'s Appointments',
+                      action: 'See All', onAction: () => widget.onTabChange(2)),
+                  const SizedBox(height: 14),
+                  if (todayList.isEmpty)
+                    _EmptyAppointmentNote('No appointments today')
+                  else
+                    ...todayList.map((a) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ApiAppointmentCard(appointment: a),
+                        )),
+                  const SizedBox(height: 20),
+
+                  // ── Upcoming ──
+                  _SectionTitle('Upcoming Appointments',
+                      action: 'See All', onAction: () => widget.onTabChange(2)),
+                  const SizedBox(height: 14),
+                  if (upcomingList.isEmpty)
+                    _EmptyAppointmentNote('No upcoming appointments')
+                  else
+                    ...upcomingList.take(3).map((a) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _ApiAppointmentCard(appointment: a),
+                        )),
+                ],
+              );
+            },
+          );
   }
 
   // ── Helper: wrap any child in the stagger animation ───────────────────────
@@ -628,21 +660,8 @@ class _HomeScreenState extends State<HomeScreen>
                 )),
                 const SizedBox(height: 28),
 
-                // Upcoming Appointments
-                _anim(3, Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SectionTitle('Upcoming Appointments',
-                        action: 'See All', onAction: () => widget.onTabChange(2)),
-                    const SizedBox(height: 14),
-                    ...sampleAppointments
-                        .where((a) => a.status == 'Upcoming')
-                        .map((a) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _UpcomingCard(appointment: a),
-                            )),
-                  ],
-                )),
+                // Today & Upcoming Appointments
+                _anim(3, _buildAppointmentsSection()),
                 const SizedBox(height: 28),
 
                 // Specialties
@@ -1249,15 +1268,76 @@ class _QuickAction extends StatelessWidget {
   }
 }
 
-// ─── UPCOMING CARD ───────────────────────────────────────────────────────────
+// ─── EMPTY NOTE ──────────────────────────────────────────────────────────────
 
-class _UpcomingCard extends StatelessWidget {
-  final Appointment appointment;
-  const _UpcomingCard({required this.appointment});
+class _EmptyAppointmentNote extends StatelessWidget {
+  final String message;
+  const _EmptyAppointmentNote(this.message);
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_today_rounded,
+              size: 16,
+              color: isDark ? Colors.white38 : Colors.grey.shade400),
+          const SizedBox(width: 8),
+          Text(message,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? Colors.white38 : Colors.grey.shade500)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── API APPOINTMENT CARD ────────────────────────────────────────────────────
+
+class _ApiAppointmentCard extends StatelessWidget {
+  final AppointmentList appointment;
+  const _ApiAppointmentCard({required this.appointment});
+
+  String _formatDate(String? raw) {
+    if (raw == null) return '—';
+    final dt = DateTime.tryParse(raw);
+    if (dt == null) return raw;
+    return DateFormat('d MMM yyyy').format(dt);
+  }
+
+  String _formatTime(String? raw) {
+    if (raw == null || raw.isEmpty) return '—';
+    // startTime may be "HH:mm:ss" or "HH:mm"
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    final dt = DateTime(2000, 1, 1, h, m);
+    return DateFormat('h:mm a').format(dt);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final doctorName   = appointment.doctorName ?? 'Doctor';
+    final specialty    = appointment.specialization ?? '';
+    final dateStr      = _formatDate(appointment.appointmentDate);
+    final timeStr      = _formatTime(appointment.startTime);
+    final isToday = () {
+      final p = DateTime.tryParse(appointment.appointmentDate ?? '');
+      if (p == null) return false;
+      final now = DateTime.now();
+      return p.year == now.year && p.month == now.month && p.day == now.day;
+    }();
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1270,19 +1350,19 @@ class _UpcomingCard extends StatelessWidget {
             color: const Color(0xFF1A73E8).withOpacity(0.2), width: 1.5),
       ),
       child: Row(children: [
-        _doctorAvatar(appointment.doctorImage, size: 50),
+        _doctorAvatar('cardio', size: 50),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(appointment.doctorName,
+              Text(doctorName,
                   style: TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w800,
                     color: isDark ? Colors.white : AppTheme.textPrimary,
                   )),
               const SizedBox(height: 2),
-              Text(appointment.specialty,
+              Text(specialty,
                   style: TextStyle(
                       fontSize: 12,
                       color: isDark ? Colors.white54 : AppTheme.textSecondary)),
@@ -1292,7 +1372,7 @@ class _UpcomingCard extends StatelessWidget {
                     size: 12, color: AppTheme.primary),
                 const SizedBox(width: 4),
                 Flexible(
-                  child: Text(appointment.date,
+                  child: Text(dateStr,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 11, fontWeight: FontWeight.w600,
@@ -1302,7 +1382,7 @@ class _UpcomingCard extends StatelessWidget {
                 const Icon(Icons.access_time_rounded,
                     size: 12, color: AppTheme.secondary),
                 const SizedBox(width: 4),
-                Text(appointment.time,
+                Text(timeStr,
                     style: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.w600,
                         color: AppTheme.secondary)),
@@ -1311,18 +1391,23 @@ class _UpcomingCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-              color: AppTheme.primary,
-              borderRadius: BorderRadius.circular(10)),
-          child: const Icon(Icons.videocam_rounded,
-              color: Colors.white, size: 18),
-        ),
+        if (isToday)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+                color: AppTheme.primary,
+                borderRadius: BorderRadius.circular(10)),
+            child: const Text('Today',
+                style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700)),
+          ),
       ]),
     );
   }
 }
+
 
 // ─── SPECIALTY CHIP ──────────────────────────────────────────────────────────
 
