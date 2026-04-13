@@ -270,7 +270,12 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                     // Stats row
                     Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                       _HeroStat(
-                          label: 'Rating', value: '4.8',
+                          label: reviews.isEmpty
+                              ? 'Rating'
+                              : '${reviews.length} ${reviews.length == 1 ? 'review' : 'reviews'}',
+                          value: avgRating == 0
+                              ? '--'
+                              : avgRating.toStringAsFixed(1),
                           icon: Icons.star_rounded),
                       _HeroDiv(),
                       _HeroStat(

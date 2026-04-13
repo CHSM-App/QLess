@@ -1685,3 +1685,219 @@ class _AppointmentDetailSheet extends StatelessWidget {
   Widget _dividerLine() =>
       const Divider(height: 1, color: kDivider, indent: 14, endIndent: 14);
 }
+
+
+class AppointmentReviewInput {
+  final int rating;
+  final String comment;
+  const AppointmentReviewInput({required this.rating, required this.comment});
+}
+
+Future<AppointmentReviewInput?> showAppointmentReviewDialog(
+  BuildContext context, {
+  required String doctorName,
+  String? doctorSpecialty,
+  String? doctorInitials,
+}) {
+  final commentCtrl = TextEditingController();
+  int rating = 0;
+  int hoveredRating = 0;
+
+  const starColors = [
+    Colors.transparent,
+    Color(0xFFE24B4A), // 1 - red
+    Color(0xFFEF9F27), // 2 - amber
+    Color(0xFF639922), // 3 - green
+    Color(0xFF1D9E75), // 4 - teal
+    Color(0xFF378ADD), // 5 - blue
+  ];
+
+  const starLabels = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
+
+  return showDialog<AppointmentReviewInput>(
+    context: context,
+    barrierColor: Colors.black54,
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setState) {
+        final activeRating = hoveredRating > 0 ? hoveredRating : rating;
+
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          title: Row(
+            children: [
+              CircleAvatar(
+                radius: 23,
+                backgroundColor: const Color(0xFFE6F1FB),
+                child: Text(
+                  doctorInitials ?? doctorName.substring(0, 2).toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF185FA5),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Rate your visit',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    'Dr. $doctorName${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Divider(height: 28),
+              const Text(
+                'How was your appointment experience?',
+                style: TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              // Stars
+              Row(
+                children: List.generate(5, (i) {
+                  final idx = i + 1;
+                  final filled = idx <= activeRating;
+                  final color = activeRating > 0
+                      ? starColors[activeRating]
+                      : Colors.grey.shade300;
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      rating = idx;
+                      hoveredRating = 0;
+                    }),
+                    child: MouseRegion(
+                      onEnter: (_) => setState(() => hoveredRating = idx),
+                      onExit: (_) => setState(() => hoveredRating = 0),
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 4),
+                        child: Icon(
+                          filled
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          size: 32,
+                          color: filled ? color : Colors.grey.shade300,
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 4),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                child: activeRating > 0
+                    ? Text(
+                        starLabels[activeRating],
+                        key: ValueKey(activeRating),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: starColors[activeRating],
+                        ),
+                      )
+                    : const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: commentCtrl,
+                maxLines: 3,
+                style: const TextStyle(fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'Write a short review (optional)',
+                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: Colors.grey.shade50,
+                  contentPadding: const EdgeInsets.all(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(
+                      color: Color(0xFF378ADD),
+                      width: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      side: BorderSide(color: Colors.grey.shade300),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Cancel',
+                        style: TextStyle(color: Colors.grey)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF378ADD),
+                      disabledBackgroundColor:
+                          const Color(0xFF378ADD).withOpacity(0.4),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: rating <= 0
+                        ? null
+                        : () => Navigator.pop(
+                              ctx,
+                              AppointmentReviewInput(
+                                rating: rating,
+                                comment: commentCtrl.text.trim(),
+                              ),
+                            ),
+                    child: const Text('Submit review'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+        );
+      },
+    ),
+  );
+}

@@ -10,6 +10,7 @@ import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
+import 'package:qless/domain/models/review_model.dart';
 
 // ─── Colour palette ───────────────────────────────────────────────────────────
 const kPrimary   = Color(0xFF1A73E8);
@@ -753,13 +754,20 @@ class _BaAppBar extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // DOCTOR STATS ROW  (experience · rating · patients · view profile)
 // ─────────────────────────────────────────────────────────────────────────────
-class _DoctorStatsRow extends StatelessWidget {
+class _DoctorStatsRow extends ConsumerWidget {
   final DoctorDetails doctor;
   final bool          isDark;
   const _DoctorStatsRow({required this.doctor, required this.isDark});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviews = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
+    final avgRating = reviews.isEmpty
+        ? 0.0
+        : reviews.fold<double>(0, (acc, r) => acc + (r.rating?.toDouble() ?? 0)) /
+            reviews.length;
+    final ratingLabel = reviews.isEmpty ? 'Rating' : '${reviews.length} reviews';
+
     return Container(
       color: isDark ? _kDarkSurface : kCardBg,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
@@ -771,14 +779,16 @@ class _DoctorStatsRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _StatBox(
-            label: 'Rating',
+            label: ratingLabel,
             widget: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.star_rounded, color: kOrange, size: 14),
                 const SizedBox(width: 2),
-                Text('4.8', style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
+                Text(
+                  avgRating == 0 ? '--' : avgRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
               ],
             ),
           ),
@@ -1490,117 +1500,6 @@ class _BaNoAvail extends StatelessWidget {
       child: const Text('Go Back'),
         ),
       ]),
-    ),
-  );
-}
-
-class AppointmentReviewInput {
-  final int rating;
-  final String comment;
-  const AppointmentReviewInput({required this.rating, required this.comment});
-}
-
-Future<AppointmentReviewInput?> showAppointmentReviewDialog(
-  BuildContext context, {
-  required String doctorName,
-}) {
-  final commentCtrl = TextEditingController();
-  int rating = 0;
-
-  Future<void> showRatingError() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please select a rating'),
-        backgroundColor: kRed,
-      ),
-    );
-  }
-
-  return showDialog<AppointmentReviewInput>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Rate your visit',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'How was your appointment with Dr. $doctorName?',
-              style: const TextStyle(fontSize: 12.5, color: kTextMid),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: List.generate(5, (i) {
-                final idx = i + 1;
-                return IconButton(
-                  onPressed: () => setState(() => rating = idx),
-                  icon: Icon(
-                    idx <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                    color: idx <= rating ? kOrange : kBorder,
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: commentCtrl,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Write a short review (optional)',
-                hintStyle: const TextStyle(fontSize: 12.5, color: kTextMid),
-                filled: true,
-                fillColor: kBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: kPrimary, width: 1.2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () {
-              if (rating <= 0) {
-                showRatingError();
-                return;
-              }
-              Navigator.pop(
-                ctx,
-                AppointmentReviewInput(
-                  rating: rating,
-                  comment: commentCtrl.text.trim(),
-                ),
-              );
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
     ),
   );
 }
