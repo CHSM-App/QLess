@@ -208,13 +208,17 @@ class _FavoriteButtonState extends State<_FavoriteButton>
 class BookAppointmentScreen extends ConsumerStatefulWidget {
   final DoctorDetails doctor;
   final int?          bookingForMemberId;
-  final bool          initialFavorite;   // ← pass from parent
+  final bool          initialFavorite;
+  final bool          isReschedule;
+  final int?          appointmentId;
 
   const BookAppointmentScreen({
     super.key,
     required this.doctor,
     this.bookingForMemberId,
     this.initialFavorite = false,
+    this.isReschedule = false,
+    this.appointmentId,
   });
 
   @override
@@ -375,7 +379,9 @@ class _BookAppointmentScreenState
     }
 
     ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
-      if (next.bookingResponse != null &&
+      // Book success
+      if (!widget.isReschedule &&
+          next.bookingResponse != null &&
           next.bookingResponse != prev?.bookingResponse &&
           !next.isLoading) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -386,6 +392,21 @@ class _BookAppointmentScreenState
         Navigator.pop(context, true);
         return;
       }
+      // Reschedule success
+      if (widget.isReschedule &&
+          next.isSuccess &&
+          next.rescheduleResponse != null &&
+          next.rescheduleResponse != prev?.rescheduleResponse &&
+          !next.isLoading) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(next.rescheduleResponse!.message ?? 'Appointment rescheduled!'),
+          backgroundColor: kGreen,
+        ));
+        setState(() => _isBooking = false);
+        Navigator.pop(context, true);
+        return;
+      }
+      // Error (book or reschedule)
       if (next.error != null && next.error != prev?.error && !next.isLoading && _isBooking) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(next.error!), backgroundColor: kRed),
@@ -431,11 +452,12 @@ class _BookAppointmentScreenState
       body: CustomScrollView(
         slivers: [
           _BaAppBar(
-            doctor:     widget.doctor,
-            isDark:     isDark,
-            isFavorite: _isFavorite,
-            onBack:     () => Navigator.pop(context),
-            onFavToggle: _handleFavoriteToggle,
+            doctor:       widget.doctor,
+            isDark:       isDark,
+            isFavorite:   _isFavorite,
+            isReschedule: widget.isReschedule,
+            onBack:       () => Navigator.pop(context),
+            onFavToggle:  _handleFavoriteToggle,
           ),
           SliverToBoxAdapter(
             child: _DoctorStatsRow(doctor: widget.doctor, isDark: isDark),
@@ -485,6 +507,7 @@ class _BookAppointmentScreenState
           ? _BaConfirmBar(
               isDark:       isDark,
               isQueue:      isQueue,
+              isReschedule: widget.isReschedule,
               selectedDate: _selectedDate,
               selectedSlot: _selectedTime,
               fee:          widget.doctor.consultationFee,
@@ -580,12 +603,8 @@ class _BookAppointmentScreenState
 
   void _onConfirm() {
     if (_isBooking || _selectedDate == null) return;
-    final ps          = ref.read(patientLoginViewModelProvider);
-    final isForMember = _selectedMemberId != null;
-    final patientId   = isForMember ? _selectedMemberId : ps.patientId;
-    final userType    = isForMember ? 2 : 1;
-    final ds          = ref.read(doctorsViewModelProvider);
-    final avail       = _selectedSlotId == null
+    final ds    = ref.read(doctorsViewModelProvider);
+    final avail = _selectedSlotId == null
         ? null
         : ds.doctorAvailabilities.cast<DoctorAvailabilityModel?>()
             .firstWhere((a) => a?.slotId == _selectedSlotId, orElse: () => null);
@@ -595,15 +614,31 @@ class _BookAppointmentScreenState
     final start   = isQueue ? null : (_selectedTime != null ? _toApiTime(_selectedTime!) : null);
 
     setState(() => _isBooking = true);
-    ref.read(appointmentViewModelProvider.notifier).bookAppointment(
-      AppointmentRequestModel(
-        doctorId:        widget.doctor.doctorId,
-        patientId:       patientId,
-        appointmentDate: _fmtDateApi(_selectedDate!),
-        startTime:       start,
-        userType:        userType,
-      ),
-    );
+
+    if (widget.isReschedule) {
+      ref.read(appointmentViewModelProvider.notifier).rescheduleAppointment(
+        AppointmentRequestModel(
+          appointmentId:   widget.appointmentId,
+          doctorId:        widget.doctor.doctorId,
+          appointmentDate: _fmtDateApi(_selectedDate!),
+          startTime:       start,
+        ),
+      );
+    } else {
+      final ps          = ref.read(patientLoginViewModelProvider);
+      final isForMember = _selectedMemberId != null;
+      final patientId   = isForMember ? _selectedMemberId : ps.patientId;
+      final userType    = isForMember ? 2 : 1;
+      ref.read(appointmentViewModelProvider.notifier).bookAppointment(
+        AppointmentRequestModel(
+          doctorId:        widget.doctor.doctorId,
+          patientId:       patientId,
+          appointmentDate: _fmtDateApi(_selectedDate!),
+          startTime:       start,
+          userType:        userType,
+        ),
+      );
+    }
   }
 }
 
@@ -614,6 +649,7 @@ class _BaAppBar extends StatelessWidget {
   final DoctorDetails         doctor;
   final bool                  isDark;
   final bool                  isFavorite;
+  final bool                  isReschedule;
   final VoidCallback          onBack;
   final void Function(bool)   onFavToggle;
 
@@ -623,6 +659,7 @@ class _BaAppBar extends StatelessWidget {
     required this.isFavorite,
     required this.onBack,
     required this.onFavToggle,
+    this.isReschedule = false,
   });
 
   @override
@@ -643,7 +680,7 @@ class _BaAppBar extends StatelessWidget {
         onPressed: onBack,
       ),
       title: Text(
-        'Book Appointment',
+        isReschedule ? 'Reschedule Appointment' : 'Book Appointment',
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
@@ -1409,6 +1446,7 @@ class _SlotGrid extends StatelessWidget {
 class _BaConfirmBar extends StatelessWidget {
   final bool         isDark;
   final bool         isQueue;
+  final bool         isReschedule;
   final DateTime?    selectedDate;
   final String?      selectedSlot;
   final double?      fee;
@@ -1416,7 +1454,8 @@ class _BaConfirmBar extends StatelessWidget {
   final VoidCallback onConfirm;
   const _BaConfirmBar({required this.isDark, required this.isQueue,
       required this.selectedDate, required this.selectedSlot, required this.fee,
-      required this.isLoading, required this.onConfirm});
+      required this.isLoading, required this.onConfirm,
+      this.isReschedule = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1460,9 +1499,15 @@ class _BaConfirmBar extends StatelessWidget {
                 ? const SizedBox(width: 22, height: 22,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
                 : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(isQueue ? Icons.confirmation_number_rounded : Icons.calendar_month_rounded, size: 17),
+                    Icon(isReschedule
+                        ? Icons.edit_calendar_rounded
+                        : (isQueue ? Icons.confirmation_number_rounded : Icons.calendar_month_rounded),
+                        size: 17),
                     const SizedBox(width: 8),
-                    const Text('Confirm Appointment', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(
+                      isReschedule ? 'Reschedule Appointment' : 'Confirm Appointment',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
                   ]),
           ),
         ),

@@ -21,10 +21,14 @@ class AppointmentUsecase {
     return appointmentRepository.bookAppointment(appointmentRequest);
   }
 
-  Future<AppointmentResponseModel> cancelAppointment(
+  Future<AppointmentResponseModel> rescheduleAppointment(
     AppointmentRequestModel appointmentRequest,
   ) {
-    return appointmentRepository.cancelAppointment(appointmentRequest);
+    return appointmentRepository.rescheduleAppointment(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> cancelAppointment(int appointmentId) {
+    return appointmentRepository.cancelAppointment(appointmentId);
   }
 
   Future<AppointmentResponseModel> updateQueueStatus(

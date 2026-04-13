@@ -25,10 +25,15 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
-  Future<AppointmentResponseModel> cancelAppointment(
+  Future<AppointmentResponseModel> rescheduleAppointment(
     AppointmentRequestModel appointmentRequest,
   ) {
-    return apiService.cancelAppointment(appointmentRequest);
+    return apiService.rescheduleAppointment(appointmentRequest);
+  }
+
+  @override
+  Future<AppointmentResponseModel> cancelAppointment(int appointmentId) {
+    return apiService.cancelAppointment(appointmentId);
   }
 
   @override

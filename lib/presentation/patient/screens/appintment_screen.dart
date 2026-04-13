@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
+import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -173,10 +175,12 @@ bool _isUpcoming(AppointmentList a) {
   if (a.appointmentDate == null) return false;
   final p = DateTime.tryParse(a.appointmentDate!);
   if (p == null) return false;
+  final s = a.status?.toLowerCase();
+  if (s == 'cancelled' || s == 'completed' || s == 'complete') return false;
   final now = DateTime.now();
   final apptDay = DateTime(p.year, p.month, p.day);
   final todayDay = DateTime(now.year, now.month, now.day);
-  return apptDay.isAfter(todayDay);
+  return !apptDay.isBefore(todayDay); // today and future
 }
 
 bool _isCompleted(AppointmentList a) {
@@ -298,7 +302,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _AppointmentDetailSheet(appointment: a),
+      builder: (_) => _AppointmentDetailSheet(
+        appointment: a,
+        onCancel: _canCancel(a) ? () { Navigator.pop(context); _handleCancel(a); } : null,
+        onReschedule: _canReschedule(a) ? () { Navigator.pop(context); _handleReschedule(a); } : null,
+      ),
     );
   }
 
@@ -308,6 +316,98 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         a.appointmentId != null &&
         a.doctorId != null &&
         a.patientId != null;
+  }
+
+  bool _canCancel(AppointmentList a) {
+    final s = a.status?.toLowerCase();
+    return (s == 'upcoming' || s == 'booked' || s == 'confirmed') &&
+        a.appointmentId != null;
+  }
+
+  bool _canReschedule(AppointmentList a) {
+    final s = a.status?.toLowerCase();
+    return (s == 'upcoming' || s == 'booked' || s == 'confirmed') &&
+        a.appointmentId != null &&
+        a.doctorId != null;
+  }
+
+  Future<void> _handleCancel(AppointmentList a) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text(
+          'Cancel Appointment',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 17),
+        ),
+        content: const Text(
+          'Are you sure you want to cancel this appointment?',
+          style: TextStyle(color: kTextMid, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No', style: TextStyle(color: kTextMid)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kRed,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'Yes, Cancel',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    await ref
+        .read(appointmentViewModelProvider.notifier)
+        .cancelAppointment(a.appointmentId!);
+    if (!mounted) return;
+    final id = ref.read(patientLoginViewModelProvider).patientId;
+    if (id != null && id != 0) {
+      ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(id);
+    }
+  }
+
+  Future<void> _handleReschedule(AppointmentList a) async {
+    final doctor = DoctorDetails(
+      doctorId:      a.doctorId,
+      name:          a.doctorName,
+      specialization: a.specialization,
+      experience:    a.experience,
+      clinicName:    a.clinicName,
+      clinicAddress: a.clinicAddress,
+      latitude:      a.latitude,
+      longitude:     a.longitude,
+      clinicContact: a.clinicContact,
+    );
+
+    final rescheduled = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookAppointmentScreen(
+          doctor:        doctor,
+          isReschedule:  true,
+          appointmentId: a.appointmentId,
+        ),
+      ),
+    );
+
+    if (rescheduled == true && mounted) {
+      final id = ref.read(patientLoginViewModelProvider).patientId;
+      if (id != null && id != 0) {
+        ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(id);
+      }
+    }
   }
 
   Future<void> _handleReview(BuildContext context, AppointmentList a) async {
@@ -351,6 +451,42 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Thanks for your review!'),
+            backgroundColor: kGreen,
+          ),
+        );
+      }
+    });
+
+    ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
+      // Show SP-level errors (e.g. "Slot already booked", "Invalid slot")
+      final prevError = prev?.error;
+      if (next.error != null && next.error != prevError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(next.error!), backgroundColor: kRed),
+        );
+      }
+      // Reschedule success
+      if (next.isSuccess &&
+          next.rescheduleResponse != null &&
+          next.rescheduleResponse != prev?.rescheduleResponse) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              next.rescheduleResponse?.message ?? 'Appointment rescheduled',
+            ),
+            backgroundColor: kGreen,
+          ),
+        );
+      }
+      // Cancel success
+      if (next.isSuccess &&
+          next.cancelResponse != null &&
+          next.cancelResponse != prev?.cancelResponse) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              next.cancelResponse?.message ?? 'Appointment cancelled',
+            ),
             backgroundColor: kGreen,
           ),
         );
@@ -643,6 +779,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
             appointment: a,
             onViewDetails: () => _openDetail(a),
             onReview: _canReview(a) ? () => _handleReview(context, a) : null,
+            onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
+            onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
           );
         },
       ),
@@ -780,13 +918,17 @@ class _AppointmentCard extends StatelessWidget {
   final AppointmentList appointment;
   final VoidCallback onViewDetails;
   final VoidCallback? onReview;
-  final int? queueNumber; // ← NEW
+  final VoidCallback? onCancel;
+  final VoidCallback? onReschedule;
+  final int? queueNumber;
 
   const _AppointmentCard({
     required this.appointment,
     required this.onViewDetails,
     this.onReview,
-    this.queueNumber, // ← NEW
+    this.onCancel,
+    this.onReschedule,
+    this.queueNumber,
   });
 
   @override
@@ -1004,6 +1146,24 @@ class _AppointmentCard extends StatelessWidget {
                             ),
                           ),
                         ],
+                        if (onReschedule != null) ...[
+                          const SizedBox(width: 8),
+                          _iconBtn(
+                            icon: Icons.edit_calendar_rounded,
+                            bg: kAmberLight,
+                            iconColor: kAmber,
+                            onTap: onReschedule!,
+                          ),
+                        ],
+                        if (onCancel != null) ...[
+                          const SizedBox(width: 8),
+                          _iconBtn(
+                            icon: Icons.cancel_rounded,
+                            bg: kRedLight,
+                            iconColor: kRed,
+                            onTap: onCancel!,
+                          ),
+                        ],
                         const SizedBox(width: 8),
                         if (hasMap) ...[
                           _iconBtn(
@@ -1139,8 +1299,14 @@ class _AppointmentCard extends StatelessWidget {
 
 class _AppointmentDetailSheet extends StatelessWidget {
   final AppointmentList appointment;
+  final VoidCallback? onCancel;
+  final VoidCallback? onReschedule;
 
-  const _AppointmentDetailSheet({required this.appointment});
+  const _AppointmentDetailSheet({
+    required this.appointment,
+    this.onCancel,
+    this.onReschedule,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1539,6 +1705,75 @@ class _AppointmentDetailSheet extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 32),
+
+                  if (onReschedule != null || onCancel != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      child: Row(
+                        children: [
+                          if (onReschedule != null)
+                            Expanded(
+                              child: SizedBox(
+                                height: 48,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kAmberLight,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(13),
+                                    ),
+                                  ),
+                                  onPressed: onReschedule,
+                                  icon: const Icon(
+                                    Icons.edit_calendar_rounded,
+                                    color: kAmber,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    "Reschedule",
+                                    style: TextStyle(
+                                      color: kAmber,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (onReschedule != null && onCancel != null)
+                            const SizedBox(width: 12),
+                          if (onCancel != null)
+                            Expanded(
+                              child: SizedBox(
+                                height: 48,
+                                child: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kRedLight,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(13),
+                                    ),
+                                  ),
+                                  onPressed: onCancel,
+                                  icon: const Icon(
+                                    Icons.cancel_rounded,
+                                    color: kRed,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    "Cancel",
+                                    style: TextStyle(
+                                      color: kRed,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
 
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
