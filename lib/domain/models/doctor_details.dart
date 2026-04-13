@@ -45,6 +45,13 @@ class DoctorDetails {
      @JsonKey(name: 'q_start_time')
   final int? leadTime;
 
+     @JsonKey(name: 'q_start_before')
+  final int? qStartBefore;
+
+     @JsonKey(name: 'q_start_section')
+  final int? qStartSection;
+
+
   
 
   @JsonKey(name : 'queue_length')
@@ -75,6 +82,8 @@ class DoctorDetails {
     this.Token,
     this.genderId,
     this.leadTime,
+    this.qStartBefore,
+    this.qStartSection,
   });
   
   factory DoctorDetails.fromJson(Map<String, dynamic> json) =>

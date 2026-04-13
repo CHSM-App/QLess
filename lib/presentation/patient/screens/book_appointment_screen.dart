@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +11,7 @@ import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
+import 'package:qless/domain/models/review_model.dart';
 
 // ─── Colour palette ───────────────────────────────────────────────────────────
 const kPrimary   = Color(0xFF1A73E8);
@@ -78,7 +80,7 @@ bool _baBookable(int? mode, bool isToday) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAVORITE BUTTON WIDGET  ← NEW
+// FAVORITE BUTTON WIDGET
 // ─────────────────────────────────────────────────────────────────────────────
 class _FavoriteButton extends StatefulWidget {
   final bool   initialFav;
@@ -207,13 +209,17 @@ class _FavoriteButtonState extends State<_FavoriteButton>
 class BookAppointmentScreen extends ConsumerStatefulWidget {
   final DoctorDetails doctor;
   final int?          bookingForMemberId;
-  final bool          initialFavorite;   // ← pass from parent
+  final bool          initialFavorite;
+  final bool          isReschedule;
+  final int?          appointmentId;
 
   const BookAppointmentScreen({
     super.key,
     required this.doctor,
     this.bookingForMemberId,
     this.initialFavorite = false,
+    this.isReschedule = false,
+    this.appointmentId,
   });
 
   @override
@@ -228,10 +234,11 @@ class _BookAppointmentScreenState
   String?   _selectedTime;
   bool      _isBooking   = false;
   int?      _selectedMemberId;
-  bool      _isFavorite  = false;   // ← favorite state
+  bool      _isFavorite  = false;
   int?      _favFetchedForDoctorId;
   int?      _favFetchedForPatientId;
   bool      _didRouteRefresh = false;
+  Timer?    _queueTimer;
 
   @override
   void initState() {
@@ -242,6 +249,12 @@ class _BookAppointmentScreenState
         : ref.read(favoriteViewModelProvider).doctorFavorites[did];
     _isFavorite      = cached ?? widget.initialFavorite;
     _selectedMemberId = widget.bookingForMemberId;
+
+    // Refresh every 10 seconds so queue open status updates within moments of opening
+    _queueTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) setState(() {});
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final id = widget.doctor.doctorId;
       if (id != null) {
@@ -268,6 +281,12 @@ class _BookAppointmentScreenState
     _tryFetchFavorite();
   }
 
+  @override
+  void dispose() {
+    _queueTimer?.cancel();
+    super.dispose();
+  }
+
   String _fmtDateApi(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}';
 
@@ -283,10 +302,15 @@ class _BookAppointmentScreenState
   }
 
   TimeOfDay _parseTime(String? iso) {
-    if (iso == null) return const TimeOfDay(hour: 9, minute: 0);
+    if (iso == null || iso.isEmpty) return const TimeOfDay(hour: 9, minute: 0);
+    // Try full ISO datetime first (e.g. "2024-01-15T16:15:00")
     final dt = DateTime.tryParse(iso);
-    if (dt == null) return const TimeOfDay(hour: 9, minute: 0);
-    return TimeOfDay(hour: dt.hour, minute: dt.minute);
+    if (dt != null) return TimeOfDay(hour: dt.hour, minute: dt.minute);
+    // Fallback: plain "HH:mm" or "HH:mm:ss"
+    final parts = iso.split(':');
+    final h = int.tryParse(parts[0]) ?? 9;
+    final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    return TimeOfDay(hour: h, minute: m);
   }
 
   String _fmtTime(String? iso) {
@@ -374,11 +398,25 @@ class _BookAppointmentScreenState
     }
 
     ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
-      if (next.bookingResponse != null &&
+      if (!widget.isReschedule &&
+          next.bookingResponse != null &&
           next.bookingResponse != prev?.bookingResponse &&
           !next.isLoading) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(next.bookingResponse!.message ?? 'Appointment booked!'),
+          backgroundColor: kGreen,
+        ));
+        setState(() => _isBooking = false);
+        Navigator.pop(context, true);
+        return;
+      }
+      if (widget.isReschedule &&
+          next.isSuccess &&
+          next.rescheduleResponse != null &&
+          next.rescheduleResponse != prev?.rescheduleResponse &&
+          !next.isLoading) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(next.rescheduleResponse!.message ?? 'Appointment rescheduled!'),
           backgroundColor: kGreen,
         ));
         setState(() => _isBooking = false);
@@ -421,20 +459,54 @@ class _BookAppointmentScreenState
     final dayIsToday   = _selectedDate != null && _baIsToday(_selectedDate!);
     final mode         = selAvail?.bookingMode ?? 0;
     final isQueue      = mode == 1 || (mode == 3 && dayIsToday);
+
+    // ── Queue lead-time check ──
+    // Logic: if q_start_section = 40 min and session starts at 3:00 PM,
+    // queue booking opens at 2:20 PM. Before 2:20 PM → blocked.
+    // Note is only shown for today + queue mode + qStartSection > 0.
+    String? queueOpenTimeStr;
+    bool isQueueOpen = true;
+    if (isQueue && dayIsToday && selAvail != null) {
+      final leadMin = widget.doctor.qStartSection ?? widget.doctor.qStartBefore ?? 0;
+      if (leadMin > 0) {
+        final sessionStart    = _parseTime(selAvail!.startTime);
+        final sessionStartMin = sessionStart.hour * 60 + sessionStart.minute;
+        final openTotalMin    = sessionStartMin - leadMin;
+
+        if (openTotalMin >= 0) {
+          // Calculate the open time string (e.g. "02:00 PM")
+          final openH = openTotalMin ~/ 60;
+          final openM = openTotalMin % 60;
+          final sf    = openH < 12 ? 'AM' : 'PM';
+          final dh    = openH == 0 ? 12 : (openH > 12 ? openH - 12 : openH);
+          queueOpenTimeStr =
+              '${dh.toString().padLeft(2, '0')}:${openM.toString().padLeft(2, '0')} $sf';
+
+          // Check if current time has passed the open time
+          final nowMin = DateTime.now().hour * 60 + DateTime.now().minute;
+          isQueueOpen  = nowMin >= openTotalMin;
+        }
+        // openTotalMin < 0 means lead time > session start time → no restriction
+      }
+      // leadMin == 0 → no restriction, no note shown (queueOpenTimeStr stays null)
+    }
+
     final canConfirm   = selAvail != null &&
         _baBookable(mode, dayIsToday) &&
-        (isQueue || _selectedTime != null);
+        (isQueue || _selectedTime != null) &&
+        (!isQueue || !dayIsToday || isQueueOpen);
 
     return Scaffold(
       backgroundColor: isDark ? _kDarkBg : kBg,
       body: CustomScrollView(
         slivers: [
           _BaAppBar(
-            doctor:     widget.doctor,
-            isDark:     isDark,
-            isFavorite: _isFavorite,
-            onBack:     () => Navigator.pop(context),
-            onFavToggle: _handleFavoriteToggle,
+            doctor:       widget.doctor,
+            isDark:       isDark,
+            isFavorite:   _isFavorite,
+            isReschedule: widget.isReschedule,
+            onBack:       () => Navigator.pop(context),
+            onFavToggle:  _handleFavoriteToggle,
           ),
           SliverToBoxAdapter(
             child: _DoctorStatsRow(doctor: widget.doctor, isDark: isDark),
@@ -468,6 +540,8 @@ class _BookAppointmentScreenState
                 selectedAvail:     selAvail,
                 dayIsToday:        dayIsToday,
                 bookedTimes:       bookedTimes,
+                queueOpenTimeStr:  queueOpenTimeStr,
+                isQueueOpen:       isQueueOpen,
                 onPickDate:        _pickDate,
                 onPickSession:     (id) => setState(() {
                   _selectedSlotId = id;
@@ -482,13 +556,15 @@ class _BookAppointmentScreenState
       ),
       bottomNavigationBar: canConfirm
           ? _BaConfirmBar(
-              isDark:       isDark,
-              isQueue:      isQueue,
-              selectedDate: _selectedDate,
-              selectedSlot: _selectedTime,
-              fee:          widget.doctor.consultationFee,
-              isLoading:    _isBooking,
-              onConfirm:    _onConfirm,
+              isDark:           isDark,
+              isQueue:          isQueue,
+              isReschedule:     widget.isReschedule,
+              selectedDate:     _selectedDate,
+              selectedSlot:     _selectedTime,
+              queueStartTime:   isQueue ? _fmtTime(selAvail.startTime) : null,
+              fee:              widget.doctor.consultationFee,
+              isLoading:        _isBooking,
+              onConfirm:        _onConfirm,
             )
           : null,
     );
@@ -579,12 +655,8 @@ class _BookAppointmentScreenState
 
   void _onConfirm() {
     if (_isBooking || _selectedDate == null) return;
-    final ps          = ref.read(patientLoginViewModelProvider);
-    final isForMember = _selectedMemberId != null;
-    final patientId   = isForMember ? _selectedMemberId : ps.patientId;
-    final userType    = isForMember ? 2 : 1;
-    final ds          = ref.read(doctorsViewModelProvider);
-    final avail       = _selectedSlotId == null
+    final ds    = ref.read(doctorsViewModelProvider);
+    final avail = _selectedSlotId == null
         ? null
         : ds.doctorAvailabilities.cast<DoctorAvailabilityModel?>()
             .firstWhere((a) => a?.slotId == _selectedSlotId, orElse: () => null);
@@ -594,25 +666,42 @@ class _BookAppointmentScreenState
     final start   = isQueue ? null : (_selectedTime != null ? _toApiTime(_selectedTime!) : null);
 
     setState(() => _isBooking = true);
-    ref.read(appointmentViewModelProvider.notifier).bookAppointment(
-      AppointmentRequestModel(
-        doctorId:        widget.doctor.doctorId,
-        patientId:       patientId,
-        appointmentDate: _fmtDateApi(_selectedDate!),
-        startTime:       start,
-        userType:        userType,
-      ),
-    );
+
+    if (widget.isReschedule) {
+      ref.read(appointmentViewModelProvider.notifier).rescheduleAppointment(
+        AppointmentRequestModel(
+          appointmentId:   widget.appointmentId,
+          doctorId:        widget.doctor.doctorId,
+          appointmentDate: _fmtDateApi(_selectedDate!),
+          startTime:       start,
+        ),
+      );
+    } else {
+      final ps          = ref.read(patientLoginViewModelProvider);
+      final isForMember = _selectedMemberId != null;
+      final patientId   = isForMember ? _selectedMemberId : ps.patientId;
+      final userType    = isForMember ? 2 : 1;
+      ref.read(appointmentViewModelProvider.notifier).bookAppointment(
+        AppointmentRequestModel(
+          doctorId:        widget.doctor.doctorId,
+          patientId:       patientId,
+          appointmentDate: _fmtDateApi(_selectedDate!),
+          startTime:       start,
+          userType:        userType,
+        ),
+      );
+    }
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// APP BAR (SliverAppBar)  ← updated with favorite button
+// APP BAR (SliverAppBar)
 // ─────────────────────────────────────────────────────────────────────────────
 class _BaAppBar extends StatelessWidget {
   final DoctorDetails         doctor;
   final bool                  isDark;
   final bool                  isFavorite;
+  final bool                  isReschedule;
   final VoidCallback          onBack;
   final void Function(bool)   onFavToggle;
 
@@ -622,6 +711,7 @@ class _BaAppBar extends StatelessWidget {
     required this.isFavorite,
     required this.onBack,
     required this.onFavToggle,
+    this.isReschedule = false,
   });
 
   @override
@@ -642,14 +732,13 @@ class _BaAppBar extends StatelessWidget {
         onPressed: onBack,
       ),
       title: Text(
-        'Book Appointment',
+        isReschedule ? 'Reschedule Appointment' : 'Book Appointment',
         style: TextStyle(
           fontSize: 16,
           fontWeight: FontWeight.w700,
           color: isDark ? Colors.white : kTextDark,
         ),
       ),
-      // ── Favourite button in collapsed app-bar ──
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 12),
@@ -672,7 +761,6 @@ class _BaAppBar extends StatelessWidget {
           alignment: Alignment.bottomLeft,
           child: Row(
             children: [
-              // ── Doctor avatar ──
               Stack(
                 children: [
                   CircleAvatar(
@@ -681,7 +769,6 @@ class _BaAppBar extends StatelessWidget {
                     child: Text(initial, style: const TextStyle(
                         fontSize: 24, fontWeight: FontWeight.w700, color: Colors.white)),
                   ),
-                  // ── Small fav indicator on avatar ──
                   if (isFavorite)
                     Positioned(
                       right: 0,
@@ -751,15 +838,22 @@ class _BaAppBar extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DOCTOR STATS ROW  (experience · rating · patients · view profile)
+// DOCTOR STATS ROW
 // ─────────────────────────────────────────────────────────────────────────────
-class _DoctorStatsRow extends StatelessWidget {
+class _DoctorStatsRow extends ConsumerWidget {
   final DoctorDetails doctor;
   final bool          isDark;
   const _DoctorStatsRow({required this.doctor, required this.isDark});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviews = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
+    final avgRating = reviews.isEmpty
+        ? 0.0
+        : reviews.fold<double>(0, (acc, r) => acc + (r.rating?.toDouble() ?? 0)) /
+            reviews.length;
+    final ratingLabel = reviews.isEmpty ? 'Rating' : '${reviews.length} reviews';
+
     return Container(
       color: isDark ? _kDarkSurface : kCardBg,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
@@ -771,21 +865,22 @@ class _DoctorStatsRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           _StatBox(
-            label: 'Rating',
+            label: ratingLabel,
             widget: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Icon(Icons.star_rounded, color: kOrange, size: 14),
                 const SizedBox(width: 2),
-                Text('4.8', style: const TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
+                Text(
+                  avgRating == 0 ? '--' : avgRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
               ],
             ),
           ),
           const SizedBox(width: 8),
           _StatBox(label: 'Patients', value: '1.2k+'),
           const SizedBox(width: 8),
-          // View Profile button
           Expanded(
             child: GestureDetector(
               onTap: () => Navigator.push(
@@ -954,6 +1049,8 @@ class _BaBody extends StatelessWidget {
   final DoctorAvailabilityModel? selectedAvail;
   final bool       dayIsToday;
   final Set<String> bookedTimes;
+  final String?    queueOpenTimeStr;
+  final bool       isQueueOpen;
   final void Function(DateTime, List<DoctorAvailabilityModel>) onPickDate;
   final ValueChanged<int?>   onPickSession;
   final ValueChanged<String> onPickTime;
@@ -966,6 +1063,7 @@ class _BaBody extends StatelessWidget {
     required this.selectedAvail, required this.dayIsToday, required this.bookedTimes,
     required this.onPickDate, required this.onPickSession, required this.onPickTime,
     required this.buildSlots, required this.fmtTime,
+    this.queueOpenTimeStr, this.isQueueOpen = true,
   });
 
   String _dayName(int w) {
@@ -1005,7 +1103,11 @@ class _BaBody extends StatelessWidget {
           const SizedBox(height: 24),
           if (selectedAvail!.bookingMode == 1 ||
               (selectedAvail!.bookingMode == 3 && dayIsToday))
-            _BaQueueCard(avail: selectedAvail!)
+            _BaQueueCard(
+              avail:            selectedAvail!,
+              queueOpenTimeStr: queueOpenTimeStr,
+              isQueueOpen:      isQueueOpen,
+            )
           else
             _BaSlotPicker(
               slots:       buildSlots(selectedAvail!),
@@ -1252,29 +1354,103 @@ class _BaSessionRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _BaQueueCard extends StatelessWidget {
   final DoctorAvailabilityModel avail;
-  const _BaQueueCard({required this.avail});
+  final String? queueOpenTimeStr;
+  final bool    isQueueOpen;
+
+  const _BaQueueCard({
+    required this.avail,
+    this.queueOpenTimeStr,
+    this.isQueueOpen = true,
+  });
+
+  /// Converts ISO datetime or "HH:mm:ss" → "hh:mm AM/PM"
+  String _fmt(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    // Try full ISO datetime first
+    final dt = DateTime.tryParse(raw);
+    if (dt != null) {
+      final ampm = dt.hour < 12 ? 'AM' : 'PM';
+      int h = dt.hour == 0 ? 12 : (dt.hour > 12 ? dt.hour - 12 : dt.hour);
+      return '${h.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} $ampm';
+    }
+    // Fallback: plain "HH:mm:ss"
+    final parts = raw.split(':');
+    int h = int.tryParse(parts[0]) ?? 0;
+    final m   = parts.length > 1 ? parts[1] : '00';
+    final ampm = h < 12 ? 'AM' : 'PM';
+    if (h == 0) { h = 12; }
+    else if (h > 12) { h -= 12; }
+    return '${h.toString().padLeft(2, '0')}:$m $ampm';
+  }
+
   @override
-  Widget build(BuildContext context) => Container(
-    width: double.infinity,
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: kOrange.withOpacity(0.07),
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: kOrange.withOpacity(0.3)),
-    ),
-    child: Row(children: [
-      Container(width: 48, height: 48,
-        decoration: BoxDecoration(color: kOrange.withOpacity(0.15), shape: BoxShape.circle),
-        child: const Icon(Icons.confirmation_number_rounded, size: 22, color: kOrange)),
-      const SizedBox(width: 14),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Walk-in Queue', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
-        const SizedBox(height: 3),
-        Text('Show up today · ${avail.slotDuration ?? 10} min per patient',
-          style: const TextStyle(fontSize: 12, color: kTextMid)),
-      ])),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    final sessionStartStr = _fmt(avail.startTime);
+
+    // Note row is always shown: status + session start time
+    final noteColor = isQueueOpen ? kGreen : kRed;
+    final noteBg    = isQueueOpen
+        ? kGreen.withValues(alpha: 0.08)
+        : kRed.withValues(alpha: 0.08);
+    final noteIcon  = isQueueOpen
+        ? Icons.check_circle_rounded
+        : Icons.access_time_rounded;
+    final noteText  = !isQueueOpen && queueOpenTimeStr != null
+        ? 'Queue booking opens at $queueOpenTimeStr'
+        : 'Queue booking is open';
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // ── Status note: first ──
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: noteBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: noteColor.withValues(alpha: 0.3)),
+        ),
+        child: Row(children: [
+          Icon(noteIcon, size: 16, color: noteColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              noteText,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: noteColor),
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 10),
+      // ── Walk-in Queue card ──
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: kOrange.withValues(alpha: 0.07),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kOrange.withValues(alpha: 0.3)),
+        ),
+        child: Row(children: [
+          Container(width: 48, height: 48,
+            decoration: BoxDecoration(color: kOrange.withValues(alpha: 0.15), shape: BoxShape.circle),
+            child: const Icon(Icons.confirmation_number_rounded, size: 22, color: kOrange)),
+          const SizedBox(width: 14),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Walk-in Queue',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
+            const SizedBox(height: 3),
+            Text('Show up today · ${avail.slotDuration ?? 10} min per patient',
+                style: const TextStyle(fontSize: 12, color: kTextMid)),
+            // if (sessionStartStr.isNotEmpty) ...[
+            //   const SizedBox(height: 4),
+            //   Text('Queue starts at $sessionStartStr',
+            //       style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kOrange)),
+            // ],
+          ])),
+        ]),
+      ),
+    ]);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1399,19 +1575,24 @@ class _SlotGrid extends StatelessWidget {
 class _BaConfirmBar extends StatelessWidget {
   final bool         isDark;
   final bool         isQueue;
+  final bool         isReschedule;
   final DateTime?    selectedDate;
   final String?      selectedSlot;
+  final String?      queueStartTime;
   final double?      fee;
   final bool         isLoading;
   final VoidCallback onConfirm;
   const _BaConfirmBar({required this.isDark, required this.isQueue,
       required this.selectedDate, required this.selectedSlot, required this.fee,
-      required this.isLoading, required this.onConfirm});
+      required this.isLoading, required this.onConfirm,
+      this.queueStartTime, this.isReschedule = false});
 
   @override
   Widget build(BuildContext context) {
     final dateStr = selectedDate != null ? _baFmtFull(selectedDate!) : '';
-    final label   = isQueue ? 'Confirm Queue  ·  $dateStr' : '$selectedSlot  ·  $dateStr';
+    final label   = isQueue
+        ? (queueStartTime != null ? 'Confirm Queue   ·  $dateStr' : 'Confirm Queue  ·  $dateStr')
+        : '$selectedSlot  ·  $dateStr';
     return Container(
       padding: EdgeInsets.fromLTRB(16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
       decoration: BoxDecoration(
@@ -1450,9 +1631,15 @@ class _BaConfirmBar extends StatelessWidget {
                 ? const SizedBox(width: 22, height: 22,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
                 : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(isQueue ? Icons.confirmation_number_rounded : Icons.calendar_month_rounded, size: 17),
+                    Icon(isReschedule
+                        ? Icons.edit_calendar_rounded
+                        : (isQueue ? Icons.confirmation_number_rounded : Icons.calendar_month_rounded),
+                        size: 17),
                     const SizedBox(width: 8),
-                    const Text('Confirm Appointment', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    Text(
+                      isReschedule ? 'Reschedule Appointment' : 'Confirm Appointment',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    ),
                   ]),
           ),
         ),
@@ -1487,120 +1674,9 @@ class _BaNoAvail extends StatelessWidget {
           style: ElevatedButton.styleFrom(backgroundColor: kPrimary, foregroundColor: Colors.white,
             elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-      child: const Text('Go Back'),
+          child: const Text('Go Back'),
         ),
       ]),
-    ),
-  );
-}
-
-class AppointmentReviewInput {
-  final int rating;
-  final String comment;
-  const AppointmentReviewInput({required this.rating, required this.comment});
-}
-
-Future<AppointmentReviewInput?> showAppointmentReviewDialog(
-  BuildContext context, {
-  required String doctorName,
-}) {
-  final commentCtrl = TextEditingController();
-  int rating = 0;
-
-  Future<void> showRatingError() async {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Please select a rating'),
-        backgroundColor: kRed,
-      ),
-    );
-  }
-
-  return showDialog<AppointmentReviewInput>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Rate your visit',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'How was your appointment with Dr. $doctorName?',
-              style: const TextStyle(fontSize: 12.5, color: kTextMid),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: List.generate(5, (i) {
-                final idx = i + 1;
-                return IconButton(
-                  onPressed: () => setState(() => rating = idx),
-                  icon: Icon(
-                    idx <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
-                    color: idx <= rating ? kOrange : kBorder,
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: commentCtrl,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Write a short review (optional)',
-                hintStyle: const TextStyle(fontSize: 12.5, color: kTextMid),
-                filled: true,
-                fillColor: kBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: kBorder.withOpacity(0.6)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: kPrimary, width: 1.2),
-                ),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () {
-              if (rating <= 0) {
-                showRatingError();
-                return;
-              }
-              Navigator.pop(
-                ctx,
-                AppointmentReviewInput(
-                  rating: rating,
-                  comment: commentCtrl.text.trim(),
-                ),
-              );
-            },
-            child: const Text('Submit'),
-          ),
-        ],
-      ),
     ),
   );
 }

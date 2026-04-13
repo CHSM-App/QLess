@@ -197,9 +197,14 @@ Future<AppointmentResponseModel> endSession(
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
-  @POST("patient/insert/appointment/cancel")
-  Future<AppointmentResponseModel> cancelAppointment(
+  @POST("patient/insert/rescheduleAppointment")
+  Future<AppointmentResponseModel> rescheduleAppointment(
     @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+  @POST("patient/insert/cancelAppointment/{appointment_id}")
+  Future<AppointmentResponseModel> cancelAppointment(
+    @Path("appointment_id") int appointmentId,
   );
 
   @POST("patient/insert/appointment/queueStatus")

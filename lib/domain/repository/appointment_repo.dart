@@ -12,9 +12,11 @@ abstract class AppointmentRepository {
     AppointmentRequestModel appointmentRequest,
   );
 
-  Future<AppointmentResponseModel> cancelAppointment(
+  Future<AppointmentResponseModel> rescheduleAppointment(
     AppointmentRequestModel appointmentRequest,
   );
+
+  Future<AppointmentResponseModel> cancelAppointment(int appointmentId);
 
   Future<AppointmentResponseModel> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
