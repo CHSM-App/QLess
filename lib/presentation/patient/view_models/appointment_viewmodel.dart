@@ -12,6 +12,7 @@ class AppointmentState {
   final bool isSuccess;
   final AppointmentResponseModel? availabilityResponse;
   final AppointmentResponseModel? bookingResponse;
+  final AppointmentResponseModel? rescheduleResponse;
   final AppointmentResponseModel? cancelResponse;
   final AppointmentResponseModel? queueStatusResponse;
   final List<MonthSlotData> bookedSlots;
@@ -23,6 +24,7 @@ class AppointmentState {
     this.isSuccess = false,
     this.availabilityResponse,
     this.bookingResponse,
+    this.rescheduleResponse,
     this.cancelResponse,
     this.queueStatusResponse,
     this.bookedSlots = const [],
@@ -36,6 +38,7 @@ class AppointmentState {
     bool clearError = false,
     AppointmentResponseModel? availabilityResponse,
     AppointmentResponseModel? bookingResponse,
+    AppointmentResponseModel? rescheduleResponse,
     AppointmentResponseModel? cancelResponse,
     AppointmentResponseModel? queueStatusResponse,
     List<MonthSlotData>? bookedSlots,
@@ -47,6 +50,7 @@ class AppointmentState {
       isSuccess: isSuccess ?? this.isSuccess,
       availabilityResponse: availabilityResponse ?? this.availabilityResponse,
       bookingResponse: bookingResponse ?? this.bookingResponse,
+      rescheduleResponse: rescheduleResponse ?? this.rescheduleResponse,
       cancelResponse: cancelResponse ?? this.cancelResponse,
       queueStatusResponse: queueStatusResponse ?? this.queueStatusResponse,
       bookedSlots: bookedSlots ?? this.bookedSlots,
@@ -106,17 +110,47 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     }
   }
 
-  Future<void> cancelAppointment(
+  Future<void> rescheduleAppointment(
     AppointmentRequestModel appointmentRequest,
   ) async {
     state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
     try {
-      final result = await usecase.cancelAppointment(appointmentRequest);
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-        cancelResponse: result,
-      );
+      final result = await usecase.rescheduleAppointment(appointmentRequest);
+      if (result.success == false) {
+        state = state.copyWith(
+          isLoading: false,
+          error: result.message ?? 'Reschedule failed',
+          rescheduleResponse: result,
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          isSuccess: true,
+          rescheduleResponse: result,
+        );
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractError(e));
+    }
+  }
+
+  Future<void> cancelAppointment(int appointmentId) async {
+    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
+    try {
+      final result = await usecase.cancelAppointment(appointmentId);
+      if (result.success == false) {
+        state = state.copyWith(
+          isLoading: false,
+          error: result.message ?? 'Cancellation failed',
+          cancelResponse: result,
+        );
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          isSuccess: true,
+          cancelResponse: result,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));
     }
