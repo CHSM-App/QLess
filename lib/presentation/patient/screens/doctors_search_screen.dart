@@ -703,7 +703,7 @@ class _DoctorList extends StatelessWidget {
       onRefresh: onRefresh,
       color: kPrimary,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
         itemCount: doctors.length,
         itemBuilder: (_, i) => _DoctorCard(
           doctor:           doctors[i],

@@ -288,7 +288,9 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
       ),
 
       // ── FAB ───────────────────────────────────────────────────
-      floatingActionButton: FloatingActionButton.extended(
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: FloatingActionButton.extended(
         onPressed: _goToAddMedicine,
         backgroundColor: kPrimaryBlue,
         elevation: 4,
@@ -302,6 +304,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
             letterSpacing: 0.2,
           ),
         ),
+      ),
       ),
     );
   }

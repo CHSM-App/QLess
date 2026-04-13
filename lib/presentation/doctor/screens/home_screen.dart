@@ -167,6 +167,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           ),
         ),
         child: SafeArea(
+          bottom: false,
           child: Column(
             children: [
               _buildHeader(),
@@ -212,7 +213,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                             : null;
 
                         return SingleChildScrollView(
-                          padding: const EdgeInsets.only(bottom: 24),
+                          padding: const EdgeInsets.only(bottom: 100),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

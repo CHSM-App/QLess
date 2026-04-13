@@ -371,7 +371,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       color: primary,
       onRefresh: () async => _refreshAppointments(force: true),
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 20),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
         itemCount: patients.length,
         itemBuilder: (context, index) {
           final p = patients[index];
