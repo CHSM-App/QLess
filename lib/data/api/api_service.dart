@@ -119,9 +119,9 @@ Future<AppointmentResponseModel> endSession(
   @Body() AppointmentRequestModel appointmentRequest,
 );
 
-  @POST("doctor/insert/addQueueStartTime/{doctor_id}/{q_start_before}")
-  Future<AppointmentResponseModel> updateLeadTime(
-     @Path("doctor_id") int doctorId, @Path("q_start_before") int leadTime
+  @POST("doctor/insert/addQueueStartTime/")
+  Future<dynamic> updateLeadTime(
+     @Body() DoctorDetails doctor
   );
 
 

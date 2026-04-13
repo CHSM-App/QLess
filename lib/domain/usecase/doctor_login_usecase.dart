@@ -27,8 +27,8 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.fetchAllMedicines(doctorId);
   }
 
-  Future<dynamic> updateLeadTime( int doctorId, int minutes) {
-    return doctorLoginRepository.updateLeadTime(doctorId, minutes );
+  Future<dynamic> updateLeadTime(DoctorDetails doctor) {
+    return doctorLoginRepository.updateLeadTime(doctor );
   }
 
 }

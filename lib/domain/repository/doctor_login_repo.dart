@@ -12,7 +12,7 @@ abstract class DoctorLoginRepository {
 
     Future<List<Medicine>> fetchAllMedicines(int doctId);
 
-  Future<dynamic> updateLeadTime( int doctorId, int minutes);
+  Future<dynamic> updateLeadTime(DoctorDetails doctor);
 
    
 

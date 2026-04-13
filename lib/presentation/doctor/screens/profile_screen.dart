@@ -35,14 +35,23 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   bool _darkMode             = false;
   bool _availableForConsultation = true;
   bool _didFetchProfile      = false;
-  Timer? _debounce;
-  bool _hasLeadTimeChanged   = false;
-  int? _lastSavedMinutes;
 
-  late final ProviderSubscription<DoctorLoginState> _doctorLoginSub;
+  // Saved (confirmed) lead time
+  int _savedLeadHours   = 0;
+  int _savedLeadMinutes = 0;
 
+  // Working (draft) lead time — shown in the pickers
   int _leadHours   = 0;
   int _leadMinutes = 0;
+
+  // Whether the user has changed the pickers without saving yet
+  bool _leadTimeEdited = false;
+
+  bool _isSavingLeadTime = false;
+
+  int? _lastAppliedLeadTimeMinutes;
+
+  late final ProviderSubscription<DoctorLoginState> _doctorLoginSub;
 
   @override
   void initState() {
@@ -67,20 +76,50 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     });
   }
 
-  void _onLeadTimeChanged() {
-    _hasLeadTimeChanged = true;
-    _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 800), _saveLeadTime);
+  void _setLeadTimeFromApi(int minutes) {
+    final safeMinutes = minutes < 0 ? 0 : minutes;
+    final hours = (safeMinutes ~/ 60).clamp(0, 23);
+    final mins  = safeMinutes % 60;
+
+    _leadHours        = hours;
+    _leadMinutes      = mins;
+    _savedLeadHours   = hours;
+    _savedLeadMinutes = mins;
+    _leadTimeEdited   = false;
   }
 
-  Future<void> _saveLeadTime() async {
+  void _onLeadTimeChanged(int hours, int minutes) {
+    setState(() {
+      _leadHours      = hours;
+      _leadMinutes    = minutes;
+      _leadTimeEdited =
+          (hours != _savedLeadHours) || (minutes != _savedLeadMinutes);
+    });
+  }
+
+  Future<void> _updateLeadTime() async {
+    setState(() => _isSavingLeadTime = true);
     final minutes = (_leadHours * 60) + _leadMinutes;
-    if (_lastSavedMinutes == minutes) return;
-    _lastSavedMinutes = minutes;
-    await ref.read(doctorLoginViewModelProvider.notifier).updateLeadTime(
-          ref.read(doctorLoginViewModelProvider).doctorId ?? 0,
-          minutes,
-        );
+    final body = DoctorDetails(
+      leadTime: minutes,
+      queueStartBefore: minutes,
+      doctorId: ref.read(doctorLoginViewModelProvider).doctorId ?? 0,
+    );
+    await ref.read(doctorLoginViewModelProvider.notifier).updateLeadTime(body);
+    setState(() {
+      _savedLeadHours   = _leadHours;
+      _savedLeadMinutes = _leadMinutes;
+      _leadTimeEdited   = false;
+      _isSavingLeadTime = false;
+    });
+  }
+
+  void _cancelLeadTimeEdit() {
+    setState(() {
+      _leadHours      = _savedLeadHours;
+      _leadMinutes    = _savedLeadMinutes;
+      _leadTimeEdited = false;
+    });
   }
 
   @override
@@ -96,7 +135,6 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
 
-  // ── Personal Info Popup ───────────────────────────────────────
   void _showPersonalInfoSheet(
       DoctorLoginState doctorState, DoctorDetails? details) {
     final name           = details?.name ?? doctorState.name ?? '—';
@@ -127,21 +165,20 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  // â”€â”€ Professional Details Popup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   void _showProfessionalDetailsSheet(
       DoctorLoginState doctorState, DoctorDetails? details) {
-    final specialization = details?.specialization ?? 'â€”';
-    final qualification  = details?.qualification ?? 'â€”';
-    final licenseNo      = details?.licenseNo ?? 'â€”';
-    final experience     = details?.experience?.toString() ?? 'â€”';
+    final specialization = details?.specialization ?? '—';
+    final qualification  = details?.qualification ?? '—';
+    final licenseNo      = details?.licenseNo ?? '—';
+    final experience     = details?.experience?.toString() ?? '—';
     final fee            = details?.consultationFee != null
-        ? 'â‚¹${details!.consultationFee!.toStringAsFixed(0)}'
-        : 'â€”';
-    final clinicName     = details?.clinicName ?? doctorState.clinic_name ?? 'â€”';
-    final clinicAddress  = details?.clinicAddress ?? 'â€”';
-    final clinicEmail    = details?.clinicEmail ?? 'â€”';
-    final clinicContact  = details?.clinicContact ?? 'â€”';
-    final websiteName    = details?.websiteName ?? 'â€”';
+        ? '₹${details!.consultationFee!.toStringAsFixed(0)}'
+        : '—';
+    final clinicName    = details?.clinicName ?? doctorState.clinic_name ?? '—';
+    final clinicAddress = details?.clinicAddress ?? '—';
+    final clinicEmail   = details?.clinicEmail ?? '—';
+    final clinicContact = details?.clinicContact ?? '—';
+    final websiteName   = details?.websiteName ?? '—';
 
     showModalBottomSheet(
       context: context,
@@ -169,6 +206,16 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       data: (list) => list.isNotEmpty ? list.first : null,
       orElse: () => null,
     );
+    final stateLeadTime =
+        doctorDetails?.leadTime ?? doctorState.leadTimeMinutes;
+
+    if (stateLeadTime != null &&
+        stateLeadTime != _lastAppliedLeadTimeMinutes &&
+        !_leadTimeEdited) {
+      _setLeadTimeFromApi(stateLeadTime);
+      _lastAppliedLeadTimeMinutes = stateLeadTime;
+    }
+
     final screenWidth   = MediaQuery.of(context).size.width;
     final isTablet      = screenWidth >= 600;
     final isLargeTablet = screenWidth >= 900;
@@ -181,13 +228,13 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  Widget _buildLargeTabletLayout(
-      DoctorLoginState s, DoctorDetails? d) {
+  Widget _buildLargeTabletLayout(DoctorLoginState s, DoctorDetails? d) {
     return Row(children: [
       Expanded(
         child: Column(children: [
           Expanded(
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child:
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Expanded(
                 flex: 3,
                 child: _buildScrollContent(
@@ -314,7 +361,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
-                  child: const Icon(Icons.edit, color: Colors.white, size: 12),
+                  child:
+                      const Icon(Icons.edit, color: Colors.white, size: 12),
                 ),
               ]),
             ),
@@ -349,7 +397,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                 const SizedBox(height: 4),
                 if (clinicName.isNotEmpty)
                   Text(clinicName,
-                      style: const TextStyle(fontSize: 13, color: kTextMuted)),
+                      style:
+                          const TextStyle(fontSize: 13, color: kTextMuted)),
                 const SizedBox(height: 16),
                 isTablet
                     ? _buildStatsRowTablet(details)
@@ -358,9 +407,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: () => Navigator.of(context, rootNavigator: true)
-                        .push(MaterialPageRoute(
-                            builder: (_) => const DoctorEditProfilePage())),
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).push(
+                            MaterialPageRoute(
+                                builder: (_) =>
+                                    const DoctorEditProfilePage())),
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Edit Profile'),
                     style: OutlinedButton.styleFrom(
@@ -381,7 +432,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   }
 
   Widget _buildStatsRowMobile(DoctorDetails? details) {
-    final exp    = details?.experience?.toString();
+    final exp     = details?.experience?.toString();
     final expText = exp != null && exp.isNotEmpty ? '$exp yrs' : '12 yrs';
     return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
       _statItem(expText, 'Experience'),
@@ -393,9 +444,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   }
 
   Widget _buildStatsRowTablet(DoctorDetails? details) {
-    final exp    = details?.experience?.toString();
+    final exp     = details?.experience?.toString();
     final expText = exp != null && exp.isNotEmpty ? '$exp yrs' : '12 yrs';
-    final fee    = details?.consultationFee?.toStringAsFixed(0);
+    final fee     = details?.consultationFee?.toStringAsFixed(0);
     final feeText = fee != null && fee.isNotEmpty ? '₹$fee' : '₹800';
     return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
       _statItem(expText, 'Experience'),
@@ -483,7 +534,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               Text(item.label,
                   style: const TextStyle(
                       fontSize: 14,
@@ -491,7 +544,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                       color: kTextDark)),
               if (item.subtitle != null)
                 Text(item.subtitle!,
-                    style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                    style:
+                        const TextStyle(fontSize: 12, color: kTextMuted)),
             ]),
           ),
           const Icon(Icons.chevron_right, color: kTextMuted, size: 20),
@@ -517,12 +571,16 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(Icons.videocam_outlined,
-                color: _availableForConsultation ? kAccentGreen : kRedAccent,
+                color: _availableForConsultation
+                    ? kAccentGreen
+                    : kRedAccent,
                 size: 18),
           ),
           const SizedBox(width: 14),
           Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
               const Text('Available for Consultation',
                   style: TextStyle(
                       fontSize: 14,
@@ -539,34 +597,93 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           Switch.adaptive(
             value: _availableForConsultation,
             activeColor: kAccentGreen,
-            onChanged: (v) => setState(() => _availableForConsultation = v),
+            onChanged: (v) =>
+                setState(() => _availableForConsultation = v),
           ),
         ]),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-          child: _availableForConsultation
-              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const SizedBox(height: 16),
-                  const Divider(height: 1, color: kDivider),
-                  const SizedBox(height: 16),
-                  const Text('Booking lead time',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextDark)),
-                  const SizedBox(height: 12),
-                  _buildLeadTimeRow(),
-                  const SizedBox(height: 4),
-                ])
-              : const SizedBox.shrink(),
-        ),
+        if (_availableForConsultation) ...[
+          const SizedBox(height: 16),
+          const Divider(height: 1, color: kDivider),
+          const SizedBox(height: 16),
+          const Text('Booking lead time',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: kTextDark)),
+          const SizedBox(height: 12),
+          _buildLeadTimeRow(),
+          // ── Update / Cancel buttons ──
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            child: _leadTimeEdited
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Row(children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isSavingLeadTime
+                              ? null
+                              : _cancelLeadTimeEdit,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kTextMuted,
+                            side: const BorderSide(color: kDivider),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 10),
+                          ),
+                          child: const Text('Cancel',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed:
+                              _isSavingLeadTime ? null : _updateLeadTime,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimaryBlue,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 10),
+                          ),
+                          child: _isSavingLeadTime
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(
+                                            Colors.white),
+                                  ),
+                                )
+                              : const Text('Update',
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ]),
+                  )
+                : const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 4),
+        ],
         const SizedBox(height: 16),
         const Divider(height: 1, color: kDivider),
         const SizedBox(height: 16),
         const Text('Working Hours',
             style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600, color: kTextDark)),
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: kTextDark)),
         const SizedBox(height: 10),
         _buildDayRow('Mon – Fri', '9:00 AM – 5:00 PM', true),
         const SizedBox(height: 6),
@@ -577,7 +694,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         Align(
           alignment: Alignment.centerRight,
           child: TextButton.icon(
-            onPressed: () => Navigator.push(context,
+            onPressed: () => Navigator.push(
+                context,
                 MaterialPageRoute(
                     builder: (_) => const DoctorAvailabilityPage())),
             icon: const Icon(Icons.edit_calendar_outlined, size: 14),
@@ -595,7 +713,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   Widget _buildLeadTimeRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+      child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
         Container(
           width: 32,
           height: 32,
@@ -608,7 +728,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         ),
         const SizedBox(width: 12),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
             Text('Queue booking',
                 style: TextStyle(
                     fontSize: 13,
@@ -622,26 +744,27 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         Column(children: [
           const Row(children: [
             SizedBox(
-                width: 40,
+                width: 50,
                 child: Center(
                     child: Text('HH',
-                        style: TextStyle(fontSize: 10, color: kTextMuted)))),
+                        style: TextStyle(
+                            fontSize: 10, color: kTextMuted)))),
             SizedBox(width: 12),
             SizedBox(
-                width: 40,
+                width: 50,
                 child: Center(
                     child: Text('MM',
-                        style: TextStyle(fontSize: 10, color: kTextMuted)))),
+                        style: TextStyle(
+                            fontSize: 10, color: kTextMuted)))),
           ]),
           const SizedBox(height: 4),
           Row(children: [
             _WheelPicker(
+              key: ValueKey('lead_hours_${_leadHours}_${_savedLeadHours}'),
               value: _leadHours,
               max: 24,
-              onChanged: (v) {
-                setState(() => _leadHours = v);
-                _onLeadTimeChanged();
-              },
+              onChanged: (v) =>
+                  _onLeadTimeChanged(v, _leadMinutes),
             ),
             const SizedBox(width: 6),
             const Text(':',
@@ -651,12 +774,12 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                     color: kTextDark)),
             const SizedBox(width: 6),
             _WheelPicker(
+              key: ValueKey(
+                  'lead_minutes_${_leadMinutes}_${_savedLeadMinutes}'),
               value: _leadMinutes,
               max: 60,
-              onChanged: (v) {
-                setState(() => _leadMinutes = v);
-                _onLeadTimeChanged();
-              },
+              onChanged: (v) =>
+                  _onLeadTimeChanged(_leadHours, v),
             ),
           ]),
         ]),
@@ -681,7 +804,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
               style: const TextStyle(fontSize: 13, color: kTextDark))),
       Text(hours,
           style: TextStyle(
-              fontSize: 13, color: active ? kTextDark : kTextMuted)),
+              fontSize: 13,
+              color: active ? kTextDark : kTextMuted)),
     ]);
   }
 
@@ -743,18 +867,23 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             Text(label,
                 style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: kTextDark)),
             Text(subtitle,
-                style: const TextStyle(fontSize: 12, color: kTextMuted)),
+                style:
+                    const TextStyle(fontSize: 12, color: kTextMuted)),
           ]),
         ),
         Switch.adaptive(
-            value: value, activeColor: kPrimaryBlue, onChanged: onChanged),
+            value: value,
+            activeColor: kPrimaryBlue,
+            onChanged: onChanged),
       ]),
     );
   }
@@ -792,11 +921,31 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
   Widget _buildSupportCard() {
     final items = [
-      _SettingItem(icon: Icons.help_outline,         label: 'Help Center',       subtitle: 'FAQs & documentation',    onTap: null),
-      _SettingItem(icon: Icons.chat_bubble_outline,  label: 'Contact Support',   subtitle: 'Chat, Email, Phone',      onTap: null),
-      _SettingItem(icon: Icons.privacy_tip_outlined, label: 'Privacy Policy',    subtitle: null,                      onTap: null),
-      _SettingItem(icon: Icons.description_outlined, label: 'Terms of Service',  subtitle: null,                      onTap: null),
-      _SettingItem(icon: Icons.info_outline,         label: 'App Version',       subtitle: 'v2.4.1 (Build 204)',      onTap: null),
+      _SettingItem(
+          icon: Icons.help_outline,
+          label: 'Help Center',
+          subtitle: 'FAQs & documentation',
+          onTap: null),
+      _SettingItem(
+          icon: Icons.chat_bubble_outline,
+          label: 'Contact Support',
+          subtitle: 'Chat, Email, Phone',
+          onTap: null),
+      _SettingItem(
+          icon: Icons.privacy_tip_outlined,
+          label: 'Privacy Policy',
+          subtitle: null,
+          onTap: null),
+      _SettingItem(
+          icon: Icons.description_outlined,
+          label: 'Terms of Service',
+          subtitle: null,
+          onTap: null),
+      _SettingItem(
+          icon: Icons.info_outline,
+          label: 'App Version',
+          subtitle: 'v2.4.1 (Build 204)',
+          onTap: null),
     ];
     return Container(
       decoration: _cardDecoration(),
@@ -876,10 +1025,13 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       margin: const EdgeInsets.fromLTRB(0, 20, 24, 20),
       decoration: _cardDecoration(),
       padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child:
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Quick Stats',
             style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w700, color: kTextDark)),
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: kTextDark)),
         const SizedBox(height: 16),
         _quickStatCard("Today's Appointments", '8',
             Icons.calendar_today_outlined, kPrimaryBlue),
@@ -892,7 +1044,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         const SizedBox(height: 24),
         const Text('Account Health',
             style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: kTextDark)),
         const SizedBox(height: 12),
         _healthRow('Profile Completion', 0.85),
         const SizedBox(height: 8),
@@ -925,10 +1079,13 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         const SizedBox(width: 12),
         Expanded(
             child: Text(label,
-                style: const TextStyle(fontSize: 12, color: kTextMuted))),
+                style:
+                    const TextStyle(fontSize: 12, color: kTextMuted))),
         Text(value,
             style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.w700, color: color)),
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: color)),
       ]),
     );
   }
@@ -936,7 +1093,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   Widget _healthRow(String label, double value) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: kTextMuted)),
+        Text(label,
+            style: const TextStyle(fontSize: 12, color: kTextMuted)),
         Text('${(value * 100).toInt()}%',
             style: const TextStyle(
                 fontSize: 12,
@@ -1018,7 +1176,6 @@ class _PersonalInfoSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── drag handle ──────────────────────────────────────
           const SizedBox(height: 12),
           Container(
             width: 40,
@@ -1029,8 +1186,6 @@ class _PersonalInfoSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-
-          // ── avatar + name + close ────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(children: [
@@ -1102,12 +1257,9 @@ class _PersonalInfoSheet extends StatelessWidget {
               ),
             ]),
           ),
-
           const SizedBox(height: 20),
           const Divider(height: 1, color: kDivider),
           const SizedBox(height: 8),
-
-          // ── info rows ────────────────────────────────────────
           _InfoRow(
             icon: Icons.phone_outlined,
             iconColor: kAccentGreen,
@@ -1151,10 +1303,7 @@ class _PersonalInfoSheet extends StatelessWidget {
             value: fee,
             isLast: true,
           ),
-
           const SizedBox(height: 16),
-
-          // ── edit profile button ──────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: SizedBox(
@@ -1189,7 +1338,7 @@ class _PersonalInfoSheet extends StatelessWidget {
   }
 }
 
-// â”€â”€ Professional Details Bottom Sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Professional Details Bottom Sheet ───────────────────────────────────────
 
 class _ProfessionalDetailsSheet extends StatelessWidget {
   const _ProfessionalDetailsSheet({
@@ -1284,7 +1433,6 @@ class _ProfessionalDetailsSheet extends StatelessWidget {
           const SizedBox(height: 14),
           const Divider(height: 1, color: kDivider),
           const SizedBox(height: 8),
-
           _InfoRow(
             icon: Icons.medical_services_outlined,
             iconColor: kPrimaryBlue,
@@ -1356,7 +1504,6 @@ class _ProfessionalDetailsSheet extends StatelessWidget {
             value: websiteName,
             isLast: true,
           ),
-
           const SizedBox(height: 16),
         ],
       ),
@@ -1364,7 +1511,7 @@ class _ProfessionalDetailsSheet extends StatelessWidget {
   }
 }
 
-// ─────────────────────── Info Row ─────────────────────────────────────────────
+// ─── Info Row ─────────────────────────────────────────────────────────────────
 
 class _InfoRow extends StatelessWidget {
   const _InfoRow({
@@ -1404,7 +1551,8 @@ class _InfoRow extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
               Text(label,
-                  style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                  style:
+                      const TextStyle(fontSize: 11, color: kTextMuted)),
               const SizedBox(height: 2),
               Text(value,
                   style: const TextStyle(
@@ -1447,6 +1595,7 @@ class _WheelPicker extends StatefulWidget {
   final ValueChanged<int> onChanged;
 
   const _WheelPicker({
+    super.key,
     required this.value,
     required this.max,
     required this.onChanged,
@@ -1463,8 +1612,29 @@ class _WheelPickerState extends State<_WheelPicker> {
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.value;
-    _controller = FixedExtentScrollController(initialItem: widget.value);
+    _currentIndex = widget.value.clamp(0, widget.max - 1);
+    _controller =
+        FixedExtentScrollController(initialItem: _currentIndex);
+  }
+
+  @override
+  void didUpdateWidget(covariant _WheelPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      final target = widget.value.clamp(0, widget.max - 1);
+      // Smooth animate only if delta is small; otherwise jump instantly
+      final delta = (target - _currentIndex).abs();
+      if (delta <= 3) {
+        _controller.animateToItem(
+          target,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _controller.jumpToItem(target);
+      }
+      _currentIndex = target;
+    }
   }
 
   @override
@@ -1477,35 +1647,52 @@ class _WheelPickerState extends State<_WheelPicker> {
   Widget build(BuildContext context) {
     return SizedBox(
       width: 50,
-      height: 40,
-      child: ListWheelScrollView.useDelegate(
-        itemExtent: 30,
-        diameterRatio: 1.8,
-        perspective: 0.003,
-        physics: const FixedExtentScrollPhysics(),
-        controller: _controller,
-        onSelectedItemChanged: (index) {
-          HapticFeedback.lightImpact();
-          setState(() => _currentIndex = index);
-          widget.onChanged(index);
+      height: 52,
+      child: ShaderMask(
+        shaderCallback: (Rect bounds) {
+          return const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.white,
+              Colors.white,
+              Colors.transparent,
+            ],
+            stops: [0.0, 0.25, 0.75, 1.0],
+          ).createShader(bounds);
         },
-        childDelegate: ListWheelChildBuilderDelegate(
-          childCount: widget.max,
-          builder: (context, index) {
-            final isSelected = index == _currentIndex;
-            return Center(
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 150),
-                style: TextStyle(
-                  fontSize: isSelected ? 16 : 13,
-                  fontWeight:
-                      isSelected ? FontWeight.w700 : FontWeight.w400,
-                  color: isSelected ? kPrimaryBlue : kTextMuted,
-                ),
-                child: Text(index.toString().padLeft(2, '0')),
-              ),
-            );
+        blendMode: BlendMode.dstIn,
+        child: ListWheelScrollView.useDelegate(
+          itemExtent: 32,
+          diameterRatio: 2.0,
+          perspective: 0.002,
+          physics: const FixedExtentScrollPhysics(),
+          controller: _controller,
+          onSelectedItemChanged: (index) {
+            HapticFeedback.selectionClick();
+            setState(() => _currentIndex = index);
+            widget.onChanged(index);
           },
+          childDelegate: ListWheelChildBuilderDelegate(
+            childCount: widget.max,
+            builder: (context, index) {
+              final isSelected = index == _currentIndex;
+              return Center(
+                child: AnimatedDefaultTextStyle(
+                  duration: const Duration(milliseconds: 180),
+                  style: TextStyle(
+                    fontSize: isSelected ? 17 : 13,
+                    fontWeight: isSelected
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                    color: isSelected ? kPrimaryBlue : kTextMuted,
+                  ),
+                  child: Text(index.toString().padLeft(2, '0')),
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

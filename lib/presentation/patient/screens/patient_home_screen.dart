@@ -147,7 +147,7 @@ Color _doctorColor(String image) {
     case 'ortho':  return const Color(0xFF3B82F6);
     case 'derm':   return const Color(0xFFF59E0B);
     case 'neuro':  return const Color(0xFF8B5CF6);
-    default:       return AppTheme.primary;
+    default:       return const Color(0xFF00BFA5);
   }
 }
 
@@ -161,7 +161,7 @@ IconData _doctorIcon(String image) {
   }
 }
 
-Widget _doctorAvatar(String image, {double size = 56}) {
+Widget _doctorAvatar(String image, {double size = 48}) {
   final color = _doctorColor(image);
   final icon  = _doctorIcon(image);
   return Container(
@@ -173,12 +173,11 @@ Widget _doctorAvatar(String image, {double size = 56}) {
       ),
       borderRadius: BorderRadius.circular(size * 0.3),
     ),
-    child: Icon(icon, color: Colors.white, size: size * 0.5),
+    child: Icon(icon, color: Colors.white, size: size * 0.48),
   );
 }
 
 // ─── SHIMMER BOX ─────────────────────────────────────────────────────────────
-// Shown in the location pill while GPS is resolving on first launch.
 
 class _ShimmerBox extends StatefulWidget {
   final double width;
@@ -214,7 +213,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
           width: widget.width, height: widget.height,
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(_anim.value),
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(4),
           ),
         ),
       );
@@ -242,7 +241,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   late List<Animation<double>> _itemAnims;
 
   String _location = '';
-  bool   _locationLoaded = false; // drives shimmer vs real text
+  bool   _locationLoaded = false;
   bool   _didFetch       = false;
   bool   _isFetching     = false;
 
@@ -258,7 +257,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     ));
     _animCtrl.forward();
-    _ensureLocationPermission(); // ask permission on first run, then fetch
+    _ensureLocationPermission();
     Future.microtask(_ensurePatientIdAndFetch);
   }
 
@@ -286,23 +285,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void dispose() { _animCtrl.dispose(); super.dispose(); }
 
   Future<void> _ensureLocationPermission() async {
-    // Always request permission on first run so mobile shows the dialog.
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.deniedForever) {
       if (mounted) _showLocationSettingsSnack();
-      // Still show cached/manual if any.
       await _loadLocation();
       return;
     }
     await _loadLocation();
   }
 
-  // ── FIX 1: non-blocking location load with shimmer fallback ───────────────
   Future<void> _loadLocation() async {
-    // If user set a manual location, always prefer it.
     final isManual = await LocationStorage.isManual();
     if (isManual) {
       final saved = await LocationStorage.getLocation();
@@ -311,14 +306,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return;
       }
     }
-
-    // 1) Try cached value first — instant if previously saved
     final saved = await LocationStorage.getLocation();
     if (saved != null && saved.isNotEmpty && !_isGenericLocation(saved)) {
       if (mounted) setState(() { _location = saved; _locationLoaded = true; });
       return;
     }
-    // 2) No cache → fetch GPS in background; shimmer stays until done
     final current = await LocationService.getCurrentAddress();
     if (mounted) {
       setState(() { _location = current; _locationLoaded = true; });
@@ -376,7 +368,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   bool _isGenericLocation(String value) {
     final v = value.trim().toLowerCase();
-    // Generic messages or coordinates should be refreshed to get a better name.
     if (v.contains('location ') ||
         v.contains('permission') ||
         v.contains('unknown')) {
@@ -386,7 +377,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return coordRegex.hasMatch(v);
   }
 
-  // ── Appointment helpers ───────────────────────────────────────────────────
   bool _isToday(AppointmentList a) {
     final p = DateTime.tryParse(a.appointmentDate ?? '');
     if (p == null) return false;
@@ -410,7 +400,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             children: [
               _SectionTitle('Today\'s Appointments',
                   action: 'See All', onAction: () => widget.onTabChange(2)),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               const Center(child: CircularProgressIndicator()),
             ],
           )
@@ -420,7 +410,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               children: [
                 _SectionTitle('Today\'s Appointments',
                     action: 'See All', onAction: () => widget.onTabChange(2)),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 const Center(child: CircularProgressIndicator()),
               ],
             ),
@@ -431,28 +421,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Today ──
                   _SectionTitle('Today\'s Appointments',
                       action: 'See All', onAction: () => widget.onTabChange(2)),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   if (todayList.isEmpty)
                     _EmptyAppointmentNote('No appointments today')
                   else
                     ...todayList.map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 10),
                           child: _ApiAppointmentCard(appointment: a),
                         )),
-                  const SizedBox(height: 20),
-
-                  // ── Upcoming ──
+                  const SizedBox(height: 18),
                   _SectionTitle('Upcoming Appointments',
                       action: 'See All', onAction: () => widget.onTabChange(2)),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
                   if (upcomingList.isEmpty)
                     _EmptyAppointmentNote('No upcoming appointments')
                   else
                     ...upcomingList.take(3).map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 10),
                           child: _ApiAppointmentCard(appointment: a),
                         )),
                 ],
@@ -461,13 +448,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           );
   }
 
-  // ── Helper: wrap any child in the stagger animation ───────────────────────
   Widget _anim(int idx, Widget child) => AnimatedBuilder(
         animation: _itemAnims[idx],
         builder: (_, w) => Opacity(
           opacity: _itemAnims[idx].value,
           child: Transform.translate(
-              offset: Offset(0, 20 * (1 - _itemAnims[idx].value)), child: w),
+              offset: Offset(0, 16 * (1 - _itemAnims[idx].value)), child: w),
         ),
         child: child,
       );
@@ -485,27 +471,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
+                  // ── Q UP teal gradient (was blue)
                   colors: isDark
-                      ? [const Color(0xFF1E293B), const Color(0xFF0F172A)]
-                      : [const Color(0xFF1A73E8), const Color(0xFF0D5DBF)],
+                      ? [const Color(0xFF0D2B27), const Color(0xFF071A17)]
+                      : [const Color(0xFF00BFA5), const Color(0xFF008C7A)],
                   begin: Alignment.topLeft, end: Alignment.bottomRight,
                 ),
                 borderRadius: const BorderRadius.only(
-                  bottomLeft:  Radius.circular(32),
-                  bottomRight: Radius.circular(32),
+                  bottomLeft:  Radius.circular(28),
+                  bottomRight: Radius.circular(28),
                 ),
               ),
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 22),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _anim(0, Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          // Greeting
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -513,61 +499,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 Text('Good Morning 👋',
                                     style: TextStyle(
                                       color: Colors.white.withOpacity(0.75),
-                                      fontSize: 13, fontWeight: FontWeight.w500,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
                                     )),
-                                const SizedBox(height: 3),
+                                const SizedBox(height: 2),
                                 const Text('Arjun Mehta',
                                     style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: 20, fontWeight: FontWeight.w800,
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.w700,
                                     )),
-
-                                    
-                          // ── FIX 1: Location pill – shimmer while GPS loads ──
-                          GestureDetector(
-                            onTap: _openLocationPicker,
-                            child: Container(
-                              constraints: const BoxConstraints(maxWidth: 145),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.18),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                    color: Colors.white.withOpacity(0.3)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.location_on_rounded,
-                                      color: Colors.white, size: 13),
-                                  const SizedBox(width: 4),
-                                  // Show shimmer until loaded
-                                  if (!_locationLoaded)
-                                    _ShimmerBox(width: 72, height: 10)
-                                  else
-                                    Flexible(
-                                      child: Text(_location,
-                                          overflow: TextOverflow.ellipsis,
-                                          maxLines: 1,
-                                          style: TextStyle(
-                                            color: Colors.white.withOpacity(0.95),
-                                            fontSize: 11, fontWeight: FontWeight.w600,
-                                          )),
+                                const SizedBox(height: 4),
+                                // Location pill
+                                GestureDetector(
+                                  onTap: _openLocationPicker,
+                                  child: Container(
+                                    constraints: const BoxConstraints(maxWidth: 140),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.18),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color: Colors.white.withOpacity(0.3)),
                                     ),
-                                  const SizedBox(width: 2),
-                                  const Icon(Icons.keyboard_arrow_down,
-                                      color: Colors.white, size: 15),
-                                ],
-                              ),
-                            ),
-                          ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.location_on_rounded,
+                                            color: Colors.white, size: 11),
+                                        const SizedBox(width: 3),
+                                        if (!_locationLoaded)
+                                          _ShimmerBox(width: 64, height: 9)
+                                        else
+                                          Flexible(
+                                            child: Text(_location,
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
+                                                style: TextStyle(
+                                                  color: Colors.white.withOpacity(0.95),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w600,
+                                                )),
+                                          ),
+                                        const SizedBox(width: 2),
+                                        const Icon(Icons.keyboard_arrow_down,
+                                            color: Colors.white, size: 13),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-
-                          const SizedBox(width: 2),
-
+                          const SizedBox(width: 4),
                           _HeaderBtn(
                             icon: widget.themeMode == ThemeMode.dark
                                 ? Icons.light_mode_rounded
@@ -585,28 +570,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ],
                       )),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
-                      // Search bar (navigates to search tab)
+                      // Search bar
                       _anim(1, GestureDetector(
                         onTap: () => widget.onTabChange(1),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
+                              horizontal: 14, vertical: 11),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(14),
                             border: Border.all(
                                 color: Colors.white.withOpacity(0.3), width: 1),
                           ),
                           child: Row(children: [
                             Icon(Icons.search_rounded,
-                                color: Colors.white.withOpacity(0.8), size: 22),
-                            const SizedBox(width: 10),
+                                color: Colors.white.withOpacity(0.8), size: 18),
+                            const SizedBox(width: 8),
                             Text('Search doctors or specialties…',
                                 style: TextStyle(
                                     color: Colors.white.withOpacity(0.7),
-                                    fontSize: 14)),
+                                    fontSize: 13)),
                           ]),
                         ),
                       )),
@@ -619,7 +604,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
           // ── BODY ──────────────────────────────────────────────────────────
           SliverPadding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(16),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
 
@@ -628,54 +613,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _SectionTitle('Quick Actions'),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Row(children: [
-                      _QuickAction(icon: Icons.calendar_month_rounded,     label: 'Book\nAppt.',   color: const Color(0xFF1A73E8), onTap: () => widget.onTabChange(1)),
-                      const SizedBox(width: 10),
-                      _QuickAction(icon: Icons.history_rounded,            label: 'My\nAppts.',    color: const Color(0xFF00BFA5), onTap: () => widget.onTabChange(2)),
-                      const SizedBox(width: 10),
+                      // ── Q UP teal for the first two quick actions (was blue / teal)
+                      _QuickAction(icon: Icons.calendar_month_rounded, label: 'Book\nAppt.',  color: const Color(0xFF00BFA5), onTap: () => widget.onTabChange(1)),
+                      const SizedBox(width: 8),
+                      _QuickAction(icon: Icons.history_rounded,         label: 'My\nAppts.', color: const Color(0xFF00BFA5), onTap: () => widget.onTabChange(2)),
+                      const SizedBox(width: 8),
                       _QuickAction(
                         icon: Icons.group_add_rounded,
                         label: 'Add\nFamily',
                         color: const Color(0xFF7C3AED),
                         onTap: () => Navigator.push(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => const FamilyMembersScreen(),
-                          ),
+                          MaterialPageRoute(builder: (_) => const FamilyMembersScreen()),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      _QuickAction(icon: Icons.medical_information_rounded, 
-                      label: 'My\nRecords', 
-                       color: const Color(0xFFF59E0B), 
-                       onTap: () => Navigator.push(
+                      const SizedBox(width: 8),
+                      _QuickAction(
+                        icon: Icons.medical_information_rounded,
+                        label: 'My\nRecords',
+                        color: const Color(0xFFF59E0B),
+                        onTap: () => Navigator.push(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => const PatientPrescriptionListScreen(),
-                          ),
-                        ),),
+                          MaterialPageRoute(builder: (_) => const PatientPrescriptionListScreen()),
+                        ),
+                      ),
                     ]),
                   ],
                 )),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // Today & Upcoming Appointments
                 _anim(3, _buildAppointmentsSection()),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // Specialties
                 _anim(4, Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _SectionTitle('Most Searched Specialties'),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     SizedBox(
-                      height: 108,
+                      height: 100,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: specialties.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
                         itemBuilder: (_, i) {
                           final s = specialties[i];
                           return _SpecialtyChip(
@@ -687,7 +671,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ],
                 )),
-                const SizedBox(height: 28),
+                const SizedBox(height: 24),
 
                 // Top Doctors
                 _anim(5, Column(
@@ -695,14 +679,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   children: [
                     _SectionTitle('Top Rated Doctors',
                         action: 'View All', onAction: () => widget.onTabChange(1)),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     ...sampleDoctors.take(2).map((d) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.only(bottom: 10),
                           child: _DoctorCard(doctor: d, onTap: () {}),
                         )),
                   ],
                 )),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
               ]),
             ),
           ),
@@ -711,6 +695,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 }
+
+// ─── LOCATION PICKER SHEET ───────────────────────────────────────────────────
 
 class _LocationPickerSheet extends StatefulWidget {
   final bool isDark;
@@ -748,7 +734,6 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     super.dispose();
   }
 
-  // ── FIX 2: live filtering as user types ───────────────────────────────────
   void _onType() {
     final q = _searchCtrl.text.trim().toLowerCase();
     setState(() {
@@ -758,13 +743,11 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     });
   }
 
-  // ── FIX 2: tap a row → set location and close sheet ───────────────────────
   void _pick(String loc) {
     widget.onLocationSelected(loc);
     Navigator.pop(context);
   }
 
-  // ── GPS button ────────────────────────────────────────────────────────────
   Future<void> _useGPS() async {
     setState(() => _isLoadingGPS = true);
     try {
@@ -809,184 +792,184 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     );
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final isDark      = widget.isDark;
-    final bg          = isDark ? const Color(0xFF0F172A) : Colors.white;
-    final textColor   = isDark ? Colors.white : const Color(0xFF0F172A);
-    final sub         = isDark ? Colors.white38 : Colors.grey.shade400;
-    final tileBg      = isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC);
-    final divColor    = isDark ? Colors.white10 : const Color(0xFFF1F5F9);
+    final isDark    = widget.isDark;
+    // ── Q UP teal-tinted surfaces (was slate/navy)
+    final bg        = isDark ? const Color(0xFF0A1F1C) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A2B4A);
+    final sub       = isDark ? Colors.white38 : Colors.grey.shade400;
+    final tileBg    = isDark ? const Color(0xFF142E29) : const Color(0xFFF0FAF8);
+    final divColor  = isDark ? Colors.white10 : const Color(0xFFE0F5F2);
 
     return Padding(
-      // ── FIX 3: slide up when keyboard appears ────────────────────────────
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
-        // ── FIX 3: cap height so sheet never overflows on small screens ────
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.85,
         ),
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.18),
-              blurRadius: 28, offset: const Offset(0, -4),
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 24, offset: const Offset(0, -4),
             ),
           ],
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,   // shrinks when list is short
+          mainAxisSize: MainAxisSize.min,
           children: [
 
-            // Drag handle
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Container(
-              width: 36, height: 4,
+              width: 32, height: 4,
               decoration: BoxDecoration(
                 color: isDark ? Colors.white24 : Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
             // Title row
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
                   Container(
-                    width: 40, height: 40,
+                    width: 36, height: 36,
                     decoration: BoxDecoration(
+                      // ── Q UP teal gradient (was blue)
                       gradient: const LinearGradient(
-                          colors: [Color(0xFF1A73E8), Color(0xFF0D5DBF)]),
-                      borderRadius: BorderRadius.circular(12),
+                          colors: [Color(0xFF00BFA5), Color(0xFF008C7A)]),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.location_on_rounded,
-                        color: Colors.white, size: 20),
+                        color: Colors.white, size: 18),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Choose Location',
                             style: TextStyle(
-                                fontSize: 17, fontWeight: FontWeight.w800,
+                                fontSize: 15, fontWeight: FontWeight.w700,
                                 color: textColor)),
                         if (widget.currentLocation.isNotEmpty)
                           Text('Current: ${widget.currentLocation}',
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 11, color: sub)),
+                              style: TextStyle(
+                                  fontSize: 11, color: sub)),
                       ],
                     ),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
                     child: Container(
-                      width: 32, height: 32,
+                      width: 28, height: 28,
                       decoration: BoxDecoration(
-                        color: isDark ? Colors.white12 : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(10),
+                        color: isDark ? Colors.white12 : const Color(0xFFF0FAF8),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Icon(Icons.close_rounded, size: 18, color: sub),
+                      child: Icon(Icons.close_rounded, size: 16, color: sub),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
-            // ── FIX 2: Search field ───────────────────────────────────────
+            // Search field
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Container(
                 decoration: BoxDecoration(
                   color: tileBg,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
+                      color: isDark ? Colors.white12 : const Color(0xFFD0EDE9)),
                 ),
                 child: TextField(
                   controller: _searchCtrl,
                   focusNode: _focusNode,
                   textInputAction: TextInputAction.done,
                   style: TextStyle(
-                      color: textColor, fontSize: 14, fontWeight: FontWeight.w600),
+                      color: textColor,
+                      fontSize: 13, fontWeight: FontWeight.w600),
                   decoration: InputDecoration(
                     hintText: 'Search city…',
                     hintStyle: TextStyle(
-                        color: sub, fontSize: 14, fontWeight: FontWeight.w400),
-                    prefixIcon: Icon(Icons.search_rounded, color: sub, size: 20),
-                    // Clear button when text is present
+                        color: sub,
+                        fontSize: 13, fontWeight: FontWeight.w400),
+                    prefixIcon: Icon(Icons.search_rounded, color: sub, size: 18),
                     suffixIcon: _searchCtrl.text.isNotEmpty
                         ? GestureDetector(
                             onTap: () {
                               _searchCtrl.clear();
                               _focusNode.requestFocus();
                             },
-                            child: Icon(Icons.clear_rounded, color: sub, size: 18),
+                            child: Icon(Icons.clear_rounded, color: sub, size: 16),
                           )
                         : null,
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 13),
+                        horizontal: 14, vertical: 11),
                   ),
-                  // Pressing "Done" on keyboard picks the top suggestion
                   onSubmitted: (val) {
                     final v = val.trim();
                     if (v.isEmpty) return;
                     if (_suggestions.isNotEmpty) {
                       _pick(_suggestions.first);
                     } else {
-                      _pick(v); // allow custom city entry
+                      _pick(v);
                     }
                   },
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // GPS button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
                 onTap: _isLoadingGPS ? null : _useGPS,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 11),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
+                      // ── Q UP teal gradient (was blue/teal)
                       colors: isDark
-                          ? [const Color(0xFF1A73E8).withOpacity(0.18),
-                             const Color(0xFF00BFA5).withOpacity(0.18)]
-                          : [const Color(0xFF1A73E8).withOpacity(0.08),
-                             const Color(0xFF00BFA5).withOpacity(0.08)],
+                          ? [const Color(0xFF00BFA5).withOpacity(0.18),
+                             const Color(0xFF008C7A).withOpacity(0.18)]
+                          : [const Color(0xFF00BFA5).withOpacity(0.08),
+                             const Color(0xFF008C7A).withOpacity(0.08)],
                     ),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: const Color(0xFF1A73E8).withOpacity(0.3),
+                        color: const Color(0xFF00BFA5).withOpacity(0.3),
                         width: 1.5),
                   ),
                   child: Row(children: [
                     Container(
-                      width: 36, height: 36,
+                      width: 32, height: 32,
                       decoration: BoxDecoration(
+                        // ── Q UP teal gradient (was blue/teal)
                         gradient: const LinearGradient(
-                            colors: [Color(0xFF1A73E8), Color(0xFF00BFA5)]),
-                        borderRadius: BorderRadius.circular(10),
+                            colors: [Color(0xFF00BFA5), Color(0xFF008C7A)]),
+                        borderRadius: BorderRadius.circular(9),
                       ),
                       child: _isLoadingGPS
                           ? const Padding(
-                              padding: EdgeInsets.all(8),
+                              padding: EdgeInsets.all(7),
                               child: CircularProgressIndicator(
                                   strokeWidth: 2, color: Colors.white))
                           : const Icon(Icons.my_location_rounded,
-                              color: Colors.white, size: 18),
+                              color: Colors.white, size: 16),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -994,26 +977,27 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                           Text(
                             _isLoadingGPS ? 'Detecting…' : 'Use Current Location',
                             style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700,
+                                fontSize: 12, fontWeight: FontWeight.w700,
                                 color: textColor),
                           ),
                           Text('Auto-detect via GPS',
-                              style: TextStyle(fontSize: 11, color: sub)),
+                              style: TextStyle(
+                                  fontSize: 10, color: sub)),
                         ],
                       ),
                     ),
                     if (!_isLoadingGPS)
                       const Icon(Icons.chevron_right_rounded,
-                          color: Color(0xFF1A73E8), size: 20),
+                          color: Color(0xFF00BFA5), size: 18), // Q UP teal
                   ]),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // Clear saved location
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: GestureDetector(
                 onTap: () async {
                   await LocationStorage.clearLocation();
@@ -1024,20 +1008,20 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                   );
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white10 : const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(14),
+                    color: isDark ? Colors.white10 : const Color(0xFFF0FAF8),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: divColor),
                   ),
                   child: Row(children: [
-                    Icon(Icons.delete_outline_rounded, size: 18, color: sub),
-                    const SizedBox(width: 10),
+                    Icon(Icons.delete_outline_rounded, size: 16, color: sub),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Clear Saved Location',
                         style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             fontWeight: FontWeight.w700,
                             color: textColor),
                       ),
@@ -1046,20 +1030,20 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
             // Divider label
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(children: [
                 Expanded(child: Divider(color: divColor, thickness: 1)),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Text(
                     _searchCtrl.text.isEmpty ? 'POPULAR CITIES' : 'RESULTS',
                     style: TextStyle(
                         fontSize: 9, fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2, color: sub),
+                        letterSpacing: 1.1, color: sub),
                   ),
                 ),
                 Expanded(child: Divider(color: divColor, thickness: 1)),
@@ -1067,21 +1051,22 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
             ),
             const SizedBox(height: 4),
 
-            // ── FIX 2 + 3: Flexible list — scrollable, never overflows ────
+            // City list
             Flexible(
               child: _suggestions.isEmpty
                   ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.search_off_rounded, size: 34, color: sub),
-                        const SizedBox(height: 8),
+                        Icon(Icons.search_off_rounded, size: 30, color: sub),
+                        const SizedBox(height: 6),
                         Text('No cities found',
-                            style: TextStyle(color: sub, fontSize: 13)),
+                            style: TextStyle(
+                                color: sub, fontSize: 12)),
                       ]),
                     )
                   : ListView.separated(
                       shrinkWrap: true,
-                      padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
+                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
                       itemCount: _suggestions.length,
                       separatorBuilder: (_, __) =>
                           Divider(color: divColor, height: 1),
@@ -1089,60 +1074,58 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                         final loc      = _suggestions[i];
                         final isActive = loc == widget.currentLocation;
                         return GestureDetector(
-                          // ── FIX 2: tap → set & close ─────────────────────
                           onTap: () => _pick(loc),
                           child: Container(
                             color: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 11),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
                             child: Row(children: [
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                width: 34, height: 34,
+                                width: 30, height: 30,
                                 decoration: BoxDecoration(
                                   color: isActive
-                                      ? const Color(0xFF1A73E8)
+                                      ? const Color(0xFF00BFA5) // Q UP teal
                                       : tileBg,
-                                  borderRadius: BorderRadius.circular(9),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Icon(
                                   isActive
                                       ? Icons.location_on_rounded
                                       : Icons.location_city_rounded,
                                   color: isActive ? Colors.white : sub,
-                                  size: 17,
+                                  size: 15,
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(loc,
                                     style: TextStyle(
-                                      fontSize: 14,
+                                      fontSize: 13,
                                       fontWeight: isActive
                                           ? FontWeight.w700
                                           : FontWeight.w500,
                                       color: isActive
-                                          ? const Color(0xFF1A73E8)
+                                          ? const Color(0xFF00BFA5) // Q UP teal
                                           : textColor,
                                     )),
                               ),
                               if (isActive)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 7, vertical: 3),
+                                      horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFF1A73E8)
-                                        .withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(6),
+                                    color: const Color(0xFF00BFA5).withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(5),
                                   ),
                                   child: const Text('Active',
                                       style: TextStyle(
-                                          fontSize: 10,
+                                          fontSize: 9,
                                           fontWeight: FontWeight.w700,
-                                          color: Color(0xFF1A73E8))),
+                                          color: Color(0xFF00BFA5))), // Q UP teal
                                 )
                               else
                                 Icon(Icons.chevron_right_rounded,
-                                    color: divColor, size: 18),
+                                    color: divColor, size: 16),
                             ]),
                           ),
                         );
@@ -1150,8 +1133,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
                     ),
             ),
 
-            // Safe-area bottom padding
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 14),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 12),
           ],
         ),
       ),
@@ -1172,18 +1154,18 @@ class _HeaderBtn extends StatelessWidget {
         onTap: onTap,
         child: Stack(children: [
           Container(
-            width: 40, height: 40,
+            width: 36, height: 36,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: Colors.white, size: 20),
+            child: Icon(icon, color: Colors.white, size: 18),
           ),
           if (badge)
             Positioned(
-              right: 8, top: 8,
+              right: 7, top: 7,
               child: Container(
-                width: 8, height: 8,
+                width: 7, height: 7,
                 decoration: const BoxDecoration(
                     color: Color(0xFFF59E0B), shape: BoxShape.circle),
               ),
@@ -1208,7 +1190,7 @@ class _SectionTitle extends StatelessWidget {
       children: [
         Text(title,
             style: TextStyle(
-              fontSize: 17, fontWeight: FontWeight.w800,
+              fontSize: 15, fontWeight: FontWeight.w700,
               color: isDark ? Colors.white : AppTheme.textPrimary,
             )),
         if (action != null)
@@ -1216,8 +1198,8 @@ class _SectionTitle extends StatelessWidget {
             onTap: onAction,
             child: Text(action!,
                 style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700,
-                    color: AppTheme.primary)),
+                    fontSize: 12, fontWeight: FontWeight.w600,
+                    color: Color(0xFF00BFA5))), // Q UP teal
           ),
       ],
     );
@@ -1242,23 +1224,23 @@ class _QuickAction extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Column(children: [
             Container(
-              width: 40, height: 40,
+              width: 36, height: 36,
               decoration: BoxDecoration(
-                  color: color, borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: Colors.white, size: 20),
+                  color: color, borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, color: Colors.white, size: 18),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 6),
             Text(label,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w700, height: 1.3,
+                  fontSize: 9, fontWeight: FontWeight.w700, height: 1.3,
                   color: isDark ? Colors.white70 : AppTheme.textPrimary,
                 )),
           ]),
@@ -1278,21 +1260,22 @@ class _EmptyAppointmentNote extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(16),
+        // ── Q UP teal-tinted empty state (was slate)
+        color: isDark ? const Color(0xFF142E29) : const Color(0xFFF0FAF8),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.calendar_today_rounded,
-              size: 16,
+              size: 14,
               color: isDark ? Colors.white38 : Colors.grey.shade400),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(message,
               style: TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   color: isDark ? Colors.white38 : Colors.grey.shade500)),
         ],
       ),
@@ -1315,7 +1298,6 @@ class _ApiAppointmentCard extends StatelessWidget {
 
   String _formatTime(String? raw) {
     if (raw == null || raw.isEmpty) return '—';
-    // startTime may be "HH:mm:ss" or "HH:mm"
     final parts = raw.split(':');
     if (parts.length < 2) return raw;
     final h = int.tryParse(parts[0]) ?? 0;
@@ -1327,10 +1309,10 @@ class _ApiAppointmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final doctorName   = appointment.doctorName ?? 'Doctor';
-    final specialty    = appointment.specialization ?? '';
-    final dateStr      = _formatDate(appointment.appointmentDate);
-    final timeStr      = _formatTime(appointment.startTime);
+    final doctorName = appointment.doctorName ?? 'Doctor';
+    final specialty  = appointment.specialization ?? '';
+    final dateStr    = _formatDate(appointment.appointmentDate);
+    final timeStr    = _formatTime(appointment.startTime);
     final isToday = () {
       final p = DateTime.tryParse(appointment.appointmentDate ?? '');
       if (p == null) return false;
@@ -1339,75 +1321,75 @@ class _ApiAppointmentCard extends StatelessWidget {
     }();
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: [
-          const Color(0xFF1A73E8).withOpacity(isDark ? 0.25 : 0.08),
-          const Color(0xFF00BFA5).withOpacity(isDark ? 0.25 : 0.08),
+          // ── Q UP teal gradient (was blue)
+          const Color(0xFF00BFA5).withOpacity(isDark ? 0.22 : 0.07),
+          const Color(0xFF008C7A).withOpacity(isDark ? 0.22 : 0.07),
         ]),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-            color: const Color(0xFF1A73E8).withOpacity(0.2), width: 1.5),
+            color: const Color(0xFF00BFA5).withOpacity(0.2), width: 1.2),
       ),
       child: Row(children: [
-        _doctorAvatar('cardio', size: 50),
-        const SizedBox(width: 12),
+        _doctorAvatar('cardio', size: 44),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(doctorName,
                   style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w800,
+                    fontSize: 13, fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white : AppTheme.textPrimary,
                   )),
               const SizedBox(height: 2),
               Text(specialty,
                   style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 11,
                       color: isDark ? Colors.white54 : AppTheme.textSecondary)),
-              const SizedBox(height: 7),
+              const SizedBox(height: 6),
               Row(children: [
                 const Icon(Icons.calendar_today_rounded,
-                    size: 12, color: AppTheme.primary),
-                const SizedBox(width: 4),
+                    size: 11, color: Color(0xFF00BFA5)), // Q UP teal
+                const SizedBox(width: 3),
                 Flexible(
                   child: Text(dateStr,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w600,
-                          color: AppTheme.primary)),
+                          fontSize: 10, fontWeight: FontWeight.w600,
+                          color: Color(0xFF00BFA5))), // Q UP teal
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 const Icon(Icons.access_time_rounded,
-                    size: 12, color: AppTheme.secondary),
-                const SizedBox(width: 4),
+                    size: 11, color: Color(0xFF008C7A)), // Q UP teal dark
+                const SizedBox(width: 3),
                 Text(timeStr,
                     style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w600,
-                        color: AppTheme.secondary)),
+                        fontSize: 10, fontWeight: FontWeight.w600,
+                        color: Color(0xFF008C7A))), // Q UP teal dark
               ]),
             ],
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         if (isToday)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(10)),
+                color: const Color(0xFF00BFA5), // Q UP teal
+                borderRadius: BorderRadius.circular(8)),
             child: const Text('Today',
                 style: TextStyle(
                     color: Colors.white,
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700)),
           ),
       ]),
     );
   }
 }
-
 
 // ─── SPECIALTY CHIP ──────────────────────────────────────────────────────────
 
@@ -1426,27 +1408,27 @@ class _SpecialtyChip extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 86,
+        width: 80,
         decoration: BoxDecoration(
           color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 46, height: 46,
+              width: 40, height: 40,
               decoration: BoxDecoration(
                   color: color.withOpacity(0.2), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 22),
+              child: Icon(icon, color: color, size: 20),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 5),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(label,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 9, fontWeight: FontWeight.w700,
+                    fontSize: 8, fontWeight: FontWeight.w700,
                     color: isDark ? Colors.white70 : AppTheme.textPrimary,
                   )),
             ),
@@ -1470,22 +1452,23 @@ class _DoctorCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1E293B) : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          // ── Q UP teal-tinted dark card (was slate)
+          color: isDark ? const Color(0xFF142E29) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.2 : 0.06),
-              blurRadius: 12, offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(isDark ? 0.18 : 0.05),
+              blurRadius: 10, offset: const Offset(0, 3),
             ),
           ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _doctorAvatar(doctor.image, size: 62),
-            const SizedBox(width: 12),
+            _doctorAvatar(doctor.image, size: 54),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1494,27 +1477,28 @@ class _DoctorCard extends StatelessWidget {
                     Expanded(
                       child: Text(doctor.name,
                           style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800,
+                            fontSize: 13, fontWeight: FontWeight.w700,
                             color: isDark ? Colors.white : AppTheme.textPrimary,
                           )),
                     ),
                     Row(mainAxisSize: MainAxisSize.min, children: [
                       const Icon(Icons.star_rounded,
-                          color: Color(0xFFF59E0B), size: 15),
+                          color: Color(0xFFF59E0B), size: 13),
                       const SizedBox(width: 2),
                       Text(doctor.rating.toString(),
                           style: const TextStyle(
-                              fontSize: 12, fontWeight: FontWeight.w700,
+                              fontSize: 11, fontWeight: FontWeight.w700,
                               color: Color(0xFFF59E0B))),
                     ]),
                   ]),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(doctor.specialty,
                       style: const TextStyle(
-                          fontSize: 12, color: AppTheme.primary,
+                          fontSize: 11,
+                          color: Color(0xFF00BFA5), // Q UP teal
                           fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  Wrap(spacing: 5, runSpacing: 4, children: [
+                  const SizedBox(height: 5),
+                  Wrap(spacing: 4, runSpacing: 3, children: [
                     _InfoTag(icon: Icons.work_history_rounded,
                         label: '${doctor.experience}yr',
                         color: const Color(0xFF10B981)),
@@ -1525,29 +1509,33 @@ class _DoctorCard extends StatelessWidget {
                         label: '~${doctor.waitMinutes}min',
                         color: const Color(0xFF6366F1)),
                   ]),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Row(children: [
                     Expanded(
                       child: OutlinedButton(
                         onPressed: onTap,
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 7),
-                          side: const BorderSide(color: AppTheme.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          side: const BorderSide(color: Color(0xFF00BFA5)), // Q UP teal
+                          foregroundColor: const Color(0xFF00BFA5),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(9)),
                         ),
                         child: const Text('View Profile',
                             style: TextStyle(fontSize: 11)),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {},
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 7),
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          backgroundColor: const Color(0xFF00BFA5), // Q UP teal
+                          foregroundColor: Colors.white,
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(9)),
                         ),
                         child: const Text('Book Now',
                             style: TextStyle(fontSize: 11)),
@@ -1576,14 +1564,14 @@ class _InfoTag extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
       decoration: BoxDecoration(
         color: color.withOpacity(isDark ? 0.2 : 0.1),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(5),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 11, color: color),
-        const SizedBox(width: 3),
+        Icon(icon, size: 10, color: color),
+        const SizedBox(width: 2),
         Text(label,
             style: TextStyle(
                 fontSize: 10, fontWeight: FontWeight.w700, color: color)),
