@@ -32,6 +32,11 @@ AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
       longitude: (json['longitude'] as num?)?.toDouble(),
       clinicContact: json['clinic_contact'] as String?,
       queueStatus: (json['queue_status'] as num?)?.toInt(),
+      myQueueNumber: (json['my_queue_number'] as num?)?.toInt(),
+      patientsAhead: (json['patients_ahead'] as num?)?.toInt(),
+      estimatedArrivalTime: json['estimated_arrival_time'] as String?,
+      queueStarted: json['queue_started'] as bool?,
+      isMyTurn: json['is_my_turn'] as bool?,
     )..patientName = json['patient_name'] as String?;
 
 Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
@@ -61,4 +66,9 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'user_type': instance.userType,
       'patient_name': instance.patientName,
       'queue_status': instance.queueStatus,
+      'my_queue_number': instance.myQueueNumber,
+      'patients_ahead': instance.patientsAhead,
+      'estimated_arrival_time': instance.estimatedArrivalTime,
+      'queue_started': instance.queueStarted,
+      'is_my_turn': instance.isMyTurn,
     };
