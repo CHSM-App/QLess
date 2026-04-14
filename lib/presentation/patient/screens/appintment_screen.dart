@@ -779,50 +779,29 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
 Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
-  
-  // Live queue sathi estimate fetch karo (background, silent)
-  WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
     for (final a in filtered) {
-      if (_isLiveQueueToday(a) &&
-          a.appointmentId != null &&
-          a.doctorId != null) {
+      if (!_isLiveQueueToday(a)) continue;
+      if (a.appointmentId == null || a.doctorId == null) continue;
+
+      final hasEstimate = ref
+          .read(appointmentViewModelProvider)
+          .queueEstimates[a.appointmentId!] != null;
+
+      if (!hasEstimate) {
         ref
-          .read(appointmentViewModelProvider.notifier).queueEstimate(
-            AppointmentRequestModel(
-
-              appointmentId: a.appointmentId!,
-              doctorId: a.doctorId!,
-            ),
-          );
+            .read(appointmentViewModelProvider.notifier)
+            .queueEstimate(
+              AppointmentRequestModel(
+                appointmentId: a.appointmentId!,
+                doctorId: a.doctorId!,
+              ),
+            );
       }
     }
   });
-// Inside _buildList method, before if (filtered.isEmpty)
-if (filtered.isNotEmpty) {
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    for (final a in filtered) {
-      if (_isLiveQueueToday(a) &&
-          a.appointmentId != null &&
-          a.doctorId != null) {
-        
-        // Optional: Only fetch if we don't have fresh data
-        final hasEstimate = ref.read(appointmentViewModelProvider)
-            .queueEstimates[a.appointmentId!] != null;
-
-        if (!hasEstimate) {
-          ref
-              .read(appointmentViewModelProvider.notifier)
-              .queueEstimate(
-                AppointmentRequestModel(
-                  appointmentId: a.appointmentId!,
-                  doctorId: a.doctorId!,
-                ),
-              );
-        }
-      }
-    }
-  });
-}
+  
   return RefreshIndicator(
     color: kPrimary,
     onRefresh: () async {
