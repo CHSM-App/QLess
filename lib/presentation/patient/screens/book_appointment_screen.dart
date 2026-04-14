@@ -467,7 +467,7 @@ class _BookAppointmentScreenState
     String? queueOpenTimeStr;
     bool isQueueOpen = true;
     if (isQueue && dayIsToday && selAvail != null) {
-      final leadMin = widget.doctor.qStartSection ?? widget.doctor.qStartBefore ?? 0;
+      final leadMin = widget.doctor.qStartSection ?? widget.doctor.leadTime ?? 0;
       if (leadMin > 0) {
         final sessionStart    = _parseTime(selAvail!.startTime);
         final sessionStartMin = sessionStart.hour * 60 + sessionStart.minute;

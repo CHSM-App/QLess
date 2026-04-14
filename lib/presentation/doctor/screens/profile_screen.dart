@@ -102,7 +102,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final minutes = (_leadHours * 60) + _leadMinutes;
     final body = DoctorDetails(
       // leadTime: minutes,
-      qStartBefore: minutes,
+      leadTime: minutes,
       doctorId: ref.read(doctorLoginViewModelProvider).doctorId ?? 0,
     );
     await ref.read(doctorLoginViewModelProvider.notifier).updateLeadTime(body);
@@ -221,7 +221,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final isLargeTablet = screenWidth >= 900;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: kSurface,
       body: isLargeTablet
           ? _buildLargeTabletLayout(doctorState, doctorDetails)
           : _buildMobileLayout(isTablet, doctorState, doctorDetails),
@@ -265,7 +265,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   }) {
     final hPad = isTablet ? 24.0 : 16.0;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 100),
+      padding: EdgeInsets.fromLTRB(hPad, 20, hPad, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -287,7 +287,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           _buildSupportCard(),
           const SizedBox(height: 20),
           _buildLogoutButton(),
-          const SizedBox(height: 110),
+          const SizedBox(height: 0),
         ],
       ),
     );

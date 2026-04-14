@@ -272,7 +272,7 @@ class _DoctorMedicinesTabState extends ConsumerState<DoctorMedicinePage> {
                   color: kPrimaryBlue,
                   onRefresh: () async => _refreshMedicines(force: true),
                   child: ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                     itemCount: filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (_, i) => _MedicineCard(

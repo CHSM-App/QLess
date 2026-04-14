@@ -18,26 +18,45 @@ class DoctorBottomNav extends ConsumerStatefulWidget {
 class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
+  bool _isDragging = false;
+  double? _dragX;
+  int? _dragHoverIndex;
 
   late final List<AnimationController> _iconControllers;
   late final List<Animation<double>> _iconScales;
 
   // ── Light theme palette ──────────────────────────────────────
-  static const _primary     = Color(0xFF1E293B);
-  static const _slate       = Color(0xFF64748B);
-  static const _accent      = Color(0xFF6366F1); // indigo active
+  static const _primary = Color(0xFF1E293B);
+  static const _slate = Color(0xFF64748B);
+  static const _accent = Color(0xFF6366F1); // indigo active
   static const _inactiveClr = Color(0xFF1E293B);
-  static const _pillBg      = Color(0xC0FFFFFF); // 75% white
-  static const _pillBorder  = Color(0xF0FFFFFF); // near-opaque white
-  static const _activePill  = Color(0x1A6366F1); // 10% indigo tint
+  static const _pillBg = Color(0x00FFFFFF); // fully transparent
+  static const _pillBorder = Color(0x00FFFFFF); // fully transparent border
+  static const _activePill = Color(0x1A6366F1); // 10% indigo tint
 
   static const _wideBreakpoint = 600.0;
 
   static const _navItems = [
-    _NavItem(icon: Icons.home_rounded,       label: 'Home'),
-    _NavItem(icon: Icons.people_alt_rounded,  label: 'Patients'),
-    _NavItem(icon: Icons.medication_rounded,  label: 'Medicines'),
-    _NavItem(icon: Icons.person_rounded,      label: 'Profile'),
+    _NavItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Home',
+    ),
+    _NavItem(
+      icon: Icons.people_alt_outlined,
+      activeIcon: Icons.people_alt_rounded,
+      label: 'Patients',
+    ),
+    _NavItem(
+      icon: Icons.medication_outlined,
+      activeIcon: Icons.medication_rounded,
+      label: 'Medicines',
+    ),
+    _NavItem(
+      icon: Icons.person_outline,
+      activeIcon: Icons.person_rounded,
+      label: 'Profile',
+    ),
   ];
 
   @override
@@ -51,9 +70,12 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
       ),
     );
     _iconScales = _iconControllers
-        .map((c) => Tween<double>(begin: 1.0, end: 1.18).animate(
-              CurvedAnimation(parent: c, curve: Curves.elasticOut),
-            ))
+        .map(
+          (c) => Tween<double>(
+            begin: 1.0,
+            end: 1.18,
+          ).animate(CurvedAnimation(parent: c, curve: Curves.elasticOut)),
+        )
         .toList();
     _iconControllers[0].forward();
   }
@@ -93,10 +115,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
           children: [
             _buildSideRail(),
             Expanded(
-              child: IndexedStack(
-                index: _currentIndex,
-                children: pages,
-              ),
+              child: IndexedStack(index: _currentIndex, children: pages),
             ),
           ],
         ),
@@ -105,14 +124,17 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
       // ── Mobile: floating pill nav ─────────────────────────────
       return Scaffold(
         backgroundColor: Colors.transparent,
-        extendBody: true,           // page draws behind the pill
+        extendBody: true, // page draws behind the pill
         extendBodyBehindAppBar: false,
         appBar: _currentIndex == 3 ? null : _buildAppBar(),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: pages,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: IndexedStack(index: _currentIndex, children: pages),
+            ),
+            Positioned(left: 0, right: 0, bottom: 0, child: _buildBottomNav()),
+          ],
         ),
-        bottomNavigationBar: _buildBottomNav(),
       );
     }
   }
@@ -199,10 +221,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
       ),
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(
-          height: 1,
-          color: Colors.white.withOpacity(0.6),
-        ),
+        child: Container(height: 1, color: Colors.white.withOpacity(0.6)),
       ),
     );
   }
@@ -256,7 +275,9 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                               child: Icon(
                                 _navItems[i].icon,
                                 size: 22,
-                                color: selected ? _accent : const Color.fromARGB(255, 116, 133, 156),
+                                color: selected
+                                    ? _accent
+                                    : const Color.fromARGB(255, 116, 133, 156),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -294,84 +315,181 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(30),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: Container(
-              height: 64,
-              decoration: BoxDecoration(
-                color: _pillBg,
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: _pillBorder, width: 1.2),
-          boxShadow: [
-  BoxShadow(
-    color: const Color(0xFF6366F1).withOpacity(0.18),
-    blurRadius: 18,
-    spreadRadius: 4,
-    offset: const Offset(0, 0),
-  ),
-  BoxShadow(
-    color: const Color(0xFF6366F1).withOpacity(0.10),
-    blurRadius: 24,
-    offset: const Offset(0, 8),
-  ),
-  BoxShadow(
-    color: Colors.black.withOpacity(0.06),
-    blurRadius: 12,
-    offset: const Offset(0, 2),
-  ),
-],
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
               ),
-              child: Row(
-                children: List.generate(_navItems.length, (i) {
-                  final selected = _currentIndex == i;
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => _onTabTap(i),
-                      behavior: HitTestBehavior.opaque,
-                      child: AnimatedBuilder(
-                        animation: _iconScales[i],
-                        builder: (context, _) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeInOut,
-                          margin: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: selected ? _activePill : Colors.transparent,
-                            borderRadius: BorderRadius.circular(22),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Transform.scale(
-                                scale: _iconScales[i].value,
-                                child: Icon(
-                                  _navItems[i].icon,
-                                  size: 21,
-                                  color: selected ? _accent : _inactiveClr,
-                                ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.18),
+                blurRadius: 24,
+                offset: const Offset(0, 14), // extra bottom shadow
+              ),
+              BoxShadow(
+                color: Colors.white.withOpacity(0.25),
+                blurRadius: 8,
+                offset: const Offset(0, -2), // subtle top highlight
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(30),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+              child: Container(
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0x12FFFFFF), // slightly stronger wash
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(
+                    color: const Color(0x66FFFFFF),
+                    width: 1.2,
+                  ),
+                ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final totalWidth = constraints.maxWidth;
+                    final itemCount = _navItems.length;
+                    final itemWidth = totalWidth / itemCount;
+                    final pillWidth = itemWidth - 10;
+                    final pillHeight = (64 - 16).toDouble();
+                    final currentCenter = (_currentIndex + 0.5) * itemWidth;
+                    final minCenter = itemWidth / 2;
+                    final maxCenter = totalWidth - itemWidth / 2;
+                    final dragCenter = (_dragX ?? currentCenter)
+                        .clamp(minCenter, maxCenter)
+                        .toDouble();
+                    final pillLeft = (dragCenter - pillWidth / 2)
+                        .clamp(0.0, totalWidth - pillWidth)
+                        .toDouble();
+
+                    return GestureDetector(
+                      onHorizontalDragStart: (details) {
+                        setState(() {
+                          _isDragging = true;
+                          _dragX = details.localPosition.dx;
+                          _dragHoverIndex = _currentIndex;
+                        });
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        setState(() {
+                          _dragX = details.localPosition.dx
+                              .clamp(minCenter, maxCenter)
+                              .toDouble();
+                          final hoverIndex =
+                              ((_dragX ?? currentCenter) / itemWidth)
+                                  .floor()
+                                  .clamp(0, itemCount - 1);
+                          if (hoverIndex != _dragHoverIndex) {
+                            _dragHoverIndex = hoverIndex;
+                            HapticFeedback.selectionClick();
+                          }
+                        });
+                      },
+                      onHorizontalDragEnd: (_) {
+                        final targetCenter = (_dragX ?? currentCenter)
+                            .clamp(minCenter, maxCenter)
+                            .toDouble();
+                        final newIndex = (targetCenter / itemWidth)
+                            .floor()
+                            .clamp(0, itemCount - 1);
+                        setState(() {
+                          _isDragging = false;
+                          _dragX = null;
+                          _dragHoverIndex = null;
+                        });
+                        _onTabTap(newIndex);
+                      },
+                      onHorizontalDragCancel: () {
+                        setState(() {
+                          _isDragging = false;
+                          _dragX = null;
+                          _dragHoverIndex = null;
+                        });
+                      },
+                      behavior: HitTestBehavior.translucent,
+                      child: Stack(
+                        children: [
+                          AnimatedPositioned(
+                            duration: _isDragging
+                                ? Duration.zero
+                                : const Duration(milliseconds: 220),
+                            curve: Curves.easeInOut,
+                            left: pillLeft,
+                            top: 8,
+                            width: pillWidth,
+                            height: pillHeight,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: _activePill,
+                                borderRadius: BorderRadius.circular(22),
                               ),
-                              const SizedBox(height: 3),
-                              AnimatedDefaultTextStyle(
-                                duration: const Duration(milliseconds: 200),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: selected
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                  color: selected ? _accent : _inactiveClr,
-                                  letterSpacing: 0.1,
-                                ),
-                                child: Text(_navItems[i].label),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                          Row(
+                            children: List.generate(_navItems.length, (i) {
+                              final selected = _currentIndex == i;
+                              return Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _onTabTap(i),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: AnimatedBuilder(
+                                    animation: _iconScales[i],
+                                    builder: (context, _) => Container(
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 8,
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Transform.scale(
+                                            scale: _iconScales[i].value,
+                                            child: Icon(
+                                              selected
+                                                  ? _navItems[i].activeIcon
+                                                  : _navItems[i].icon,
+                                              size: 22,
+                                              color: selected
+                                                  ? _accent
+                                                  : _inactiveClr,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          AnimatedDefaultTextStyle(
+                                            duration: const Duration(
+                                              milliseconds: 200,
+                                            ),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              fontWeight: selected
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                              color: selected
+                                                  ? _accent
+                                                  : _inactiveClr,
+                                              letterSpacing: 0.1,
+                                            ),
+                                            child: Text(_navItems[i].label),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                        ],
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -384,8 +502,13 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
 // ── Helpers ────────────────────────────────────────────────────
 
 class _NavItem {
-  const _NavItem({required this.icon, required this.label});
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
   final IconData icon;
+  final IconData activeIcon;
   final String label;
 }
 

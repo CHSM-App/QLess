@@ -254,10 +254,10 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       }
     });
     Future.microtask(_ensurePatientIdAndFetch);
-    _refreshTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => _autoRefresh(),
-    );
+    // _refreshTimer = Timer.periodic(
+    //   const Duration(seconds: 30),
+    //   (_) => _autoRefresh(),
+    // );
   }
 
   @override
@@ -537,7 +537,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     return Scaffold(
       backgroundColor: kBg,
       floatingActionButton: Padding(
-  padding: const EdgeInsets.only(bottom: 20.0), // adjust value as needed
+  padding: const EdgeInsets.only(bottom: 88.0), // lift above bottom bar
   child: FloatingActionButton.extended(
     backgroundColor: kPrimary,
     elevation: 4,
@@ -808,7 +808,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         }
       },
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final a = filtered[index];

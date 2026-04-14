@@ -26,8 +26,17 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   bool _hasFetched = false;
   late final ProviderSubscription<int?> _doctorIdSub;
 
-  static const Color primary = Color(0xFF1A56A0);
-  static const Color bgColor = Color(0xFFF0F4F8);
+  static const Color primary = Color(0xFF00450D);
+  static const Color primaryContainer = Color(0xFF1B5E20);
+  static const Color surface = Color(0xFFF9F9F9);
+  static const Color surfaceLowest = Color(0xFFFFFFFF);
+  static const Color surfaceLow = Color(0xFFF3F3F3);
+  static const Color surfaceHigh = Color(0xFFE8E8E8);
+  static const Color outlineVariant = Color(0xFFC0C9BB);
+  static const Color secondaryContainer = Color(0xFFC9E7CA);
+  static const Color onSurface = Color(0xFF1A1C1C);
+  static const Color onSurfaceVariant = Color(0xFF41493E);
+  static const Color error = Color(0xFFBA1A1A);
 
   @override
   void initState() {
@@ -146,7 +155,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     final completedAppointments = _completedList(allAppointments);
 
     return Scaffold(
-      backgroundColor: bgColor,
+      backgroundColor: surface,
       body: Column(children: [
         _buildHeader(
           totalCount: allAppointments.length,
@@ -199,68 +208,136 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   }) {
     final now = DateTime.now();
     final dateLabel =
-        '${now.day.toString().padLeft(2, '0')} ${_monthLabel(now.month)} ${now.year}';
+        '${_weekdayLabel(now.weekday)}, ${now.day.toString().padLeft(2, '0')} ${_monthLabel(now.month)} ${now.year}';
     return Container(
-      color: primary,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [primary, primaryContainer],
+        ),
+      ),
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 12,
+        top: MediaQuery.of(context).padding.top + 16,
         left: 20,
         right: 20,
-        bottom: 16,
+        bottom: 18,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
         children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Patient List',
+          Positioned(
+            right: -40,
+            top: -40,
+            child: Container(
+              width: 160,
+              height: 160,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Queue Management',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () {},
+                        icon: const Icon(Icons.search, color: Colors.white),
+                        splashRadius: 20,
+                      ),
+                      IconButton(
+                        onPressed: () {},
+                        icon:
+                            const Icon(Icons.notifications_none, color: Colors.white),
+                        splashRadius: 20,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                dateLabel,
                 style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white)),
-            const SizedBox(height: 2),
-            Text('Today - $dateLabel - $totalCount total',
-                style: const TextStyle(fontSize: 12, color: Colors.white70)),
-          ]),
-          Wrap(spacing: 6, children: [
-            _headerBadge('$todayCount Today', Colors.white24),
-            _headerBadge('$upcomingCount Soon', Colors.white12),
-            _headerBadge('$completedCount Done', const Color(0x1AFFFFFF)),
-          ]),
+                  fontSize: 12,
+                  color: Colors.white.withOpacity(0.7),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _headerBadge('$todayCount Today'),
+                  _headerBadge('$upcomingCount Upcoming'),
+                  _headerBadge('$completedCount Completed'),
+                  _headerBadge('$totalCount Total'),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _headerBadge(String text, Color bg) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration:
-            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-        child: Text(text,
-            style: const TextStyle(
-                fontSize: 10,
-                color: Colors.white,
-                fontWeight: FontWeight.w500)),
+  Widget _headerBadge(String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       );
 
   // ------------------------- Search Bar -------------------------
 
   Widget _buildSearchBar() {
     return Container(
-      color: primary,
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      color: surface,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          color: surfaceLowest,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: TextField(
           controller: _searchController,
-          style: const TextStyle(fontSize: 13),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
           decoration: InputDecoration(
             hintText: 'Search by name, status, or queue...',
-            hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-            prefixIcon:
-                Icon(Icons.search, size: 18, color: Colors.grey.shade400),
+            hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            prefixIcon: Icon(Icons.search, size: 18, color: Colors.grey.shade500),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
                     icon: const Icon(Icons.clear, size: 16),
@@ -268,7 +345,8 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
                   )
                 : null,
             border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            contentPadding:
+                const EdgeInsets.symmetric(vertical: 14, horizontal: 4),
           ),
         ),
       ),
@@ -283,22 +361,32 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     required int completedCount,
   }) {
     return Container(
-      color: Colors.white,
-      child: TabBar(
-        controller: _tabController,
-        labelColor: primary,
-        unselectedLabelColor: Colors.grey,
-        indicatorColor: primary,
-        indicatorWeight: 2.5,
-        labelStyle:
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-        unselectedLabelStyle:
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
-        tabs: [
-          Tab(text: 'Today ($todayCount)'),
-          Tab(text: 'Upcoming ($upcomingCount)'),
-          Tab(text: 'Completed ($completedCount)'),
-        ],
+      color: surface,
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+      child: Container(
+        decoration: BoxDecoration(
+          color: surfaceLow,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: TabBar(
+          controller: _tabController,
+          labelColor: primary,
+          unselectedLabelColor: onSurfaceVariant,
+          indicator: BoxDecoration(
+            color: secondaryContainer,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          indicatorPadding: const EdgeInsets.all(4),
+          labelStyle:
+              const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          unselectedLabelStyle:
+              const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          tabs: [
+            Tab(text: 'Today ($todayCount)'),
+            Tab(text: 'Upcoming ($upcomingCount)'),
+            Tab(text: 'Completed ($completedCount)'),
+          ],
+        ),
       ),
     );
   }
@@ -367,14 +455,45 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       }
     }
 
+    final sectionTitle = switch (tabType) {
+      _TabType.today => 'Waiting',
+      _TabType.upcoming => 'Upcoming',
+      _TabType.completed => 'Completed',
+    };
+    final badgeText = switch (tabType) {
+      _TabType.today => '${patients.length} Left',
+      _TabType.upcoming => '${patients.length} Scheduled',
+      _TabType.completed => '${patients.length} Done',
+    };
+
     return RefreshIndicator(
       color: primary,
       onRefresh: () async => _refreshAppointments(force: true),
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 100),
-        itemCount: patients.length,
+        padding: const EdgeInsets.only(bottom: 0),
+        itemCount: patients.length + (tabType == _TabType.today ? 2 : 1),
         itemBuilder: (context, index) {
-          final p = patients[index];
+          final hasLiveQueue = tabType == _TabType.today;
+          final headerCount = hasLiveQueue ? 2 : 1;
+          if (index == 0) {
+            return hasLiveQueue
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
+                    child: _buildLiveQueueCard(
+                      patients: patients,
+                      queueState: queueState,
+                      onStart: _onStartSession,
+                      onSkip: _onSkipPatient,
+                    ),
+                  )
+                : _sectionHeader(sectionTitle, badgeText);
+          }
+          if (hasLiveQueue && index == 1) {
+            return _sectionHeader(sectionTitle, badgeText);
+          }
+
+          final patientIndex = index - headerCount;
+          final p = patients[patientIndex];
 
           bool isAccessible = true;
           if (tabType == _TabType.today) {
@@ -396,7 +515,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           }
 
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: PatientCard(
               patient: p,
               tabType: tabType,
@@ -415,6 +534,355 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         },
       ),
     );
+  }
+
+  Widget _sectionHeader(String title, String badgeText) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: primary,
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: secondaryContainer,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              badgeText,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF334D37),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveQueueCard({
+    required List<AppointmentList> patients,
+    required QueueState queueState,
+    required void Function(AppointmentList) onStart,
+    required void Function(AppointmentList) onSkip,
+  }) {
+    AppointmentList? inProgress;
+    for (final p in patients) {
+      if ((p.status?.toLowerCase() ?? '') == 'in_progress') {
+        inProgress = p;
+        break;
+      }
+    }
+
+    final bookedSorted = patients
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+
+    final current = inProgress ?? (bookedSorted.isNotEmpty ? bookedSorted.first : null);
+    AppointmentList? next;
+    if (inProgress != null) {
+      next = bookedSorted.isNotEmpty ? bookedSorted.first : null;
+    } else if (bookedSorted.length > 1) {
+      next = bookedSorted[1];
+    }
+
+    final currentToken = current?.queueNumber?.toString() ?? '-';
+    final nextToken = next?.queueNumber?.toString() ?? '-';
+    final totalCount = patients.length.toString();
+
+    final isRunning = queueState == QueueState.running;
+    final statusLabel = current == null
+        ? 'NO ACTIVE'
+        : (current.status ?? '').toUpperCase().replaceAll('_', ' ');
+    final statusBg = current == null
+        ? surfaceHigh
+        : (current.status?.toLowerCase() ?? '') == 'in_progress'
+            ? const Color(0xFFE8F5E9)
+            : secondaryContainer;
+    final statusText = current == null
+        ? onSurfaceVariant
+        : (current.status?.toLowerCase() ?? '') == 'in_progress'
+            ? const Color(0xFF2E7D32)
+            : const Color(0xFF334D37);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surfaceLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: secondaryContainer.withOpacity(0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: secondaryContainer.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    'LIVE QUEUE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1,
+                      color: primary,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                _queueIconButton(
+                  icon: Icons.play_arrow_rounded,
+                  enabled: !isRunning,
+                ),
+                _queueIconButton(
+                  icon: Icons.pause_rounded,
+                  enabled: isRunning,
+                ),
+                _queueIconButton(
+                  icon: Icons.close_rounded,
+                  enabled: true,
+                  color: error,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _tokenTile('CURRENT', currentToken),
+                const SizedBox(width: 10),
+                _tokenTile('NEXT', nextToken),
+                const SizedBox(width: 10),
+                _tokenTile('TOTAL', totalCount),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: outlineVariant.withOpacity(0.4)),
+              ),
+              child: current == null
+                  ? Row(
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: surfaceHigh,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.person_outline,
+                              color: onSurfaceVariant),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            'No active patient right now',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: secondaryContainer,
+                          child: Text(
+                            _initials(current.patientName),
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                current.patientName ?? 'Patient',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _ageGenderFor(current),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: statusBg,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  statusLabel.isEmpty ? 'STATUS' : statusLabel,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: statusText,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: (current != null &&
+                            (current.status?.toLowerCase() ?? '') == 'booked')
+                        ? () => onSkip(current)
+                        : null,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: error,
+                      side: BorderSide(
+                        color: error.withOpacity(0.4),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Skip',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: current != null ? () => onStart(current) : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      (current?.status?.toLowerCase() ?? '') == 'in_progress'
+                          ? 'Continue'
+                          : 'Start Session',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tokenTile(String label, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: surfaceLow,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value == '-' ? '-' : '#$value',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _queueIconButton({
+    required IconData icon,
+    required bool enabled,
+    Color color = primary,
+  }) {
+    return IconButton(
+      onPressed: enabled ? () {} : null,
+      icon: Icon(icon, size: 20, color: enabled ? color : color.withOpacity(0.3)),
+      splashRadius: 18,
+    );
+  }
+
+  String _initials(String? name) {
+    if (name == null || name.trim().isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  String _ageGenderFor(AppointmentList patient) {
+    final gender = patient.gender ?? '-';
+    final age = _ageString(patient.dob);
+    if (age == null || age.isEmpty) return gender;
+    return '$age - $gender';
   }
 
   // ------------------------- Actions -------------------------
@@ -583,6 +1051,15 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     if (month < 1 || month > 12) return '';
     return months[month - 1];
   }
+
+  String _weekdayLabel(int weekday) {
+    const weekdays = [
+      'Monday', 'Tuesday', 'Wednesday',
+      'Thursday', 'Friday', 'Saturday', 'Sunday',
+    ];
+    if (weekday < 1 || weekday > 7) return '';
+    return weekdays[weekday - 1];
+  }
 }
 
 // ------------------------- Tab Type Enum -------------------------
@@ -613,7 +1090,13 @@ class PatientCard extends StatelessWidget {
     this.onSkip,
   });
 
-  static const Color primary = Color(0xFF1A56A0);
+  static const Color primary = Color(0xFF00450D);
+  static const Color secondaryContainer = Color(0xFFC9E7CA);
+  static const Color surfaceLow = Color(0xFFF3F3F3);
+  static const Color outlineVariant = Color(0xFFC0C9BB);
+  static const Color onSurface = Color(0xFF1A1C1C);
+  static const Color onSurfaceVariant = Color(0xFF41493E);
+  static const Color error = Color(0xFFBA1A1A);
 
   Color get avatarBg {
     const colors = [
@@ -634,7 +1117,7 @@ class PatientCard extends StatelessWidget {
   ({Color bg, Color text}) get statusStyle {
     switch ((patient.status ?? '').toLowerCase().trim()) {
       case 'booked':
-        return (bg: const Color(0xFFE6F1FB), text: const Color(0xFF0C447C));
+        return (bg: const Color(0xFFE6F4E7), text: const Color(0xFF334D37));
       case 'confirmed':
         return (bg: const Color(0xFFD4F4EC), text: const Color(0xFF0F6E56));
       case 'pending':
@@ -644,9 +1127,9 @@ class PatientCard extends StatelessWidget {
       case 'completed':
       case 'done':
       case 'closed':
-        return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
+        return (bg: surfaceLow, text: onSurfaceVariant);
       default:
-        return (bg: const Color(0xFFEEEEEE), text: const Color(0xFF5F5E5A));
+        return (bg: surfaceLow, text: onSurfaceVariant);
     }
   }
 
@@ -713,15 +1196,20 @@ class PatientCard extends StatelessWidget {
     final name = patient.patientName ?? 'Patient';
     final status = patient.status ?? 'Unknown';
     final bookingInfo = _bookingInfo();
+    final tokenLabel = patient.queueNumber?.toString() ?? '-';
 
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200, width: 0.5),
-      ),
-      color: Colors.white,
-      child: Padding(
+    return InkWell(
+      onTap: onView,
+      borderRadius: BorderRadius.circular(18),
+      child: Card(
+        elevation: 0,
+        shadowColor: Colors.black.withOpacity(0.05),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: outlineVariant.withOpacity(0.4), width: 1),
+        ),
+        color: Colors.white,
+        child: Padding(
         padding: const EdgeInsets.all(14),
         child:
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -769,10 +1257,36 @@ class PatientCard extends StatelessWidget {
                   const SizedBox(height: 5),
                   Wrap(spacing: 8, runSpacing: 4, children: [
                     _infoChip(Icons.person_outline, _ageGender()),
-                   _infoChip(Icons.calendar_today, formatDate(patient.appointmentDate)),
+                    _infoChip(Icons.calendar_today, formatDate(patient.appointmentDate)),
                     _infoChip(bookingInfo.icon, bookingInfo.label),
                   ]),
                 ])),
+            const SizedBox(width: 10),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'TOKEN',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: onSurfaceVariant,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  tokenLabel == '-' ? '-' : '#$tokenLabel',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, size: 18, color: outlineVariant),
           ]),
 
           const SizedBox(height: 10),
@@ -809,7 +1323,6 @@ class PatientCard extends StatelessWidget {
           // Action Buttons — differ per tab
           Row(children: [
             // _outlineBtn('View', Icons.visibility_outlined, onView),
-            const SizedBox(width: 8),
             if (tabType == _TabType.today) ...[
               // Show Skip only for the current accessible booked patient
               if (isAccessible &&
@@ -830,17 +1343,23 @@ class PatientCard extends StatelessWidget {
             ],
           ]),
         ]),
-      ),
+      ),),
     );
   }
 
   Widget _infoChip(IconData icon, String label) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: Colors.grey.shade500),
-          const SizedBox(width: 3),
-          Text(label,
-              style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+          Icon(icon, size: 12, color: onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: onSurfaceVariant,
+            ),
+          ),
         ],
       );
 
@@ -851,10 +1370,11 @@ class PatientCard extends StatelessWidget {
           icon: Icon(icon, size: 12),
           label: Text(label),
           style: OutlinedButton.styleFrom(
+            foregroundColor: primary,
             padding: const EdgeInsets.symmetric(vertical: 8),
             textStyle: const TextStyle(
                 fontSize: 11, fontWeight: FontWeight.w500),
-            side: BorderSide(color: Colors.grey.shade300, width: 0.5),
+            side: const BorderSide(color: outlineVariant, width: 1),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(9)),
           ),
@@ -863,15 +1383,15 @@ class PatientCard extends StatelessWidget {
 
   Widget _skipBtn() => OutlinedButton.icon(
         onPressed: onSkip,
-        icon: const Icon(Icons.skip_next_rounded, size: 14, color: Color(0xFFF57F17)),
+        icon: const Icon(Icons.skip_next_rounded, size: 14, color: error),
         label: const Text('Skip',
             style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFFF57F17))),
+                color: error)),
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(vertical: 9),
-          side: const BorderSide(color: Color(0xFFFFCC80), width: 1),
+          side: BorderSide(color: error.withOpacity(0.4), width: 1),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         ),
       );
@@ -910,7 +1430,9 @@ class PatientCard extends StatelessWidget {
             fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white),
       ),
       style: ElevatedButton.styleFrom(
-        backgroundColor: isAccessible ? primary : Colors.grey.shade400,
+        backgroundColor: isAccessible ? primary : surfaceLow,
+        disabledBackgroundColor: surfaceLow,
+        disabledForegroundColor: onSurfaceVariant,
         padding: const EdgeInsets.symmetric(vertical: 9),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
         elevation: 0,
@@ -927,7 +1449,7 @@ class PatientCard extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: Colors.white)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.redAccent,
+          backgroundColor: error,
           padding: const EdgeInsets.symmetric(vertical: 9),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
@@ -941,9 +1463,9 @@ class PatientCard extends StatelessWidget {
         label: const Text('Completed',
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.grey.shade200,
-          disabledBackgroundColor: Colors.grey.shade200,
-          disabledForegroundColor: Colors.grey.shade600,
+          backgroundColor: surfaceLow,
+          disabledBackgroundColor: surfaceLow,
+          disabledForegroundColor: onSurfaceVariant,
           padding: const EdgeInsets.symmetric(vertical: 9),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
@@ -958,7 +1480,7 @@ class PatientDetailSheet extends StatelessWidget {
   final AppointmentList patient;
   const PatientDetailSheet({super.key, required this.patient});
 
-  static const Color primary = Color(0xFF1A56A0);
+  static const Color primary = Color(0xFF00450D);
 
   String _initials(String? name) {
     if (name == null || name.trim().isEmpty) return '?';
@@ -1100,7 +1622,7 @@ String formatDate(String? rawDate) {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFE6F1FB),
+              color: const Color(0xFFE6F4E7),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 16, color: primary),
@@ -1166,7 +1688,7 @@ class _ErrorState extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1A56A0),
+              backgroundColor: const Color(0xFF00450D),
               foregroundColor: Colors.white,
               elevation: 0,
               padding:
