@@ -56,15 +56,8 @@ class DoctorDetails {
 
 
 
-     @JsonKey(name: 'q_start_section')
+  @JsonKey(name: 'q_start_section')
   final int? qStartSection;
-
-
-
-
- 
-
-
   @JsonKey(name: 'q_start_time', includeFromJson: false, includeToJson: true)
   final int? queueStartBefore;
 
