@@ -280,7 +280,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     super.dispose();
   }
 
-  // ── AUTO-REFRESH: only fetches when today's queue appointments are active ──
 
   void _autoRefresh() {
     if (!mounted) return;
@@ -298,16 +297,16 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
           .getPatientAppointments(patientId);
     }
   }
-
-  // Returns true for today's booked walk-in queue appointments.
-  bool _isLiveQueueToday(AppointmentList a) {
-    if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
-    if (a.bookingType != 1) return false;
-    final d = DateTime.tryParse(a.appointmentDate ?? '');
-    if (d == null) return false;
-    final now = DateTime.now();
-    return d.year == now.year && d.month == now.month && d.day == now.day;
-  }
+bool _isLiveQueueToday(AppointmentList a) {
+  if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
+  if (a.bookingType != 1) return false;
+  final d = DateTime.tryParse(a.appointmentDate ?? '');
+  if (d == null) return false;
+  final now = DateTime.now();
+  final isToday = d.year == now.year && d.month == now.month && d.day == now.day;
+  // ✅ Only show LIVE banner if queue has actually started
+  return isToday && (a.queueStarted == true);
+}
 
   Future<void> refreshOnVisible() async {
     _didFetch = false;
@@ -778,30 +777,74 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     );
   }
 
-Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    for (final a in filtered) {
-      if (!_isLiveQueueToday(a)) continue;
-      if (a.appointmentId == null || a.doctorId == null) continue;
+// Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//     if (!mounted) return;
+//     for (final a in filtered) {
+//       if (!_isLiveQueueToday(a)) continue;
+//       if (a.appointmentId == null || a.doctorId == null) continue;
 
-      final hasEstimate = ref
-          .read(appointmentViewModelProvider)
-          .queueEstimates[a.appointmentId!] != null;
+//       final hasEstimate = ref
+//           .read(appointmentViewModelProvider)
+//           .queueEstimates[a.appointmentId!] != null;
 
-      if (!hasEstimate) {
-        ref
-            .read(appointmentViewModelProvider.notifier)
-            .queueEstimate(
-              AppointmentRequestModel(
-                appointmentId: a.appointmentId!,
-                doctorId: a.doctorId!,
-              ),
-            );
-      }
-    }
-  });
+//       if (!hasEstimate) {
+//         ref
+//             .read(appointmentViewModelProvider.notifier)
+//             .queueEstimate(
+//               AppointmentRequestModel(
+//                 appointmentId: a.appointmentId!,
+//                 doctorId: a.doctorId!,
+//               ),
+//             );
+//       }
+//     }
+//   });
   
+//   return RefreshIndicator(
+//     color: kPrimary,
+//     onRefresh: () async {
+//       final id = ref.read(patientLoginViewModelProvider).patientId;
+//       if (id != null && id != 0) {
+//         await ref
+//             .read(appointmentViewModelProvider.notifier)
+//             .getPatientAppointments(id);
+//       }
+//     },
+//     child: ListView.builder(
+//       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+//       itemCount: filtered.length,
+//       itemBuilder: (context, index) {
+//         final a = filtered[index];
+//         final live = _isLiveQueueToday(a);
+
+//         // Get the current estimate for this appointment (if live queue)
+//         QueuePreviewResponseModel? estimate;
+//         if (live && a.appointmentId != null) {
+//           final estMap = ref.watch(appointmentViewModelProvider).queueEstimates;
+//           estimate = estMap[a.appointmentId!] as QueuePreviewResponseModel?;
+//         }
+
+//         return _AppointmentCard(
+//           appointment: a,
+//           onViewDetails: () => _openDetail(a),
+//           onReview: _canReview(a) ? () => _handleReview(context, a) : null,
+//           onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
+//           onReschedule:
+//               _canReschedule(a) ? () => _handleReschedule(a) : null,
+//           queueNumber: live ? a.queueNumber : null,
+//           isLiveQueue: live,
+//           queueEstimate: estimate,
+//         );
+//       },
+//     ),
+//   );
+// }
+
+Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
+  // ❌ REMOVE this entire block — no more separate queueEstimate calls
+  // WidgetsBinding.instance.addPostFrameCallback((_) { ... });
+
   return RefreshIndicator(
     color: kPrimary,
     onRefresh: () async {
@@ -819,23 +862,18 @@ Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
         final a = filtered[index];
         final live = _isLiveQueueToday(a);
 
-        // Get the current estimate for this appointment (if live queue)
-        QueuePreviewResponseModel? estimate;
-        if (live && a.appointmentId != null) {
-          final estMap = ref.watch(appointmentViewModelProvider).queueEstimates;
-          estimate = estMap[a.appointmentId!] as QueuePreviewResponseModel?;
-        }
-
         return _AppointmentCard(
           appointment: a,
           onViewDetails: () => _openDetail(a),
           onReview: _canReview(a) ? () => _handleReview(context, a) : null,
           onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
-          onReschedule:
-              _canReschedule(a) ? () => _handleReschedule(a) : null,
-          queueNumber: live ? a.queueNumber : null,
+          onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
+          queueNumber: live ? a.myQueueNumber : null,   // ✅ use myQueueNumber
           isLiveQueue: live,
-          queueEstimate: estimate,
+          // ✅ Pass data directly from AppointmentList — no separate estimate needed
+          estimatedMinutes: null,                        // not in API, keep null
+          patientsAhead: live ? a.patientsAhead : null,
+          estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
         );
       },
     ),
@@ -966,24 +1004,28 @@ Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
 
 
 class _AppointmentCard extends StatelessWidget {
-  final AppointmentList appointment;
+final AppointmentList appointment;
   final VoidCallback onViewDetails;
   final VoidCallback? onReview;
   final VoidCallback? onCancel;
   final VoidCallback? onReschedule;
   final int? queueNumber;
   final bool isLiveQueue;
-  final QueuePreviewResponseModel? queueEstimate; // ← nava
+  final int? estimatedMinutes;
+  final int? patientsAhead;
+  final String? estimatedArrivalTime;
 
   const _AppointmentCard({
-    required this.appointment,
+     required this.appointment,
     required this.onViewDetails,
     this.onReview,
     this.onCancel,
     this.onReschedule,
     this.queueNumber,
     this.isLiveQueue = false,
-    this.queueEstimate, // ← nava
+    this.estimatedMinutes,
+    this.patientsAhead,
+    this.estimatedArrivalTime,
   });
 
   @override
@@ -1143,16 +1185,15 @@ class _AppointmentCard extends StatelessWidget {
                     ),
 
                     // ── LIVE QUEUE BANNER with estimate ──
-                    if (isLiveQueue) ...[
-                      const SizedBox(height: 10),
-                      _LiveQueueBanner(
-                        queueNumber: queueNumber,
-                        estimatedMinutes: queueEstimate?.estimatedMinutes,
-                        estimatedArrivalTime:
-                            queueEstimate?.estimatedArrivalTime,
-                        patientsAhead: queueEstimate?.patientsAhead,
-                      ),
-                    ],
+                if (isLiveQueue) ...[
+  const SizedBox(height: 10),
+  _LiveQueueBanner(
+    queueNumber: queueNumber,
+    estimatedMinutes: estimatedMinutes,           // ✅ flat field
+    estimatedArrivalTime: estimatedArrivalTime,   // ✅ flat field
+    patientsAhead: patientsAhead,                 // ✅ flat field
+  ),
+],
 
                     const SizedBox(height: 10),
 
