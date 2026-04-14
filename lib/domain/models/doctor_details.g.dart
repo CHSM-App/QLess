@@ -31,7 +31,7 @@ DoctorDetails _$DoctorDetailsFromJson(Map<String, dynamic> json) =>
       roleId: (json['role_id'] as num?)?.toInt(),
       Token: json['token'] as String?,
       genderId: (json['gender_id'] as num?)?.toInt(),
-      leadTime: _intFromJson(json['q_start_before']),
+      leadTime: (json['q_start_before'] as num?)?.toInt(),
       qStartSection: (json['q_start_section'] as num?)?.toInt(),
     );
 
@@ -59,7 +59,8 @@ Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
       'clinic_contact': instance.clinicContact,
       'image_url': instance.imageUrl,
       'gender_id': instance.genderId,
-      'q_start_before': _intToJson(instance.leadTime),
+      'q_start_before': instance.leadTime,
       'q_start_section': instance.qStartSection,
+      'q_start_time': instance.queueStartBefore,
       'queue_length': instance.queueLength,
     };

@@ -51,11 +51,10 @@ class DoctorDetails {
   @JsonKey(name: 'gender_id')
   final int? genderId;
 
-  @JsonKey(name: 'q_start_before', fromJson: _intFromJson, toJson: _intToJson)
+  @JsonKey(name: 'q_start_before')
   final int? leadTime;
 
-     @JsonKey(name: 'q_start_before')
-  final int? qStartBefore;
+
 
      @JsonKey(name: 'q_start_section')
   final int? qStartSection;
@@ -97,7 +96,6 @@ class DoctorDetails {
     this.Token,
     this.genderId,
     this.leadTime,
-    this.qStartBefore,
     this.qStartSection,
     this.queueStartBefore,
   });

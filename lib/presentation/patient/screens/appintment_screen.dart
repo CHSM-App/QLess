@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
@@ -172,19 +174,30 @@ bool _isToday(AppointmentList a) {
   final now = DateTime.now();
   return p.year == now.year && p.month == now.month && p.day == now.day;
 }
-
 bool _isUpcoming(AppointmentList a) {
   if (a.appointmentDate == null) return false;
+
   final p = DateTime.tryParse(a.appointmentDate!);
   if (p == null) return false;
-  final s = a.status?.toLowerCase();
-  if (s == 'cancelled' || s == 'completed' || s == 'complete') return false;
+
+  final status = a.status?.toLowerCase();
+
+  // ❌ Exclude completed & cancelled
+  if (status == 'cancelled' ||
+      status == 'completed' ||
+      status == 'complete') {
+    return false;
+  }
+
   final now = DateTime.now();
+
+  // 👉 Remove time part (only date compare)
   final apptDay = DateTime(p.year, p.month, p.day);
   final todayDay = DateTime(now.year, now.month, now.day);
-  return !apptDay.isBefore(todayDay); // today and future
-}
 
+  // ✅ ONLY FUTURE (today exclude)
+  return apptDay.isAfter(todayDay);
+}
 bool _isCompleted(AppointmentList a) {
   final s = a.status?.toLowerCase();
   return s == "completed" || s == "complete";
@@ -765,68 +778,90 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     );
   }
 
-  Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
-    if (filtered.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(color: tab.bg, shape: BoxShape.circle),
-              child: Icon(tab.icon, size: 36, color: tab.color),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "No ${tab.label.toLowerCase()} appointments",
-              style: const TextStyle(
-                color: kTextDark,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              tab.key == "all"
-                  ? "Try adjusting your search"
-                  : "Nothing to show here yet",
-              style: const TextStyle(color: kTextMid, fontSize: 13),
-            ),
-          ],
-        ),
-      );
-    }
+Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
+  
+  // Live queue sathi estimate fetch karo (background, silent)
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    for (final a in filtered) {
+      if (_isLiveQueueToday(a) &&
+          a.appointmentId != null &&
+          a.doctorId != null) {
+        ref
+          .read(appointmentViewModelProvider.notifier).queueEstimate(
+            AppointmentRequestModel(
 
-    return RefreshIndicator(
-      color: kPrimary,
-      onRefresh: () async {
-        final id = ref.read(patientLoginViewModelProvider).patientId;
-        if (id != null && id != 0) {
-          await ref
-              .read(appointmentViewModelProvider.notifier)
-              .getPatientAppointments(id);
-        }
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-        itemCount: filtered.length,
-        itemBuilder: (context, index) {
-          final a = filtered[index];
-          final live = _isLiveQueueToday(a);
-          return _AppointmentCard(
-            appointment: a,
-            onViewDetails: () => _openDetail(a),
-            onReview: _canReview(a) ? () => _handleReview(context, a) : null,
-            onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
-            onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
-            queueNumber: live ? a.queueNumber : null,
-            isLiveQueue: live,
+              appointmentId: a.appointmentId!,
+              doctorId: a.doctorId!,
+            ),
           );
-        },
-      ),
-    );
-  }
+      }
+    }
+  });
+// Inside _buildList method, before if (filtered.isEmpty)
+if (filtered.isNotEmpty) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    for (final a in filtered) {
+      if (_isLiveQueueToday(a) &&
+          a.appointmentId != null &&
+          a.doctorId != null) {
+        
+        // Optional: Only fetch if we don't have fresh data
+        final hasEstimate = ref.read(appointmentViewModelProvider)
+            .queueEstimates[a.appointmentId!] != null;
 
+        if (!hasEstimate) {
+          ref
+              .read(appointmentViewModelProvider.notifier)
+              .queueEstimate(
+                AppointmentRequestModel(
+                  appointmentId: a.appointmentId!,
+                  doctorId: a.doctorId!,
+                ),
+              );
+        }
+      }
+    }
+  });
+}
+  return RefreshIndicator(
+    color: kPrimary,
+    onRefresh: () async {
+      final id = ref.read(patientLoginViewModelProvider).patientId;
+      if (id != null && id != 0) {
+        await ref
+            .read(appointmentViewModelProvider.notifier)
+            .getPatientAppointments(id);
+      }
+    },
+    child: ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final a = filtered[index];
+        final live = _isLiveQueueToday(a);
+
+        // Get the current estimate for this appointment (if live queue)
+        QueuePreviewResponseModel? estimate;
+        if (live && a.appointmentId != null) {
+          final estMap = ref.watch(appointmentViewModelProvider).queueEstimates;
+          estimate = estMap[a.appointmentId!] as QueuePreviewResponseModel?;
+        }
+
+        return _AppointmentCard(
+          appointment: a,
+          onViewDetails: () => _openDetail(a),
+          onReview: _canReview(a) ? () => _handleReview(context, a) : null,
+          onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
+          onReschedule:
+              _canReschedule(a) ? () => _handleReschedule(a) : null,
+          queueNumber: live ? a.queueNumber : null,
+          isLiveQueue: live,
+          queueEstimate: estimate,
+        );
+      },
+    ),
+  );
+}
   // ── STATES ──
 
   Widget _buildLoading(String msg) => Center(
@@ -950,9 +985,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   );
 }
 
-// ════════════════════════════════════════════════════════
-//  COMPACT CARD  — 3 rows
-// ════════════════════════════════════════════════════════
 
 class _AppointmentCard extends StatelessWidget {
   final AppointmentList appointment;
@@ -962,6 +994,7 @@ class _AppointmentCard extends StatelessWidget {
   final VoidCallback? onReschedule;
   final int? queueNumber;
   final bool isLiveQueue;
+  final QueuePreviewResponseModel? queueEstimate; // ← nava
 
   const _AppointmentCard({
     required this.appointment,
@@ -971,6 +1004,7 @@ class _AppointmentCard extends StatelessWidget {
     this.onReschedule,
     this.queueNumber,
     this.isLiveQueue = false,
+    this.queueEstimate, // ← nava
   });
 
   @override
@@ -982,7 +1016,6 @@ class _AppointmentCard extends StatelessWidget {
     final hasMap = a.latitude != null && a.longitude != null;
 
     return Stack(
-      // ← WRAP with Stack
       clipBehavior: Clip.none,
       children: [
         Container(
@@ -1055,19 +1088,14 @@ class _AppointmentCard extends StatelessWidget {
                               const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  const Icon(
-                                    Icons.person_rounded,
-                                    size: 11,
-                                    color: kTextLight,
-                                  ),
+                                  const Icon(Icons.person_rounded,
+                                      size: 11, color: kTextLight),
                                   const SizedBox(width: 3),
                                   Expanded(
                                     child: Text(
                                       a.doctorName ?? "—",
                                       style: const TextStyle(
-                                        color: kTextMid,
-                                        fontSize: 11,
-                                      ),
+                                          color: kTextMid, fontSize: 11),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -1080,9 +1108,7 @@ class _AppointmentCard extends StatelessWidget {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 5,
-                          ),
+                              horizontal: 9, vertical: 5),
                           decoration: BoxDecoration(
                             color: sBg,
                             borderRadius: BorderRadius.circular(8),
@@ -1137,14 +1163,21 @@ class _AppointmentCard extends StatelessWidget {
                       ],
                     ),
 
+                    // ── LIVE QUEUE BANNER with estimate ──
                     if (isLiveQueue) ...[
                       const SizedBox(height: 10),
-                      _LiveQueueBanner(queueNumber: queueNumber),
+                      _LiveQueueBanner(
+                        queueNumber: queueNumber,
+                        estimatedMinutes: queueEstimate?.estimatedMinutes,
+                        estimatedArrivalTime:
+                            queueEstimate?.estimatedArrivalTime,
+                        patientsAhead: queueEstimate?.patientsAhead,
+                      ),
                     ],
 
                     const SizedBox(height: 10),
 
-                    // ── ROW 3: View Details | Review | Map | Call ──
+                    // ── ROW 3: Buttons ──
                     Row(
                       children: [
                         Expanded(
@@ -1186,9 +1219,7 @@ class _AppointmentCard extends StatelessWidget {
                               child: const Text(
                                 "Review",
                                 style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 13,
-                                ),
+                                    fontWeight: FontWeight.w600, fontSize: 13),
                               ),
                             ),
                           ),
@@ -1229,9 +1260,7 @@ class _AppointmentCard extends StatelessWidget {
                           icon: Icons.call_rounded,
                           bg: kPrimaryLight,
                           iconColor: kPrimary,
-                          onTap: () {
-                            // call action
-                          },
+                          onTap: () {},
                         ),
                       ],
                     ),
@@ -1242,13 +1271,14 @@ class _AppointmentCard extends StatelessWidget {
           ),
         ),
 
-        // ── QUEUE NUMBER BADGE ── ← NEW
+        // ── QUEUE NUMBER BADGE ──
         if (queueNumber != null)
           Positioned(
             top: -8,
             left: 12,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: kPrimary,
                 borderRadius: BorderRadius.circular(20),
@@ -1296,19 +1326,15 @@ class _AppointmentCard extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              top,
-              style: const TextStyle(
-                color: kTextDark,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text(top,
+                style: const TextStyle(
+                    color: kTextDark,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
             if (bottom.isNotEmpty)
-              Text(
-                bottom,
-                style: const TextStyle(color: kTextMid, fontSize: 11),
-              ),
+              Text(bottom,
+                  style:
+                      const TextStyle(color: kTextMid, fontSize: 11)),
           ],
         ),
       ],
@@ -1340,13 +1366,21 @@ class _AppointmentCard extends StatelessWidget {
   }
 }
 
-// ════════════════════════════════════════════════════════
-//  LIVE QUEUE BANNER  (pulsing dot + queue number)
-// ════════════════════════════════════════════════════════
+
+// ── 3. _LiveQueueBanner CLASS (poora replace kara) ────────────
 
 class _LiveQueueBanner extends StatefulWidget {
   final int? queueNumber;
-  const _LiveQueueBanner({this.queueNumber});
+  final int? estimatedMinutes;
+  final String? estimatedArrivalTime;
+  final int? patientsAhead;
+
+  const _LiveQueueBanner({
+    this.queueNumber,
+    this.estimatedMinutes,
+    this.estimatedArrivalTime,
+    this.patientsAhead,
+  });
 
   @override
   State<_LiveQueueBanner> createState() => _LiveQueueBannerState();
@@ -1375,86 +1409,284 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
     super.dispose();
   }
 
+  bool get _hasEstimate =>
+      widget.estimatedMinutes != null || widget.estimatedArrivalTime != null;
+
   @override
   Widget build(BuildContext context) {
     final q = widget.queueNumber;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: kGreen.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kGreen.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        children: [
-          // Pulsing dot
-          AnimatedBuilder(
-            animation: _pulse,
-            builder: (_, __) => Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: kGreen.withValues(alpha: _pulse.value),
-              ),
-            ),
+
+    return Column(
+      children: [
+        // ── Top row: queue position + LIVE chip ──
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: kGreen.withValues(alpha: 0.07),
+            borderRadius: _hasEstimate
+                ? const BorderRadius.vertical(top: Radius.circular(12))
+                : BorderRadius.circular(12),
+            border: Border.all(color: kGreen.withValues(alpha: 0.28)),
           ),
-          const SizedBox(width: 10),
-          // Label + number
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: const TextStyle(fontSize: 13, color: kTextDark),
-                children: [
-                  const TextSpan(
-                    text: 'Your queue position  ',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: kTextMid,
-                    ),
-                  ),
-                  TextSpan(
-                    text: q != null ? '#$q' : '—',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      color: q != null ? kGreen : kTextMid,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // LIVE chip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: kGreen,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.circle, size: 6, color: Colors.white),
-                SizedBox(width: 4),
-                Text(
-                  'LIVE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.6,
+          child: Row(
+            children: [
+              AnimatedBuilder(
+                animation: _pulse,
+                builder: (_, __) => Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: kGreen.withValues(alpha: _pulse.value),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style:
+                        const TextStyle(fontSize: 13, color: kTextDark),
+                    children: [
+                      const TextSpan(
+                        text: 'Your queue position  ',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: kTextMid,
+                        ),
+                      ),
+                      TextSpan(
+                        text: q != null ? '#$q' : '—',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: q != null ? kGreen : kTextMid,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kGreen,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.circle, size: 6, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      'LIVE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
+
+        // ── Bottom row: estimate (fakt jeva data aahe) ──
+        if (_hasEstimate)
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: kAmber.withValues(alpha: 0.07),
+              borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(12)),
+              border: Border(
+                left: BorderSide(
+                    color: kGreen.withValues(alpha: 0.28), width: 1),
+                right: BorderSide(
+                    color: kGreen.withValues(alpha: 0.28), width: 1),
+                bottom: BorderSide(
+                    color: kGreen.withValues(alpha: 0.28), width: 1),
+              ),
+            ),
+            child:
+        Row(
+  children: [
+    const Icon(Icons.hourglass_top_rounded,
+        size: 13, color: kAmber),
+    const SizedBox(width: 6),
+
+    if (widget.estimatedMinutes != null)
+      Text(
+        widget.estimatedMinutes == 0
+            ? 'Your turn now'
+            : '~${widget.estimatedMinutes} min wait',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: kAmber,
+        ),
       ),
+
+    if (widget.estimatedArrivalTime != null) ...[
+      const SizedBox(width: 6),
+      Text(
+        '(~${widget.estimatedArrivalTime})',
+        style: const TextStyle(
+            fontSize: 12, color: kTextMid),
+      ),
+    ],
+
+    if (widget.patientsAhead != null) ...[
+      const Spacer(),
+      Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: kAmber.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        // child: Text(
+        //   widget.patientsAhead == 0
+        //       ? 'Next'
+        //       : '${widget.patientsAhead} ahead',
+        //   style: const TextStyle(
+        //     fontSize: 11,
+        //     fontWeight: FontWeight.w600,
+        //     color: kAmber,
+        //   ),
+        // ),
+      ),
+    ],
+  ],
+),
+          ),
+      ],
     );
   }
 }
+
+// // ════════════════════════════════════════════════════════
+// //  LIVE QUEUE BANNER  (pulsing dot + queue number)
+// // ════════════════════════════════════════════════════════
+
+// class _LiveQueueBanner extends StatefulWidget {
+//   final int? queueNumber;
+//   const _LiveQueueBanner({this.queueNumber});
+
+//   @override
+//   State<_LiveQueueBanner> createState() => _LiveQueueBannerState();
+// }
+
+// class _LiveQueueBannerState extends State<_LiveQueueBanner>
+//     with SingleTickerProviderStateMixin {
+//   late final AnimationController _ctrl;
+//   late final Animation<double> _pulse;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _ctrl = AnimationController(
+//       vsync: this,
+//       duration: const Duration(milliseconds: 900),
+//     )..repeat(reverse: true);
+//     _pulse = Tween<double>(begin: 0.35, end: 1.0).animate(
+//       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+//     );
+//   }
+
+//   @override
+//   void dispose() {
+//     _ctrl.dispose();
+//     super.dispose();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final q = widget.queueNumber;
+//     return Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//       decoration: BoxDecoration(
+//         color: kGreen.withValues(alpha: 0.07),
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: kGreen.withValues(alpha: 0.28)),
+//       ),
+//       child: Row(
+//         children: [
+//           // Pulsing dot
+//           AnimatedBuilder(
+//             animation: _pulse,
+//             builder: (_, __) => Container(
+//               width: 9,
+//               height: 9,
+//               decoration: BoxDecoration(
+//                 shape: BoxShape.circle,
+//                 color: kGreen.withValues(alpha: _pulse.value),
+//               ),
+//             ),
+//           ),
+//           const SizedBox(width: 10),
+//           // Label + number
+//           Expanded(
+//             child: RichText(
+//               text: TextSpan(
+//                 style: const TextStyle(fontSize: 13, color: kTextDark),
+//                 children: [
+//                   const TextSpan(
+//                     text: 'Your queue position  ',
+//                     style: TextStyle(
+//                       fontSize: 12,
+//                       fontWeight: FontWeight.w500,
+//                       color: kTextMid,
+//                     ),
+//                   ),
+//                   TextSpan(
+//                     text: q != null ? '#$q' : '—',
+//                     style: TextStyle(
+//                       fontSize: 17,
+//                       fontWeight: FontWeight.w800,
+//                       color: q != null ? kGreen : kTextMid,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ),
+//           // LIVE chip
+//           Container(
+//             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//             decoration: BoxDecoration(
+//               color: kGreen,
+//               borderRadius: BorderRadius.circular(6),
+//             ),
+//             child: const Row(
+//               mainAxisSize: MainAxisSize.min,
+//               children: [
+//                 Icon(Icons.circle, size: 6, color: Colors.white),
+//                 SizedBox(width: 4),
+//                 Text(
+//                   'LIVE',
+//                   style: TextStyle(
+//                     color: Colors.white,
+//                     fontSize: 10,
+//                     fontWeight: FontWeight.w700,
+//                     letterSpacing: 0.6,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 
 // ════════════════════════════════════════════════════════
 //  DETAIL BOTTOM SHEET

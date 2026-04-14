@@ -102,7 +102,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final minutes = (_leadHours * 60) + _leadMinutes;
     final body = DoctorDetails(
       // leadTime: minutes,
-      qStartBefore: minutes,
+      leadTime: minutes,
       doctorId: ref.read(doctorLoginViewModelProvider).doctorId ?? 0,
     );
     await ref.read(doctorLoginViewModelProvider.notifier).updateLeadTime(body);

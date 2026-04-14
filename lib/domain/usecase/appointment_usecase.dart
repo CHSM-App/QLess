@@ -2,6 +2,7 @@ import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
+import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/repository/appointment_repo.dart';
 
 class AppointmentUsecase {
@@ -93,5 +94,17 @@ class AppointmentUsecase {
     AppointmentRequestModel appointmentRequest,
   ) {
     return appointmentRepository.endSession(appointmentRequest);
-}
+  }
+
+  Future<QueuePreviewResponseModel> queueEstimate(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queueEstimate(appointmentRequest);
+  }
+
+  Future<QueuePreviewResponseModel> queuePreviewEstimate(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.queuePreviewEstimate(appointmentRequest);
+  }
 }
