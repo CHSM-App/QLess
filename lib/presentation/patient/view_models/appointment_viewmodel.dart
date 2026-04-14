@@ -4,6 +4,8 @@ import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
+import 'package:qless/domain/models/queue_preview_model.dart';
+
 import 'package:qless/domain/usecase/appointment_usecase.dart';
 
 class AppointmentState {
@@ -15,6 +17,8 @@ class AppointmentState {
   final AppointmentResponseModel? rescheduleResponse;
   final AppointmentResponseModel? cancelResponse;
   final AppointmentResponseModel? queueStatusResponse;
+   final Map<int, QueuePreviewResponseModel> queueEstimates;
+  final QueuePreviewResponseModel? queuePreviewEstimateResponse;
   final List<MonthSlotData> bookedSlots;
   final AsyncValue<List<AppointmentList>>?  patientAppointmentsList;
 
@@ -27,6 +31,8 @@ class AppointmentState {
     this.rescheduleResponse,
     this.cancelResponse,
     this.queueStatusResponse,
+    this.queueEstimates = const {},
+    this.queuePreviewEstimateResponse,
     this.bookedSlots = const [],
     this.patientAppointmentsList,
   });
@@ -41,6 +47,8 @@ class AppointmentState {
     AppointmentResponseModel? rescheduleResponse,
     AppointmentResponseModel? cancelResponse,
     AppointmentResponseModel? queueStatusResponse,
+  Map<int, QueuePreviewResponseModel>? queueEstimates,
+    QueuePreviewResponseModel? queuePreviewEstimateResponse,
     List<MonthSlotData>? bookedSlots,
     AsyncValue<List<AppointmentList>>?  patientAppointmentsList,
   }) {
@@ -53,6 +61,10 @@ class AppointmentState {
       rescheduleResponse: rescheduleResponse ?? this.rescheduleResponse,
       cancelResponse: cancelResponse ?? this.cancelResponse,
       queueStatusResponse: queueStatusResponse ?? this.queueStatusResponse,
+      queueEstimates: queueEstimates ?? this.queueEstimates,
+      
+      queuePreviewEstimateResponse:
+          queuePreviewEstimateResponse ?? this.queuePreviewEstimateResponse,
       bookedSlots: bookedSlots ?? this.bookedSlots,
       patientAppointmentsList: patientAppointmentsList ?? this.patientAppointmentsList,
     );
@@ -193,4 +205,61 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     }
     return e.toString().replaceFirst('Exception: ', '');
   }
+
+
+  Future<void> queuePreviewEstimate(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
+    try {
+      final result = await usecase.queuePreviewEstimate(appointmentRequest);
+      state = state.copyWith(
+        isLoading: false,
+        isSuccess: true,
+        queuePreviewEstimateResponse: result,
+      );
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractError(e));
+    }
+  }
+
+  
+  // Future<void> queueEstimate(
+  //   AppointmentRequestModel appointmentRequest,
+  // ) async {
+  //   state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
+  //   try {
+  //     final result = await usecase.queueEstimate(appointmentRequest);
+  //     state = state.copyWith(
+  //       isLoading: false,
+  //       isSuccess: true,
+  //       queueEstimateResponse: result,
+  //     );
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: _extractError(e));
+  //   }
+  // }
+
+
+  Future<void> queueEstimate(
+  AppointmentRequestModel appointmentRequest,
+) async {
+  try {
+    final result = await usecase.queueEstimate(appointmentRequest);
+
+    final appointmentId = appointmentRequest.appointmentId;
+
+    if (appointmentId == null) return;
+
+    state = state.copyWith(
+      queueEstimates: {
+        ...state.queueEstimates,
+        appointmentId: result,
+      },
+    );
+
+  } catch (e) {
+    state = state.copyWith(error: _extractError(e));
+  }
+}
 }

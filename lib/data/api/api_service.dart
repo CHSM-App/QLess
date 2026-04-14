@@ -12,6 +12,7 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/models/prescription.dart';
+import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/models/review_model.dart';
 import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/domain/models/token_response.dart';
@@ -219,6 +220,16 @@ Future<AppointmentResponseModel> endSession(
   @POST("patient/insert/review/add")
   Future<dynamic> addAppointmentReview(
     @Body() ReviewRequestModel reviewRequest,
+  );
+
+  @POST("patient/insert/queueEstimate")
+  Future<QueuePreviewResponseModel> queueEstimate(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+  @POST("patient/insert/queuePreviewEstimate")
+  Future<QueuePreviewResponseModel> queuePreviewEstimate(
+    @Body() AppointmentRequestModel appointmentRequest,
   );
 
   //DELETE API

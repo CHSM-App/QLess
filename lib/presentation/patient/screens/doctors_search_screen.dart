@@ -5,6 +5,7 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/view_models/doctors_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ─── Colour palette ───────────────────────────────────────────────────────────
@@ -71,8 +72,14 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   int?    _selectedMemberId;
   bool    _hasFetchedDoctors = false;
   bool    _hasFetchedFamily  = false;
+  final Set<int> _fetchedFavoriteDoctorIds = <int>{};
+
+  // ── NEW: toggles the in-page favorites filter ──────────────────────────────
+  bool    _showFavoritesOnly  = false;
+
   ProviderSubscription<TokenState>?        _tokenSub;
   ProviderSubscription<PatientLoginState>? _patientSub;
+  ProviderSubscription<DoctorsState>?      _doctorsSub;
 
   @override
   void initState() {
@@ -83,7 +90,16 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     );
     _patientSub = ref.listenManual<PatientLoginState>(
       patientLoginViewModelProvider,
-      (prev, next) => _tryFetch(),
+      (prev, next) {
+        if (prev?.patientId != next.patientId) {
+          _fetchedFavoriteDoctorIds.clear();
+        }
+        _tryFetch();
+      },
+    );
+    _doctorsSub = ref.listenManual<DoctorsState>(
+      doctorsViewModelProvider,
+      (_, next) => _tryFetchFavorites(next.doctors),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _tryFetch());
   }
@@ -103,6 +119,22 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       _hasFetchedFamily = true;
       ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(patientId);
     }
+
+    _tryFetchFavorites(ref.read(doctorsViewModelProvider).doctors);
+  }
+
+  void _tryFetchFavorites(List<DoctorDetails> doctors) {
+    final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    if (patientId <= 0 || doctors.isEmpty) return;
+
+    final favoriteNotifier = ref.read(favoriteViewModelProvider.notifier);
+    for (final doctor in doctors) {
+      final doctorId = doctor.doctorId;
+      if (doctorId == null || !_fetchedFavoriteDoctorIds.add(doctorId)) {
+        continue;
+      }
+      favoriteNotifier.fetchFavoriteStatus(patientId, doctorId);
+    }
   }
 
   @override
@@ -110,11 +142,27 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     _searchController.dispose();
     _tokenSub?.close();
     _patientSub?.close();
+    _doctorsSub?.close();
     super.dispose();
   }
 
   List<DoctorDetails> _filtered(List<DoctorDetails> all) {
+    final favoriteIds = ref.read(
+      favoriteViewModelProvider.select(
+        (state) => state.doctorFavorites.entries
+            .where((entry) => entry.value)
+            .map((entry) => entry.key)
+            .toSet(),
+      ),
+    );
+
     return all.where((d) {
+      // ── Favorites-only gate ────────────────────────────────────────────────
+      if (_showFavoritesOnly) {
+        final id = d.doctorId;          // adjust field name to match your model
+        if (id == null || !favoriteIds.contains(id)) return false;
+      }
+
       final q            = _searchController.text.toLowerCase();
       final matchesQuery = _searchController.text.isEmpty ||
           (d.name?.toLowerCase().contains(q) ?? false) ||
@@ -122,6 +170,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
           (d.clinicName?.toLowerCase().contains(q) ?? false);
       final matchesSpec  = _selectedSpecialty == null ||
           d.specialization?.toLowerCase() == _selectedSpecialty!.toLowerCase();
+
       return matchesQuery && matchesSpec;
     }).toList();
   }
@@ -147,7 +196,22 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
         child: Column(
           children: [
             // ── Header ───────────────────────────────────────────────────
-            _Header(isDark: isDark),
+            _Header(
+              isDark:            isDark,
+              showFavoritesOnly: _showFavoritesOnly,
+              // Toggle favorites filter; also clear specialty chip so the
+              // "All" state feels consistent when leaving favorites mode.
+              onFavoritesTap: () => setState(() {
+                _showFavoritesOnly = !_showFavoritesOnly;
+                if (!_showFavoritesOnly) _selectedSpecialty = null;
+              }),
+            ),
+
+            // ── "Favorites" banner – visible only when filter is active ──
+            if (_showFavoritesOnly)
+              _FavoritesBanner(
+                onClear: () => setState(() => _showFavoritesOnly = false),
+              ),
 
             // ── Booking for ───────────────────────────────────────────────
             familyState.allfamilyMembers.maybeWhen(
@@ -168,8 +232,8 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
               onChanged:  (_) => setState(() {}),
             ),
 
-            // ── Specialty chips ───────────────────────────────────────────
-            if (doctorsState.doctors.isNotEmpty) ...[
+            // ── Specialty chips (hide when favorites-only active) ─────────
+            if (!_showFavoritesOnly && doctorsState.doctors.isNotEmpty) ...[
               _SpecialtyChips(
                 specialties: _uniqueSpecialties(doctorsState.doctors),
                 selected:    _selectedSpecialty,
@@ -177,8 +241,14 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
                   () => _selectedSpecialty = s == _selectedSpecialty ? null : s,
                 ),
               ),
-              _ResultsBar(count: _filtered(doctorsState.doctors).length),
             ],
+
+            // ── Results bar ───────────────────────────────────────────────
+            if (doctorsState.doctors.isNotEmpty)
+              _ResultsBar(
+                count:            _filtered(doctorsState.doctors).length,
+                isFavoritesMode:  _showFavoritesOnly,
+              ),
 
             // ── List / loading / empty ────────────────────────────────────
             Expanded(
@@ -194,6 +264,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
                       doctors:          _filtered(doctorsState.doctors),
                       isDark:           isDark,
                       selectedMemberId: _selectedMemberId,
+                      isFavoritesMode:  _showFavoritesOnly,
                       onRefresh: () => ref
                           .read(doctorsViewModelProvider.notifier)
                           .fetchDoctors(),
@@ -207,14 +278,27 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HEADER
+// HEADER  (heart now toggles in-page filter)
 // ─────────────────────────────────────────────────────────────────────────────
-class _Header extends StatelessWidget {
-  final bool isDark;
-  const _Header({required this.isDark});
+class _Header extends ConsumerWidget {
+  final bool         isDark;
+  final bool         showFavoritesOnly;
+  final VoidCallback onFavoritesTap;
+
+  const _Header({
+    required this.isDark,
+    required this.showFavoritesOnly,
+    required this.onFavoritesTap,
+  });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final favCount = ref.watch(
+      favoriteViewModelProvider.select(
+        (state) => state.doctorFavorites.values.where((isFav) => isFav).length,
+      ),
+    );
+
     return Container(
       color: isDark ? _kDarkSurface : kCardBg,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -226,16 +310,15 @@ class _Header extends StatelessWidget {
               Text(
                 'Good morning',
                 style: TextStyle(
-                  // compact: 11 → 11 (already compact, keep)
                   fontSize: 11,
                   color: isDark ? Colors.white54 : kTextMid,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
-                'Find Doctors',
+                // Title changes to reflect current view mode
+                showFavoritesOnly ? 'Favorite Doctors' : 'Find Doctors',
                 style: TextStyle(
-                  // compact: 20 → 17
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : kTextDark,
@@ -243,6 +326,108 @@ class _Header extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+          const Spacer(),
+
+          // ── Heart button: tap to toggle favorites-only filter ────────────
+          GestureDetector(
+            onTap: onFavoritesTap,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                // Filled red background when filter is active
+                color: showFavoritesOnly
+                    ? kRed
+                    : kRed.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Center(
+                    child: Icon(
+                      showFavoritesOnly
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_rounded,
+                      color: showFavoritesOnly ? Colors.white : kRed,
+                      size: 18,
+                    ),
+                  ),
+                  // Badge – only when filter is OFF and there are favorites
+                  if (!showFavoritesOnly && favCount > 0)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(
+                          color: kRed,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$favCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FAVORITES BANNER  (shown below header when filter is active)
+// ─────────────────────────────────────────────────────────────────────────────
+class _FavoritesBanner extends StatelessWidget {
+  final VoidCallback onClear;
+  const _FavoritesBanner({required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: kRed.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kRed.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.favorite_rounded, color: kRed, size: 13),
+          const SizedBox(width: 6),
+          const Expanded(
+            child: Text(
+              'Showing your favorite doctors only',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: kRed,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onClear,
+            child: const Text(
+              'Show all',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: kPrimary,
+                decoration: TextDecoration.underline,
+              ),
+            ),
           ),
         ],
       ),
@@ -276,7 +461,6 @@ class _BookingForDropdown extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              // compact: radius 13 → 12
               radius: 12,
               backgroundColor: kPrimary.withOpacity(0.15),
               child: Text(
@@ -284,7 +468,6 @@ class _BookingForDropdown extends StatelessWidget {
                     ? patientState.name![0].toUpperCase()
                     : 'M',
                 style: const TextStyle(
-                  // compact: 11 → 10
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: kPrimary,
@@ -299,7 +482,6 @@ class _BookingForDropdown extends StatelessWidget {
                 Text(
                   patientState.name ?? 'Me',
                   style: TextStyle(
-                    // compact: 13 → 12
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : kTextDark,
@@ -308,7 +490,6 @@ class _BookingForDropdown extends StatelessWidget {
                 Text(
                   'You',
                   style: TextStyle(
-                    // compact: 10 → 10 (already compact, keep)
                     fontSize: 10,
                     color: isDark ? Colors.white38 : kTextMid,
                   ),
@@ -382,7 +563,6 @@ class _BookingForDropdown extends StatelessWidget {
           Text(
             'Booking for',
             style: TextStyle(
-              // compact: 12 → 11
               fontSize: 11,
               color: isDark ? Colors.white54 : kTextMid,
             ),
@@ -400,7 +580,6 @@ class _BookingForDropdown extends StatelessWidget {
                   color: kPrimary,
                 ),
                 style: const TextStyle(
-                  // compact: 13 → 12
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: kPrimary,
@@ -462,7 +641,6 @@ class _SearchBar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
       child: Container(
-        // compact: height 46 → 42
         height: 42,
         decoration: BoxDecoration(
           color: isDark ? _kDarkSurface : const Color(0xFFF9FAFB),
@@ -480,7 +658,6 @@ class _SearchBar extends StatelessWidget {
                 controller: controller,
                 onChanged: onChanged,
                 style: TextStyle(
-                  // compact: 13 → 13 (already good, keep)
                   fontSize: 13,
                   color: isDark ? Colors.white : kTextDark,
                 ),
@@ -542,7 +719,6 @@ class _SpecialtyChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      // compact: height 44 → 40
       height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
@@ -601,7 +777,6 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            // compact: 12 → 11
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: selected ? Colors.white : accent,
@@ -616,8 +791,9 @@ class _Chip extends StatelessWidget {
 // RESULTS BAR
 // ─────────────────────────────────────────────────────────────────────────────
 class _ResultsBar extends StatelessWidget {
-  final int count;
-  const _ResultsBar({required this.count});
+  final int  count;
+  final bool isFavoritesMode;
+  const _ResultsBar({required this.count, required this.isFavoritesMode});
 
   @override
   Widget build(BuildContext context) {
@@ -626,24 +802,24 @@ class _ResultsBar extends StatelessWidget {
       child: Row(
         children: [
           Text(
-            '$count doctors available',
-            style: const TextStyle(
-              // compact: 12 → 11
-              fontSize: 11,
-              color: kTextMid,
-            ),
+            isFavoritesMode
+                ? '$count favorite${count == 1 ? '' : 's'} found'
+                : '$count doctors available',
+            style: const TextStyle(fontSize: 11, color: kTextMid),
           ),
           const Spacer(),
-          const Icon(Icons.sort_rounded, size: 13, color: kPrimary),
-          const SizedBox(width: 3),
-          const Text(
-            'Sort',
-            style: TextStyle(
-              fontSize: 11,
-              color: kPrimary,
-              fontWeight: FontWeight.w500,
+          if (!isFavoritesMode) ...[
+            const Icon(Icons.sort_rounded, size: 13, color: kPrimary),
+            const SizedBox(width: 3),
+            const Text(
+              'Sort',
+              style: TextStyle(
+                fontSize: 11,
+                color: kPrimary,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -657,12 +833,14 @@ class _DoctorList extends StatelessWidget {
   final List<DoctorDetails>     doctors;
   final bool                    isDark;
   final int?                    selectedMemberId;
+  final bool                    isFavoritesMode;
   final Future<void> Function() onRefresh;
 
   const _DoctorList({
     required this.doctors,
     required this.isDark,
     required this.selectedMemberId,
+    required this.isFavoritesMode,
     required this.onRefresh,
   });
 
@@ -674,15 +852,18 @@ class _DoctorList extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              Icons.search_off_rounded,
+              isFavoritesMode
+                  ? Icons.favorite_border_rounded
+                  : Icons.search_off_rounded,
               size: 44,
               color: kTextMid.withOpacity(0.4),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'No doctors match your search',
-              // compact: 15 → 13
-              style: TextStyle(fontSize: 13, color: kTextMid),
+            Text(
+              isFavoritesMode
+                  ? 'No favorite doctors yet'
+                  : 'No doctors match your search',
+              style: const TextStyle(fontSize: 13, color: kTextMid),
             ),
           ],
         ),
@@ -699,7 +880,7 @@ class _DoctorList extends StatelessWidget {
           doctor:           doctors[i],
           isDark:           isDark,
           selectedMemberId: selectedMemberId,
-          isTopRated:       i == 0,
+          isTopRated:       !isFavoritesMode && i == 0,
         ),
       ),
     );
@@ -747,12 +928,9 @@ class _DoctorCard extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // ── Card body ────────────────────────────────────────────────────
+        // ── Card body ─────────────────────────────────────────────────────
         Container(
-          margin: EdgeInsets.only(
-            bottom: 8,
-            top: isTopRated ? 10 : 0,
-          ),
+          margin: EdgeInsets.only(bottom: 8, top: isTopRated ? 10 : 0),
           decoration: BoxDecoration(
             color: isDark ? _kDarkSurface : kCardBg,
             borderRadius: BorderRadius.circular(14),
@@ -765,14 +943,13 @@ class _DoctorCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Avatar — compact: radius 25 → 22
+              // Avatar
               CircleAvatar(
                 radius: 22,
                 backgroundColor: accent,
                 child: Text(
                   initial,
                   style: const TextStyle(
-                    // compact: 19 → 16
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -787,14 +964,12 @@ class _DoctorCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Name + fee
                     Row(
                       children: [
                         Expanded(
                           child: Text(
                             'Dr. ${doctor.name ?? 'Unknown'}',
                             style: TextStyle(
-                              // compact: 14 → 13
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: isDark ? Colors.white : kTextDark,
@@ -806,7 +981,6 @@ class _DoctorCard extends StatelessWidget {
                           Text(
                             '₹${doctor.consultationFee!.toStringAsFixed(0)}',
                             style: const TextStyle(
-                              // compact: 13 → 12
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: kGreen,
@@ -816,15 +990,13 @@ class _DoctorCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
 
-                    // Specialty badge + experience
+                    // Specialty + experience
                     Row(
                       children: [
                         if (doctor.specialization != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
+                                horizontal: 7, vertical: 2),
                             decoration: BoxDecoration(
                               color: specBg,
                               borderRadius: BorderRadius.circular(4),
@@ -832,7 +1004,6 @@ class _DoctorCard extends StatelessWidget {
                             child: Text(
                               _dssCapitalize(doctor.specialization!),
                               style: TextStyle(
-                                // compact: 10.5 → 10
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: accent,
@@ -845,7 +1016,6 @@ class _DoctorCard extends StatelessWidget {
                           Text(
                             '${doctor.experience} yrs exp',
                             style: TextStyle(
-                              // compact: 11 → 11 (keep)
                               fontSize: 11,
                               color: isDark ? Colors.white54 : kTextMid,
                             ),
@@ -859,11 +1029,9 @@ class _DoctorCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Row(
                         children: [
-                          Icon(
-                            Icons.local_hospital_rounded,
-                            size: 10,
-                            color: isDark ? Colors.white38 : kTextMid,
-                          ),
+                          Icon(Icons.local_hospital_rounded,
+                              size: 10,
+                              color: isDark ? Colors.white38 : kTextMid),
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
@@ -871,7 +1039,6 @@ class _DoctorCard extends StatelessWidget {
                                   .where((s) => s != null && s.isNotEmpty)
                                   .join(' · '),
                               style: TextStyle(
-                                // compact: 11 → 11 (keep)
                                 fontSize: 11,
                                 color: isDark ? Colors.white54 : kTextMid,
                               ),
@@ -881,11 +1048,8 @@ class _DoctorCard extends StatelessWidget {
                           ),
                           if (doctor.queueLength != null) ...[
                             const SizedBox(width: 6),
-                            Icon(
-                              Icons.people_alt_rounded,
-                              size: 10,
-                              color: queueColor,
-                            ),
+                            Icon(Icons.people_alt_rounded,
+                                size: 10, color: queueColor),
                             const SizedBox(width: 2),
                             Text(
                               queueLabel,
@@ -902,11 +1066,8 @@ class _DoctorCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Row(
                         children: [
-                          Icon(
-                            Icons.people_alt_rounded,
-                            size: 10,
-                            color: queueColor,
-                          ),
+                          Icon(Icons.people_alt_rounded,
+                              size: 10, color: queueColor),
                           const SizedBox(width: 2),
                           Text(
                             queueLabel,
@@ -924,7 +1085,7 @@ class _DoctorCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
 
-              // Book button — compact: height 34 → 32
+              // Book button
               SizedBox(
                 height: 32,
                 child: ElevatedButton(
@@ -946,7 +1107,6 @@ class _DoctorCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(9),
                     ),
                     textStyle: const TextStyle(
-                      // compact: 12 → 11
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -972,7 +1132,6 @@ class _DoctorCard extends StatelessWidget {
               child: const Text(
                 'Top rated',
                 style: TextStyle(
-                  // compact: 10 → 10 (keep)
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -1092,7 +1251,6 @@ class _EmptyState extends StatelessWidget {
             const Text(
               'No doctors found',
               style: TextStyle(
-                // compact: 18 → 15
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: kTextDark,
@@ -1103,7 +1261,6 @@ class _EmptyState extends StatelessWidget {
               'We couldn\'t load the doctors list.\nCheck your connection and try again.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                // compact: 13.5 → 12
                 fontSize: 12,
                 color: kTextMid,
                 height: 1.5,
@@ -1126,7 +1283,6 @@ class _EmptyState extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 textStyle: const TextStyle(
-                  // compact: implicit → 13
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),

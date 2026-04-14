@@ -1261,6 +1261,66 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<QueuePreviewResponseModel> queueEstimate(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
+    final _options = _setStreamType<QueuePreviewResponseModel>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'patient/insert/queueEstimate',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late QueuePreviewResponseModel _value;
+    try {
+      _value = QueuePreviewResponseModel.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<QueuePreviewResponseModel> queuePreviewEstimate(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(appointmentRequest.toJson());
+    final _options = _setStreamType<QueuePreviewResponseModel>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'patient/insert/queuePreviewEstimate',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late QueuePreviewResponseModel _value;
+    try {
+      _value = QueuePreviewResponseModel.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<FamilyMember> deleteFamilyMember(int memberId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};

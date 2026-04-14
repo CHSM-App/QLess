@@ -3,6 +3,7 @@ import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
+import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/repository/appointment_repo.dart';
 
 class AppointmentImpl implements AppointmentRepository {
@@ -114,4 +115,17 @@ class AppointmentImpl implements AppointmentRepository {
     return apiService.endSession(appointmentRequest);
   }
 
+  @override
+  Future<QueuePreviewResponseModel> queueEstimate(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.queueEstimate(appointmentRequest);
+  }
+
+  @override
+  Future<QueuePreviewResponseModel> queuePreviewEstimate(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.queuePreviewEstimate(appointmentRequest);
+  }
 }
