@@ -61,5 +61,6 @@ Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
       'gender_id': instance.genderId,
       'q_start_before': _intToJson(instance.leadTime),
       'q_start_section': instance.qStartSection,
+      'q_start_time': instance.queueStartBefore,
       'queue_length': instance.queueLength,
     };
