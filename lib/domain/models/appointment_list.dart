@@ -79,6 +79,22 @@ class AppointmentList {
   @JsonKey(name: 'queue_status')
   int? queueStatus;
 
+  // NEW FIELDS (QUEUE ESTIMATE)
+  @JsonKey(name: 'my_queue_number')
+  int? myQueueNumber;
+
+  @JsonKey(name: 'patients_ahead')
+  int? patientsAhead;
+
+  @JsonKey(name: 'estimated_arrival_time')
+  String? estimatedArrivalTime;
+
+  @JsonKey(name: 'queue_started')
+  bool? queueStarted;
+
+  @JsonKey(name: 'is_my_turn')
+  bool? isMyTurn;
+
   AppointmentList({
     this.appointmentId,
     this.patientId,
@@ -102,9 +118,15 @@ class AppointmentList {
     this.clinicName,
     this.latitude,
     this.longitude,
-
     this.clinicContact,
     this.queueStatus,
+
+    // NEW
+    this.myQueueNumber,
+    this.patientsAhead,
+    this.estimatedArrivalTime,
+    this.queueStarted,
+    this.isMyTurn,
   });
 
   factory AppointmentList.fromJson(Map<String, dynamic> json) =>
