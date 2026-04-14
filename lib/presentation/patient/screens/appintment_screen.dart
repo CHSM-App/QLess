@@ -1430,7 +1430,9 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
   }
 
   bool get _hasEstimate =>
-      widget.estimatedMinutes != null || widget.estimatedArrivalTime != null;
+      widget.estimatedMinutes != null ||
+      widget.estimatedArrivalTime != null ||
+      widget.patientsAhead != null;
 
   @override
   Widget build(BuildContext context) {
@@ -1542,11 +1544,18 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
         size: 13, color: kAmber),
     const SizedBox(width: 6),
 
-    if (widget.estimatedMinutes != null)
+    if (widget.patientsAhead == 0)
+      const Text(
+        'Your turn now',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: kAmber,
+        ),
+      )
+    else if (widget.estimatedMinutes != null)
       Text(
-        widget.estimatedMinutes == 0
-            ? 'Your turn now'
-            : '~${widget.estimatedMinutes} min wait',
+        '~${widget.estimatedMinutes} min wait',
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -1572,16 +1581,16 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
           color: kAmber.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(20),
         ),
-        // child: Text(
-        //   widget.patientsAhead == 0
-        //       ? 'Next'
-        //       : '${widget.patientsAhead} ahead',
-        //   style: const TextStyle(
-        //     fontSize: 11,
-        //     fontWeight: FontWeight.w600,
-        //     color: kAmber,
-        //   ),
-        // ),
+        child: Text(
+          widget.patientsAhead == 0
+              ? 'Next'
+              : '${widget.patientsAhead} ahead',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: kAmber,
+          ),
+        ),
       ),
     ],
   ],
@@ -1591,122 +1600,6 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
     );
   }
 }
-
-// // ════════════════════════════════════════════════════════
-// //  LIVE QUEUE BANNER  (pulsing dot + queue number)
-// // ════════════════════════════════════════════════════════
-
-// class _LiveQueueBanner extends StatefulWidget {
-//   final int? queueNumber;
-//   const _LiveQueueBanner({this.queueNumber});
-
-//   @override
-//   State<_LiveQueueBanner> createState() => _LiveQueueBannerState();
-// }
-
-// class _LiveQueueBannerState extends State<_LiveQueueBanner>
-//     with SingleTickerProviderStateMixin {
-//   late final AnimationController _ctrl;
-//   late final Animation<double> _pulse;
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _ctrl = AnimationController(
-//       vsync: this,
-//       duration: const Duration(milliseconds: 900),
-//     )..repeat(reverse: true);
-//     _pulse = Tween<double>(begin: 0.35, end: 1.0).animate(
-//       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-//     );
-//   }
-
-//   @override
-//   void dispose() {
-//     _ctrl.dispose();
-//     super.dispose();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final q = widget.queueNumber;
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-//       decoration: BoxDecoration(
-//         color: kGreen.withValues(alpha: 0.07),
-//         borderRadius: BorderRadius.circular(12),
-//         border: Border.all(color: kGreen.withValues(alpha: 0.28)),
-//       ),
-//       child: Row(
-//         children: [
-//           // Pulsing dot
-//           AnimatedBuilder(
-//             animation: _pulse,
-//             builder: (_, __) => Container(
-//               width: 9,
-//               height: 9,
-//               decoration: BoxDecoration(
-//                 shape: BoxShape.circle,
-//                 color: kGreen.withValues(alpha: _pulse.value),
-//               ),
-//             ),
-//           ),
-//           const SizedBox(width: 10),
-//           // Label + number
-//           Expanded(
-//             child: RichText(
-//               text: TextSpan(
-//                 style: const TextStyle(fontSize: 13, color: kTextDark),
-//                 children: [
-//                   const TextSpan(
-//                     text: 'Your queue position  ',
-//                     style: TextStyle(
-//                       fontSize: 12,
-//                       fontWeight: FontWeight.w500,
-//                       color: kTextMid,
-//                     ),
-//                   ),
-//                   TextSpan(
-//                     text: q != null ? '#$q' : '—',
-//                     style: TextStyle(
-//                       fontSize: 17,
-//                       fontWeight: FontWeight.w800,
-//                       color: q != null ? kGreen : kTextMid,
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ),
-//           // LIVE chip
-//           Container(
-//             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-//             decoration: BoxDecoration(
-//               color: kGreen,
-//               borderRadius: BorderRadius.circular(6),
-//             ),
-//             child: const Row(
-//               mainAxisSize: MainAxisSize.min,
-//               children: [
-//                 Icon(Icons.circle, size: 6, color: Colors.white),
-//                 SizedBox(width: 4),
-//                 Text(
-//                   'LIVE',
-//                   style: TextStyle(
-//                     color: Colors.white,
-//                     fontSize: 10,
-//                     fontWeight: FontWeight.w700,
-//                     letterSpacing: 0.6,
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
 
 // ════════════════════════════════════════════════════════
 //  DETAIL BOTTOM SHEET
