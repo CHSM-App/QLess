@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -240,6 +242,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool _isWaitingForId = false;
   bool _idMissing = false;
   late final TabController _tabController;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
@@ -251,12 +254,46 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       }
     });
     Future.microtask(_ensurePatientIdAndFetch);
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _autoRefresh(),
+    );
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _tabController.dispose();
     super.dispose();
+  }
+
+  // ── AUTO-REFRESH: only fetches when today's queue appointments are active ──
+
+  void _autoRefresh() {
+    if (!mounted) return;
+    final appointments = ref
+        .read(appointmentViewModelProvider)
+        .patientAppointmentsList
+        ?.valueOrNull;
+    final hasLiveQueue = appointments?.any(_isLiveQueueToday) ?? false;
+    if (!hasLiveQueue) return;
+    final patientId =
+        ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    if (patientId > 0) {
+      ref
+          .read(appointmentViewModelProvider.notifier)
+          .getPatientAppointments(patientId);
+    }
+  }
+
+  // Returns true for today's booked walk-in queue appointments.
+  bool _isLiveQueueToday(AppointmentList a) {
+    if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
+    if (a.bookingType != 1) return false;
+    final d = DateTime.tryParse(a.appointmentDate ?? '');
+    if (d == null) return false;
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
   }
 
   Future<void> refreshOnVisible() async {
@@ -775,12 +812,15 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final a = filtered[index];
+          final live = _isLiveQueueToday(a);
           return _AppointmentCard(
             appointment: a,
             onViewDetails: () => _openDetail(a),
             onReview: _canReview(a) ? () => _handleReview(context, a) : null,
             onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
             onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
+            queueNumber: live ? a.queueNumber : null,
+            isLiveQueue: live,
           );
         },
       ),
@@ -921,6 +961,7 @@ class _AppointmentCard extends StatelessWidget {
   final VoidCallback? onCancel;
   final VoidCallback? onReschedule;
   final int? queueNumber;
+  final bool isLiveQueue;
 
   const _AppointmentCard({
     required this.appointment,
@@ -929,6 +970,7 @@ class _AppointmentCard extends StatelessWidget {
     this.onCancel,
     this.onReschedule,
     this.queueNumber,
+    this.isLiveQueue = false,
   });
 
   @override
@@ -1094,6 +1136,11 @@ class _AppointmentCard extends StatelessWidget {
                         ),
                       ],
                     ),
+
+                    if (isLiveQueue) ...[
+                      const SizedBox(height: 10),
+                      _LiveQueueBanner(queueNumber: queueNumber),
+                    ],
 
                     const SizedBox(height: 10),
 
@@ -1288,6 +1335,122 @@ class _AppointmentCard extends StatelessWidget {
         ),
         onPressed: onTap,
         child: Icon(icon, color: iconColor, size: 17),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  LIVE QUEUE BANNER  (pulsing dot + queue number)
+// ════════════════════════════════════════════════════════
+
+class _LiveQueueBanner extends StatefulWidget {
+  final int? queueNumber;
+  const _LiveQueueBanner({this.queueNumber});
+
+  @override
+  State<_LiveQueueBanner> createState() => _LiveQueueBannerState();
+}
+
+class _LiveQueueBannerState extends State<_LiveQueueBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.35, end: 1.0).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = widget.queueNumber;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: kGreen.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kGreen.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        children: [
+          // Pulsing dot
+          AnimatedBuilder(
+            animation: _pulse,
+            builder: (_, __) => Container(
+              width: 9,
+              height: 9,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: kGreen.withValues(alpha: _pulse.value),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Label + number
+          Expanded(
+            child: RichText(
+              text: TextSpan(
+                style: const TextStyle(fontSize: 13, color: kTextDark),
+                children: [
+                  const TextSpan(
+                    text: 'Your queue position  ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: kTextMid,
+                    ),
+                  ),
+                  TextSpan(
+                    text: q != null ? '#$q' : '—',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: q != null ? kGreen : kTextMid,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // LIVE chip
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: kGreen,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.circle, size: 6, color: Colors.white),
+                SizedBox(width: 4),
+                Text(
+                  'LIVE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
