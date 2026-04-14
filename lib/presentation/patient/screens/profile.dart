@@ -87,6 +87,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
       backgroundColor: kBg,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: 100),
         child: Column(
           children: [
             _buildProfileCard(patientState, patientDetails),

@@ -2,6 +2,15 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'doctor_details.g.dart';
 
+int? _intFromJson(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
+int? _intToJson(int? value) => value;
+
 @JsonSerializable()
 class DoctorDetails {
   // Doctor fields
@@ -16,7 +25,7 @@ class DoctorDetails {
   final int? experience;
   final String? specialization;
   final String? image;
-    @JsonKey(name: 'role_id')
+  @JsonKey(name: 'role_id')
   final int? roleId;
   @JsonKey(name: 'token')
   final String? Token;
@@ -31,18 +40,18 @@ class DoctorDetails {
   final double? longitude;
   @JsonKey(name: 'consultation_fee')
   final double? consultationFee;
-   @JsonKey(name: 'website_name')
+  @JsonKey(name: 'website_name')
   final String? websiteName;
-   @JsonKey(name: 'clinic_email')
+  @JsonKey(name: 'clinic_email')
   final String? clinicEmail;
-   @JsonKey(name: 'clinic_contact')
+  @JsonKey(name: 'clinic_contact')
   final String? clinicContact;
-   @JsonKey(name: 'image_url')
+  @JsonKey(name: 'image_url')
   final String? imageUrl;
-   @JsonKey(name: 'gender_id')
+  @JsonKey(name: 'gender_id')
   final int? genderId;
 
-     @JsonKey(name: 'q_start_time')
+  @JsonKey(name: 'q_start_before', fromJson: _intFromJson, toJson: _intToJson)
   final int? leadTime;
 
      @JsonKey(name: 'q_start_before')
@@ -52,9 +61,15 @@ class DoctorDetails {
   final int? qStartSection;
 
 
-  
 
-  @JsonKey(name : 'queue_length')
+
+ 
+
+
+  @JsonKey(name: 'q_start_time', includeFromJson: false, includeToJson: true)
+  final int? queueStartBefore;
+
+  @JsonKey(name: 'queue_length')
   final int? queueLength;
 
   DoctorDetails({
@@ -84,12 +99,11 @@ class DoctorDetails {
     this.leadTime,
     this.qStartBefore,
     this.qStartSection,
+    this.queueStartBefore,
   });
-  
+
   factory DoctorDetails.fromJson(Map<String, dynamic> json) =>
-   _$DoctorDetailsFromJson(json);
-  
+      _$DoctorDetailsFromJson(json);
 
   Map<String, dynamic> toJson() => _$DoctorDetailsToJson(this);
-
 }

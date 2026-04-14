@@ -1078,7 +1078,7 @@ class _BaBody extends StatelessWidget {
             .where((s) => _baBookable(s.bookingMode, dayIsToday)).toList();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _BaCalendarStrip(
           grouped:        grouped,

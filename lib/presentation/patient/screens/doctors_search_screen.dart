@@ -115,7 +115,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
 
   List<DoctorDetails> _filtered(List<DoctorDetails> all) {
     return all.where((d) {
-      final q           = _searchController.text.toLowerCase();
+      final q            = _searchController.text.toLowerCase();
       final matchesQuery = _searchController.text.isEmpty ||
           (d.name?.toLowerCase().contains(q) ?? false) ||
           (d.specialization?.toLowerCase().contains(q) ?? false) ||
@@ -217,7 +217,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: isDark ? _kDarkSurface : kCardBg,
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
           Column(
@@ -226,6 +226,7 @@ class _Header extends StatelessWidget {
               Text(
                 'Good morning',
                 style: TextStyle(
+                  // compact: 11 → 11 (already compact, keep)
                   fontSize: 11,
                   color: isDark ? Colors.white54 : kTextMid,
                 ),
@@ -234,7 +235,8 @@ class _Header extends StatelessWidget {
               Text(
                 'Find Doctors',
                 style: TextStyle(
-                  fontSize: 20,
+                  // compact: 20 → 17
+                  fontSize: 17,
                   fontWeight: FontWeight.w700,
                   color: isDark ? Colors.white : kTextDark,
                   letterSpacing: -0.3,
@@ -242,33 +244,6 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
-         // const Spacer(),
-          // Container(
-          //   width: 36,
-          //   height: 36,
-          //   decoration: BoxDecoration(
-          //     color: kPrimaryBg,
-          //     borderRadius: BorderRadius.circular(10),
-          //   ),
-          //   child: const Icon(
-          //     Icons.notifications_outlined,
-          //     color: kPrimary,
-          //     size: 18,
-          //   ),
-          // ),
-          // const SizedBox(width: 8),
-          // CircleAvatar(
-          //   radius: 18,
-          //   backgroundColor: kPrimary,
-          //   child: const Text(
-          //     'A',
-          //     style: TextStyle(
-          //       fontSize: 14,
-          //       fontWeight: FontWeight.w700,
-          //       color: Colors.white,
-          //     ),
-          //   ),
-          // ),
         ],
       ),
     );
@@ -301,20 +276,22 @@ class _BookingForDropdown extends StatelessWidget {
         child: Row(
           children: [
             CircleAvatar(
-              radius: 13,
+              // compact: radius 13 → 12
+              radius: 12,
               backgroundColor: kPrimary.withOpacity(0.15),
               child: Text(
                 (patientState.name?.isNotEmpty ?? false)
                     ? patientState.name![0].toUpperCase()
                     : 'M',
                 style: const TextStyle(
-                  fontSize: 11,
+                  // compact: 11 → 10
+                  fontSize: 10,
                   fontWeight: FontWeight.w700,
                   color: kPrimary,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -322,7 +299,8 @@ class _BookingForDropdown extends StatelessWidget {
                 Text(
                   patientState.name ?? 'Me',
                   style: TextStyle(
-                    fontSize: 13,
+                    // compact: 13 → 12
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: isDark ? Colors.white : kTextDark,
                   ),
@@ -330,6 +308,7 @@ class _BookingForDropdown extends StatelessWidget {
                 Text(
                   'You',
                   style: TextStyle(
+                    // compact: 10 → 10 (already compact, keep)
                     fontSize: 10,
                     color: isDark ? Colors.white38 : kTextMid,
                   ),
@@ -346,20 +325,20 @@ class _BookingForDropdown extends StatelessWidget {
           child: Row(
             children: [
               CircleAvatar(
-                radius: 13,
+                radius: 12,
                 backgroundColor: color.withOpacity(0.15),
                 child: Text(
                   m.memberName?.isNotEmpty == true
                       ? m.memberName![0].toUpperCase()
                       : '?',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: FontWeight.w700,
                     color: color,
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -367,7 +346,7 @@ class _BookingForDropdown extends StatelessWidget {
                   Text(
                     m.memberName ?? '?',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: isDark ? Colors.white : kTextDark,
                     ),
@@ -389,21 +368,22 @@ class _BookingForDropdown extends StatelessWidget {
     ];
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 2),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
         color: kPrimaryBg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: kPrimary.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.location_on_outlined, color: kPrimary, size: 16),
-          const SizedBox(width: 8),
+          const Icon(Icons.location_on_outlined, color: kPrimary, size: 14),
+          const SizedBox(width: 6),
           Text(
             'Booking for',
             style: TextStyle(
-              fontSize: 12,
+              // compact: 12 → 11
+              fontSize: 11,
               color: isDark ? Colors.white54 : kTextMid,
             ),
           ),
@@ -416,11 +396,12 @@ class _BookingForDropdown extends StatelessWidget {
                 isExpanded: true,
                 icon: const Icon(
                   Icons.keyboard_arrow_down_rounded,
-                  size: 18,
+                  size: 16,
                   color: kPrimary,
                 ),
                 style: const TextStyle(
-                  fontSize: 13,
+                  // compact: 13 → 12
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: kPrimary,
                 ),
@@ -433,7 +414,7 @@ class _BookingForDropdown extends StatelessWidget {
                     child: Text(
                       patientState.name ?? 'Me',
                       style: const TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: kPrimary,
                       ),
@@ -445,7 +426,7 @@ class _BookingForDropdown extends StatelessWidget {
                       child: Text(
                         m.memberName ?? 'Member',
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: kPrimary,
                         ),
@@ -479,25 +460,27 @@ class _SearchBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
       child: Container(
-        height: 46,
+        // compact: height 46 → 42
+        height: 42,
         decoration: BoxDecoration(
           color: isDark ? _kDarkSurface : const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(color: kBorder),
         ),
         child: Row(
           children: [
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 14),
-              child: Icon(Icons.search_rounded, color: kTextMid, size: 18),
+              padding: EdgeInsets.symmetric(horizontal: 12),
+              child: Icon(Icons.search_rounded, color: kTextMid, size: 17),
             ),
             Expanded(
               child: TextField(
                 controller: controller,
                 onChanged: onChanged,
                 style: TextStyle(
+                  // compact: 13 → 13 (already good, keep)
                   fontSize: 13,
                   color: isDark ? Colors.white : kTextDark,
                 ),
@@ -521,19 +504,19 @@ class _SearchBar extends StatelessWidget {
                 },
                 child: const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Icon(Icons.close_rounded, size: 16, color: kTextMid),
+                  child: Icon(Icons.close_rounded, size: 15, color: kTextMid),
                 ),
               )
             else
               Container(
                 margin: const EdgeInsets.only(right: 8),
-                width: 28,
-                height: 28,
+                width: 26,
+                height: 26,
                 decoration: BoxDecoration(
                   color: kPrimary,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(7),
                 ),
-                child: const Icon(Icons.tune_rounded, color: Colors.white, size: 14),
+                child: const Icon(Icons.tune_rounded, color: Colors.white, size: 13),
               ),
           ],
         ),
@@ -546,8 +529,8 @@ class _SearchBar extends StatelessWidget {
 // SPECIALTY CHIPS
 // ─────────────────────────────────────────────────────────────────────────────
 class _SpecialtyChips extends StatelessWidget {
-  final List<String>     specialties;
-  final String?          selected;
+  final List<String>         specialties;
+  final String?              selected;
   final ValueChanged<String> onSelected;
 
   const _SpecialtyChips({
@@ -559,7 +542,8 @@ class _SpecialtyChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      // compact: height 44 → 40
+      height: 40,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -605,8 +589,8 @@ class _Chip extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        margin: const EdgeInsets.only(right: 8, top: 4, bottom: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        margin: const EdgeInsets.only(right: 6, top: 3, bottom: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
           color: selected ? accent : bgColor,
           borderRadius: BorderRadius.circular(20),
@@ -617,7 +601,8 @@ class _Chip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            // compact: 12 → 11
+            fontSize: 11,
             fontWeight: FontWeight.w600,
             color: selected ? Colors.white : accent,
           ),
@@ -637,20 +622,24 @@ class _ResultsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 2),
       child: Row(
         children: [
           Text(
             '$count doctors available',
-            style: const TextStyle(fontSize: 12, color: kTextMid),
+            style: const TextStyle(
+              // compact: 12 → 11
+              fontSize: 11,
+              color: kTextMid,
+            ),
           ),
           const Spacer(),
-          const Icon(Icons.sort_rounded, size: 14, color: kPrimary),
+          const Icon(Icons.sort_rounded, size: 13, color: kPrimary),
           const SizedBox(width: 3),
           const Text(
             'Sort',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
               color: kPrimary,
               fontWeight: FontWeight.w500,
             ),
@@ -686,13 +675,14 @@ class _DoctorList extends StatelessWidget {
           children: [
             Icon(
               Icons.search_off_rounded,
-              size: 52,
+              size: 44,
               color: kTextMid.withOpacity(0.4),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             const Text(
               'No doctors match your search',
-              style: TextStyle(fontSize: 15, color: kTextMid),
+              // compact: 15 → 13
+              style: TextStyle(fontSize: 13, color: kTextMid),
             ),
           ],
         ),
@@ -703,7 +693,7 @@ class _DoctorList extends StatelessWidget {
       onRefresh: onRefresh,
       color: kPrimary,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
         itemCount: doctors.length,
         itemBuilder: (_, i) => _DoctorCard(
           doctor:           doctors[i],
@@ -760,35 +750,36 @@ class _DoctorCard extends StatelessWidget {
         // ── Card body ────────────────────────────────────────────────────
         Container(
           margin: EdgeInsets.only(
-            bottom: 10,
+            bottom: 8,
             top: isTopRated ? 10 : 0,
           ),
           decoration: BoxDecoration(
             color: isDark ? _kDarkSurface : kCardBg,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: isTopRated ? kPrimary : kBorder,
               width: isTopRated ? 1.5 : 0.5,
             ),
           ),
-          padding: const EdgeInsets.fromLTRB(12, 13, 12, 13),
+          padding: const EdgeInsets.fromLTRB(11, 11, 11, 11),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Avatar
+              // Avatar — compact: radius 25 → 22
               CircleAvatar(
-                radius: 25,
+                radius: 22,
                 backgroundColor: accent,
                 child: Text(
                   initial,
                   style: const TextStyle(
-                    fontSize: 19,
+                    // compact: 19 → 16
+                    fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
               ),
-              const SizedBox(width: 11),
+              const SizedBox(width: 10),
 
               // Info column
               Expanded(
@@ -803,7 +794,8 @@ class _DoctorCard extends StatelessWidget {
                           child: Text(
                             'Dr. ${doctor.name ?? 'Unknown'}',
                             style: TextStyle(
-                              fontSize: 14,
+                              // compact: 14 → 13
+                              fontSize: 13,
                               fontWeight: FontWeight.w700,
                               color: isDark ? Colors.white : kTextDark,
                             ),
@@ -814,14 +806,15 @@ class _DoctorCard extends StatelessWidget {
                           Text(
                             '₹${doctor.consultationFee!.toStringAsFixed(0)}',
                             style: const TextStyle(
-                              fontSize: 13,
+                              // compact: 13 → 12
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
                               color: kGreen,
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 3),
 
                     // Specialty badge + experience
                     Row(
@@ -829,28 +822,30 @@ class _DoctorCard extends StatelessWidget {
                         if (doctor.specialization != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
+                              horizontal: 7,
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
                               color: specBg,
-                              borderRadius: BorderRadius.circular(5),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
                               _dssCapitalize(doctor.specialization!),
                               style: TextStyle(
-                                fontSize: 10.5,
+                                // compact: 10.5 → 10
+                                fontSize: 10,
                                 fontWeight: FontWeight.w600,
                                 color: accent,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 7),
+                          const SizedBox(width: 6),
                         ],
                         if (doctor.experience != null)
                           Text(
                             '${doctor.experience} yrs exp',
                             style: TextStyle(
+                              // compact: 11 → 11 (keep)
                               fontSize: 11,
                               color: isDark ? Colors.white54 : kTextMid,
                             ),
@@ -861,12 +856,12 @@ class _DoctorCard extends StatelessWidget {
                     // Clinic + queue
                     if (doctor.clinicName != null ||
                         doctor.clinicAddress != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Row(
                         children: [
                           Icon(
                             Icons.local_hospital_rounded,
-                            size: 11,
+                            size: 10,
                             color: isDark ? Colors.white38 : kTextMid,
                           ),
                           const SizedBox(width: 3),
@@ -876,6 +871,7 @@ class _DoctorCard extends StatelessWidget {
                                   .where((s) => s != null && s.isNotEmpty)
                                   .join(' · '),
                               style: TextStyle(
+                                // compact: 11 → 11 (keep)
                                 fontSize: 11,
                                 color: isDark ? Colors.white54 : kTextMid,
                               ),
@@ -884,13 +880,13 @@ class _DoctorCard extends StatelessWidget {
                             ),
                           ),
                           if (doctor.queueLength != null) ...[
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Icon(
                               Icons.people_alt_rounded,
-                              size: 11,
+                              size: 10,
                               color: queueColor,
                             ),
-                            const SizedBox(width: 3),
+                            const SizedBox(width: 2),
                             Text(
                               queueLabel,
                               style: TextStyle(
@@ -903,15 +899,15 @@ class _DoctorCard extends StatelessWidget {
                         ],
                       ),
                     ] else if (doctor.queueLength != null) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Row(
                         children: [
                           Icon(
                             Icons.people_alt_rounded,
-                            size: 11,
+                            size: 10,
                             color: queueColor,
                           ),
-                          const SizedBox(width: 3),
+                          const SizedBox(width: 2),
                           Text(
                             queueLabel,
                             style: TextStyle(
@@ -926,11 +922,11 @@ class _DoctorCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
 
-              // Book button
+              // Book button — compact: height 34 → 32
               SizedBox(
-                height: 34,
+                height: 32,
                 child: ElevatedButton(
                   onPressed: () => Navigator.push(
                     context,
@@ -945,12 +941,13 @@ class _DoctorCard extends StatelessWidget {
                     backgroundColor: isTopRated ? kPrimary : kTextDark,
                     foregroundColor: Colors.white,
                     elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(9),
                     ),
                     textStyle: const TextStyle(
-                      fontSize: 12,
+                      // compact: 12 → 11
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -967,7 +964,7 @@ class _DoctorCard extends StatelessWidget {
             top: 0,
             left: 14,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: kPrimary,
                 borderRadius: BorderRadius.circular(20),
@@ -975,6 +972,7 @@ class _DoctorCard extends StatelessWidget {
               child: const Text(
                 'Top rated',
                 style: TextStyle(
+                  // compact: 10 → 10 (keep)
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -996,7 +994,7 @@ class _LoadingList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
       itemCount: 5,
       itemBuilder: (_, __) => const _ShimmerCard(),
     );
@@ -1009,31 +1007,31 @@ class _ShimmerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: kCardBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kBorder, width: 0.5),
       ),
       child: Row(
         children: [
-          const _ShimmerBox(width: 50, height: 50, radius: 25),
-          const SizedBox(width: 12),
+          const _ShimmerBox(width: 44, height: 44, radius: 22),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
-                _ShimmerBox(width: 140, height: 13, radius: 4),
-                SizedBox(height: 8),
-                _ShimmerBox(width: 90, height: 20, radius: 5),
-                SizedBox(height: 8),
-                _ShimmerBox(width: 160, height: 10, radius: 4),
+                _ShimmerBox(width: 130, height: 12, radius: 4),
+                SizedBox(height: 7),
+                _ShimmerBox(width: 80, height: 18, radius: 4),
+                SizedBox(height: 7),
+                _ShimmerBox(width: 150, height: 10, radius: 4),
               ],
             ),
           ),
           const SizedBox(width: 10),
-          const _ShimmerBox(width: 58, height: 34, radius: 10),
+          const _ShimmerBox(width: 52, height: 32, radius: 9),
         ],
       ),
     );
@@ -1078,52 +1076,59 @@ class _EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 68,
+              height: 68,
               decoration: const BoxDecoration(
                 color: kPrimaryBg,
                 shape: BoxShape.circle,
               ),
               child: const Icon(
                 Icons.medical_services_outlined,
-                size: 36,
+                size: 30,
                 color: kPrimary,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             const Text(
               'No doctors found',
               style: TextStyle(
-                fontSize: 18,
+                // compact: 18 → 15
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
                 color: kTextDark,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             const Text(
               'We couldn\'t load the doctors list.\nCheck your connection and try again.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 13.5,
+                // compact: 13.5 → 12
+                fontSize: 12,
                 color: kTextMid,
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh_rounded, size: 18),
+              icon: const Icon(Icons.refresh_rounded, size: 16),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+                  horizontal: 20,
+                  vertical: 10,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                textStyle: const TextStyle(
+                  // compact: implicit → 13
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),

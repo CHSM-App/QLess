@@ -17,7 +17,7 @@ class DoctorLoginState {
   final String? clinic_id;
   final int? leadTimeMinutes;
   final AsyncValue<List<DoctorDetails>> phoneCheckResult;
-    final AsyncValue<List<Medicine>>? medicines;
+  final AsyncValue<List<Medicine>>? medicines;
   final AsyncValue<List<Medicine>>? medicineTypes;
 
   const DoctorLoginState({
@@ -34,13 +34,12 @@ class DoctorLoginState {
     this.leadTimeMinutes,
     this.phoneCheckResult = const AsyncValue.data([]),
     this.medicineTypes,
-    this.medicines
+    this.medicines,
   });
 
   DoctorLoginState copyWith({
     bool? isLoading,
     String? error,
-
     String? name,
     String? mobile,
     String? email,
@@ -51,9 +50,8 @@ class DoctorLoginState {
     String? clinic_name,
     int? leadTimeMinutes,
     AsyncValue<List<DoctorDetails>>? phoneCheckResult,
-      final AsyncValue<List<Medicine>>? medicines,
-  final AsyncValue<List<Medicine>>? medicineTypes,
-
+    AsyncValue<List<Medicine>>? medicines,
+    AsyncValue<List<Medicine>>? medicineTypes,
   }) {
     return DoctorLoginState(
       isLoading: isLoading ?? this.isLoading,
@@ -76,8 +74,8 @@ class DoctorLoginState {
 
 class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   final DoctorLoginUsecase usecase;
+
   DoctorLoginViewmodel(this.usecase) : super(const DoctorLoginState()) {
-    // Initial fetch or setup can be done here if needed
     loadFromStorage();
   }
 
@@ -86,12 +84,14 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     final mobile = await TokenStorage.getValue('mobile');
     final email = await TokenStorage.getValue('email');
     final roleId = await TokenStorage.getValue('role_id');
-
     final token = await TokenStorage.getValue('token');
     final doctorIdStr = await TokenStorage.getValue('doctor_id');
     final doctorId = int.tryParse(doctorIdStr ?? '0') ?? 0;
     final clinicName = await TokenStorage.getValue('clinic_name');
     final clinicId = await TokenStorage.getValue('clinic_id');
+    final leadTime = await TokenStorage.getValue('q_start_before');
+    final leadTimeMinutes = int.tryParse(leadTime ?? '');
+
     state = state.copyWith(
       clinicId: clinicId,
       doctorId: doctorId,
@@ -101,7 +101,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       roleId: roleId,
       clinic_name: clinicName,
       token: token,
-
+      leadTimeMinutes: leadTimeMinutes,
       phoneCheckResult: AsyncValue.data([
         DoctorDetails(
           doctorId: doctorId,
@@ -112,6 +112,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           clinicName: clinicName,
           Token: token,
           clinicId: clinicId,
+          leadTime: leadTimeMinutes,
         ),
       ]),
     );
@@ -145,6 +146,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           token: d.Token,
           clinicId: d.clinicId,
           clinic_name: d.clinicName,
+          leadTimeMinutes: d.leadTime,
           phoneCheckResult: AsyncValue.data(result),
         );
       } else {
@@ -158,142 +160,112 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     }
   }
 
-  //   Future<void> addMedicine(Medicine medicine) async {
-  //   state = state.copyWith(isLoading: true, error: null);
-  //   try {
-  //      final response = await usecase.addMedicine(medicine);
-  //     state = state.copyWith(isLoading: false);
-  //     return response;
-  //   } catch (e) {
-  //     state = state.copyWith(isLoading: false, error: e.toString());
-  //   }
-  // }
-
   Future<Map<String, dynamic>> addMedicine(Medicine medicine) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
-
       final response = await usecase.addMedicine(medicine);
-
       state = state.copyWith(isLoading: false);
-
       return response;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: 'Failed to add medicine');
-
       return {"success": 0, "message": "Failed to add medicine"};
     }
   }
 
-  //     Future<void> fetchMedicineTypes() async {
-  //   state = state.copyWith(isLoading: true, error: null);
-  //   try {
-  //     final result = await usecase.fetchMedicineTypes();
-  //     state = state.copyWith(isLoading: false, medicineTypes: AsyncValue.data(result));
-  //   } catch (e) {
-  //     state = state.copyWith(isLoading: false, error: e.toString());
-  //   }
-  // }
-
   Future<void> fetchMedicineTypes() async {
-  state = state.copyWith(
-    medicineTypes: const AsyncValue.loading(),
-    error: null,
-  );
-  try {
-    final result = await usecase.fetchMedicineTypes();
     state = state.copyWith(
-      medicineTypes: AsyncValue.data(result),
+      medicineTypes: const AsyncValue.loading(),
+      error: null,
     );
-  } catch (e, st) {
-    state = state.copyWith(
-      medicineTypes: AsyncValue.error(e, st),
-    );
+    try {
+      final result = await usecase.fetchMedicineTypes();
+      state = state.copyWith(
+        medicineTypes: AsyncValue.data(result),
+      );
+    } catch (e, st) {
+      state = state.copyWith(
+        medicineTypes: AsyncValue.error(e, st),
+      );
+    }
   }
-}
 
   Future<void> fetchAllMedicines(int doctorId) async {
-  state = state.copyWith(
-    medicines: const AsyncValue.loading(),
-    error: null,
-  );
-  try {
-    final result = await usecase.fetchAllMedicines(doctorId);
     state = state.copyWith(
-      medicines: AsyncValue.data(result),
+      medicines: const AsyncValue.loading(),
+      error: null,
     );
-  } catch (e, st) {
-    state = state.copyWith(
-      medicines: AsyncValue.error(e, st),
-    );
+    try {
+      final result = await usecase.fetchAllMedicines(doctorId);
+      state = state.copyWith(
+        medicines: AsyncValue.data(result),
+      );
+    } catch (e, st) {
+      state = state.copyWith(
+        medicines: AsyncValue.error(e, st),
+      );
+    }
   }
-}
 
   Future<void> logout() async {
     await TokenStorage.clear();
     state = const DoctorLoginState();
   }
 
-  // Future<void> updateLeadTime(int minutes) async {
-  //       state = state.copyWith(isLoading: true, error: null);
-  //   try {
-  //     await usecase.addDoctorDetails(doctorLogin);
-  //     state = state.copyWith(isLoading: false);
-  //   } catch (e) {
-  //     state = state.copyWith(isLoading: false, error: e.toString());
-  //   }
-  // }
+  Future<void> updateLeadTime(DoctorDetails doctor) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
 
-  Future<void> updateLeadTime( int doctorId, int minutes) async {
-  try {
-    // Optional: set loading state
-    state = state.copyWith(isLoading: true);
+      await usecase.updateLeadTime(doctor);
 
-    await usecase.updateLeadTime(doctorId, minutes);
+      final updatedPhoneCheckResult = state.phoneCheckResult.maybeWhen(
+        data: (list) {
+          final updatedList = list
+              .map(
+                (item) => item.doctorId == doctor.doctorId
+                    ? DoctorDetails(
+                        queueLength: item.queueLength,
+                        doctorId: item.doctorId,
+                        name: item.name,
+                        email: item.email,
+                        mobile: item.mobile,
+                        qualification: item.qualification,
+                        licenseNo: item.licenseNo,
+                        experience: item.experience,
+                        specialization: item.specialization,
+                        image: item.image,
+                        roleId: item.roleId,
+                        Token: item.Token,
+                        clinicId: item.clinicId,
+                        clinicName: item.clinicName,
+                        clinicAddress: item.clinicAddress,
+                        latitude: item.latitude,
+                        longitude: item.longitude,
+                        consultationFee: item.consultationFee,
+                        websiteName: item.websiteName,
+                        clinicEmail: item.clinicEmail,
+                        clinicContact: item.clinicContact,
+                        imageUrl: item.imageUrl,
+                        genderId: item.genderId,
+                        leadTime: doctor.leadTime,
+                      )
+                    : item,
+              )
+              .toList();
+          return AsyncValue.data(updatedList);
+        },
+        orElse: () => state.phoneCheckResult,
+      );
 
-    // ✅ Update local state (if you store it)
-    state = state.copyWith(
-      isLoading: false,
-      leadTimeMinutes: minutes,
-    );
-
-  } catch (e) {
-    // ❌ Handle error
-    state = state.copyWith(
-      isLoading: false,
-      error: e.toString(),
-    );
+      state = state.copyWith(
+        isLoading: false,
+        leadTimeMinutes: doctor.leadTime,
+        phoneCheckResult: updatedPhoneCheckResult,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
   }
 }
-
-
-
-
-
-}
-
-  // Future<void> clearLogin(String refreshToken) async {
-  //   await usecase.logOut(refreshToken);
-  //   state = const AdminloginState(
-  //     isLoading: false,
-  //     error: null,
-  //     adminDetails: AsyncValue.data([]),
-  //     phoneCheckResult: AsyncValue.data([]),
-  //     userId: 0,
-  //     name: null, 
-  //     mobileNo: null,
-  //     email: null,
-  //     roleId: null,
-  //     companyName: null,
-  //     token: null,
-  //     isCheckedIn: null,
-  //     companyId: null,
-  //   );
-
-  //   await TokenStorage.clear();
-  // }
-
-
-
-
-
