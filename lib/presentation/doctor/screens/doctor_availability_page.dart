@@ -110,34 +110,33 @@ class _DoctorAvailabilityPageState
     }
   }
 
-  void _hydrateFromModel(DoctorScheduleModel model) {
-    // Index API days by lowercase name for O(1) lookup
-    final apiDays = {
-      for (final d in model.schedule ?? <DayScheduleModel>[])
-        (d.day ?? '').toLowerCase(): d
-    };
+void _hydrateFromModel(DoctorScheduleModel model) {
+  final apiDays = {
+    for (final d in model.schedule ?? <DayScheduleModel>[])
+      (d.day ?? '').toLowerCase(): d
+  };
 
-    setState(() {
-      for (final day in _days) {
-        final api = apiDays[day.dayName.toLowerCase()];
-        if (api == null) continue;
+  setState(() {
+    for (final day in _days) {
+      final api = apiDays[day.dayName.toLowerCase()];
+      if (api == null) continue;
 
-        day.isEnabled = (api.isEnabled ?? 0) == 1;
-        day.isExpanded = false;
-        day.timeSlots = (api.slots ?? []).map((s) {
-          return TimeSlot(
-            startTime: _parseTime(s.startTime),
-            endTime: _parseTime(s.endTime),
-            bookingMode: _intToBookingMode(s.bookingMode),
-            slotDurationMinutes: s.slotDuration ?? 15,
-          );
-        }).toList();
-      }
-    });
+      day.isEnabled = (api.isEnabled ?? 0) == 1;
+      day.isExpanded = false;
+      day.timeSlots = (api.slots ?? []).map((s) {
+        return TimeSlot(
+          startTime: _parseTime(s.startTime),
+          endTime: _parseTime(s.endTime),
+          bookingMode: _intToBookingMode(s.bookingMode),
+          slotDurationMinutes: s.slotDuration ?? 15,
+          maxQueueLength: s.maxQueueLength, // ← THIS WAS MISSING
+        );
+      }).toList();
+    }
+  });
 
-    _hydratedFrom = model;
-  }
-
+  _hydratedFrom = model;
+}
   // ── Build model: _days → DoctorScheduleModel ─────────────────────────────────
 
   String _timeOfDayToString(TimeOfDay t) =>
@@ -815,6 +814,18 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
     _queueCtrl.dispose(); // ← ADD THIS
     super.dispose();
   }
+
+  @override
+void didUpdateWidget(covariant _TimeSlotCard oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  // Sync controller text if maxQueueLength changed externally (e.g. after hydration)
+  if (oldWidget.slot.maxQueueLength != widget.slot.maxQueueLength) {
+    _queueCtrl.text = widget.slot.maxQueueLength != null
+        ? '${widget.slot.maxQueueLength}'
+        : '';
+    _local.maxQueueLength = widget.slot.maxQueueLength;
+  }
+}
 
   void _update() => widget.onUpdate(_local);
 
