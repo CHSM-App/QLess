@@ -245,18 +245,18 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   AppointmentRequestModel appointmentRequest,
 ) async {
   try {
-    final result = await usecase.queueEstimate(appointmentRequest);
+    // final result = await usecase.queueEstimate(appointmentRequest);
 
-    final appointmentId = appointmentRequest.appointmentId;
+    // final appointmentId = appointmentRequest.appointmentId;
 
-    if (appointmentId == null) return;
+    // if (appointmentId == null) return;
 
-    state = state.copyWith(
-      queueEstimates: {
-        ...state.queueEstimates,
-        appointmentId: result,
-      },
-    );
+    // state = state.copyWith(
+    //   queueEstimates: {
+    //     ...state.queueEstimates,
+    //     appointmentId: result,
+    //   },
+    // );
 
   } catch (e) {
     state = state.copyWith(error: _extractError(e));

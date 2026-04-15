@@ -321,18 +321,8 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.10),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.18),
-                blurRadius: 24,
-                offset: const Offset(0, 14), // extra bottom shadow
-              ),
-              BoxShadow(
-                color: Colors.white.withOpacity(0.25),
-                blurRadius: 8,
-                offset: const Offset(0, -2), // subtle top highlight
+                blurRadius: 12,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -347,7 +337,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
                     color: const Color(0x66FFFFFF),
-                    width: 1.2,
+                    width: 1.6,
                   ),
                 ),
                 child: LayoutBuilder(

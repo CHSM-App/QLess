@@ -9,6 +9,33 @@ import 'package:http/http.dart' as http;
 
 
 class LocationService {
+  /// Returns the raw GPS [Position] (lat/lng) or null if unavailable.
+  static Future<Position?> getCurrentPosition() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      return await Geolocator.getLastKnownPosition() ??
+          await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 8),
+            ),
+          );
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<String> getCurrentAddress() async {
     bool serviceEnabled;
     LocationPermission permission;

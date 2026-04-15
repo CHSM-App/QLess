@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/view_models/doctors_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
@@ -58,6 +60,81 @@ Color _dssSpecBgFor(String? spec) =>
 String _dssCapitalize(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
 
+// ─── Queue status helpers ─────────────────────────────────────────────────────
+
+/// Determines whether the patient can tap "Book" right now.
+bool _canBook(DoctorDetails d) {
+  // Queue must be explicitly available
+  if ((d.isQueueAvailable ?? 0) != 1) return false;
+  // Booking session must have started
+  if ((d.isBookingStarted ?? 0) != 1) return false;
+  // Queue must not be full
+  if ((d.isQueueFull ?? 0) == 1) return false;
+  return true;
+}
+
+/// Compact queue status model used by the card.
+class _QueueStatus {
+  final bool   queueEnabled;    // isQueueAvailable == 1
+  final bool   bookingStarted;  // isBookingStarted == 1
+  final bool   isFull;          // isQueueFull == 1
+  final bool   canBook;         // combined flag for button enable
+  final int?   current;         // currentQueueLength
+  final int?   max;             // maxQueueLength
+  final String? openAt;         // bookingStartTime (shown when not started yet)
+
+  const _QueueStatus({
+    required this.queueEnabled,
+    required this.bookingStarted,
+    required this.isFull,
+    required this.canBook,
+    required this.current,
+    required this.max,
+    required this.openAt,
+  });
+
+  factory _QueueStatus.from(DoctorDetails d) {
+    final queueEnabled   = (d.isQueueAvailable  ?? 0) == 1;
+    final bookingStarted = (d.isBookingStarted   ?? 0) == 1;
+    final isFull         = (d.isQueueFull        ?? 0) == 1;
+    return _QueueStatus(
+      queueEnabled:   queueEnabled,
+      bookingStarted: bookingStarted,
+      isFull:         isFull,
+      canBook:        queueEnabled && bookingStarted && !isFull,
+      current:        d.currentQueueLength,
+      max:            d.maxQueueLength,
+      openAt:         d.bookingStartTime,
+    );
+  }
+
+  /// Human-readable label shown in the queue pill on the card.
+  String get label {
+    if (!queueEnabled)   return 'Queue unavailable';
+    if (isFull)          return 'Queue full';
+    if (!bookingStarted) return openAt != null ? 'Opens $openAt' : 'Not started';
+    if (current == null) return 'Queue open';
+    if (max != null)     return '$current / $max in queue';
+    return '$current in queue';
+  }
+
+  /// Pill / icon colour.
+  Color get color {
+    if (!queueEnabled || isFull) return kRed;
+    if (!bookingStarted)         return kOrange;
+    if ((current ?? 0) == 0)    return kGreen;
+    if ((current ?? 0) <= 5)    return kOrange;
+    return kRed;
+  }
+
+  IconData get icon {
+    if (!queueEnabled)   return Icons.block_rounded;
+    if (isFull)          return Icons.people_alt_rounded;
+    if (!bookingStarted) return Icons.access_time_rounded;
+    return Icons.people_alt_rounded;
+  }
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class DoctorSearchScreen extends ConsumerStatefulWidget {
   const DoctorSearchScreen({super.key});
@@ -74,8 +151,8 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   bool    _hasFetchedFamily  = false;
   final Set<int> _fetchedFavoriteDoctorIds = <int>{};
 
-  // ── NEW: toggles the in-page favorites filter ──────────────────────────────
-  bool    _showFavoritesOnly  = false;
+  bool      _showFavoritesOnly  = false;
+  Position? _userPosition;
 
   ProviderSubscription<TokenState>?        _tokenSub;
   ProviderSubscription<PatientLoginState>? _patientSub;
@@ -102,6 +179,14 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       (_, next) => _tryFetchFavorites(next.doctors),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _tryFetch());
+    _fetchUserPosition();
+  }
+
+  Future<void> _fetchUserPosition() async {
+    final position = await LocationService.getCurrentPosition();
+    if (mounted && position != null) {
+      setState(() => _userPosition = position);
+    }
   }
 
   void _tryFetch() {
@@ -157,10 +242,22 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     );
 
     return all.where((d) {
-      // ── Favorites-only gate ────────────────────────────────────────────────
       if (_showFavoritesOnly) {
-        final id = d.doctorId;          // adjust field name to match your model
+        final id = d.doctorId;
         if (id == null || !favoriteIds.contains(id)) return false;
+      }
+
+      if (_searchController.text.isEmpty &&
+          _userPosition != null &&
+          d.latitude != null &&
+          d.longitude != null) {
+        final distanceMeters = Geolocator.distanceBetween(
+          _userPosition!.latitude,
+          _userPosition!.longitude,
+          d.latitude!,
+          d.longitude!,
+        );
+        if (distanceMeters > 100000) return false;
       }
 
       final q            = _searchController.text.toLowerCase();
@@ -195,25 +292,20 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ───────────────────────────────────────────────────
             _Header(
               isDark:            isDark,
               showFavoritesOnly: _showFavoritesOnly,
-              // Toggle favorites filter; also clear specialty chip so the
-              // "All" state feels consistent when leaving favorites mode.
               onFavoritesTap: () => setState(() {
                 _showFavoritesOnly = !_showFavoritesOnly;
                 if (!_showFavoritesOnly) _selectedSpecialty = null;
               }),
             ),
 
-            // ── "Favorites" banner – visible only when filter is active ──
             if (_showFavoritesOnly)
               _FavoritesBanner(
                 onClear: () => setState(() => _showFavoritesOnly = false),
               ),
 
-            // ── Booking for ───────────────────────────────────────────────
             familyState.allfamilyMembers.maybeWhen(
               data: (members) => _BookingForDropdown(
                 patientState:     patientState,
@@ -225,14 +317,12 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
               orElse: () => const SizedBox.shrink(),
             ),
 
-            // ── Search bar ────────────────────────────────────────────────
             _SearchBar(
               controller: _searchController,
               isDark:     isDark,
               onChanged:  (_) => setState(() {}),
             ),
 
-            // ── Specialty chips (hide when favorites-only active) ─────────
             if (!_showFavoritesOnly && doctorsState.doctors.isNotEmpty) ...[
               _SpecialtyChips(
                 specialties: _uniqueSpecialties(doctorsState.doctors),
@@ -243,14 +333,12 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
               ),
             ],
 
-            // ── Results bar ───────────────────────────────────────────────
             if (doctorsState.doctors.isNotEmpty)
               _ResultsBar(
-                count:            _filtered(doctorsState.doctors).length,
-                isFavoritesMode:  _showFavoritesOnly,
+                count:           _filtered(doctorsState.doctors).length,
+                isFavoritesMode: _showFavoritesOnly,
               ),
 
-            // ── List / loading / empty ────────────────────────────────────
             Expanded(
               child: doctorsState.isLoading
                   ? const _LoadingList()
@@ -278,7 +366,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HEADER  (heart now toggles in-page filter)
+// HEADER
 // ─────────────────────────────────────────────────────────────────────────────
 class _Header extends ConsumerWidget {
   final bool         isDark;
@@ -316,7 +404,6 @@ class _Header extends ConsumerWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                // Title changes to reflect current view mode
                 showFavoritesOnly ? 'Favorite Doctors' : 'Find Doctors',
                 style: TextStyle(
                   fontSize: 17,
@@ -328,8 +415,6 @@ class _Header extends ConsumerWidget {
             ],
           ),
           const Spacer(),
-
-          // ── Heart button: tap to toggle favorites-only filter ────────────
           GestureDetector(
             onTap: onFavoritesTap,
             child: AnimatedContainer(
@@ -337,7 +422,6 @@ class _Header extends ConsumerWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                // Filled red background when filter is active
                 color: showFavoritesOnly
                     ? kRed
                     : kRed.withOpacity(0.1),
@@ -348,14 +432,11 @@ class _Header extends ConsumerWidget {
                 children: [
                   Center(
                     child: Icon(
-                      showFavoritesOnly
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_rounded,
+                      Icons.favorite_rounded,
                       color: showFavoritesOnly ? Colors.white : kRed,
                       size: 18,
                     ),
                   ),
-                  // Badge – only when filter is OFF and there are favorites
                   if (!showFavoritesOnly && favCount > 0)
                     Positioned(
                       top: -4,
@@ -387,7 +468,7 @@ class _Header extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAVORITES BANNER  (shown below header when filter is active)
+// FAVORITES BANNER
 // ─────────────────────────────────────────────────────────────────────────────
 class _FavoritesBanner extends StatelessWidget {
   final VoidCallback onClear;
@@ -888,7 +969,7 @@ class _DoctorList extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DOCTOR CARD
+// DOCTOR CARD  (queue logic fully driven by _QueueStatus)
 // ─────────────────────────────────────────────────────────────────────────────
 class _DoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
@@ -911,19 +992,8 @@ class _DoctorCard extends StatelessWidget {
         ? doctor.name![0].toUpperCase()
         : 'D';
 
-    final queue = doctor.queueLength ?? 0;
-    final Color  queueColor;
-    final String queueLabel;
-    if (queue == 0) {
-      queueColor = kGreen;
-      queueLabel = 'No queue';
-    } else if (queue <= 5) {
-      queueColor = kOrange;
-      queueLabel = '$queue in queue';
-    } else {
-      queueColor = kRed;
-      queueLabel = '$queue in queue';
-    }
+    // ── Compute queue status from model fields ────────────────────────────
+    final qs = _QueueStatus.from(doctor);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -935,7 +1005,12 @@ class _DoctorCard extends StatelessWidget {
             color: isDark ? _kDarkSurface : kCardBg,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isTopRated ? kPrimary : kBorder,
+              // Red tint on card border when queue unavailable / full
+              color: isTopRated
+                  ? kPrimary
+                  : (!qs.queueEnabled || qs.isFull)
+                      ? kRed.withOpacity(0.25)
+                      : kBorder,
               width: isTopRated ? 1.5 : 0.5,
             ),
           ),
@@ -943,27 +1018,50 @@ class _DoctorCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Avatar
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: accent,
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              // ── Avatar ───────────────────────────────────────────────────
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: accent,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
+                  // Small availability dot on avatar
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: qs.canBook ? kGreen : kRed,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? _kDarkSurface : kCardBg,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 10),
 
-              // Info column
+              // ── Info column ──────────────────────────────────────────────
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Name + fee
                     Row(
                       children: [
                         Expanded(
@@ -1023,7 +1121,7 @@ class _DoctorCard extends StatelessWidget {
                       ],
                     ),
 
-                    // Clinic + queue
+                    // Clinic name
                     if (doctor.clinicName != null ||
                         doctor.clinicAddress != null) ...[
                       const SizedBox(height: 3),
@@ -1046,61 +1144,45 @@ class _DoctorCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (doctor.queueLength != null) ...[
-                            const SizedBox(width: 6),
-                            Icon(Icons.people_alt_rounded,
-                                size: 10, color: queueColor),
-                            const SizedBox(width: 2),
-                            Text(
-                              queueLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: queueColor,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
-                    ] else if (doctor.queueLength != null) ...[
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Icon(Icons.people_alt_rounded,
-                              size: 10, color: queueColor),
-                          const SizedBox(width: 2),
-                          Text(
-                            queueLabel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: queueColor,
-                            ),
-                          ),
-                        ],
-                      ),
+                    ],
+
+                    // ── Queue status pill ──────────────────────────────────
+                    // Only rendered when the doctor has queue data at all.
+                    // isQueueAvailable == null  → API didn't return queue info → hide
+                    // isQueueAvailable == 0     → queue disabled → show "unavailable"
+                    // isQueueAvailable == 1     → show rich status
+                    if (doctor.isQueueAvailable != null) ...[
+                      const SizedBox(height: 5),
+                      _QueuePill(qs: qs, isDark: isDark),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
 
-              // Book button
+              // ── Book button ──────────────────────────────────────────────
+              // Disabled (greyed out) when booking is not possible.
               SizedBox(
                 height: 32,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BookAppointmentScreen(
-                        doctor:             doctor,
-                        bookingForMemberId: selectedMemberId,
-                      ),
-                    ),
-                  ),
+                  onPressed: qs.canBook
+                      ? () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BookAppointmentScreen(
+                                doctor:             doctor,
+                                bookingForMemberId: selectedMemberId,
+                              ),
+                            ),
+                          )
+                      : null, // null disables the button
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isTopRated ? kPrimary : kTextDark,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: kBorder,
+                    disabledForegroundColor: kTextMid,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: RoundedRectangleBorder(
@@ -1111,7 +1193,7 @@ class _DoctorCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  child: const Text('Book'),
+                  child: Text(qs.canBook ? 'Book' : _bookButtonLabel(qs)),
                 ),
               ),
             ],
@@ -1139,6 +1221,75 @@ class _DoctorCard extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  /// Short label for the disabled Book button so users know *why* they can't book.
+  String _bookButtonLabel(_QueueStatus qs) {
+    if (!qs.queueEnabled)   return 'Unavailable';
+    if (qs.isFull)          return 'Full';
+    if (!qs.bookingStarted) return 'Soon';
+    return 'Book';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUEUE PILL  – compact inline status widget shown inside the card
+// ─────────────────────────────────────────────────────────────────────────────
+class _QueuePill extends StatelessWidget {
+  final _QueueStatus qs;
+  final bool         isDark;
+
+  const _QueuePill({required this.qs, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Icon dot
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: qs.color.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(qs.icon, size: 9, color: qs.color),
+        ),
+        const SizedBox(width: 4),
+
+        // Status label
+        Flexible(
+          child: Text(
+            qs.label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: qs.color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+
+        // Progress bar when we have current + max
+        if (qs.current != null && qs.max != null && qs.max! > 0) ...[
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 40,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (qs.current! / qs.max!).clamp(0.0, 1.0),
+                minHeight: 4,
+                backgroundColor: qs.color.withOpacity(0.15),
+                valueColor: AlwaysStoppedAnimation<Color>(qs.color),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
