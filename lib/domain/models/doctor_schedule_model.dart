@@ -58,11 +58,15 @@ class TimeSlotModel {
   @JsonKey(name: 'slot_duration')
   int? slotDuration;
 
+  @JsonKey(name: 'max_queue_length')
+  int? maxQueueLength;
+
   TimeSlotModel({
     this.startTime,
     this.endTime,
     this.bookingMode,
     this.slotDuration,
+    this.maxQueueLength,
   });
 
   factory TimeSlotModel.fromJson(Map<String, dynamic> json) =>

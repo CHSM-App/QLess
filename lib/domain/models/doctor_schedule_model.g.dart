@@ -43,6 +43,7 @@ TimeSlotModel _$TimeSlotModelFromJson(Map<String, dynamic> json) =>
       endTime: json['end_time'] as String?,
       bookingMode: (json['booking_mode'] as num?)?.toInt(),
       slotDuration: (json['slot_duration'] as num?)?.toInt(),
+      maxQueueLength: (json['max_queue_length'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$TimeSlotModelToJson(TimeSlotModel instance) =>
@@ -51,4 +52,5 @@ Map<String, dynamic> _$TimeSlotModelToJson(TimeSlotModel instance) =>
       'end_time': instance.endTime,
       'booking_mode': instance.bookingMode,
       'slot_duration': instance.slotDuration,
+      'max_queue_length': instance.maxQueueLength,
     };

@@ -280,7 +280,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     super.dispose();
   }
 
-  // ── AUTO-REFRESH: only fetches when today's queue appointments are active ──
 
   void _autoRefresh() {
     if (!mounted) return;
@@ -298,16 +297,16 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
           .getPatientAppointments(patientId);
     }
   }
-
-  // Returns true for today's booked walk-in queue appointments.
-  bool _isLiveQueueToday(AppointmentList a) {
-    if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
-    if (a.bookingType != 1) return false;
-    final d = DateTime.tryParse(a.appointmentDate ?? '');
-    if (d == null) return false;
-    final now = DateTime.now();
-    return d.year == now.year && d.month == now.month && d.day == now.day;
-  }
+bool _isLiveQueueToday(AppointmentList a) {
+  if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
+  if (a.bookingType != 1) return false;
+  final d = DateTime.tryParse(a.appointmentDate ?? '');
+  if (d == null) return false;
+  final now = DateTime.now();
+  final isToday = d.year == now.year && d.month == now.month && d.day == now.day;
+  // ✅ Only show LIVE banner if queue has actually started
+  return isToday && (a.queueStarted == true);
+}
 
   Future<void> refreshOnVisible() async {
     _didFetch = false;
@@ -778,51 +777,74 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     );
   }
 
-Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
+// Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//     if (!mounted) return;
+//     for (final a in filtered) {
+//       if (!_isLiveQueueToday(a)) continue;
+//       if (a.appointmentId == null || a.doctorId == null) continue;
+
+//       final hasEstimate = ref
+//           .read(appointmentViewModelProvider)
+//           .queueEstimates[a.appointmentId!] != null;
+
+//       if (!hasEstimate) {
+//         ref
+//             .read(appointmentViewModelProvider.notifier)
+//             .queueEstimate(
+//               AppointmentRequestModel(
+//                 appointmentId: a.appointmentId!,
+//                 doctorId: a.doctorId!,
+//               ),
+//             );
+//       }
+//     }
+//   });
   
-  // Live queue sathi estimate fetch karo (background, silent)
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    for (final a in filtered) {
-      if (_isLiveQueueToday(a) &&
-          a.appointmentId != null &&
-          a.doctorId != null) {
-        ref
-          .read(appointmentViewModelProvider.notifier).queueEstimate(
-            AppointmentRequestModel(
+//   return RefreshIndicator(
+//     color: kPrimary,
+//     onRefresh: () async {
+//       final id = ref.read(patientLoginViewModelProvider).patientId;
+//       if (id != null && id != 0) {
+//         await ref
+//             .read(appointmentViewModelProvider.notifier)
+//             .getPatientAppointments(id);
+//       }
+//     },
+//     child: ListView.builder(
+//       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+//       itemCount: filtered.length,
+//       itemBuilder: (context, index) {
+//         final a = filtered[index];
+//         final live = _isLiveQueueToday(a);
 
-              appointmentId: a.appointmentId!,
-              doctorId: a.doctorId!,
-            ),
-          );
-      }
-    }
-  });
-// Inside _buildList method, before if (filtered.isEmpty)
-if (filtered.isNotEmpty) {
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    for (final a in filtered) {
-      if (_isLiveQueueToday(a) &&
-          a.appointmentId != null &&
-          a.doctorId != null) {
-        
-        // Optional: Only fetch if we don't have fresh data
-        final hasEstimate = ref.read(appointmentViewModelProvider)
-            .queueEstimates[a.appointmentId!] != null;
+//         // Get the current estimate for this appointment (if live queue)
+//         QueuePreviewResponseModel? estimate;
+//         if (live && a.appointmentId != null) {
+//           final estMap = ref.watch(appointmentViewModelProvider).queueEstimates;
+//           estimate = estMap[a.appointmentId!] as QueuePreviewResponseModel?;
+//         }
 
-        if (!hasEstimate) {
-          ref
-              .read(appointmentViewModelProvider.notifier)
-              .queueEstimate(
-                AppointmentRequestModel(
-                  appointmentId: a.appointmentId!,
-                  doctorId: a.doctorId!,
-                ),
-              );
-        }
-      }
-    }
-  });
-}
+//         return _AppointmentCard(
+//           appointment: a,
+//           onViewDetails: () => _openDetail(a),
+//           onReview: _canReview(a) ? () => _handleReview(context, a) : null,
+//           onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
+//           onReschedule:
+//               _canReschedule(a) ? () => _handleReschedule(a) : null,
+//           queueNumber: live ? a.queueNumber : null,
+//           isLiveQueue: live,
+//           queueEstimate: estimate,
+//         );
+//       },
+//     ),
+//   );
+// }
+
+Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
+  // ❌ REMOVE this entire block — no more separate queueEstimate calls
+  // WidgetsBinding.instance.addPostFrameCallback((_) { ... });
+
   return RefreshIndicator(
     color: kPrimary,
     onRefresh: () async {
@@ -840,23 +862,18 @@ if (filtered.isNotEmpty) {
         final a = filtered[index];
         final live = _isLiveQueueToday(a);
 
-        // Get the current estimate for this appointment (if live queue)
-        QueuePreviewResponseModel? estimate;
-        if (live && a.appointmentId != null) {
-          final estMap = ref.watch(appointmentViewModelProvider).queueEstimates;
-          estimate = estMap[a.appointmentId!] as QueuePreviewResponseModel?;
-        }
-
         return _AppointmentCard(
           appointment: a,
           onViewDetails: () => _openDetail(a),
           onReview: _canReview(a) ? () => _handleReview(context, a) : null,
           onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
-          onReschedule:
-              _canReschedule(a) ? () => _handleReschedule(a) : null,
-          queueNumber: live ? a.queueNumber : null,
+          onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
+          queueNumber: live ? a.myQueueNumber : null,   // ✅ use myQueueNumber
           isLiveQueue: live,
-          queueEstimate: estimate,
+          // ✅ Pass data directly from AppointmentList — no separate estimate needed
+          estimatedMinutes: null,                        // not in API, keep null
+          patientsAhead: live ? a.patientsAhead : null,
+          estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
         );
       },
     ),
@@ -987,24 +1004,28 @@ if (filtered.isNotEmpty) {
 
 
 class _AppointmentCard extends StatelessWidget {
-  final AppointmentList appointment;
+final AppointmentList appointment;
   final VoidCallback onViewDetails;
   final VoidCallback? onReview;
   final VoidCallback? onCancel;
   final VoidCallback? onReschedule;
   final int? queueNumber;
   final bool isLiveQueue;
-  final QueuePreviewResponseModel? queueEstimate; // ← nava
+  final int? estimatedMinutes;
+  final int? patientsAhead;
+  final String? estimatedArrivalTime;
 
   const _AppointmentCard({
-    required this.appointment,
+     required this.appointment,
     required this.onViewDetails,
     this.onReview,
     this.onCancel,
     this.onReschedule,
     this.queueNumber,
     this.isLiveQueue = false,
-    this.queueEstimate, // ← nava
+    this.estimatedMinutes,
+    this.patientsAhead,
+    this.estimatedArrivalTime,
   });
 
   @override
@@ -1164,16 +1185,15 @@ class _AppointmentCard extends StatelessWidget {
                     ),
 
                     // ── LIVE QUEUE BANNER with estimate ──
-                    if (isLiveQueue) ...[
-                      const SizedBox(height: 10),
-                      _LiveQueueBanner(
-                        queueNumber: queueNumber,
-                        estimatedMinutes: queueEstimate?.estimatedMinutes,
-                        estimatedArrivalTime:
-                            queueEstimate?.estimatedArrivalTime,
-                        patientsAhead: queueEstimate?.patientsAhead,
-                      ),
-                    ],
+                if (isLiveQueue) ...[
+  const SizedBox(height: 10),
+  _LiveQueueBanner(
+    queueNumber: queueNumber,
+    estimatedMinutes: estimatedMinutes,           // ✅ flat field
+    estimatedArrivalTime: estimatedArrivalTime,   // ✅ flat field
+    patientsAhead: patientsAhead,                 // ✅ flat field
+  ),
+],
 
                     const SizedBox(height: 10),
 
@@ -1410,7 +1430,9 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
   }
 
   bool get _hasEstimate =>
-      widget.estimatedMinutes != null || widget.estimatedArrivalTime != null;
+      widget.estimatedMinutes != null ||
+      widget.estimatedArrivalTime != null ||
+      widget.patientsAhead != null;
 
   @override
   Widget build(BuildContext context) {
@@ -1522,11 +1544,18 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
         size: 13, color: kAmber),
     const SizedBox(width: 6),
 
-    if (widget.estimatedMinutes != null)
+    if (widget.patientsAhead == 0)
+      const Text(
+        'Your turn now',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: kAmber,
+        ),
+      )
+    else if (widget.estimatedMinutes != null)
       Text(
-        widget.estimatedMinutes == 0
-            ? 'Your turn now'
-            : '~${widget.estimatedMinutes} min wait',
+        '~${widget.estimatedMinutes} min wait',
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -1552,16 +1581,16 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
           color: kAmber.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(20),
         ),
-        // child: Text(
-        //   widget.patientsAhead == 0
-        //       ? 'Next'
-        //       : '${widget.patientsAhead} ahead',
-        //   style: const TextStyle(
-        //     fontSize: 11,
-        //     fontWeight: FontWeight.w600,
-        //     color: kAmber,
-        //   ),
-        // ),
+        child: Text(
+          widget.patientsAhead == 0
+              ? 'Next'
+              : '${widget.patientsAhead} ahead',
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: kAmber,
+          ),
+        ),
       ),
     ],
   ],
@@ -1571,122 +1600,6 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
     );
   }
 }
-
-// // ════════════════════════════════════════════════════════
-// //  LIVE QUEUE BANNER  (pulsing dot + queue number)
-// // ════════════════════════════════════════════════════════
-
-// class _LiveQueueBanner extends StatefulWidget {
-//   final int? queueNumber;
-//   const _LiveQueueBanner({this.queueNumber});
-
-//   @override
-//   State<_LiveQueueBanner> createState() => _LiveQueueBannerState();
-// }
-
-// class _LiveQueueBannerState extends State<_LiveQueueBanner>
-//     with SingleTickerProviderStateMixin {
-//   late final AnimationController _ctrl;
-//   late final Animation<double> _pulse;
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _ctrl = AnimationController(
-//       vsync: this,
-//       duration: const Duration(milliseconds: 900),
-//     )..repeat(reverse: true);
-//     _pulse = Tween<double>(begin: 0.35, end: 1.0).animate(
-//       CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-//     );
-//   }
-
-//   @override
-//   void dispose() {
-//     _ctrl.dispose();
-//     super.dispose();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final q = widget.queueNumber;
-//     return Container(
-//       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-//       decoration: BoxDecoration(
-//         color: kGreen.withValues(alpha: 0.07),
-//         borderRadius: BorderRadius.circular(12),
-//         border: Border.all(color: kGreen.withValues(alpha: 0.28)),
-//       ),
-//       child: Row(
-//         children: [
-//           // Pulsing dot
-//           AnimatedBuilder(
-//             animation: _pulse,
-//             builder: (_, __) => Container(
-//               width: 9,
-//               height: 9,
-//               decoration: BoxDecoration(
-//                 shape: BoxShape.circle,
-//                 color: kGreen.withValues(alpha: _pulse.value),
-//               ),
-//             ),
-//           ),
-//           const SizedBox(width: 10),
-//           // Label + number
-//           Expanded(
-//             child: RichText(
-//               text: TextSpan(
-//                 style: const TextStyle(fontSize: 13, color: kTextDark),
-//                 children: [
-//                   const TextSpan(
-//                     text: 'Your queue position  ',
-//                     style: TextStyle(
-//                       fontSize: 12,
-//                       fontWeight: FontWeight.w500,
-//                       color: kTextMid,
-//                     ),
-//                   ),
-//                   TextSpan(
-//                     text: q != null ? '#$q' : '—',
-//                     style: TextStyle(
-//                       fontSize: 17,
-//                       fontWeight: FontWeight.w800,
-//                       color: q != null ? kGreen : kTextMid,
-//                     ),
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ),
-//           // LIVE chip
-//           Container(
-//             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-//             decoration: BoxDecoration(
-//               color: kGreen,
-//               borderRadius: BorderRadius.circular(6),
-//             ),
-//             child: const Row(
-//               mainAxisSize: MainAxisSize.min,
-//               children: [
-//                 Icon(Icons.circle, size: 6, color: Colors.white),
-//                 SizedBox(width: 4),
-//                 Text(
-//                   'LIVE',
-//                   style: TextStyle(
-//                     color: Colors.white,
-//                     fontSize: 10,
-//                     fontWeight: FontWeight.w700,
-//                     letterSpacing: 0.6,
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-// }
 
 // ════════════════════════════════════════════════════════
 //  DETAIL BOTTOM SHEET
