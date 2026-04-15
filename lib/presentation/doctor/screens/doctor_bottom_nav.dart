@@ -8,60 +8,118 @@ import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
 import 'package:qless/presentation/doctor/screens/profile_screen.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// THEME CONSTANTS  (single source of truth — change here, applies everywhere)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class DoctorNavTheme {
+  DoctorNavTheme._();
+
+  // Brand palette
+  static const teal        = Color(0xFF26C6B0);
+  static const tealDark    = Color(0xFF2BB5A0);
+  static const tealLight   = Color(0xFFD9F5F1);
+  static const tealLighter = Color(0xFFF2FCFA);
+
+  // Gradient stops
+  static const gradientFrom = Color(0xFF4DD9C8);
+  static const gradientTo   = Color(0xFF2BB5A0);
+
+  // Text
+  static const textPrimary = Color(0xFF2D3748);
+  static const textSlate   = Color(0xFF718096);
+
+  // Nav states
+  static const activePill      = Color(0x1A26C6B0);   // 10% teal tint
+  static const inactiveIcon    = Color(0xFFA0AEC0);   // cool light grey
+  static const inactiveIconNav = Color(0xFF748598);   // side rail inactive
+
+  // Scaffold
+  static const scaffoldBg = Color(0xFFF8FFFE);
+
+  // Breakpoint
+  static const wideBreakpoint = 800.0; // px — switch to rail layout
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// NAV ITEM MODEL
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NavItem {
+  const _NavItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+}
+
+const _navItems = [
+  _NavItem(
+    icon: Icons.home_outlined,
+    activeIcon: Icons.home_rounded,
+    label: 'Queue',
+  ),
+  _NavItem(
+    icon: Icons.people_alt_outlined,
+    activeIcon: Icons.people_alt_rounded,
+    label: 'Patients',
+  ),
+  _NavItem(
+    icon: Icons.medication_outlined,
+    activeIcon: Icons.medication_rounded,
+    label: 'Medicines',
+  ),
+  _NavItem(
+    icon: Icons.person_outline,
+    activeIcon: Icons.person_rounded,
+    label: 'Profile',
+  ),
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN SHELL WIDGET
+// ─────────────────────────────────────────────────────────────────────────────
+
 class DoctorBottomNav extends ConsumerStatefulWidget {
   const DoctorBottomNav({super.key});
 
   @override
-  ConsumerState<DoctorBottomNav> createState() => _DoctorMainScreenState();
+  ConsumerState<DoctorBottomNav> createState() => _DoctorBottomNavState();
 }
 
-class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
+class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
     with TickerProviderStateMixin {
+  // ── State ──────────────────────────────────────────────────────────────────
   int _currentIndex = 0;
-  bool _isDragging = false;
+
+  // Drag state (pill nav)
+  bool   _isDragging     = false;
   double? _dragX;
-  int? _dragHoverIndex;
+  int?    _dragHoverIndex;
 
+  // Icon bounce animations
   late final List<AnimationController> _iconControllers;
-  late final List<Animation<double>> _iconScales;
+  late final List<Animation<double>>   _iconScales;
 
-  // ── Light theme palette ──────────────────────────────────────
-  static const _primary = Color(0xFF1E293B);
-  static const _slate = Color(0xFF64748B);
-  static const _accent = Color(0xFF6366F1); // indigo active
-  static const _inactiveClr = Color(0xFF1E293B);
-  static const _pillBg = Color(0x00FFFFFF); // fully transparent
-  static const _pillBorder = Color(0x00FFFFFF); // fully transparent border
-  static const _activePill = Color(0x1A6366F1); // 10% indigo tint
+  // ── Pages ──────────────────────────────────────────────────────────────────
+  late final List<Widget> _pages;
 
-  static const _wideBreakpoint = 600.0;
-
-  static const _navItems = [
-    _NavItem(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
-      label: 'Home',
-    ),
-    _NavItem(
-      icon: Icons.people_alt_outlined,
-      activeIcon: Icons.people_alt_rounded,
-      label: 'Patients',
-    ),
-    _NavItem(
-      icon: Icons.medication_outlined,
-      activeIcon: Icons.medication_rounded,
-      label: 'Medicines',
-    ),
-    _NavItem(
-      icon: Icons.person_outline,
-      activeIcon: Icons.person_rounded,
-      label: 'Profile',
-    ),
-  ];
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
+
+    _pages = [
+      const QueueHomePage(),
+      const PatientListScreen(),
+      const DoctorMedicinePage(),
+      const DoctorSettingsPage(),
+    ];
+
     _iconControllers = List.generate(
       _navItems.length,
       (_) => AnimationController(
@@ -69,22 +127,26 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
         duration: const Duration(milliseconds: 380),
       ),
     );
-    _iconScales = _iconControllers
-        .map(
-          (c) => Tween<double>(
-            begin: 1.0,
-            end: 1.18,
-          ).animate(CurvedAnimation(parent: c, curve: Curves.elasticOut)),
-        )
-        .toList();
+
+    _iconScales = _iconControllers.map((c) {
+      return Tween<double>(begin: 1.0, end: 1.18).animate(
+        CurvedAnimation(parent: c, curve: Curves.elasticOut),
+      );
+    }).toList();
+
+    // Animate first tab on launch
     _iconControllers[0].forward();
   }
 
   @override
   void dispose() {
-    for (final c in _iconControllers) c.dispose();
+    for (final c in _iconControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
+
+  // ── Tab switching ──────────────────────────────────────────────────────────
 
   void _onTabTap(int index) {
     if (index == _currentIndex) return;
@@ -94,88 +156,119 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
     HapticFeedback.selectionClick();
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
-    final isWide = width >= _wideBreakpoint;
+    final isWide =
+        MediaQuery.of(context).size.width >= DoctorNavTheme.wideBreakpoint;
 
-    final pages = [
-      QueueHomePage(),
-      PatientListScreen(),
-      DoctorMedicinePage(),
-      DoctorSettingsPage(),
-    ];
+    // Profile page hides the shared app bar (manages its own header)
+final showAppBar = true;
 
     if (isWide) {
-      // ── Tablet / PC: left side rail ──────────────────────────
-      return Scaffold(
-        backgroundColor: const Color(0xFFF8FAFC),
-        appBar: _currentIndex == 3 ? null : _buildAppBar(),
-        body: Row(
-          children: [
-            _buildSideRail(),
-            Expanded(
-              child: IndexedStack(index: _currentIndex, children: pages),
-            ),
-          ],
-        ),
-      );
+      return _buildWideLayout(showAppBar);
     } else {
-      // ── Mobile: floating pill nav ─────────────────────────────
-      return Scaffold(
-        backgroundColor: Colors.transparent,
-        extendBody: true, // page draws behind the pill
-        extendBodyBehindAppBar: false,
-        appBar: _currentIndex == 3 ? null : _buildAppBar(),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: IndexedStack(index: _currentIndex, children: pages),
-            ),
-            Positioned(left: 0, right: 0, bottom: 0, child: _buildBottomNav()),
-          ],
-        ),
-      );
+      return _buildMobileLayout(showAppBar);
     }
   }
 
-  // ── AppBar ────────────────────────────────────────────────────
+  // ── WIDE layout (tablet / desktop): sidebar rail + content ────────────────
+
+  Widget _buildWideLayout(bool showAppBar) {
+    return Scaffold(
+      backgroundColor: DoctorNavTheme.scaffoldBg,
+      appBar: showAppBar ? _buildAppBar() : null,
+      body: Row(
+        children: [
+          _buildSideRail(),
+          Expanded(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _pages,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── MOBILE layout: floating pill nav ──────────────────────────────────────
+
+  Widget _buildMobileLayout(bool showAppBar) {
+    return Scaffold(
+      backgroundColor: DoctorNavTheme.scaffoldBg,
+      extendBody: true,
+      appBar: showAppBar ? _buildAppBar() : null,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: IndexedStack(
+              index: _currentIndex,
+              children: _pages,
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildPillNav(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // SHARED APP BAR
+  // One design used on every screen — frosted glass, teal avatar gradient,
+  // teal notification bell. Profile page opts out via showAppBar flag.
+  // ─────────────────────────────────────────────────────────────────────────
+
   PreferredSizeWidget _buildAppBar() {
     final doctorName = ref.watch(
       doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'),
     );
-    final initial = doctorName.isNotEmpty ? doctorName[0].toUpperCase() : 'D';
+    final initial =
+        doctorName.isNotEmpty ? doctorName[0].toUpperCase() : 'D';
 
     return AppBar(
-      backgroundColor: Colors.white.withOpacity(0.85),
+      backgroundColor: Colors.white.withOpacity(0.88),
       elevation: 0,
       automaticallyImplyLeading: false,
       systemOverlayStyle: SystemUiOverlayStyle.dark,
       titleSpacing: 0,
+
+      // Frosted-glass background
       flexibleSpace: ClipRect(
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: const SizedBox.expand(),
         ),
       ),
+
       title: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
           children: [
+            // ── Avatar (teal gradient) ──
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                  colors: [
+                    DoctorNavTheme.gradientFrom,
+                    DoctorNavTheme.gradientTo,
+                  ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.3),
-                    blurRadius: 8,
+                    color: DoctorNavTheme.teal.withOpacity(0.28),
+                    blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -191,15 +284,19 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                 ),
               ),
             ),
+
             const SizedBox(width: 12),
+
+            // ── Greeting + name ──
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
                   'Good morning 👋',
                   style: TextStyle(
                     fontSize: 11,
-                    color: _slate,
+                    color: DoctorNavTheme.textSlate,
                     fontWeight: FontWeight.w400,
                   ),
                 ),
@@ -208,32 +305,43 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: _primary,
+                    color: DoctorNavTheme.textPrimary,
                     height: 1.2,
                   ),
                 ),
               ],
             ),
+
             const Spacer(),
-            _NotificationBell(),
+
+            // ── Notification bell (teal) ──
+            _TealNotificationBell(),
           ],
         ),
       ),
+
+      // Hairline divider at the bottom of the app bar
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: Colors.white.withOpacity(0.6)),
+        child: Container(
+          height: 1,
+          color: DoctorNavTheme.tealLight.withOpacity(0.6),
+        ),
       ),
     );
   }
 
-  // ── Side Rail (tablet / PC) ───────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // SIDE RAIL  (tablet / desktop — 76 px wide)
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildSideRail() {
     return Container(
       width: 76,
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(
-          right: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+          right: BorderSide(color: Color(0xFFE2E8F0)),
         ),
         boxShadow: [
           BoxShadow(
@@ -250,7 +358,8 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
             children: List.generate(_navItems.length, (i) {
               final selected = _currentIndex == i;
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
                 child: Tooltip(
                   message: _navItems[i].label,
                   preferBelow: false,
@@ -259,12 +368,15 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                     behavior: HitTestBehavior.opaque,
                     child: AnimatedBuilder(
                       animation: _iconScales[i],
-                      builder: (context, _) => AnimatedContainer(
+                      builder: (_, __) => AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
                         width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: selected ? _activePill : Colors.transparent,
+                          color: selected
+                              ? DoctorNavTheme.activePill
+                              : Colors.transparent,
                           borderRadius: BorderRadius.circular(14),
                         ),
                         child: Column(
@@ -273,11 +385,13 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                             Transform.scale(
                               scale: _iconScales[i].value,
                               child: Icon(
-                                _navItems[i].icon,
+                                selected
+                                    ? _navItems[i].activeIcon
+                                    : _navItems[i].icon,
                                 size: 22,
                                 color: selected
-                                    ? _accent
-                                    : const Color.fromARGB(255, 116, 133, 156),
+                                    ? DoctorNavTheme.teal
+                                    : DoctorNavTheme.inactiveIconNav,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -288,7 +402,9 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                                 fontWeight: selected
                                     ? FontWeight.w700
                                     : FontWeight.w400,
-                                color: selected ? _accent : _inactiveClr,
+                                color: selected
+                                    ? DoctorNavTheme.teal
+                                    : DoctorNavTheme.textPrimary,
                               ),
                               child: Text(
                                 _navItems[i].label,
@@ -309,8 +425,11 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
     );
   }
 
-  // ── Floating Light Glass Pill Nav (mobile) ────────────────────
-  Widget _buildBottomNav() {
+  // ─────────────────────────────────────────────────────────────────────────
+  // FLOATING PILL NAV  (mobile — glass morphism, draggable indicator)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildPillNav() {
     return SafeArea(
       top: false,
       child: Padding(
@@ -320,19 +439,19 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.10),
+                color: Colors.black.withOpacity(0.08),
                 blurRadius: 14,
                 offset: const Offset(0, 6),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.18),
+                color: Colors.black.withOpacity(0.14),
                 blurRadius: 24,
-                offset: const Offset(0, 14), // extra bottom shadow
+                offset: const Offset(0, 14),
               ),
               BoxShadow(
                 color: Colors.white.withOpacity(0.25),
                 blurRadius: 8,
-                offset: const Offset(0, -2), // subtle top highlight
+                offset: const Offset(0, -2),
               ),
             ],
           ),
@@ -343,93 +462,90 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
               child: Container(
                 height: 64,
                 decoration: BoxDecoration(
-                  color: const Color(0x12FFFFFF), // slightly stronger wash
+                  // Very light teal wash (was plain white)
+                  color: DoctorNavTheme.tealLighter.withOpacity(0.72),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: const Color(0x66FFFFFF),
+                    color: DoctorNavTheme.tealLight.withOpacity(0.7),
                     width: 1.2,
                   ),
                 ),
                 child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final totalWidth = constraints.maxWidth;
-                    final itemCount = _navItems.length;
-                    final itemWidth = totalWidth / itemCount;
-                    final pillWidth = itemWidth - 10;
-                    final pillHeight = (64 - 16).toDouble();
-                    final currentCenter = (_currentIndex + 0.5) * itemWidth;
-                    final minCenter = itemWidth / 2;
-                    final maxCenter = totalWidth - itemWidth / 2;
-                    final dragCenter = (_dragX ?? currentCenter)
-                        .clamp(minCenter, maxCenter)
-                        .toDouble();
-                    final pillLeft = (dragCenter - pillWidth / 2)
-                        .clamp(0.0, totalWidth - pillWidth)
-                        .toDouble();
+                  builder: (_, constraints) {
+                    final totalWidth  = constraints.maxWidth;
+                    final itemCount   = _navItems.length;
+                    final itemWidth   = totalWidth / itemCount;
+                    final pillWidth   = itemWidth - 10;
+                    final pillHeight  = 64.0 - 16;
+                    final curCenter   = (_currentIndex + 0.5) * itemWidth;
+                    final minCenter   = itemWidth / 2;
+                    final maxCenter   = totalWidth - itemWidth / 2;
+                    final dragCenter  =
+                        (_dragX ?? curCenter).clamp(minCenter, maxCenter);
+                    final pillLeft    =
+                        (dragCenter - pillWidth / 2)
+                            .clamp(0.0, totalWidth - pillWidth);
 
                     return GestureDetector(
-                      onHorizontalDragStart: (details) {
-                        setState(() {
-                          _isDragging = true;
-                          _dragX = details.localPosition.dx;
-                          _dragHoverIndex = _currentIndex;
-                        });
-                      },
-                      onHorizontalDragUpdate: (details) {
-                        setState(() {
-                          _dragX = details.localPosition.dx
-                              .clamp(minCenter, maxCenter)
-                              .toDouble();
-                          final hoverIndex =
-                              ((_dragX ?? currentCenter) / itemWidth)
-                                  .floor()
-                                  .clamp(0, itemCount - 1);
-                          if (hoverIndex != _dragHoverIndex) {
-                            _dragHoverIndex = hoverIndex;
-                            HapticFeedback.selectionClick();
-                          }
-                        });
-                      },
-                      onHorizontalDragEnd: (_) {
-                        final targetCenter = (_dragX ?? currentCenter)
-                            .clamp(minCenter, maxCenter)
-                            .toDouble();
-                        final newIndex = (targetCenter / itemWidth)
-                            .floor()
-                            .clamp(0, itemCount - 1);
-                        setState(() {
-                          _isDragging = false;
-                          _dragX = null;
-                          _dragHoverIndex = null;
-                        });
-                        _onTabTap(newIndex);
-                      },
-                      onHorizontalDragCancel: () {
-                        setState(() {
-                          _isDragging = false;
-                          _dragX = null;
-                          _dragHoverIndex = null;
-                        });
-                      },
                       behavior: HitTestBehavior.translucent,
+                      onHorizontalDragStart: (d) => setState(() {
+                        _isDragging      = true;
+                        _dragX           = d.localPosition.dx;
+                        _dragHoverIndex  = _currentIndex;
+                      }),
+                      onHorizontalDragUpdate: (d) => setState(() {
+                        _dragX = d.localPosition.dx
+                            .clamp(minCenter, maxCenter);
+                        final hover =
+                            ((_dragX ?? curCenter) / itemWidth)
+                                .floor()
+                                .clamp(0, itemCount - 1);
+                        if (hover != _dragHoverIndex) {
+                          _dragHoverIndex = hover;
+                          HapticFeedback.selectionClick();
+                        }
+                      }),
+                      onHorizontalDragEnd: (_) {
+                        final target =
+                            (_dragX ?? curCenter)
+                                .clamp(minCenter, maxCenter);
+                        final newIdx =
+                            (target / itemWidth)
+                                .floor()
+                                .clamp(0, itemCount - 1);
+                        setState(() {
+                          _isDragging     = false;
+                          _dragX          = null;
+                          _dragHoverIndex = null;
+                        });
+                        _onTabTap(newIdx);
+                      },
+                      onHorizontalDragCancel: () => setState(() {
+                        _isDragging     = false;
+                        _dragX          = null;
+                        _dragHoverIndex = null;
+                      }),
                       child: Stack(
                         children: [
+                          // Sliding active-tab indicator
                           AnimatedPositioned(
                             duration: _isDragging
                                 ? Duration.zero
                                 : const Duration(milliseconds: 220),
                             curve: Curves.easeInOut,
-                            left: pillLeft,
-                            top: 8,
-                            width: pillWidth,
+                            left:   pillLeft,
+                            top:    8,
+                            width:  pillWidth,
                             height: pillHeight,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: _activePill,
+                                color: DoctorNavTheme.activePill,
                                 borderRadius: BorderRadius.circular(22),
                               ),
                             ),
                           ),
+
+                          // Nav items
                           Row(
                             children: List.generate(_navItems.length, (i) {
                               final selected = _currentIndex == i;
@@ -439,7 +555,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                                   behavior: HitTestBehavior.opaque,
                                   child: AnimatedBuilder(
                                     animation: _iconScales[i],
-                                    builder: (context, _) => Container(
+                                    builder: (_, __) => Container(
                                       margin: const EdgeInsets.symmetric(
                                         horizontal: 5,
                                         vertical: 8,
@@ -456,8 +572,8 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                                                   : _navItems[i].icon,
                                               size: 22,
                                               color: selected
-                                                  ? _accent
-                                                  : _inactiveClr,
+                                                  ? DoctorNavTheme.teal
+                                                  : DoctorNavTheme.inactiveIcon,
                                             ),
                                           ),
                                           const SizedBox(height: 3),
@@ -471,8 +587,8 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
                                                   ? FontWeight.w700
                                                   : FontWeight.w500,
                                               color: selected
-                                                  ? _accent
-                                                  : _inactiveClr,
+                                                  ? DoctorNavTheme.teal
+                                                  : DoctorNavTheme.inactiveIcon,
                                               letterSpacing: 0.1,
                                             ),
                                             child: Text(_navItems[i].label),
@@ -499,20 +615,12 @@ class _DoctorMainScreenState extends ConsumerState<DoctorBottomNav>
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// REUSABLE TEAL NOTIFICATION BELL
+// Drop this widget into any screen that needs the bell independently.
+// ─────────────────────────────────────────────────────────────────────────────
 
-class _NavItem {
-  const _NavItem({
-    required this.icon,
-    required this.activeIcon,
-    required this.label,
-  });
-  final IconData icon;
-  final IconData activeIcon;
-  final String label;
-}
-
-class _NotificationBell extends StatelessWidget {
+class _TealNotificationBell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -522,12 +630,16 @@ class _NotificationBell extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: const Color(0xFF6366F1).withOpacity(0.08),
+            color: DoctorNavTheme.teal.withOpacity(0.10),
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: DoctorNavTheme.tealLight,
+              width: 1,
+            ),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.notifications_outlined,
-            color: Color(0xFF6366F1),
+            color: DoctorNavTheme.teal,
             size: 20,
           ),
         ),
@@ -538,7 +650,7 @@ class _NotificationBell extends StatelessWidget {
             width: 7,
             height: 7,
             decoration: const BoxDecoration(
-              color: Color(0xFFEF4444),
+              color: Color(0xFFFC8181),
               shape: BoxShape.circle,
             ),
           ),
@@ -546,4 +658,103 @@ class _NotificationBell extends StatelessWidget {
       ],
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUBLIC EXPORTS — use these in any screen that needs the shared components
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Reusable teal notification bell — use anywhere a standalone bell is needed.
+class DoctorNotificationBell extends _TealNotificationBell {}
+
+PreferredSizeWidget buildDoctorAppBar({
+  required String doctorName,
+  required String initial,
+}) {
+  return AppBar(
+    backgroundColor: Colors.white.withOpacity(0.88),
+    elevation: 0,
+    automaticallyImplyLeading: false,
+    systemOverlayStyle: SystemUiOverlayStyle.dark,
+    titleSpacing: 0,
+    flexibleSpace: ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: const SizedBox.expand(),
+      ),
+    ),
+    title: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          // Teal gradient avatar
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  DoctorNavTheme.gradientFrom,
+                  DoctorNavTheme.gradientTo,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: DoctorNavTheme.teal.withOpacity(0.28),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Good morning 👋',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: DoctorNavTheme.textSlate,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              Text(
+                'Dr. $doctorName',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: DoctorNavTheme.textPrimary,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+          const Spacer(),
+          _TealNotificationBell(),
+        ],
+      ),
+    ),
+    bottom: PreferredSize(
+      preferredSize: const Size.fromHeight(1),
+      child: Container(
+        height: 1,
+        color: DoctorNavTheme.tealLight.withOpacity(0.6),
+      ),
+    ),
+  );
 }
