@@ -9,7 +9,12 @@ int? _intFromJson(dynamic value) {
   return int.tryParse(value.toString());
 }
 
-int? _intToJson(int? value) => value;
+double? _doubleFromJson(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
+}
 
 @JsonSerializable()
 class DoctorDetails {
@@ -29,6 +34,7 @@ class DoctorDetails {
   final int? roleId;
   @JsonKey(name: 'token')
   final String? Token;
+
   // Clinic fields
   @JsonKey(name: 'clinic_id')
   final String? clinicId;
@@ -36,10 +42,16 @@ class DoctorDetails {
   final String? clinicName;
   @JsonKey(name: 'clinic_address')
   final String? clinicAddress;
+
+  @JsonKey(fromJson: _doubleFromJson)
   final double? latitude;
+
+  @JsonKey(fromJson: _doubleFromJson)
   final double? longitude;
-  @JsonKey(name: 'consultation_fee')
+
+  @JsonKey(name: 'consultation_fee', fromJson: _doubleFromJson)
   final double? consultationFee;
+
   @JsonKey(name: 'website_name')
   final String? websiteName;
   @JsonKey(name: 'clinic_email')
@@ -51,21 +63,36 @@ class DoctorDetails {
   @JsonKey(name: 'gender_id')
   final int? genderId;
 
-  @JsonKey(name: 'q_start_before')
+  // Queue config
+  @JsonKey(name: 'q_start_before', fromJson: _intFromJson)
   final int? leadTime;
 
-
-
-  @JsonKey(name: 'q_start_section')
+  @JsonKey(name: 'q_start_section', fromJson: _intFromJson)
   final int? qStartSection;
-  @JsonKey(name: 'q_start_time', includeFromJson: false, includeToJson: true)
-  final int? queueStartBefore;
 
-  @JsonKey(name: 'queue_length')
+  // 🔥 Queue status (from APPLY query)
+  @JsonKey(name: 'queue_length', fromJson: _intFromJson)
   final int? queueLength;
 
+  @JsonKey(name: 'is_queue_available', fromJson: _intFromJson)
+  final int? isQueueAvailable;
+
+  @JsonKey(name: 'is_booking_started', fromJson: _intFromJson)
+  final int? isBookingStarted;
+
+  @JsonKey(name: 'current_queue_length', fromJson: _intFromJson)
+  final int? currentQueueLength;
+
+  @JsonKey(name: 'max_queue_length', fromJson: _intFromJson)
+  final int? maxQueueLength;
+
+  @JsonKey(name: 'is_queue_full', fromJson: _intFromJson)
+  final int? isQueueFull;
+
+  @JsonKey(name: 'booking_start_time')
+  final String? bookingStartTime;
+
   DoctorDetails({
-    this.queueLength,
     this.doctorId,
     this.name,
     this.email,
@@ -75,6 +102,8 @@ class DoctorDetails {
     this.experience,
     this.specialization,
     this.image,
+    this.roleId,
+    this.Token,
     this.clinicId,
     this.clinicName,
     this.clinicAddress,
@@ -85,12 +114,16 @@ class DoctorDetails {
     this.clinicEmail,
     this.clinicContact,
     this.imageUrl,
-    this.roleId,
-    this.Token,
     this.genderId,
     this.leadTime,
     this.qStartSection,
-    this.queueStartBefore,
+    this.queueLength,
+    this.isQueueAvailable,
+    this.isBookingStarted,
+    this.currentQueueLength,
+    this.maxQueueLength,
+    this.isQueueFull,
+    this.bookingStartTime,
   });
 
   factory DoctorDetails.fromJson(Map<String, dynamic> json) =>
