@@ -1,51 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/view_models/doctors_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ─── Colour palette ───────────────────────────────────────────────────────────
-const kPrimary   = Color(0xFF1A73E8);
+const kPrimary = Color(0xFF1A73E8);
 const kPrimaryBg = Color(0xFFE8F0FE);
-const kBg        = Color(0xFFF4F6FB);
-const kCardBg    = Colors.white;
-const kTextDark  = Color(0xFF1F2937);
-const kTextMid   = Color(0xFF6B7280);
-const kBorder    = Color(0xFFE5E7EB);
-const kRed       = Color(0xFFEA4335);
-const kGreen     = Color(0xFF34A853);
-const kOrange    = Color(0xFFF59E0B);
-const kPurple    = Color(0xFF8B5CF6);
-const kCyan      = Color(0xFF06B6D4);
+const kBg = Color(0xFFF4F6FB);
+const kCardBg = Colors.white;
+const kTextDark = Color(0xFF1F2937);
+const kTextMid = Color(0xFF6B7280);
+const kBorder = Color(0xFFE5E7EB);
+const kRed = Color(0xFFEA4335);
+const kGreen = Color(0xFF34A853);
+const kOrange = Color(0xFFF59E0B);
+const kPurple = Color(0xFF8B5CF6);
+const kCyan = Color(0xFF06B6D4);
 
 // ─── Dark mode surfaces ───────────────────────────────────────────────────────
 const _kDarkSurface = Color(0xFF1E293B);
-const _kDarkBg      = Color(0xFF0F172A);
+const _kDarkBg = Color(0xFF0F172A);
 
 // ─── Specialty → accent colour ────────────────────────────────────────────────
 const _specialtyAccent = <String, Color>{
-  'cardiology':    Color(0xFFEF4444),
-  'dermatology':   Color(0xFFF59E0B),
-  'pediatrics':    Color(0xFF10B981),
-  'orthopedics':   Color(0xFF8B5CF6),
-  'neurology':     Color(0xFF8B5CF6),
-  'general':       Color(0xFF06B6D4),
-  'gynecology':    Color(0xFFEC4899),
+  'cardiology': Color(0xFFEF4444),
+  'dermatology': Color(0xFFF59E0B),
+  'pediatrics': Color(0xFF10B981),
+  'orthopedics': Color(0xFF8B5CF6),
+  'neurology': Color(0xFF8B5CF6),
+  'general': Color(0xFF06B6D4),
+  'gynecology': Color(0xFFEC4899),
   'ophthalmology': Color(0xFF14B8A6),
 };
 
 const _specialtyBgMap = <String, Color>{
-  'cardiology':    Color(0xFFFEE2E2),
-  'dermatology':   Color(0xFFFEF3C7),
-  'pediatrics':    Color(0xFFD1FAE5),
-  'orthopedics':   Color(0xFFEDE9FE),
-  'neurology':     Color(0xFFEDE9FE),
-  'general':       Color(0xFFCFFAFE),
-  'gynecology':    Color(0xFFFCE7F3),
+  'cardiology': Color(0xFFFEE2E2),
+  'dermatology': Color(0xFFFEF3C7),
+  'pediatrics': Color(0xFFD1FAE5),
+  'orthopedics': Color(0xFFEDE9FE),
+  'neurology': Color(0xFFEDE9FE),
+  'general': Color(0xFFCFFAFE),
+  'gynecology': Color(0xFFFCE7F3),
   'ophthalmology': Color(0xFFCCFBF1),
 };
 
@@ -58,6 +60,81 @@ Color _dssSpecBgFor(String? spec) =>
 String _dssCapitalize(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
 
+// ─── Queue status helpers ─────────────────────────────────────────────────────
+
+/// Determines whether the patient can tap "Book" right now.
+bool _canBook(DoctorDetails d) {
+  // Queue must be explicitly available
+  if ((d.isQueueAvailable ?? 0) != 1) return false;
+  // Booking session must have started
+  if ((d.isBookingStarted ?? 0) != 1) return false;
+  // Queue must not be full
+  if ((d.isQueueFull ?? 0) == 1) return false;
+  return true;
+}
+
+/// Compact queue status model used by the card.
+class _QueueStatus {
+  final bool   queueEnabled;    // isQueueAvailable == 1
+  final bool   bookingStarted;  // isBookingStarted == 1
+  final bool   isFull;          // isQueueFull == 1
+  final bool   canBook;         // combined flag for button enable
+  final int?   current;         // currentQueueLength
+  final int?   max;             // maxQueueLength
+  final String? openAt;         // bookingStartTime (shown when not started yet)
+
+  const _QueueStatus({
+    required this.queueEnabled,
+    required this.bookingStarted,
+    required this.isFull,
+    required this.canBook,
+    required this.current,
+    required this.max,
+    required this.openAt,
+  });
+
+  factory _QueueStatus.from(DoctorDetails d) {
+    final queueEnabled   = (d.isQueueAvailable  ?? 0) == 1;
+    final bookingStarted = (d.isBookingStarted   ?? 0) == 1;
+    final isFull         = (d.isQueueFull        ?? 0) == 1;
+    return _QueueStatus(
+      queueEnabled:   queueEnabled,
+      bookingStarted: bookingStarted,
+      isFull:         isFull,
+      canBook:        queueEnabled && bookingStarted && !isFull,
+      current:        d.currentQueueLength,
+      max:            d.maxQueueLength,
+      openAt:         d.bookingStartTime,
+    );
+  }
+
+  /// Human-readable label shown in the queue pill on the card.
+  String get label {
+    if (!queueEnabled)   return 'Queue unavailable';
+    if (isFull)          return 'Queue full';
+    if (!bookingStarted) return openAt != null ? 'Opens $openAt' : 'Not started';
+    if (current == null) return 'Queue open';
+    if (max != null)     return '$current / $max in queue';
+    return '$current in queue';
+  }
+
+  /// Pill / icon colour.
+  Color get color {
+    if (!queueEnabled || isFull) return kRed;
+    if (!bookingStarted)         return kOrange;
+    if ((current ?? 0) == 0)    return kGreen;
+    if ((current ?? 0) <= 5)    return kOrange;
+    return kRed;
+  }
+
+  IconData get icon {
+    if (!queueEnabled)   return Icons.block_rounded;
+    if (isFull)          return Icons.people_alt_rounded;
+    if (!bookingStarted) return Icons.access_time_rounded;
+    return Icons.people_alt_rounded;
+  }
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 class DoctorSearchScreen extends ConsumerStatefulWidget {
   const DoctorSearchScreen({super.key});
@@ -69,17 +146,17 @@ class DoctorSearchScreen extends ConsumerStatefulWidget {
 class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   final _searchController = TextEditingController();
   String? _selectedSpecialty;
-  int?    _selectedMemberId;
-  bool    _hasFetchedDoctors = false;
-  bool    _hasFetchedFamily  = false;
+  int? _selectedMemberId;
+  bool _hasFetchedDoctors = false;
+  bool _hasFetchedFamily = false;
   final Set<int> _fetchedFavoriteDoctorIds = <int>{};
 
-  // ── NEW: toggles the in-page favorites filter ──────────────────────────────
-  bool    _showFavoritesOnly  = false;
+  bool      _showFavoritesOnly  = false;
+  Position? _userPosition;
 
-  ProviderSubscription<TokenState>?        _tokenSub;
+  ProviderSubscription<TokenState>? _tokenSub;
   ProviderSubscription<PatientLoginState>? _patientSub;
-  ProviderSubscription<DoctorsState>?      _doctorsSub;
+  ProviderSubscription<DoctorsState>? _doctorsSub;
 
   @override
   void initState() {
@@ -102,12 +179,20 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       (_, next) => _tryFetchFavorites(next.doctors),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _tryFetch());
+    _fetchUserPosition();
+  }
+
+  Future<void> _fetchUserPosition() async {
+    final position = await LocationService.getCurrentPosition();
+    if (mounted && position != null) {
+      setState(() => _userPosition = position);
+    }
   }
 
   void _tryFetch() {
     final tokenState = ref.read(tokenProvider);
-    final tokenReady = !tokenState.isLoading &&
-        (tokenState.accessToken ?? '').isNotEmpty;
+    final tokenReady =
+        !tokenState.isLoading && (tokenState.accessToken ?? '').isNotEmpty;
 
     if (tokenReady && !_hasFetchedDoctors) {
       _hasFetchedDoctors = true;
@@ -117,7 +202,9 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     if (tokenReady && patientId > 0 && !_hasFetchedFamily) {
       _hasFetchedFamily = true;
-      ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(patientId);
+      ref
+          .read(familyViewModelProvider.notifier)
+          .fetchAllFamilyMembers(patientId);
     }
 
     _tryFetchFavorites(ref.read(doctorsViewModelProvider).doctors);
@@ -157,10 +244,22 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     );
 
     return all.where((d) {
-      // ── Favorites-only gate ────────────────────────────────────────────────
       if (_showFavoritesOnly) {
-        final id = d.doctorId;          // adjust field name to match your model
+        final id = d.doctorId;
         if (id == null || !favoriteIds.contains(id)) return false;
+      }
+
+      if (_searchController.text.isEmpty &&
+          _userPosition != null &&
+          d.latitude != null &&
+          d.longitude != null) {
+        final distanceMeters = Geolocator.distanceBetween(
+          _userPosition!.latitude,
+          _userPosition!.longitude,
+          d.latitude!,
+          d.longitude!,
+        );
+        if (distanceMeters > 100000) return false;
       }
 
       final q            = _searchController.text.toLowerCase();
@@ -168,7 +267,8 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
           (d.name?.toLowerCase().contains(q) ?? false) ||
           (d.specialization?.toLowerCase().contains(q) ?? false) ||
           (d.clinicName?.toLowerCase().contains(q) ?? false);
-      final matchesSpec  = _selectedSpecialty == null ||
+      final matchesSpec =
+          _selectedSpecialty == null ||
           d.specialization?.toLowerCase() == _selectedSpecialty!.toLowerCase();
 
       return matchesQuery && matchesSpec;
@@ -187,70 +287,61 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   Widget build(BuildContext context) {
     final doctorsState = ref.watch(doctorsViewModelProvider);
     final patientState = ref.watch(patientLoginViewModelProvider);
-    final familyState  = ref.watch(familyViewModelProvider);
-    final isDark       = Theme.of(context).brightness == Brightness.dark;
+    final familyState = ref.watch(familyViewModelProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       backgroundColor: isDark ? _kDarkBg : kBg,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ───────────────────────────────────────────────────
             _Header(
-              isDark:            isDark,
+              isDark: isDark,
               showFavoritesOnly: _showFavoritesOnly,
-              // Toggle favorites filter; also clear specialty chip so the
-              // "All" state feels consistent when leaving favorites mode.
               onFavoritesTap: () => setState(() {
                 _showFavoritesOnly = !_showFavoritesOnly;
                 if (!_showFavoritesOnly) _selectedSpecialty = null;
               }),
             ),
 
-            // ── "Favorites" banner – visible only when filter is active ──
             if (_showFavoritesOnly)
               _FavoritesBanner(
                 onClear: () => setState(() => _showFavoritesOnly = false),
               ),
 
-            // ── Booking for ───────────────────────────────────────────────
             familyState.allfamilyMembers.maybeWhen(
               data: (members) => _BookingForDropdown(
-                patientState:     patientState,
-                members:          members,
+                patientState: patientState,
+                members: members,
                 selectedMemberId: _selectedMemberId,
-                onSelected:       (id) => setState(() => _selectedMemberId = id),
-                isDark:           isDark,
+                onSelected: (id) => setState(() => _selectedMemberId = id),
+                isDark: isDark,
               ),
               orElse: () => const SizedBox.shrink(),
             ),
 
-            // ── Search bar ────────────────────────────────────────────────
             _SearchBar(
               controller: _searchController,
-              isDark:     isDark,
-              onChanged:  (_) => setState(() {}),
+              isDark: isDark,
+              onChanged: (_) => setState(() {}),
             ),
 
-            // ── Specialty chips (hide when favorites-only active) ─────────
             if (!_showFavoritesOnly && doctorsState.doctors.isNotEmpty) ...[
               _SpecialtyChips(
                 specialties: _uniqueSpecialties(doctorsState.doctors),
-                selected:    _selectedSpecialty,
-                onSelected:  (s) => setState(
+                selected: _selectedSpecialty,
+                onSelected: (s) => setState(
                   () => _selectedSpecialty = s == _selectedSpecialty ? null : s,
                 ),
               ),
             ],
 
-            // ── Results bar ───────────────────────────────────────────────
             if (doctorsState.doctors.isNotEmpty)
               _ResultsBar(
-                count:            _filtered(doctorsState.doctors).length,
-                isFavoritesMode:  _showFavoritesOnly,
+                count:           _filtered(doctorsState.doctors).length,
+                isFavoritesMode: _showFavoritesOnly,
               ),
 
-            // ── List / loading / empty ────────────────────────────────────
             Expanded(
               child: doctorsState.isLoading
                   ? const _LoadingList()
@@ -261,10 +352,10 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
                           .fetchDoctors(),
                     )
                   : _DoctorList(
-                      doctors:          _filtered(doctorsState.doctors),
-                      isDark:           isDark,
+                      doctors: _filtered(doctorsState.doctors),
+                      isDark: isDark,
                       selectedMemberId: _selectedMemberId,
-                      isFavoritesMode:  _showFavoritesOnly,
+                      isFavoritesMode: _showFavoritesOnly,
                       onRefresh: () => ref
                           .read(doctorsViewModelProvider.notifier)
                           .fetchDoctors(),
@@ -278,11 +369,11 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HEADER  (heart now toggles in-page filter)
+// HEADER
 // ─────────────────────────────────────────────────────────────────────────────
 class _Header extends ConsumerWidget {
-  final bool         isDark;
-  final bool         showFavoritesOnly;
+  final bool isDark;
+  final bool showFavoritesOnly;
   final VoidCallback onFavoritesTap;
 
   const _Header({
@@ -316,7 +407,6 @@ class _Header extends ConsumerWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                // Title changes to reflect current view mode
                 showFavoritesOnly ? 'Favorite Doctors' : 'Find Doctors',
                 style: TextStyle(
                   fontSize: 17,
@@ -328,8 +418,6 @@ class _Header extends ConsumerWidget {
             ],
           ),
           const Spacer(),
-
-          // ── Heart button: tap to toggle favorites-only filter ────────────
           GestureDetector(
             onTap: onFavoritesTap,
             child: AnimatedContainer(
@@ -337,7 +425,6 @@ class _Header extends ConsumerWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                // Filled red background when filter is active
                 color: showFavoritesOnly
                     ? kRed
                     : kRed.withOpacity(0.1),
@@ -348,14 +435,11 @@ class _Header extends ConsumerWidget {
                 children: [
                   Center(
                     child: Icon(
-                      showFavoritesOnly
-                          ? Icons.favorite_rounded
-                          : Icons.favorite_rounded,
+                      Icons.favorite_rounded,
                       color: showFavoritesOnly ? Colors.white : kRed,
                       size: 18,
                     ),
                   ),
-                  // Badge – only when filter is OFF and there are favorites
                   if (!showFavoritesOnly && favCount > 0)
                     Positioned(
                       top: -4,
@@ -387,7 +471,7 @@ class _Header extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FAVORITES BANNER  (shown below header when filter is active)
+// FAVORITES BANNER
 // ─────────────────────────────────────────────────────────────────────────────
 class _FavoritesBanner extends StatelessWidget {
   final VoidCallback onClear;
@@ -439,11 +523,11 @@ class _FavoritesBanner extends StatelessWidget {
 // BOOKING-FOR DROPDOWN
 // ─────────────────────────────────────────────────────────────────────────────
 class _BookingForDropdown extends StatelessWidget {
-  final PatientLoginState  patientState;
+  final PatientLoginState patientState;
   final List<FamilyMember> members;
-  final int?               selectedMemberId;
+  final int? selectedMemberId;
   final ValueChanged<int?> onSelected;
-  final bool               isDark;
+  final bool isDark;
 
   const _BookingForDropdown({
     required this.patientState,
@@ -627,8 +711,8 @@ class _BookingForDropdown extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _SearchBar extends StatelessWidget {
   final TextEditingController controller;
-  final ValueChanged<String>  onChanged;
-  final bool                  isDark;
+  final ValueChanged<String> onChanged;
+  final bool isDark;
 
   const _SearchBar({
     required this.controller,
@@ -693,7 +777,11 @@ class _SearchBar extends StatelessWidget {
                   color: kPrimary,
                   borderRadius: BorderRadius.circular(7),
                 ),
-                child: const Icon(Icons.tune_rounded, color: Colors.white, size: 13),
+                child: const Icon(
+                  Icons.tune_rounded,
+                  color: Colors.white,
+                  size: 13,
+                ),
               ),
           ],
         ),
@@ -706,8 +794,8 @@ class _SearchBar extends StatelessWidget {
 // SPECIALTY CHIPS
 // ─────────────────────────────────────────────────────────────────────────────
 class _SpecialtyChips extends StatelessWidget {
-  final List<String>         specialties;
-  final String?              selected;
+  final List<String> specialties;
+  final String? selected;
   final ValueChanged<String> onSelected;
 
   const _SpecialtyChips({
@@ -725,19 +813,21 @@ class _SpecialtyChips extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
           _Chip(
-            label:    'All',
+            label: 'All',
             selected: selected == null,
-            accent:   kPrimary,
-            bgColor:  kPrimaryBg,
-            onTap:    () => onSelected('__all__'),
+            accent: kPrimary,
+            bgColor: kPrimaryBg,
+            onTap: () => onSelected('__all__'),
           ),
-          ...specialties.map((s) => _Chip(
-                label:    _dssCapitalize(s),
-                selected: selected == s,
-                accent:   _dssAccentFor(s),
-                bgColor:  _dssSpecBgFor(s),
-                onTap:    () => onSelected(s),
-              )),
+          ...specialties.map(
+            (s) => _Chip(
+              label: _dssCapitalize(s),
+              selected: selected == s,
+              accent: _dssAccentFor(s),
+              bgColor: _dssSpecBgFor(s),
+              onTap: () => onSelected(s),
+            ),
+          ),
         ],
       ),
     );
@@ -745,10 +835,10 @@ class _SpecialtyChips extends StatelessWidget {
 }
 
 class _Chip extends StatelessWidget {
-  final String       label;
-  final bool         selected;
-  final Color        accent;
-  final Color        bgColor;
+  final String label;
+  final bool selected;
+  final Color accent;
+  final Color bgColor;
   final VoidCallback onTap;
 
   const _Chip({
@@ -791,7 +881,7 @@ class _Chip extends StatelessWidget {
 // RESULTS BAR
 // ─────────────────────────────────────────────────────────────────────────────
 class _ResultsBar extends StatelessWidget {
-  final int  count;
+  final int count;
   final bool isFavoritesMode;
   const _ResultsBar({required this.count, required this.isFavoritesMode});
 
@@ -830,10 +920,10 @@ class _ResultsBar extends StatelessWidget {
 // DOCTOR LIST
 // ─────────────────────────────────────────────────────────────────────────────
 class _DoctorList extends StatelessWidget {
-  final List<DoctorDetails>     doctors;
-  final bool                    isDark;
-  final int?                    selectedMemberId;
-  final bool                    isFavoritesMode;
+  final List<DoctorDetails> doctors;
+  final bool isDark;
+  final int? selectedMemberId;
+  final bool isFavoritesMode;
   final Future<void> Function() onRefresh;
 
   const _DoctorList({
@@ -877,10 +967,10 @@ class _DoctorList extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
         itemCount: doctors.length,
         itemBuilder: (_, i) => _DoctorCard(
-          doctor:           doctors[i],
-          isDark:           isDark,
+          doctor: doctors[i],
+          isDark: isDark,
           selectedMemberId: selectedMemberId,
-          isTopRated:       !isFavoritesMode && i == 0,
+          isTopRated: !isFavoritesMode && i == 0,
         ),
       ),
     );
@@ -888,13 +978,13 @@ class _DoctorList extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DOCTOR CARD
+// DOCTOR CARD  (queue logic fully driven by _QueueStatus)
 // ─────────────────────────────────────────────────────────────────────────────
-class _DoctorCard extends StatelessWidget {
+class _DoctorCard extends ConsumerWidget {
   final DoctorDetails doctor;
-  final bool          isDark;
-  final int?          selectedMemberId;
-  final bool          isTopRated;
+  final bool isDark;
+  final int? selectedMemberId;
+  final bool isTopRated;
 
   const _DoctorCard({
     required this.doctor,
@@ -904,26 +994,21 @@ class _DoctorCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final accent  = _dssAccentFor(doctor.specialization);
-    final specBg  = _dssSpecBgFor(doctor.specialization);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isFavorite = ref.watch(
+      favoriteViewModelProvider.select(
+        (state) => state.doctorFavorites[doctor.doctorId] == true,
+      ),
+    );
+
+    final accent = _dssAccentFor(doctor.specialization);
+    final specBg = _dssSpecBgFor(doctor.specialization);
     final initial = (doctor.name?.isNotEmpty ?? false)
         ? doctor.name![0].toUpperCase()
         : 'D';
 
-    final queue = doctor.queueLength ?? 0;
-    final Color  queueColor;
-    final String queueLabel;
-    if (queue == 0) {
-      queueColor = kGreen;
-      queueLabel = 'No queue';
-    } else if (queue <= 5) {
-      queueColor = kOrange;
-      queueLabel = '$queue in queue';
-    } else {
-      queueColor = kRed;
-      queueLabel = '$queue in queue';
-    }
+    // ── Compute queue status from model fields ────────────────────────────
+    final qs = _QueueStatus.from(doctor);
 
     return Stack(
       clipBehavior: Clip.none,
@@ -935,7 +1020,12 @@ class _DoctorCard extends StatelessWidget {
             color: isDark ? _kDarkSurface : kCardBg,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isTopRated ? kPrimary : kBorder,
+              // Red tint on card border when queue unavailable / full
+              color: isTopRated
+                  ? kPrimary
+                  : (!qs.queueEnabled || qs.isFull)
+                      ? kRed.withOpacity(0.25)
+                      : kBorder,
               width: isTopRated ? 1.5 : 0.5,
             ),
           ),
@@ -943,27 +1033,50 @@ class _DoctorCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Avatar
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: accent,
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              // ── Avatar ───────────────────────────────────────────────────
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: accent,
+                    child: Text(
+                      initial,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
-                ),
+                  // Small availability dot on avatar
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: qs.canBook ? kGreen : kRed,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark ? _kDarkSurface : kCardBg,
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 10),
 
-              // Info column
+              // ── Info column ──────────────────────────────────────────────
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Name + fee
                     Row(
                       children: [
                         Expanded(
@@ -996,7 +1109,9 @@ class _DoctorCard extends StatelessWidget {
                         if (doctor.specialization != null) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: specBg,
                               borderRadius: BorderRadius.circular(4),
@@ -1023,15 +1138,17 @@ class _DoctorCard extends StatelessWidget {
                       ],
                     ),
 
-                    // Clinic + queue
+                    // Clinic name
                     if (doctor.clinicName != null ||
                         doctor.clinicAddress != null) ...[
                       const SizedBox(height: 3),
                       Row(
                         children: [
-                          Icon(Icons.local_hospital_rounded,
-                              size: 10,
-                              color: isDark ? Colors.white38 : kTextMid),
+                          Icon(
+                            Icons.local_hospital_rounded,
+                            size: 10,
+                            color: isDark ? Colors.white38 : kTextMid,
+                          ),
                           const SizedBox(width: 3),
                           Expanded(
                             child: Text(
@@ -1046,61 +1163,45 @@ class _DoctorCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (doctor.queueLength != null) ...[
-                            const SizedBox(width: 6),
-                            Icon(Icons.people_alt_rounded,
-                                size: 10, color: queueColor),
-                            const SizedBox(width: 2),
-                            Text(
-                              queueLabel,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: queueColor,
-                              ),
-                            ),
-                          ],
                         ],
                       ),
-                    ] else if (doctor.queueLength != null) ...[
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Icon(Icons.people_alt_rounded,
-                              size: 10, color: queueColor),
-                          const SizedBox(width: 2),
-                          Text(
-                            queueLabel,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: queueColor,
-                            ),
-                          ),
-                        ],
-                      ),
+                    ],
+
+                    // ── Queue status pill ──────────────────────────────────
+                    // Only rendered when the doctor has queue data at all.
+                    // isQueueAvailable == null  → API didn't return queue info → hide
+                    // isQueueAvailable == 0     → queue disabled → show "unavailable"
+                    // isQueueAvailable == 1     → show rich status
+                    if (doctor.isQueueAvailable != null) ...[
+                      const SizedBox(height: 5),
+                      _QueuePill(qs: qs, isDark: isDark),
                     ],
                   ],
                 ),
               ),
               const SizedBox(width: 8),
 
-              // Book button
+              // ── Book button ──────────────────────────────────────────────
+              // Disabled (greyed out) when booking is not possible.
               SizedBox(
                 height: 32,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => BookAppointmentScreen(
-                        doctor:             doctor,
-                        bookingForMemberId: selectedMemberId,
-                      ),
-                    ),
-                  ),
+                  onPressed: qs.canBook
+                      ? () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BookAppointmentScreen(
+                                doctor:             doctor,
+                                bookingForMemberId: selectedMemberId,
+                              ),
+                            ),
+                          )
+                      : null, // null disables the button
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isTopRated ? kPrimary : kTextDark,
                     foregroundColor: Colors.white,
+                    disabledBackgroundColor: kBorder,
+                    disabledForegroundColor: kTextMid,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                     shape: RoundedRectangleBorder(
@@ -1111,7 +1212,7 @@ class _DoctorCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  child: const Text('Book'),
+                  child: Text(qs.canBook ? 'Book' : _bookButtonLabel(qs)),
                 ),
               ),
             ],
@@ -1139,6 +1240,75 @@ class _DoctorCard extends StatelessWidget {
               ),
             ),
           ),
+      ],
+    );
+  }
+
+  /// Short label for the disabled Book button so users know *why* they can't book.
+  String _bookButtonLabel(_QueueStatus qs) {
+    if (!qs.queueEnabled)   return 'Unavailable';
+    if (qs.isFull)          return 'Full';
+    if (!qs.bookingStarted) return 'Soon';
+    return 'Book';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUEUE PILL  – compact inline status widget shown inside the card
+// ─────────────────────────────────────────────────────────────────────────────
+class _QueuePill extends StatelessWidget {
+  final _QueueStatus qs;
+  final bool         isDark;
+
+  const _QueuePill({required this.qs, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Icon dot
+        Container(
+          width: 16,
+          height: 16,
+          decoration: BoxDecoration(
+            color: qs.color.withOpacity(0.15),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(qs.icon, size: 9, color: qs.color),
+        ),
+        const SizedBox(width: 4),
+
+        // Status label
+        Flexible(
+          child: Text(
+            qs.label,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: qs.color,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+
+        // Progress bar when we have current + max
+        if (qs.current != null && qs.max != null && qs.max! > 0) ...[
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 40,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: (qs.current! / qs.max!).clamp(0.0, 1.0),
+                minHeight: 4,
+                backgroundColor: qs.color.withOpacity(0.15),
+                valueColor: AlwaysStoppedAnimation<Color>(qs.color),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -1210,13 +1380,13 @@ class _ShimmerBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: const Color(0xFFE5E7EB),
-          borderRadius: BorderRadius.circular(radius),
-        ),
-      );
+    width: width,
+    height: height,
+    decoration: BoxDecoration(
+      color: const Color(0xFFE5E7EB),
+      borderRadius: BorderRadius.circular(radius),
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1260,11 +1430,7 @@ class _EmptyState extends StatelessWidget {
             const Text(
               'We couldn\'t load the doctors list.\nCheck your connection and try again.',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: kTextMid,
-                height: 1.5,
-              ),
+              style: TextStyle(fontSize: 12, color: kTextMid, height: 1.5),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(

@@ -13,12 +13,14 @@ class TimeSlot {
   TimeOfDay endTime;
   BookingMode bookingMode;
   int slotDurationMinutes;
+  int? maxQueueLength;
 
   TimeSlot({
     required this.startTime,
     required this.endTime,
     this.bookingMode = BookingMode.queue,
     this.slotDurationMinutes = 15,
+    this.maxQueueLength,
   });
 }
 
@@ -108,34 +110,33 @@ class _DoctorAvailabilityPageState
     }
   }
 
-  void _hydrateFromModel(DoctorScheduleModel model) {
-    // Index API days by lowercase name for O(1) lookup
-    final apiDays = {
-      for (final d in model.schedule ?? <DayScheduleModel>[])
-        (d.day ?? '').toLowerCase(): d
-    };
+void _hydrateFromModel(DoctorScheduleModel model) {
+  final apiDays = {
+    for (final d in model.schedule ?? <DayScheduleModel>[])
+      (d.day ?? '').toLowerCase(): d
+  };
 
-    setState(() {
-      for (final day in _days) {
-        final api = apiDays[day.dayName.toLowerCase()];
-        if (api == null) continue;
+  setState(() {
+    for (final day in _days) {
+      final api = apiDays[day.dayName.toLowerCase()];
+      if (api == null) continue;
 
-        day.isEnabled = (api.isEnabled ?? 0) == 1;
-        day.isExpanded = false;
-        day.timeSlots = (api.slots ?? []).map((s) {
-          return TimeSlot(
-            startTime: _parseTime(s.startTime),
-            endTime: _parseTime(s.endTime),
-            bookingMode: _intToBookingMode(s.bookingMode),
-            slotDurationMinutes: s.slotDuration ?? 15,
-          );
-        }).toList();
-      }
-    });
+      day.isEnabled = (api.isEnabled ?? 0) == 1;
+      day.isExpanded = false;
+      day.timeSlots = (api.slots ?? []).map((s) {
+        return TimeSlot(
+          startTime: _parseTime(s.startTime),
+          endTime: _parseTime(s.endTime),
+          bookingMode: _intToBookingMode(s.bookingMode),
+          slotDurationMinutes: s.slotDuration ?? 15,
+          maxQueueLength: s.maxQueueLength, // ← THIS WAS MISSING
+        );
+      }).toList();
+    }
+  });
 
-    _hydratedFrom = model;
-  }
-
+  _hydratedFrom = model;
+}
   // ── Build model: _days → DoctorScheduleModel ─────────────────────────────────
 
   String _timeOfDayToString(TimeOfDay t) =>
@@ -162,17 +163,17 @@ class _DoctorAvailabilityPageState
         return DayScheduleModel(
           day: day.dayName,
           isEnabled: day.isEnabled ? 1 : 0,
-          slots: day.timeSlots.map((slot) {
-            return TimeSlotModel(
-              startTime: _timeOfDayToString(slot.startTime),
-              endTime: _timeOfDayToString(slot.endTime),
-              bookingMode: _bookingModeToInt(slot.bookingMode),
-              // slotDuration is irrelevant for queue-only mode
-              slotDuration: slot.bookingMode == BookingMode.queue
-                  ? null
-                  : slot.slotDurationMinutes,
-            );
-          }).toList(),
+   slots: day.timeSlots.map((slot) {
+  return TimeSlotModel(
+    startTime: _timeOfDayToString(slot.startTime),
+    endTime: _timeOfDayToString(slot.endTime),
+    bookingMode: _bookingModeToInt(slot.bookingMode),
+    slotDuration: slot.bookingMode == BookingMode.queue
+        ? null
+        : slot.slotDurationMinutes,
+    maxQueueLength: slot.maxQueueLength, // ← ADD THIS (add field to TimeSlotModel too)
+  );
+}).toList(),
         );
       }).toList(),
     );
@@ -788,6 +789,7 @@ class _TimeSlotCard extends StatefulWidget {
 
 class _TimeSlotCardState extends State<_TimeSlotCard> {
   late TimeSlot _local;
+  late TextEditingController _queueCtrl; // ← ADD THIS
 
   @override
   void initState() {
@@ -797,8 +799,33 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
       endTime: widget.slot.endTime,
       bookingMode: widget.slot.bookingMode,
       slotDurationMinutes: widget.slot.slotDurationMinutes,
+      maxQueueLength: widget.slot.maxQueueLength,
     );
+    // Pre-fill if value exists
+    _queueCtrl = TextEditingController(
+      text: _local.maxQueueLength != null
+          ? '${_local.maxQueueLength}'
+          : '',
+    ); // ← ADD THIS
   }
+
+  @override
+  void dispose() {
+    _queueCtrl.dispose(); // ← ADD THIS
+    super.dispose();
+  }
+
+  @override
+void didUpdateWidget(covariant _TimeSlotCard oldWidget) {
+  super.didUpdateWidget(oldWidget);
+  // Sync controller text if maxQueueLength changed externally (e.g. after hydration)
+  if (oldWidget.slot.maxQueueLength != widget.slot.maxQueueLength) {
+    _queueCtrl.text = widget.slot.maxQueueLength != null
+        ? '${widget.slot.maxQueueLength}'
+        : '';
+    _local.maxQueueLength = widget.slot.maxQueueLength;
+  }
+}
 
   void _update() => widget.onUpdate(_local);
 
@@ -1030,6 +1057,92 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
             }).toList(),
           ),
 
+          // Max Queue Length (only for queue / both)
+if (_local.bookingMode == BookingMode.queue ||
+    _local.bookingMode == BookingMode.both) ...[
+  const SizedBox(height: 14),
+  const Text(
+    'Max Queue Length',
+    style: TextStyle(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+      color: Color(0xFF6B7280),
+      letterSpacing: 0.3,
+    ),
+  ),
+  const SizedBox(height: 8),
+  Container(
+    height: 44,
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(9),
+      border: Border.all(color: const Color(0xFFDDE0E8)),
+    ),
+    child: Row(
+      children: [
+        const SizedBox(width: 12),
+        const Icon(
+          Icons.people_alt_rounded,
+          size: 16,
+          color: Color(0xFF2D7DD2),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: _queueCtrl,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF0F1923),
+            ),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              hintText: 'e.g. 20',
+              hintStyle: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF9CA3AF),
+                fontWeight: FontWeight.w400,
+              ),
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (val) {
+              setState(() {
+                _local.maxQueueLength =
+                    val.isEmpty ? null : int.tryParse(val);
+              });
+              _update();
+            },
+          ),
+        ),
+        Container(
+          margin: const EdgeInsets.only(right: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2D7DD2).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Text(
+            'patients',
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2D7DD2),
+            ),
+          ),
+        ),
+      ],
+    ),
+  ),
+],
+
+// Slot duration (only for slots / both) — keep existing block below
+if (_local.bookingMode == BookingMode.slots ||
+    _local.bookingMode == BookingMode.both) ...[
+  // ... existing slot duration code ...
+],
           // Slot duration (only for slots / both)
           if (_local.bookingMode == BookingMode.slots ||
               _local.bookingMode == BookingMode.both) ...[
