@@ -1215,6 +1215,7 @@ class _BaBody extends StatelessWidget {
               slots:       buildSlots(selectedAvail!),
               selected:    selectedTime,
               isDark:      isDark,
+              isToday:     dayIsToday,
               bookedTimes: bookedTimes,
               onSelected:  onPickTime,
             ),
@@ -1669,11 +1670,13 @@ class _BaSlotPicker extends StatelessWidget {
   final List<String>         slots;
   final String?              selected;
   final bool                 isDark;
+  final bool                 isToday;
   final Set<String>          bookedTimes;
   final ValueChanged<String> onSelected;
   const _BaSlotPicker({
     required this.slots, required this.selected,
     required this.isDark, required this.bookedTimes, required this.onSelected,
+    this.isToday = false,
   });
 
   int _mins(String slot) {
@@ -1697,6 +1700,9 @@ class _BaSlotPicker extends StatelessWidget {
           style: TextStyle(color: kTextMid, fontSize: 13)),
       ));
     }
+    final now     = DateTime.now();
+    final nowMins = isToday ? now.hour * 60 + now.minute : -1;
+
     final morning   = slots.where((s) => _mins(s) < 720).toList();
     final afternoon = slots.where((s) {
       final m = _mins(s); return m >= 720 && m < 1020;
@@ -1710,21 +1716,21 @@ class _BaSlotPicker extends StatelessWidget {
         _SlotHeader(icon: Icons.wb_sunny_outlined, label: 'Morning'),
         const SizedBox(height: 8),
         _SlotGrid(slots: morning, selected: selected, isDark: isDark,
-            booked: bookedTimes, onSelected: onSelected),
+            booked: bookedTimes, nowMins: nowMins, onSelected: onSelected),
         const SizedBox(height: 14),
       ],
       if (afternoon.isNotEmpty) ...[
         _SlotHeader(icon: Icons.wb_twilight_outlined, label: 'Afternoon'),
         const SizedBox(height: 8),
         _SlotGrid(slots: afternoon, selected: selected, isDark: isDark,
-            booked: bookedTimes, onSelected: onSelected),
+            booked: bookedTimes, nowMins: nowMins, onSelected: onSelected),
         const SizedBox(height: 14),
       ],
       if (evening.isNotEmpty) ...[
         _SlotHeader(icon: Icons.nights_stay_outlined, label: 'Evening'),
         const SizedBox(height: 8),
         _SlotGrid(slots: evening, selected: selected, isDark: isDark,
-            booked: bookedTimes, onSelected: onSelected),
+            booked: bookedTimes, nowMins: nowMins, onSelected: onSelected),
       ],
     ]);
   }
@@ -1747,11 +1753,25 @@ class _SlotGrid extends StatelessWidget {
   final String?              selected;
   final bool                 isDark;
   final Set<String>          booked;
+  final int                  nowMins;   // -1 means not today
   final ValueChanged<String> onSelected;
   const _SlotGrid({
     required this.slots, required this.selected,
-    required this.isDark, required this.booked, required this.onSelected,
+    required this.isDark, required this.booked,
+    required this.nowMins, required this.onSelected,
   });
+
+  int _slotMins(String slot) {
+    final p  = slot.split(':');
+    final h  = int.tryParse(p[0]) ?? 0;
+    final r  = p[1].split(' ');
+    final m  = int.tryParse(r[0]) ?? 0;
+    final sf = r[1];
+    var hr   = h;
+    if (sf == 'PM' && hr != 12) hr += 12;
+    if (sf == 'AM' && hr == 12) hr = 0;
+    return hr * 60 + m;
+  }
 
   @override
   Widget build(BuildContext context) => Wrap(
@@ -1759,26 +1779,28 @@ class _SlotGrid extends StatelessWidget {
     children: slots.map((slot) {
       final isSel    = selected == slot;
       final isBooked = booked.contains(slot);
+      final isPast   = nowMins >= 0 && _slotMins(slot) <= nowMins;
+      final disabled = isBooked || isPast;
       return GestureDetector(
-        onTap: isBooked ? null : () => onSelected(slot),
+        onTap: disabled ? null : () => onSelected(slot),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isBooked
+            color: disabled
                 ? (isDark ? _kDarkSurface : const Color(0xFFF3F4F6))
                 : isSel ? kPrimary
                 : (isDark ? _kDarkSurface : kCardBg),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isBooked
+              color: disabled
                   ? const Color(0xFFD1D5DB)
                   : (isSel ? kPrimary : kBorder),
             ),
           ),
           child: Text(slot, style: TextStyle(
             fontSize: 12, fontWeight: FontWeight.w600,
-            color: isBooked
+            color: disabled
                 ? const Color(0xFFD1D5DB)
                 : (isSel ? Colors.white : kTextDark),
             decoration: isBooked ? TextDecoration.lineThrough : null,

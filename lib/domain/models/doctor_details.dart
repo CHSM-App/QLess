@@ -76,6 +76,8 @@ class DoctorDetails {
 
   @JsonKey(name: 'is_queue_available', fromJson: _intFromJson)
   final int? isQueueAvailable;
+  @JsonKey(name: 'is_slot_available', fromJson: _intFromJson)
+  final int? isSlotAvailable;
 
   @JsonKey(name: 'is_booking_started', fromJson: _intFromJson)
   final int? isBookingStarted;
@@ -119,6 +121,7 @@ class DoctorDetails {
     this.qStartSection,
     this.queueLength,
     this.isQueueAvailable,
+    this.isSlotAvailable,
     this.isBookingStarted,
     this.currentQueueLength,
     this.maxQueueLength,

@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 
 // ─── Color Palette ─────────────────────────────────────────────────────────
@@ -57,94 +63,23 @@ const _specialtyBg = <String, Color>{
 Color _accentFor(String? s) => _specialtyAccent[s?.toLowerCase()] ?? _C.teal;
 Color _bgFor(String? s)     => _specialtyBg[s?.toLowerCase()]     ?? _C.tealLighter;
 
-// ─── Mock Data Models ─────────────────────────────────────────────────────
-enum QueueState { unavailable, opensSoon, full, empty, hasQueue }
+// ─── Queue State helpers derived from DoctorDetails ───────────────────────
+enum _QueueState { noQueue, unavailable, opensSoon, full, open, hasQueue }
 
-class MockDoctor {
-  final int id;
-  final String name;
-  final String specialization;
-  final String clinic;
-  final String address;
-  final double fee;
-  final int experience;
-  final QueueState queueState;
-  final int currentQueue;
-  final int maxQueue;
-  final bool isFavorite;
-  final String? opensAt;
-
-  const MockDoctor({
-    required this.id,
-    required this.name,
-    required this.specialization,
-    required this.clinic,
-    required this.address,
-    required this.fee,
-    required this.experience,
-    this.queueState = QueueState.hasQueue,
-    this.currentQueue = 0,
-    this.maxQueue = 20,
-    this.isFavorite = false,
-    this.opensAt,
-  });
+_QueueState _queueStateFor(DoctorDetails d) {
+  // No queue configured for this doctor at all
+  if (d.isQueueAvailable == null) return _QueueState.noQueue;
+  // Queue exists but is disabled/unavailable
+  if (d.isQueueAvailable == 0)    return _QueueState.unavailable;
+  // Queue available but booking hasn't started yet
+  if (d.isBookingStarted != 1)    return _QueueState.opensSoon;
+  // Booking started — check capacity
+  if (d.isQueueFull == 1)         return _QueueState.full;
+  final cur = d.currentQueueLength ?? 0;
+  final max = d.maxQueueLength ?? 0;
+  if (cur == 0 && max == 0)       return _QueueState.open;
+  return _QueueState.hasQueue;
 }
-
-const _mockDoctors = <MockDoctor>[
-  MockDoctor(
-    id: 1, name: 'Aisha Mehta', specialization: 'cardiology',
-    clinic: 'Heart Care Centre', address: 'Bandra West',
-    fee: 800, experience: 12,
-    queueState: QueueState.hasQueue, currentQueue: 3, maxQueue: 15,
-    isFavorite: true,
-  ),
-  MockDoctor(
-    id: 2, name: 'Rajan Patel', specialization: 'pediatrics',
-    clinic: 'Little Stars Clinic', address: 'Andheri East',
-    fee: 600, experience: 8,
-    queueState: QueueState.empty,
-  ),
-  MockDoctor(
-    id: 3, name: 'Sunita Rao', specialization: 'dermatology',
-    clinic: 'Skin & Glow', address: 'Juhu',
-    fee: 1200, experience: 15,
-    queueState: QueueState.full,
-  ),
-  MockDoctor(
-    id: 4, name: 'Vikram Singh', specialization: 'orthopedics',
-    clinic: 'Bone & Joint Clinic', address: 'Malad',
-    fee: 1000, experience: 20,
-    queueState: QueueState.opensSoon, opensAt: '10:00 AM',
-    isFavorite: true,
-  ),
-  MockDoctor(
-    id: 5, name: 'Priya Nair', specialization: 'neurology',
-    clinic: 'Neuro Specialists', address: 'Dadar',
-    fee: 1500, experience: 18,
-    queueState: QueueState.hasQueue, currentQueue: 7, maxQueue: 20,
-  ),
-  MockDoctor(
-    id: 6, name: 'Amit Shah', specialization: 'general',
-    clinic: 'Family Health Clinic', address: 'Borivali',
-    fee: 400, experience: 5,
-    queueState: QueueState.unavailable,
-  ),
-  MockDoctor(
-    id: 7, name: 'Kavita Desai', specialization: 'gynecology',
-    clinic: 'Women\'s Wellness', address: 'Vile Parle',
-    fee: 900, experience: 11,
-    queueState: QueueState.hasQueue, currentQueue: 2, maxQueue: 10,
-    isFavorite: true,
-  ),
-  MockDoctor(
-    id: 8, name: 'Suresh Iyer', specialization: 'ophthalmology',
-    clinic: 'Eye Care Centre', address: 'Chembur',
-    fee: 700, experience: 9,
-    queueState: QueueState.empty,
-  ),
-];
-
-const _mockMembers = ['Rahul (Son)', 'Meera (Wife)', 'Dad'];
 
 // ─── Queue Status Model ────────────────────────────────────────────────────
 class _QueueStatus {
@@ -160,31 +95,48 @@ class _QueueStatus {
     required this.color, required this.icon, this.progress,
   });
 
-  factory _QueueStatus.from(MockDoctor d) {
-    switch (d.queueState) {
-      case QueueState.unavailable:
+  factory _QueueStatus.from(DoctorDetails d) {
+    final state = _queueStateFor(d);
+    switch (state) {
+      case _QueueState.noQueue:
+        // No queue — hide the pill, allow booking via slots
+        return const _QueueStatus(isVisible: false, canBook: true, tintCard: false,
+            label: '', btnLabel: 'Book',
+            color: _C.teal, icon: Icons.calendar_today_rounded);
+      case _QueueState.unavailable:
         return const _QueueStatus(isVisible: true, canBook: false, tintCard: true,
             label: 'Queue unavailable', btnLabel: 'Unavailable',
             color: _C.red, icon: Icons.block_rounded);
-      case QueueState.opensSoon:
+      case _QueueState.opensSoon:
+        final opensAt = d.bookingStartTime;
+        final label   = opensAt != null ? 'Queue opens $opensAt' : 'Queue opens soon';
+        // Slots available — show the queue open-time pill but still allow booking
+        if (d.isSlotAvailable == 1) {
+          return _QueueStatus(isVisible: true, canBook: true, tintCard: false,
+              label: label, btnLabel: 'Book',
+              color: _C.amber, icon: Icons.schedule_rounded);
+        }
+        // No slots either — disable booking
         return _QueueStatus(isVisible: true, canBook: false, tintCard: false,
-            label: d.opensAt != null ? 'Opens ${d.opensAt}' : 'Opens soon',
-            btnLabel: 'Soon', color: _C.amber, icon: Icons.schedule_rounded);
-      case QueueState.full:
+            label: label, btnLabel: 'Soon',
+            color: _C.amber, icon: Icons.schedule_rounded);
+      case _QueueState.full:
         return const _QueueStatus(isVisible: true, canBook: false, tintCard: true,
             label: 'Queue full', btnLabel: 'Full',
             color: _C.red, icon: Icons.group_off_rounded);
-      case QueueState.empty:
+      case _QueueState.open:
         return const _QueueStatus(isVisible: true, canBook: true, tintCard: false,
             label: 'Queue open', btnLabel: 'Book',
             color: _C.teal, icon: Icons.event_available_rounded);
-      case QueueState.hasQueue:
-        final prog = (d.currentQueue / d.maxQueue).clamp(0.0, 1.0);
+      case _QueueState.hasQueue:
+        final cur  = d.currentQueueLength ?? 0;
+        final max  = d.maxQueueLength ?? 1;
+        final prog = (cur / max).clamp(0.0, 1.0);
         return _QueueStatus(
           isVisible: true, canBook: true, tintCard: false,
-          label: '${d.currentQueue} / ${d.maxQueue} in queue',
+          label: '$cur / $max in queue',
           btnLabel: 'Book',
-          color: d.currentQueue > 5 ? _C.red : _C.amber,
+          color: cur > 5 ? _C.red : _C.amber,
           icon: Icons.people_alt_rounded, progress: prog,
         );
     }
@@ -194,22 +146,21 @@ class _QueueStatus {
 }
 
 // ─── Main Screen ──────────────────────────────────────────────────────────
-class DoctorSearchScreen extends StatefulWidget {
+class DoctorSearchScreen extends ConsumerStatefulWidget {
   const DoctorSearchScreen({super.key});
   @override
-  State<DoctorSearchScreen> createState() => _DoctorSearchScreenState();
+  ConsumerState<DoctorSearchScreen> createState() => _DoctorSearchScreenState();
 }
 
-class _DoctorSearchScreenState extends State<DoctorSearchScreen>
+class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen>
     with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
   String? _specialty;
-  String? _selectedMember;
-  bool _favOnly  = false;
-  bool _loading  = false;
+  int?    _selectedMemberId;
+  bool    _favOnly  = false;
 
   late final AnimationController _fadeCtrl;
-  late final Animation<double> _fadeAnim;
+  late final Animation<double>   _fadeAnim;
 
   @override
   void initState() {
@@ -217,6 +168,14 @@ class _DoctorSearchScreenState extends State<DoctorSearchScreen>
     _fadeCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 450));
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     Future.delayed(const Duration(milliseconds: 100), () => _fadeCtrl.forward());
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(doctorsViewModelProvider.notifier).fetchDoctors();
+      final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      if (pid > 0) {
+        ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
+      }
+    });
   }
 
   @override
@@ -226,33 +185,44 @@ class _DoctorSearchScreenState extends State<DoctorSearchScreen>
     super.dispose();
   }
 
-  List<MockDoctor> get _filtered {
-    return _mockDoctors.where((d) {
-      if (_favOnly && !d.isFavorite) return false;
-      final q = _search.text.toLowerCase();
+  List<DoctorDetails> _filtered(List<DoctorDetails> all) {
+    return all.where((d) {
+      final q      = _search.text.toLowerCase();
       final matchQ = q.isEmpty ||
-          d.name.toLowerCase().contains(q) ||
-          d.specialization.toLowerCase().contains(q) ||
-          d.clinic.toLowerCase().contains(q);
+          (d.name?.toLowerCase().contains(q) ?? false) ||
+          (d.specialization?.toLowerCase().contains(q) ?? false) ||
+          (d.clinicName?.toLowerCase().contains(q) ?? false);
       final matchS = _specialty == null || d.specialization == _specialty;
       return matchQ && matchS;
     }).toList();
   }
 
-  List<String> get _specialties {
+  List<String> _specialties(List<DoctorDetails> all) {
     final seen = <String>{};
-    return _mockDoctors.map((d) => d.specialization).where(seen.add).toList();
+    return all
+        .map((d) => d.specialization ?? '')
+        .where((s) => s.isNotEmpty && seen.add(s))
+        .toList();
   }
 
   Future<void> _refresh() async {
-    setState(() => _loading = true);
-    await Future.delayed(const Duration(seconds: 1));
-    setState(() => _loading = false);
+    await ref.read(doctorsViewModelProvider.notifier).fetchDoctors();
   }
 
   @override
   Widget build(BuildContext context) {
-    final docs = _filtered;
+    final doctorsState = ref.watch(doctorsViewModelProvider);
+    final patState     = ref.watch(patientLoginViewModelProvider);
+    final famState     = ref.watch(familyViewModelProvider);
+
+    final allDoctors = doctorsState.doctors;
+    final members    = famState.allfamilyMembers.maybeWhen(
+      data: (m) => m, orElse: () => <FamilyMember>[],
+    );
+
+    final docs       = _filtered(allDoctors);
+    final specialties = _specialties(allDoctors);
+    final isLoading  = doctorsState.isLoading;
 
     return Scaffold(
       backgroundColor: _C.bg,
@@ -263,26 +233,27 @@ class _DoctorSearchScreenState extends State<DoctorSearchScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _TopBar(
-                favOnly: _favOnly,
-                favCount: _mockDoctors.where((d) => d.isFavorite).length,
+                favOnly:  _favOnly,
+                favCount: 0,
                 onFavTap: () => setState(() {
                   _favOnly = !_favOnly;
                   if (!_favOnly) _specialty = null;
                 }),
               ),
               _BookingRow(
-                members: _mockMembers,
-                selected: _selectedMember,
-                onChanged: (v) => setState(() => _selectedMember = v),
+                patState:         patState,
+                members:          members,
+                selectedMemberId: _selectedMemberId,
+                onChanged: (id) => setState(() => _selectedMemberId = id),
               ),
               _SearchBar(
                 controller: _search,
-                onChanged: (_) => setState(() {}),
+                onChanged:  (_) => setState(() {}),
               ),
               if (!_favOnly)
                 _SpecialtyChips(
-                  specialties: _specialties,
-                  selected: _specialty,
+                  specialties: specialties,
+                  selected:    _specialty,
                   onTap: (s) => setState(
                     () => _specialty = s == _specialty ? null : s,
                   ),
@@ -290,17 +261,28 @@ class _DoctorSearchScreenState extends State<DoctorSearchScreen>
               else
                 _FavFilter(onClear: () => setState(() => _favOnly = false)),
 
-              if (!_loading)
+              if (!isLoading)
                 _CountBadge(count: docs.length, isFav: _favOnly),
 
               Expanded(
-                child: _loading
+                child: isLoading
                     ? const _LoadingShimmer()
                     : _DoctorListView(
-                        doctors: docs,
-                        isFavMode: _favOnly,
-                        selectedMember: _selectedMember,
-                        onRefresh: _refresh,
+                        doctors:          docs,
+                        isFavMode:        _favOnly,
+                        selectedMemberId: _selectedMemberId,
+                        onRefresh:        _refresh,
+                        onBook: (doctor) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => BookAppointmentScreen(
+                                doctor:             doctor,
+                                bookingForMemberId: _selectedMemberId,
+                              ),
+                            ),
+                          );
+                        },
                       ),
               ),
             ],
@@ -356,7 +338,7 @@ class _TopBar extends StatelessWidget {
             decoration: BoxDecoration(
               color: _C.tealLighter,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _C.teal.withOpacity(0.2)),
+              border: Border.all(color: _C.teal.withValues(alpha: 0.2)),
             ),
             child: const Icon(Icons.notifications_none_rounded, color: _C.teal, size: 16),
           ),
@@ -370,10 +352,10 @@ class _TopBar extends StatelessWidget {
                   duration: const Duration(milliseconds: 200),
                   width: 34, height: 34,
                   decoration: BoxDecoration(
-                    color: favOnly ? _C.red.withOpacity(0.1) : _C.tealLighter,
+                    color: favOnly ? _C.red.withValues(alpha: 0.1) : _C.tealLighter,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: favOnly ? _C.red.withOpacity(0.3) : _C.teal.withOpacity(0.2),
+                      color: favOnly ? _C.red.withValues(alpha: 0.3) : _C.teal.withValues(alpha: 0.2),
                     ),
                   ),
                   child: Icon(
@@ -404,11 +386,17 @@ class _TopBar extends StatelessWidget {
 
 // ─── Booking Row ──────────────────────────────────────────────────────────
 class _BookingRow extends StatelessWidget {
-  final List<String> members;
-  final String? selected;
-  final ValueChanged<String?> onChanged;
+  final PatientLoginState  patState;
+  final List<FamilyMember> members;
+  final int?               selectedMemberId;
+  final ValueChanged<int?> onChanged;
 
-  const _BookingRow({required this.members, required this.selected, required this.onChanged});
+  const _BookingRow({
+    required this.patState,
+    required this.members,
+    required this.selectedMemberId,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -418,7 +406,7 @@ class _BookingRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: _C.tealLighter,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _C.teal.withOpacity(0.2)),
+        border: Border.all(color: _C.teal.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -428,28 +416,38 @@ class _BookingRow extends StatelessWidget {
           const SizedBox(width: 4),
           Expanded(
             child: DropdownButtonHideUnderline(
-              child: DropdownButton<String?>(
-                value: selected,
+              child: DropdownButton<int?>(
+                value: selectedMemberId,
                 isDense: true,
                 isExpanded: true,
                 icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: _C.teal),
                 dropdownColor: Colors.white,
-                hint: const Text('Myself',
-                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _C.teal)),
+                hint: Text(
+                  patState.name ?? 'Myself',
+                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: _C.teal),
+                ),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<int?>(
                     value: null,
-                    child: _MemberOption(label: 'Myself', sub: 'Self', color: _C.teal),
+                    child: _MemberOption(
+                      label: patState.name ?? 'Myself',
+                      sub: 'Self',
+                      color: _C.teal,
+                    ),
                   ),
-                  ...members.map((m) => DropdownMenuItem<String?>(
-                        value: m,
-                        child: _MemberOption(label: m.split(' ').first, sub: m.split(' ').last, color: _C.purple),
+                  ...members.map((m) => DropdownMenuItem<int?>(
+                        value: m.memberId,
+                        child: _MemberOption(
+                          label: m.memberName?.split(' ').first ?? '?',
+                          sub: m.relationName ?? '',
+                          color: _C.purple,
+                        ),
                       )),
                 ],
                 onChanged: onChanged,
                 selectedItemBuilder: (ctx) => [
-                  const _DropSelected('Myself'),
-                  ...members.map((m) => _DropSelected(m.split(' ').first)),
+                  _DropSelected(patState.name ?? 'Myself'),
+                  ...members.map((m) => _DropSelected(m.memberName?.split(' ').first ?? '?')),
                 ],
               ),
             ),
@@ -470,8 +468,9 @@ class _MemberOption extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 10,
-            backgroundColor: color.withOpacity(0.15),
-            child: Text(label[0], style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: color)),
+            backgroundColor: color.withValues(alpha: 0.15),
+            child: Text(label.isNotEmpty ? label[0] : '?',
+                style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w700, color: color)),
           ),
           const SizedBox(width: 7),
           Column(
@@ -512,7 +511,7 @@ class _SearchBar extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: _C.border),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Row(
           children: [
@@ -541,7 +540,7 @@ class _SearchBar extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       child: Container(
                         width: 17, height: 17,
-                        decoration: BoxDecoration(color: _C.textMuted.withOpacity(0.15), shape: BoxShape.circle),
+                        decoration: BoxDecoration(color: _C.textMuted.withValues(alpha: 0.15), shape: BoxShape.circle),
                         child: const Icon(Icons.close_rounded, size: 11, color: _C.textSlate),
                       ),
                     ),
@@ -606,7 +605,7 @@ class _SpecChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? accent : bg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? accent : accent.withOpacity(0.3), width: 1),
+          border: Border.all(color: selected ? accent : accent.withValues(alpha: 0.3), width: 1),
         ),
         child: Text(label,
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: selected ? Colors.white : accent)),
@@ -626,9 +625,9 @@ class _FavFilter extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 0),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: _C.red.withOpacity(0.05),
+        color: _C.red.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _C.red.withOpacity(0.18)),
+        border: Border.all(color: _C.red.withValues(alpha: 0.18)),
       ),
       child: Row(
         children: [
@@ -674,14 +673,18 @@ class _CountBadge extends StatelessWidget {
 
 // ─── Doctor List ──────────────────────────────────────────────────────────
 class _DoctorListView extends StatelessWidget {
-  final List<MockDoctor> doctors;
+  final List<DoctorDetails> doctors;
   final bool isFavMode;
-  final String? selectedMember;
+  final int? selectedMemberId;
   final Future<void> Function() onRefresh;
+  final void Function(DoctorDetails) onBook;
 
   const _DoctorListView({
-    required this.doctors, required this.isFavMode,
-    required this.selectedMember, required this.onRefresh,
+    required this.doctors,
+    required this.isFavMode,
+    required this.selectedMemberId,
+    required this.onRefresh,
+    required this.onBook,
   });
 
   @override
@@ -713,7 +716,11 @@ class _DoctorListView extends StatelessWidget {
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 20),
         itemCount: doctors.length,
-        itemBuilder: (_, i) => _DoctorCard(doctor: doctors[i], selectedMember: selectedMember),
+        itemBuilder: (_, i) => _DoctorCard(
+          doctor:          doctors[i],
+          selectedMemberId: selectedMemberId,
+          onBook:          onBook,
+        ),
       ),
     );
   }
@@ -721,46 +728,26 @@ class _DoctorListView extends StatelessWidget {
 
 // ─── Doctor Card ──────────────────────────────────────────────────────────
 class _DoctorCard extends StatefulWidget {
-  final MockDoctor doctor;
-  final String? selectedMember;
-  const _DoctorCard({required this.doctor, required this.selectedMember});
+  final DoctorDetails doctor;
+  final int?          selectedMemberId;
+  final void Function(DoctorDetails) onBook;
+  const _DoctorCard({required this.doctor, required this.selectedMemberId, required this.onBook});
 
   @override
   State<_DoctorCard> createState() => _DoctorCardState();
 }
 
-class _DoctorCardState extends State<_DoctorCard> with SingleTickerProviderStateMixin {
-  late bool _fav;
-  late AnimationController _heartCtrl;
-  late Animation<double> _heartScale;
-
-  @override
-  void initState() {
-    super.initState();
-    _fav = widget.doctor.isFavorite;
-    _heartCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 250));
-    _heartScale = TweenSequence([
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.4), weight: 50),
-      TweenSequenceItem(tween: Tween(begin: 1.4, end: 1.0), weight: 50),
-    ]).animate(CurvedAnimation(parent: _heartCtrl, curve: Curves.easeOut));
-  }
-
-  @override
-  void dispose() { _heartCtrl.dispose(); super.dispose(); }
-
-  void _toggleFav() {
-    setState(() => _fav = !_fav);
-    _heartCtrl.forward(from: 0);
-  }
-
+class _DoctorCardState extends State<_DoctorCard> {
   @override
   Widget build(BuildContext context) {
-    final d = widget.doctor;
-    final qs = _QueueStatus.from(d);
-    final accent = _accentFor(d.specialization);
-    final specBg = _bgFor(d.specialization);
-    final init = d.name[0].toUpperCase();
-    final clinicText = '${d.clinic} · ${d.address}';
+    final d          = widget.doctor;
+    final qs         = _QueueStatus.from(d);
+    final accent     = _accentFor(d.specialization);
+    final specBg     = _bgFor(d.specialization);
+    final init       = (d.name?.isNotEmpty ?? false) ? d.name![0].toUpperCase() : 'D';
+    final clinicText = [d.clinicName, d.clinicAddress]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(' · ');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -768,12 +755,12 @@ class _DoctorCardState extends State<_DoctorCard> with SingleTickerProviderState
         color: _C.card,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: qs.tintCard ? _C.red.withOpacity(0.28) : _C.border,
+          color: qs.tintCard ? _C.red.withValues(alpha: 0.28) : _C.border,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12, offset: const Offset(0, 4),
           ),
         ],
@@ -789,35 +776,12 @@ class _DoctorCardState extends State<_DoctorCard> with SingleTickerProviderState
               Container(
                 width: 50, height: 50,
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.1),
+                  color: accent.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
-                  border: Border.all(color: accent.withOpacity(0.2), width: 1.5),
+                  border: Border.all(color: accent.withValues(alpha: 0.2), width: 1.5),
                 ),
                 child: Center(
                   child: Text(init, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: accent)),
-                ),
-              ),
-              // Fav heart
-              Positioned(
-                top: -4, right: -4,
-                child: GestureDetector(
-                  onTap: _toggleFav,
-                  child: ScaleTransition(
-                    scale: _heartScale,
-                    child: Container(
-                      width: 18, height: 18,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _C.border),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 3)],
-                      ),
-                      child: Icon(
-                        _fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        size: 9.5, color: _fav ? _C.red : _C.textMuted,
-                      ),
-                    ),
-                  ),
                 ),
               ),
               // Online dot
@@ -847,37 +811,43 @@ class _DoctorCardState extends State<_DoctorCard> with SingleTickerProviderState
                   children: [
                     Expanded(
                       child: Text(
-                        'Dr. ${d.name}',
+                        'Dr. ${d.name ?? 'Unknown'}',
                         style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: _C.textPrimary),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    _FeeTag(fee: d.fee),
+                    if (d.consultationFee != null)
+                      _FeeTag(fee: d.consultationFee!),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    _SpecTag(label: _cap(d.specialization), accent: accent, bg: specBg),
-                    const SizedBox(width: 6),
-                    _ExpTag(years: d.experience),
+                    if (d.specialization != null)
+                      _SpecTag(label: _cap(d.specialization!), accent: accent, bg: specBg),
+                    if (d.experience != null) ...[
+                      const SizedBox(width: 6),
+                      _ExpTag(years: d.experience!),
+                    ],
                     const Spacer(),
-                    _RatingDot(),
+                    const _RatingDot(),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_rounded, size: 10, color: _C.textMuted),
-                    const SizedBox(width: 2),
-                    Expanded(
-                      child: Text(clinicText,
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 10.5, color: _C.textMuted)),
-                    ),
-                  ],
-                ),
+                if (clinicText.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on_rounded, size: 10, color: _C.textMuted),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(clinicText,
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10.5, color: _C.textMuted)),
+                      ),
+                    ],
+                  ),
+                ],
                 if (qs.isVisible) ...[
                   const SizedBox(height: 5),
                   _QueuePill(status: qs),
@@ -889,7 +859,7 @@ class _DoctorCardState extends State<_DoctorCard> with SingleTickerProviderState
           const SizedBox(width: 8),
 
           // ── Book Button ──
-          _BookButton(status: qs),
+          _BookButton(status: qs, onBook: () => widget.onBook(widget.doctor)),
         ],
       ),
     );
@@ -938,12 +908,12 @@ class _ExpTag extends StatelessWidget {
 class _RatingDot extends StatelessWidget {
   const _RatingDot();
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) => const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded, size: 10, color: _C.amber),
-          const SizedBox(width: 2),
-          const Text('4.8', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _C.textSlate)),
+          Icon(Icons.star_rounded, size: 10, color: _C.amber),
+          SizedBox(width: 2),
+          Text('4.8', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _C.textSlate)),
         ],
       );
 }
@@ -960,7 +930,7 @@ class _QueuePill extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
           decoration: BoxDecoration(
-            color: status.color.withOpacity(0.09),
+            color: status.color.withValues(alpha: 0.09),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
@@ -995,7 +965,8 @@ class _QueuePill extends StatelessWidget {
 
 class _BookButton extends StatelessWidget {
   final _QueueStatus status;
-  const _BookButton({required this.status});
+  final VoidCallback onBook;
+  const _BookButton({required this.status, required this.onBook});
 
   @override
   Widget build(BuildContext context) {
@@ -1006,11 +977,11 @@ class _BookButton extends StatelessWidget {
           width: 66,
           height: 36,
           child: ElevatedButton(
-            onPressed: status.canBook ? () => _showConfirmSnack(context) : null,
+            onPressed: status.canBook ? onBook : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: status.canBook ? _C.teal : status.color.withOpacity(0.1),
+              backgroundColor: status.canBook ? _C.teal : status.color.withValues(alpha: 0.1),
               foregroundColor: status.canBook ? Colors.white : status.color,
-              disabledBackgroundColor: status.color.withOpacity(0.1),
+              disabledBackgroundColor: status.color.withValues(alpha: 0.1),
               disabledForegroundColor: status.color,
               elevation: 0,
               padding: EdgeInsets.zero,
@@ -1027,19 +998,6 @@ class _BookButton extends StatelessWidget {
       ],
     );
   }
-
-  void _showConfirmSnack(BuildContext ctx) {
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(
-        content: const Text('Opening appointment screen…', style: TextStyle(fontSize: 12)),
-        backgroundColor: _C.teal,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-      ),
-    );
-  }
 }
 
 // ─── Loading Shimmer ──────────────────────────────────────────────────────
@@ -1051,7 +1009,7 @@ class _LoadingShimmer extends StatefulWidget {
 
 class _LoadingShimmerState extends State<_LoadingShimmer> with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double> _anim;
+  late Animation<double>   _anim;
 
   @override
   void initState() {
