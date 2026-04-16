@@ -13,85 +13,85 @@ import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.d
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/domain/models/review_model.dart';
 
-// ─── Colour palette ────────────────────────────────────────────
-const kPrimary   = Color(0xFF1A73E8);
-const kPrimaryBg = Color(0xFFE8F0FE);
-const kBg        = Color(0xFFF4F6FB);
-const kCardBg    = Colors.white;
-const kTextDark  = Color(0xFF1F2937);
-const kTextMid   = Color(0xFF6B7280);
-const kBorder    = Color(0xFFE5E7EB);
-const kRed       = Color(0xFFEA4335);
-const kGreen     = Color(0xFF34A853);
-const kOrange    = Color(0xFFF59E0B);
-const kPurple    = Color(0xFF8B5CF6);
-const kCyan      = Color(0xFF06B6D4);
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder  = Color(0xFFEDF2F7);
+const kDivider = Color(0xFFE5E7EB);
+
+const kError      = Color(0xFFFC8181);
+const kRedLight   = Color(0xFFFEE2E2);
+const kSuccess    = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+const kWarning    = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+const kPurple     = Color(0xFF9F7AEA);
+const kPurpleLight= Color(0xFFEDE9FE);
+const kInfo       = Color(0xFF3B82F6);
+const kInfoLight  = Color(0xFFDBEAFE);
+
 const kFavActive = Color(0xFFE53E3E);
 
-const _kDarkSurface = Color(0xFF1E293B);
-const _kDarkBg      = Color(0xFF0F172A);
-
-// ─── Specialty colours ────────────────────────────────────────────────────────
-const _baAccentMap = <String, Color>{
-  'cardiology':    Color(0xFFEF4444),
-  'dermatology':   Color(0xFFF59E0B),
-  'pediatrics':    Color(0xFF10B981),
-  'orthopedics':   Color(0xFF8B5CF6),
-  'neurology':     Color(0xFF8B5CF6),
-  'general':       Color(0xFF06B6D4),
+// ── Specialty accent/bg ───────────────────────────────────────────────────────
+const _accentMap = <String, Color>{
+  'cardiology':    kError,
+  'dermatology':   kWarning,
+  'pediatrics':    kSuccess,
+  'orthopedics':   kPurple,
+  'neurology':     kPurple,
+  'general':       kPrimary,
   'gynecology':    Color(0xFFEC4899),
-  'ophthalmology': Color(0xFF14B8A6),
+  'ophthalmology': kPrimary,
 };
-const _baBgMap = <String, Color>{
-  'cardiology':    Color(0xFFFEE2E2),
-  'dermatology':   Color(0xFFFEF3C7),
-  'pediatrics':    Color(0xFFD1FAE5),
-  'orthopedics':   Color(0xFFEDE9FE),
-  'neurology':     Color(0xFFEDE9FE),
-  'general':       Color(0xFFCFFAFE),
+const _bgMap = <String, Color>{
+  'cardiology':    kRedLight,
+  'dermatology':   kAmberLight,
+  'pediatrics':    kGreenLight,
+  'orthopedics':   kPurpleLight,
+  'neurology':     kPurpleLight,
+  'general':       kPrimaryLight,
   'gynecology':    Color(0xFFFCE7F3),
-  'ophthalmology': Color(0xFFCCFBF1),
+  'ophthalmology': kPrimaryLight,
 };
 
-Color _baAccent(String? s) => _baAccentMap[s?.toLowerCase()] ?? kPrimary;
-Color _baBg(String? s)     => _baBgMap[s?.toLowerCase()] ?? kPrimaryBg;
-String _baCap(String s)    => s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
+Color _accent(String? s) => _accentMap[s?.toLowerCase()] ?? kPrimary;
+Color _bg(String? s)     => _bgMap[s?.toLowerCase()]     ?? kPrimaryLight;
+String _cap(String s)    =>
+    s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
 
-// ─── Date helpers ─────────────────────────────────────────────────────────────
-const _baMonths     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const _baFullMonths = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-const _baDayAbbr    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+// ── Date helpers ──────────────────────────────────────────────────────────────
+const _months     = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const _fullMonths = ['January','February','March','April','May','June',
+    'July','August','September','October','November','December'];
+const _dayAbbr    = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-bool _baIsToday(DateTime dt) {
+bool _isToday(DateTime dt) {
   final n = DateTime.now();
   return dt.year == n.year && dt.month == n.month && dt.day == n.day;
 }
-String _baFmtFull(DateTime dt) {
-  if (_baIsToday(dt)) return 'Today';
-  return '${_baDayAbbr[dt.weekday - 1]}, ${dt.day} ${_baMonths[dt.month - 1]}';
-}
-bool _baBookable(int? mode, bool isToday) {
-  switch (mode) {
-    case 1: return isToday;
-    case 2: return true;
-    case 3: return true;
-    default: return false;
-  }
+
+String _fmtFull(DateTime dt) {
+  if (_isToday(dt)) return 'Today';
+  return '${_dayAbbr[dt.weekday - 1]}, ${dt.day} ${_months[dt.month - 1]}';
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FAVORITE BUTTON WIDGET
-// ─────────────────────────────────────────────────────────────────────────────
+bool _bookable(int? mode, bool isToday) {
+  return switch (mode) { 1 => isToday, 2 => true, 3 => true, _ => false };
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  FAVORITE BUTTON
+// ════════════════════════════════════════════════════════════════════
 class _FavoriteButton extends StatefulWidget {
-  final bool   initialFav;
-  final bool   isDark;
+  final bool initialFav;
   final void Function(bool) onToggle;
-
-  const _FavoriteButton({
-    required this.initialFav,
-    required this.isDark,
-    required this.onToggle,
-  });
+  const _FavoriteButton({required this.initialFav, required this.onToggle});
 
   @override
   State<_FavoriteButton> createState() => _FavoriteButtonState();
@@ -102,17 +102,14 @@ class _FavoriteButtonState extends State<_FavoriteButton>
   late bool _isFav;
   late AnimationController _ctrl;
   late Animation<double> _scale;
-  late Animation<double> _bounce;
 
   @override
   void initState() {
     super.initState();
     _isFav = widget.initialFav;
     _ctrl  = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    );
-    _scale  = TweenSequence<double>([
+        vsync: this, duration: const Duration(milliseconds: 420));
+    _scale = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35)
           .chain(CurveTween(curve: Curves.easeOut)), weight: 35),
       TweenSequenceItem(tween: Tween(begin: 1.35, end: 0.88)
@@ -122,16 +119,15 @@ class _FavoriteButtonState extends State<_FavoriteButton>
       TweenSequenceItem(tween: Tween(begin: 1.06, end: 1.0)
           .chain(CurveTween(curve: Curves.easeIn)), weight: 15),
     ]).animate(_ctrl);
-    _bounce = CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut);
   }
 
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
 
   @override
-  void didUpdateWidget(_FavoriteButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialFav != widget.initialFav) {
+  void didUpdateWidget(_FavoriteButton old) {
+    super.didUpdateWidget(old);
+    if (old.initialFav != widget.initialFav) {
       setState(() => _isFav = widget.initialFav);
     }
   }
@@ -149,36 +145,34 @@ class _FavoriteButtonState extends State<_FavoriteButton>
       onTap: _toggle,
       child: AnimatedBuilder(
         animation: _ctrl,
-        builder: (_, child) => Transform.scale(scale: _scale.value, child: child),
+        builder: (_, child) =>
+            Transform.scale(scale: _scale.value, child: child),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 260),
+          duration: const Duration(milliseconds: 220),
           curve: Curves.easeInOut,
-          width: 38, height: 38,
+          width: 36, height: 36,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: _isFav
-                ? kFavActive.withOpacity(0.12)
-                : (widget.isDark ? Colors.white.withOpacity(0.08) : const Color(0xFFF3F4F6)),
+            borderRadius: BorderRadius.circular(10),
+            color: _isFav ? kFavActive.withOpacity(0.12) : kPrimaryLight,
             border: Border.all(
-              color: _isFav
-                  ? kFavActive.withOpacity(0.45)
-                  : (widget.isDark ? Colors.white.withOpacity(0.12) : kBorder),
-              width: 1.2,
+              color: _isFav ? kFavActive.withOpacity(0.4) : kPrimary.withOpacity(0.2),
             ),
             boxShadow: _isFav
-                ? [BoxShadow(color: kFavActive.withOpacity(0.25), blurRadius: 10)]
+                ? [BoxShadow(color: kFavActive.withOpacity(0.2), blurRadius: 8)]
                 : [],
           ),
           child: Center(
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
+              duration: const Duration(milliseconds: 200),
               transitionBuilder: (child, anim) =>
                   ScaleTransition(scale: anim, child: child),
               child: Icon(
-                _isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                _isFav
+                    ? Icons.favorite_rounded
+                    : Icons.favorite_border_rounded,
                 key: ValueKey(_isFav),
-                size: 18,
-                color: _isFav ? kFavActive : kTextMid,
+                size: 17,
+                color: _isFav ? kFavActive : kPrimary,
               ),
             ),
           ),
@@ -188,9 +182,9 @@ class _FavoriteButtonState extends State<_FavoriteButton>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BOOK APPOINTMENT SCREEN
-// ─────────────────────────────────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════════════
+//  BOOK APPOINTMENT SCREEN
+// ════════════════════════════════════════════════════════════════════
 class BookAppointmentScreen extends ConsumerStatefulWidget {
   final DoctorDetails doctor;
   final int?          bookingForMemberId;
@@ -203,7 +197,7 @@ class BookAppointmentScreen extends ConsumerStatefulWidget {
     required this.doctor,
     this.bookingForMemberId,
     this.initialFavorite = false,
-    this.isReschedule = false,
+    this.isReschedule    = false,
     this.appointmentId,
   });
 
@@ -220,12 +214,11 @@ class _BookAppointmentScreenState
   bool      _isBooking   = false;
   int?      _selectedMemberId;
   bool      _isFavorite  = false;
-  int?      _favFetchedForDoctorId;
-  int?      _favFetchedForPatientId;
+  int?      _favFetchedDoctorId;
+  int?      _favFetchedPatientId;
   bool      _didRouteRefresh = false;
   Timer?    _queueTimer;
 
-  // ── Queue estimate state ──────────────────────────────────────────────────
   String? _estimatedWaitTime;
   bool    _isEstimateLoading = false;
 
@@ -239,15 +232,13 @@ class _BookAppointmentScreenState
     _isFavorite       = cached ?? widget.initialFavorite;
     _selectedMemberId = widget.bookingForMemberId;
 
-    _queueTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-      if (mounted) setState(() {});
-    });
+    _queueTimer = Timer.periodic(
+        const Duration(seconds: 10), (_) { if (mounted) setState(() {}); });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final id = widget.doctor.doctorId;
-      if (id != null) {
-        ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(id);
-        ref.read(appointmentViewModelProvider.notifier).getBookedSlots(id);
+      if (did != null) {
+        ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did);
+        ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did);
       }
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {
@@ -261,8 +252,8 @@ class _BookAppointmentScreenState
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_didRouteRefresh) { _didRouteRefresh = true; return; }
-    _favFetchedForDoctorId  = null;
-    _favFetchedForPatientId = null;
+    _favFetchedDoctorId  = null;
+    _favFetchedPatientId = null;
     _tryFetchFavorite();
   }
 
@@ -272,7 +263,10 @@ class _BookAppointmentScreenState
     super.dispose();
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
   String _fmtDateApi(DateTime dt) =>
       '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
 
@@ -292,9 +286,9 @@ class _BookAppointmentScreenState
     final dt = DateTime.tryParse(iso);
     if (dt != null) return TimeOfDay(hour: dt.hour, minute: dt.minute);
     final parts = iso.split(':');
-    final h = int.tryParse(parts[0]) ?? 9;
-    final m = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
-    return TimeOfDay(hour: h, minute: m);
+    return TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? 9,
+        minute: parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0);
   }
 
   String _fmtTime(String? iso) {
@@ -316,7 +310,8 @@ class _BookAppointmentScreenState
       final m  = cur % 60;
       final sf = h < 12 ? 'AM' : 'PM';
       final dh = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-      slots.add('${dh.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $sf');
+      slots.add(
+          '${dh.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $sf');
       cur += dur;
     }
     return slots;
@@ -332,60 +327,42 @@ class _BookAppointmentScreenState
     }
     return map;
   }
-Future<void> _fetchQueueEstimate() async {
-  final did = widget.doctor.doctorId;
-  if (did == null || !mounted) return;
 
-  setState(() {
-    _isEstimateLoading = true;
-    _estimatedWaitTime = null;
-  });
-
-  await ref
-      .read(appointmentViewModelProvider.notifier)
-      .queuePreviewEstimate(AppointmentRequestModel(doctorId: did));
-
-  if (!mounted) return;
-
-  final queueData = ref
-      .read(appointmentViewModelProvider)
-      .queuePreviewEstimateResponse;
-
-  String? label;
-  if (queueData != null) {
-    final mins    = queueData.estimatedMinutes;
-    final arrival = queueData.estimatedArrivalTime;
-    final ahead   = queueData.patientsAhead;
-
-    if (mins != null && arrival != null) {
-      label = '~$mins min  ·  arrives around $arrival'
-          '${ahead != null ? '  ($ahead ahead)' : ''}';
-    } else if (mins != null) {
-      label = '~$mins min wait';
-    } else if (arrival != null) {
-      label = 'Arrives around $arrival';
-    }
-  }
-
-  setState(() {
-    _estimatedWaitTime = label;
-    _isEstimateLoading = false;
-  });
-}
-
-  /// True when the given avail record is a queue session for the current date.
   bool _isQueueSession(DoctorAvailabilityModel avail) {
-    final isToday = _selectedDate != null && _baIsToday(_selectedDate!);
+    final isToday = _selectedDate != null && _isToday(_selectedDate!);
     return avail.bookingMode == 1 || (avail.bookingMode == 3 && isToday);
   }
 
-  // ── Date / session pickers ────────────────────────────────────────────────
-  void _pickDate(DateTime date, List<DoctorAvailabilityModel> sessions) {
-    final isToday  = _baIsToday(date);
-    final bookable = sessions
-        .where((s) => _baBookable(s.bookingMode, isToday))
-        .toList();
+  Future<void> _fetchQueueEstimate() async {
+    final did = widget.doctor.doctorId;
+    if (did == null || !mounted) return;
+    setState(() { _isEstimateLoading = true; _estimatedWaitTime = null; });
 
+    await ref.read(appointmentViewModelProvider.notifier)
+        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did));
+    if (!mounted) return;
+
+    final qd = ref.read(appointmentViewModelProvider).queuePreviewEstimateResponse;
+    String? label;
+    if (qd != null) {
+      final mins    = qd.estimatedMinutes;
+      final arrival = qd.estimatedArrivalTime;
+      final ahead   = qd.patientsAhead;
+      if (mins != null && arrival != null) {
+        label = '~$mins min  ·  arrives around $arrival'
+            '${ahead != null ? '  ($ahead ahead)' : ''}';
+      } else if (mins != null) {
+        label = '~$mins min wait';
+      } else if (arrival != null) {
+        label = 'Arrives around $arrival';
+      }
+    }
+    setState(() { _estimatedWaitTime = label; _isEstimateLoading = false; });
+  }
+
+  void _pickDate(DateTime date, List<DoctorAvailabilityModel> sessions) {
+    final isToday  = _isToday(date);
+    final bookable = sessions.where((s) => _bookable(s.bookingMode, isToday)).toList();
     setState(() {
       _selectedDate      = date;
       _selectedSlotId    = bookable.length == 1 ? bookable.first.slotId : null;
@@ -397,56 +374,44 @@ Future<void> _fetchQueueEstimate() async {
     if (widget.doctor.doctorId != null) {
       ref.read(appointmentViewModelProvider.notifier).getAppointmentAvailability(
         AppointmentRequestModel(
-          doctorId:        widget.doctor.doctorId,
+          doctorId: widget.doctor.doctorId,
           appointmentDate: _fmtDateApi(date),
         ),
       );
     }
-
-    // Auto-fetch estimate when exactly one queue session is auto-selected
     if (bookable.length == 1 && _isQueueSession(bookable.first)) {
       _fetchQueueEstimate();
     }
   }
 
   void _onSessionPicked(int? slotId) {
-    final enabled = ref
-        .read(doctorsViewModelProvider)
-        .doctorAvailabilities
-        .where((a) => a.isEnabled == true)
-        .toList();
-
+    final enabled = ref.read(doctorsViewModelProvider).doctorAvailabilities
+        .where((a) => a.isEnabled == true).toList();
     setState(() {
       _selectedSlotId    = slotId;
       _selectedTime      = null;
       _estimatedWaitTime = null;
       _isEstimateLoading = false;
     });
-
     if (slotId == null) return;
-
     final picked = enabled.firstWhere(
-      (a) => a.slotId == slotId,
-      orElse: () => DoctorAvailabilityModel(),
-    );
-
+      (a) => a.slotId == slotId, orElse: () => DoctorAvailabilityModel());
     if (_isQueueSession(picked)) _fetchQueueEstimate();
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     final state     = ref.watch(doctorsViewModelProvider);
     final apptState = ref.watch(appointmentViewModelProvider);
     final patState  = ref.watch(patientLoginViewModelProvider);
     final famState  = ref.watch(familyViewModelProvider);
-    final isDark    = Theme.of(context).brightness == Brightness.dark;
+    final members   = famState.allfamilyMembers.maybeWhen(
+        data: (m) => m, orElse: () => <FamilyMember>[]);
 
-    final members = famState.allfamilyMembers.maybeWhen(
-      data: (m) => m, orElse: () => <FamilyMember>[],
-    );
-
-    // Sync favorite from provider cache
     final did    = widget.doctor.doctorId;
     final cached = did == null
         ? null
@@ -457,29 +422,24 @@ Future<void> _fetchQueueEstimate() async {
       });
     }
 
-    // Collect booked times for the selected date
+    // Booked times for selected date
     final bookedTimes = <String>{};
     if (_selectedDate != null) {
       final ds = _fmtDateApi(_selectedDate!);
       for (final s in apptState.bookedSlots) {
-        if (s.bookingDate != null &&
-            s.bookingDate!.startsWith(ds) &&
-            s.startTime != null) {
+        if (s.bookingDate?.startsWith(ds) == true && s.startTime != null) {
           bookedTimes.add(_fmtTime(s.startTime));
         }
       }
     }
 
-    // ── Listeners ─────────────────────────────────────────────────────────
+    // Listeners
     ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
       if (!widget.isReschedule &&
           next.bookingResponse != null &&
           next.bookingResponse != prev?.bookingResponse &&
           !next.isLoading) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(next.bookingResponse!.message ?? 'Appointment booked!'),
-          backgroundColor: kGreen,
-        ));
+        _snack(next.bookingResponse!.message ?? 'Appointment booked!');
         setState(() => _isBooking = false);
         Navigator.pop(context, true);
         return;
@@ -489,21 +449,14 @@ Future<void> _fetchQueueEstimate() async {
           next.rescheduleResponse != null &&
           next.rescheduleResponse != prev?.rescheduleResponse &&
           !next.isLoading) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(next.rescheduleResponse!.message ?? 'Appointment rescheduled!'),
-          backgroundColor: kGreen,
-        ));
+        _snack(next.rescheduleResponse!.message ?? 'Appointment rescheduled!');
         setState(() => _isBooking = false);
         Navigator.pop(context, true);
         return;
       }
-      if (next.error != null &&
-          next.error != prev?.error &&
-          !next.isLoading &&
-          _isBooking) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.error!), backgroundColor: kRed),
-        );
+      if (next.error != null && next.error != prev?.error &&
+          !next.isLoading && _isBooking) {
+        _snack(next.error!, isError: true);
         setState(() => _isBooking = false);
       }
     });
@@ -515,96 +468,90 @@ Future<void> _fetchQueueEstimate() async {
     ref.listen<FavoriteState>(favoriteViewModelProvider, (prev, next) {
       final did = widget.doctor.doctorId;
       if (did == null) return;
-      final prevFav = prev?.doctorFavorites[did];
       final nextFav = next.doctorFavorites[did];
-      if (nextFav != null && nextFav != prevFav && mounted) {
+      if (nextFav != null && nextFav != prev?.doctorFavorites[did] && mounted) {
         setState(() => _isFavorite = nextFav);
       }
       if (next.error != null && next.error != prev?.error && mounted) {
-        _showErrorSnack(next.error!);
+        _snack(next.error!, isError: true);
       }
     });
 
-    // ── Availability ───────────────────────────────────────────────────────
+    // Availability
     final enabled  = state.doctorAvailabilities
-        .where((a) => a.isEnabled == true)
-        .toList();
+        .where((a) => a.isEnabled == true).toList();
     final grouped  = _grouped(enabled);
     final selAvail = _selectedSlotId == null
         ? null
         : enabled.firstWhere(
             (a) => a.slotId == _selectedSlotId,
-            orElse: () => DoctorAvailabilityModel(),
-          );
-    final dayIsToday = _selectedDate != null && _baIsToday(_selectedDate!);
+            orElse: () => DoctorAvailabilityModel());
+    final dayIsToday = _selectedDate != null && _isToday(_selectedDate!);
     final mode       = selAvail?.bookingMode ?? 0;
     final isQueue    = mode == 1 || (mode == 3 && dayIsToday);
 
-    // ── Queue lead-time check ──────────────────────────────────────────────
+    // Queue open-time check
     String? queueOpenTimeStr;
     bool isQueueOpen = true;
     if (isQueue && dayIsToday && selAvail != null) {
       final leadMin = widget.doctor.qStartSection ?? widget.doctor.leadTime ?? 0;
       if (leadMin > 0) {
-        final sessionStart    = _parseTime(selAvail.startTime);
-        final sessionStartMin = sessionStart.hour * 60 + sessionStart.minute;
-        final openTotalMin    = sessionStartMin - leadMin;
-
-        if (openTotalMin >= 0) {
-          final openH = openTotalMin ~/ 60;
-          final openM = openTotalMin % 60;
+        final sessionStart = _parseTime(selAvail.startTime);
+        final openMin      = sessionStart.hour * 60 + sessionStart.minute - leadMin;
+        if (openMin >= 0) {
+          final openH = openMin ~/ 60;
+          final openM = openMin % 60;
           final sf    = openH < 12 ? 'AM' : 'PM';
           final dh    = openH == 0 ? 12 : (openH > 12 ? openH - 12 : openH);
           queueOpenTimeStr =
               '${dh.toString().padLeft(2, '0')}:${openM.toString().padLeft(2, '0')} $sf';
-
           final nowMin = DateTime.now().hour * 60 + DateTime.now().minute;
-          isQueueOpen  = nowMin >= openTotalMin;
+          isQueueOpen  = nowMin >= openMin;
         }
       }
     }
 
     final canConfirm = selAvail != null &&
-        _baBookable(mode, dayIsToday) &&
+        _bookable(mode, dayIsToday) &&
         (isQueue || _selectedTime != null) &&
         (!isQueue || !dayIsToday || isQueueOpen);
 
     return Scaffold(
-      backgroundColor: isDark ? _kDarkBg : kBg,
+      backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
-          _BaAppBar(
+          _AppBar(
             doctor:       widget.doctor,
-            isDark:       isDark,
             isFavorite:   _isFavorite,
             isReschedule: widget.isReschedule,
             onBack:       () => Navigator.pop(context),
             onFavToggle:  _handleFavoriteToggle,
           ),
           SliverToBoxAdapter(
-            child: _DoctorStatsRow(doctor: widget.doctor, isDark: isDark),
+            child: _StatsRow(doctor: widget.doctor),
           ),
           SliverToBoxAdapter(
-            child: _BaBookingFor(
+            child: _BookingFor(
               patState:         patState,
               members:          members,
               selectedMemberId: _selectedMemberId,
-              onSelected:       (id) => setState(() => _selectedMemberId = id),
-              isDark:           isDark,
+              onSelected: (id) => setState(() => _selectedMemberId = id),
             ),
           ),
           if (state.isLoading)
             const SliverFillRemaining(
-              child: Center(child: CircularProgressIndicator(color: kPrimary)),
+              child: Center(
+                child: CircularProgressIndicator(
+                    color: kPrimary, strokeWidth: 2.5),
+              ),
             )
           else if (grouped.isEmpty)
             SliverFillRemaining(
-              child: _BaNoAvail(onBack: () => Navigator.pop(context)),
+              child: _NoAvail(onBack: () => Navigator.pop(context)),
             )
           else
             SliverToBoxAdapter(
-              child: _BaBody(
-                isDark:            isDark,
+              child: _Body(
                 grouped:           grouped,
                 enabled:           enabled,
                 selectedDate:      _selectedDate,
@@ -619,7 +566,7 @@ Future<void> _fetchQueueEstimate() async {
                 isEstimateLoading: _isEstimateLoading,
                 onPickDate:        _pickDate,
                 onPickSession:     _onSessionPicked,
-                onPickTime:        (t) => setState(() => _selectedTime = t),
+                onPickTime: (t) => setState(() => _selectedTime = t),
                 buildSlots:        _buildSlots,
                 fmtTime:           _fmtTime,
               ),
@@ -627,8 +574,7 @@ Future<void> _fetchQueueEstimate() async {
         ],
       ),
       bottomNavigationBar: canConfirm
-          ? _BaConfirmBar(
-              isDark:         isDark,
+          ? _ConfirmBar(
               isQueue:        isQueue,
               isReschedule:   widget.isReschedule,
               selectedDate:   _selectedDate,
@@ -642,45 +588,45 @@ Future<void> _fetchQueueEstimate() async {
     );
   }
 
-  // ── Snack helpers ─────────────────────────────────────────────────────────
-  void _showFavSnack(bool added) {
+  // ---------------------------------------------------------------------------
+  // Snack / Favorite helpers
+  // ---------------------------------------------------------------------------
+
+  void _snack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: added ? kFavActive : kTextDark,
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        backgroundColor: isError ? kError : kPrimary,
         duration: const Duration(seconds: 2),
         content: Row(children: [
           Icon(
-            added ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            color: Colors.white, size: 16,
+            isError
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            color: Colors.white, size: 15,
           ),
-          const SizedBox(width: 10),
-          Text(
-            added
-                ? 'Dr. ${widget.doctor.name ?? ''} added to favourites'
-                : 'Removed from favourites',
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(msg,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white)),
           ),
         ]),
       ),
     );
   }
 
-  void _showErrorSnack(String message) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: kRed,
-        duration: const Duration(seconds: 2),
-        content: Text(message,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-      ),
+  void _showFavSnack(bool added) {
+    _snack(
+      added
+          ? 'Dr. ${widget.doctor.name ?? ''} added to favourites'
+          : 'Removed from favourites',
+      isError: false,
     );
   }
 
@@ -688,34 +634,30 @@ Future<void> _fetchQueueEstimate() async {
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     final did = widget.doctor.doctorId ?? 0;
     if (pid <= 0 || did <= 0) return;
-    if (_favFetchedForDoctorId == did && _favFetchedForPatientId == pid) return;
-    _favFetchedForDoctorId  = did;
-    _favFetchedForPatientId = pid;
+    if (_favFetchedDoctorId == did && _favFetchedPatientId == pid) return;
+    _favFetchedDoctorId  = did;
+    _favFetchedPatientId = pid;
     ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did);
   }
 
   Future<void> _handleFavoriteToggle(bool v) async {
     final prev = _isFavorite;
     setState(() => _isFavorite = v);
-
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     final did = widget.doctor.doctorId ?? 0;
     if (pid <= 0 || did <= 0) {
       setState(() => _isFavorite = prev);
-      _showErrorSnack('Please login to use favourites');
+      _snack('Please login to use favourites', isError: true);
       return;
     }
-
     final notifier = ref.read(favoriteViewModelProvider.notifier);
     final ok = v
         ? await notifier.addFavoriteDoctor(pid, did)
         : await notifier.deleteFavoriteDoctor(pid, did);
-
     if (!ok) {
       setState(() => _isFavorite = prev);
-      final err = ref.read(favoriteViewModelProvider).error
-                  ?? 'Failed to update favourites';
-      _showErrorSnack(err);
+      _snack(ref.read(favoriteViewModelProvider).error ??
+          'Failed to update favourites', isError: true);
       return;
     }
     _showFavSnack(v);
@@ -729,12 +671,11 @@ Future<void> _fetchQueueEstimate() async {
         : ds.doctorAvailabilities.cast<DoctorAvailabilityModel?>()
             .firstWhere((a) => a?.slotId == _selectedSlotId,
                 orElse: () => null);
-    final isToday = _baIsToday(_selectedDate!);
+    final isToday = _isToday(_selectedDate!);
     final mode    = avail?.bookingMode ?? 0;
     final isQueue = mode == 1 || (mode == 3 && isToday);
-    final start   = isQueue
-        ? null
-        : (_selectedTime != null ? _toApiTime(_selectedTime!) : null);
+    final start   =
+        isQueue ? null : (_selectedTime != null ? _toApiTime(_selectedTime!) : null);
 
     setState(() => _isBooking = true);
 
@@ -745,233 +686,267 @@ Future<void> _fetchQueueEstimate() async {
           doctorId:        widget.doctor.doctorId,
           appointmentDate: _fmtDateApi(_selectedDate!),
           startTime:       start,
+          soltId:          _selectedSlotId,
         ),
       );
     } else {
       final ps          = ref.read(patientLoginViewModelProvider);
       final isForMember = _selectedMemberId != null;
-      final patientId   = isForMember ? _selectedMemberId : ps.patientId;
-      final userType    = isForMember ? 2 : 1;
       ref.read(appointmentViewModelProvider.notifier).bookAppointment(
         AppointmentRequestModel(
           doctorId:        widget.doctor.doctorId,
-          patientId:       patientId,
+          patientId:       isForMember ? _selectedMemberId : ps.patientId,
           appointmentDate: _fmtDateApi(_selectedDate!),
           startTime:       start,
-          userType:        userType,
+          userType:        isForMember ? 2 : 1,
+          soltId:          _selectedSlotId,
         ),
       );
     }
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// APP BAR (SliverAppBar)
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaAppBar extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  APP BAR
+// ════════════════════════════════════════════════════════════════════
+class _AppBar extends StatelessWidget {
   final DoctorDetails       doctor;
-  final bool                isDark;
   final bool                isFavorite;
   final bool                isReschedule;
   final VoidCallback        onBack;
   final void Function(bool) onFavToggle;
 
-  const _BaAppBar({
-    required this.doctor,
-    required this.isDark,
-    required this.isFavorite,
-    required this.onBack,
-    required this.onFavToggle,
+  const _AppBar({
+    required this.doctor,    required this.isFavorite,
+    required this.onBack,    required this.onFavToggle,
     this.isReschedule = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final accent  = _baAccent(doctor.specialization);
-    final specBg  = _baBg(doctor.specialization);
+    final ac      = _accent(doctor.specialization);
+    final specBg  = _bg(doctor.specialization);
     final initial = (doctor.name?.isNotEmpty ?? false)
-        ? doctor.name![0].toUpperCase()
-        : 'D';
+        ? doctor.name![0].toUpperCase() : 'D';
 
     return SliverAppBar(
-      expandedHeight:   160,
+      expandedHeight:   150,
       pinned:           true,
-      backgroundColor:  isDark ? _kDarkSurface : kCardBg,
+      backgroundColor:  Colors.white,
       surfaceTintColor: Colors.transparent,
       elevation:        0,
-      leading: IconButton(
-        icon: Icon(Icons.arrow_back_ios_new_rounded, size: 18,
-            color: isDark ? Colors.white : kTextDark),
-        onPressed: onBack,
+      leading: GestureDetector(
+        onTap: onBack,
+        child: Container(
+          margin: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+              color: kPrimaryLight, borderRadius: BorderRadius.circular(10)),
+          child: const Icon(Icons.arrow_back_ios_new_rounded,
+              size: 15, color: kPrimary),
+        ),
       ),
       title: Text(
-        isReschedule ? 'Reschedule Appointment' : 'Book Appointment',
-        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-            color: isDark ? Colors.white : kTextDark),
+        isReschedule ? 'Reschedule' : 'Book Appointment',
+        style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: kTextPrimary,
+            letterSpacing: -0.2),
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.only(right: 12),
+          padding: const EdgeInsets.only(right: 14),
           child: _FavoriteButton(
-            initialFav: isFavorite,
-            isDark:     isDark,
-            onToggle:   onFavToggle,
-          ),
+              initialFav: isFavorite, onToggle: onFavToggle),
         ),
       ],
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(0.5),
-        child: Container(height: 0.5, color: kBorder),
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: kBorder),
       ),
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.pin,
         background: Container(
-          color: isDark ? _kDarkSurface : kCardBg,
+          color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
           alignment: Alignment.bottomLeft,
-          child: Row(children: [
-            Stack(children: [
-              CircleAvatar(
-                radius: 29,
-                backgroundColor: accent,
-                child: Text(initial, style: const TextStyle(
-                    fontSize: 24, fontWeight: FontWeight.w700,
-                    color: Colors.white)),
-              ),
-              if (isFavorite)
-                Positioned(
-                  right: 0, bottom: 0,
-                  child: Container(
-                    width: 18, height: 18,
+          child: Row(
+            children: [
+              // Avatar
+              Stack(
+                children: [
+                  Container(
+                    width: 52, height: 52,
                     decoration: BoxDecoration(
-                      color: kFavActive,
-                      shape: BoxShape.circle,
+                      color: ac.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(13),
                       border: Border.all(
-                          color: isDark ? _kDarkSurface : kCardBg, width: 2),
+                          color: ac.withOpacity(0.2), width: 1.5),
                     ),
-                    child: const Icon(Icons.favorite_rounded,
-                        size: 9, color: Colors.white),
+                    alignment: Alignment.center,
+                    child: Text(initial,
+                        style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: ac)),
                   ),
-                ),
-            ]),
-            const SizedBox(width: 14),
-            Expanded(child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Dr. ${doctor.name ?? 'Unknown'}',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white : kTextDark)),
-                const SizedBox(height: 4),
-                Row(children: [
-                  if (doctor.specialization != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                          color: specBg,
-                          borderRadius: BorderRadius.circular(5)),
-                      child: Text(_baCap(doctor.specialization!),
-                        style: TextStyle(fontSize: 10.5,
-                            fontWeight: FontWeight.w600, color: accent)),
+                  if (isFavorite)
+                    Positioned(
+                      right: 0, bottom: 0,
+                      child: Container(
+                        width: 16, height: 16,
+                        decoration: BoxDecoration(
+                          color: kFavActive,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color: Colors.white, width: 2),
+                        ),
+                        child: const Icon(Icons.favorite_rounded,
+                            size: 8, color: Colors.white),
+                      ),
                     ),
-                    const SizedBox(width: 6),
+                ],
+              ),
+              const SizedBox(width: 12),
+              // Name + spec
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Dr. ${doctor.name ?? 'Unknown'}',
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary)),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        if (doctor.specialization != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                                color: specBg,
+                                borderRadius: BorderRadius.circular(6)),
+                            child: Text(_cap(doctor.specialization!),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: ac)),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        if (doctor.clinicName != null)
+                          Flexible(
+                            child: Text(doctor.clinicName!,
+                                style: const TextStyle(
+                                    fontSize: 11, color: kTextMuted),
+                                overflow: TextOverflow.ellipsis),
+                          ),
+                      ],
+                    ),
                   ],
-                  if (doctor.clinicName != null)
-                    Flexible(child: Text(doctor.clinicName!,
-                      style: const TextStyle(fontSize: 11, color: kTextMid),
-                      overflow: TextOverflow.ellipsis)),
-                ]),
-              ],
-            )),
-            if (doctor.consultationFee != null)
-              Column(mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text('₹${doctor.consultationFee!.toStringAsFixed(0)}',
-                  style: const TextStyle(fontSize: 17,
-                      fontWeight: FontWeight.w700, color: kGreen)),
-                const Text('consult fee',
-                  style: TextStyle(fontSize: 9.5, color: kTextMid)),
-              ]),
-          ]),
+                ),
+              ),
+              // Fee
+              if (doctor.consultationFee != null)
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('₹${doctor.consultationFee!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: kSuccess)),
+                    const Text('consult fee',
+                        style: TextStyle(
+                            fontSize: 10, color: kTextMuted)),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DOCTOR STATS ROW
-// ─────────────────────────────────────────────────────────────────────────────
-class _DoctorStatsRow extends ConsumerWidget {
+// ════════════════════════════════════════════════════════════════════
+//  STATS ROW
+// ════════════════════════════════════════════════════════════════════
+class _StatsRow extends ConsumerWidget {
   final DoctorDetails doctor;
-  final bool          isDark;
-  const _DoctorStatsRow({required this.doctor, required this.isDark});
+  const _StatsRow({required this.doctor});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reviews = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
+    final reviews  = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
     final avgRating = reviews.isEmpty
         ? 0.0
         : reviews.fold<double>(0, (acc, r) =>
               acc + (r.rating?.toDouble() ?? 0)) /
             reviews.length;
-    final ratingLabel =
-        reviews.isEmpty ? 'Rating' : '${reviews.length} reviews';
 
     return Container(
-      color: isDark ? _kDarkSurface : kCardBg,
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
-      child: Row(children: [
-        _StatBox(
-          label: 'Experience',
-          value: doctor.experience != null
-              ? '${doctor.experience} yrs'
-              : '--',
-        ),
-        const SizedBox(width: 8),
-        _StatBox(
-          label: ratingLabel,
-          widget: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.star_rounded, color: kOrange, size: 14),
-            const SizedBox(width: 2),
-            Text(
-              avgRating == 0 ? '--' : avgRating.toStringAsFixed(1),
-              style: const TextStyle(fontSize: 14,
-                  fontWeight: FontWeight.w700, color: kTextDark)),
-          ]),
-        ),
-        const SizedBox(width: 8),
-        _StatBox(label: 'Patients', value: '1.2k+'),
-        const SizedBox(width: 8),
-        Expanded(
-          child: GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => DoctorProfileScreen(doctor: doctor)),
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+      child: Row(
+        children: [
+          _StatBox(label: 'Experience',
+              value: doctor.experience != null
+                  ? '${doctor.experience} yrs' : '--'),
+          const SizedBox(width: 8),
+          _StatBox(
+            label: reviews.isEmpty ? 'Rating' : '${reviews.length} reviews',
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.star_rounded, color: kWarning, size: 14),
+                const SizedBox(width: 2),
+                Text(
+                  avgRating == 0 ? '--' : avgRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+              ],
             ),
-            child: Container(
-              height: 60,
-              decoration: BoxDecoration(
-                color: kPrimaryBg,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kPrimary.withOpacity(0.3)),
-              ),
-              child: const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.person_outlined, color: kPrimary, size: 16),
-                  SizedBox(height: 3),
-                  Text('Profile', style: TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.w600,
-                      color: kPrimary)),
-                ],
+          ),
+          const SizedBox(width: 8),
+          _StatBox(label: 'Patients', value: '1.2k+'),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(
+                      builder: (_) => DoctorProfileScreen(doctor: doctor))),
+              child: Container(
+                height: 58,
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kPrimary.withOpacity(0.25)),
+                ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.person_outline_rounded,
+                        color: kPrimary, size: 16),
+                    SizedBox(height: 3),
+                    Text('Profile',
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: kPrimary)),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }
@@ -979,44 +954,49 @@ class _DoctorStatsRow extends ConsumerWidget {
 class _StatBox extends StatelessWidget {
   final String  label;
   final String? value;
-  final Widget? widget;
-  const _StatBox({required this.label, this.value, this.widget});
+  final Widget? child;
+  const _StatBox({required this.label, this.value, this.child});
 
   @override
   Widget build(BuildContext context) => Expanded(
-    child: Container(
-      height: 60,
-      decoration: BoxDecoration(
-        color: kBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
-      ),
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: kTextMid)),
-        const SizedBox(height: 4),
-        if (widget != null)
-          widget!
-        else
-          Text(value ?? '--', style: const TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark)),
-      ]),
-    ),
-  );
+        child: Container(
+          height: 58,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kBorder),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 10, color: kTextMuted)),
+              const SizedBox(height: 3),
+              child ??
+                  Text(value ?? '--',
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary)),
+            ],
+          ),
+        ),
+      );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BOOKING FOR DROPDOWN
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaBookingFor extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  BOOKING FOR DROPDOWN
+// ════════════════════════════════════════════════════════════════════
+class _BookingFor extends StatelessWidget {
   final PatientLoginState  patState;
   final List<FamilyMember> members;
   final int?               selectedMemberId;
   final ValueChanged<int?> onSelected;
-  final bool               isDark;
-  const _BaBookingFor({
+
+  const _BookingFor({
     required this.patState, required this.members,
     required this.selectedMemberId, required this.onSelected,
-    required this.isDark,
   });
 
   @override
@@ -1025,85 +1005,97 @@ class _BaBookingFor extends StatelessWidget {
       DropdownMenuItem<int?>(
         value: null,
         child: Row(children: [
-          CircleAvatar(radius: 13,
+          CircleAvatar(
+            radius: 13,
             backgroundColor: kPrimary.withOpacity(0.15),
             child: Text(
               (patState.name?.isNotEmpty ?? false)
                   ? patState.name![0].toUpperCase() : 'M',
-              style: const TextStyle(fontSize: 11,
-                  fontWeight: FontWeight.w700, color: kPrimary))),
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary)),
+          ),
           const SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min, children: [
-            Text(patState.name ?? 'Me', style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : kTextDark)),
-            Text('You', style: TextStyle(
-                fontSize: 10,
-                color: isDark ? Colors.white38 : kTextMid)),
-          ]),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(patState.name ?? 'Me',
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: kTextPrimary)),
+              const Text('You',
+                  style: TextStyle(fontSize: 10, color: kTextMuted)),
+            ],
+          ),
         ]),
       ),
       ...members.map((m) => DropdownMenuItem<int?>(
-        value: m.memberId,
-        child: Row(children: [
-          CircleAvatar(radius: 13,
-            backgroundColor: kPrimary.withOpacity(0.12),
-            child: Text(
-              m.memberName?.isNotEmpty == true
-                  ? m.memberName![0].toUpperCase() : '?',
-              style: const TextStyle(fontSize: 11,
-                  fontWeight: FontWeight.w700, color: kPrimary))),
-          const SizedBox(width: 10),
-          Column(crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min, children: [
-            Text(m.memberName ?? '?', style: TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600,
-                color: isDark ? Colors.white : kTextDark)),
-            if (m.relationName?.isNotEmpty == true)
-              Text(m.relationName!, style: TextStyle(
-                  fontSize: 10,
-                  color: isDark ? Colors.white38 : kTextMid)),
-          ]),
-        ]),
-      )),
+            value: m.memberId,
+            child: Row(children: [
+              CircleAvatar(
+                radius: 13,
+                backgroundColor: kPurple.withOpacity(0.12),
+                child: Text(
+                  m.memberName?.isNotEmpty == true
+                      ? m.memberName![0].toUpperCase() : '?',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: kPurple)),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(m.memberName ?? '?',
+                      style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary)),
+                  if (m.relationName?.isNotEmpty == true)
+                    Text(m.relationName!,
+                        style: const TextStyle(
+                            fontSize: 10, color: kTextMuted)),
+                ],
+              ),
+            ]),
+          )),
     ];
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 10, 16, 2),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: kPrimaryBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kPrimary.withOpacity(0.3)),
+        color: kPrimaryLight.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kPrimary.withOpacity(0.2)),
       ),
       child: Row(children: [
-        const Icon(Icons.location_on_outlined, color: kPrimary, size: 16),
+        const Icon(Icons.person_outline_rounded, color: kPrimary, size: 14),
         const SizedBox(width: 8),
-        Text('Booking for', style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white54 : kTextMid)),
+        const Text('Booking for',
+            style: TextStyle(fontSize: 12, color: kTextSecondary)),
         const SizedBox(width: 4),
         Expanded(
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int?>(
-              value: selectedMemberId, isDense: true, isExpanded: true,
+              value: selectedMemberId,
+              isDense: true,
+              isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 18, color: kPrimary),
-              style: const TextStyle(fontSize: 13,
-                  fontWeight: FontWeight.w700, color: kPrimary),
-              dropdownColor: isDark ? _kDarkSurface : Colors.white,
+                  size: 15, color: kPrimary),
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
               items: items,
               onChanged: onSelected,
               selectedItemBuilder: (_) => [
-                Align(alignment: Alignment.centerLeft,
-                  child: Text(patState.name ?? 'Me', style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w700,
-                      color: kPrimary))),
-                ...members.map((m) => Align(alignment: Alignment.centerLeft,
-                  child: Text(m.memberName ?? 'Member', style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w700,
-                      color: kPrimary)))),
+                _dropSel(patState.name ?? 'Me'),
+                ...members.map(
+                    (m) => _dropSel(m.memberName ?? 'Member')),
               ],
             ),
           ),
@@ -1111,57 +1103,53 @@ class _BaBookingFor extends StatelessWidget {
       ]),
     );
   }
+
+  Widget _dropSel(String text) => Align(
+        alignment: Alignment.centerLeft,
+        child: Text(text,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: kPrimary)),
+      );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// BOOKING BODY
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaBody extends StatelessWidget {
-  final bool     isDark;
+// ════════════════════════════════════════════════════════════════════
+//  BODY
+// ════════════════════════════════════════════════════════════════════
+class _Body extends StatelessWidget {
   final Map<String, List<DoctorAvailabilityModel>> grouped;
   final List<DoctorAvailabilityModel> enabled;
-  final DateTime? selectedDate;
-  final int?      selectedSlotId;
-  final String?   selectedTime;
+  final DateTime?    selectedDate;
+  final int?         selectedSlotId;
+  final String?      selectedTime;
   final DoctorAvailabilityModel? selectedAvail;
-  final bool      dayIsToday;
-  final Set<String> bookedTimes;
-  final String?   queueOpenTimeStr;
-  final bool      isQueueOpen;
-  final String?   estimatedWaitTime;   // ← new
-  final bool      isEstimateLoading;   // ← new
+  final bool         dayIsToday;
+  final Set<String>  bookedTimes;
+  final String?      queueOpenTimeStr;
+  final bool         isQueueOpen;
+  final String?      estimatedWaitTime;
+  final bool         isEstimateLoading;
 
   final void Function(DateTime, List<DoctorAvailabilityModel>) onPickDate;
-  final ValueChanged<int?>   onPickSession;
-  final ValueChanged<String> onPickTime;
+  final ValueChanged<int?>    onPickSession;
+  final ValueChanged<String>  onPickTime;
   final List<String> Function(DoctorAvailabilityModel) buildSlots;
   final String Function(String?) fmtTime;
 
-  const _BaBody({
-    required this.isDark,
-    required this.grouped,
-    required this.enabled,
-    required this.selectedDate,
-    required this.selectedSlotId,
-    required this.selectedTime,
-    required this.selectedAvail,
-    required this.dayIsToday,
-    required this.bookedTimes,
-    required this.onPickDate,
-    required this.onPickSession,
-    required this.onPickTime,
-    required this.buildSlots,
-    required this.fmtTime,
-    this.queueOpenTimeStr,
-    this.isQueueOpen      = true,
-    this.estimatedWaitTime,
-    this.isEstimateLoading = false,
+  const _Body({
+    required this.grouped, required this.enabled,
+    required this.selectedDate, required this.selectedSlotId,
+    required this.selectedTime, required this.selectedAvail,
+    required this.dayIsToday, required this.bookedTimes,
+    required this.onPickDate, required this.onPickSession,
+    required this.onPickTime, required this.buildSlots, required this.fmtTime,
+    this.queueOpenTimeStr, this.isQueueOpen = true,
+    this.estimatedWaitTime, this.isEstimateLoading = false,
   });
 
   String _dayName(int w) {
-    const n = [
-      'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
-    ];
+    const n = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     return n[(w - 1).clamp(0, 6)];
   }
 
@@ -1170,29 +1158,27 @@ class _BaBody extends StatelessWidget {
     final sessions = selectedDate == null
         ? <DoctorAvailabilityModel>[]
         : (grouped[_dayName(selectedDate!.weekday)] ?? [])
-            .where((s) => _baBookable(s.bookingMode, dayIsToday))
+            .where((s) => _bookable(s.bookingMode, dayIsToday))
             .toList();
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
+      padding: const EdgeInsets.fromLTRB(14, 16, 14, 100),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _BaCalendarStrip(
+        _CalendarStrip(
           grouped:        grouped,
           selectedDate:   selectedDate,
-          onDateSelected: (date) {
-            final dn = _dayName(date.weekday);
-            onPickDate(date, grouped[dn] ?? []);
-          },
+          onDateSelected: (date) =>
+              onPickDate(date, grouped[_dayName(date.weekday)] ?? []),
         ),
         if (selectedDate != null) ...[
-          const SizedBox(height: 14),
-          _BaDateBadge(date: selectedDate!),
+          const SizedBox(height: 12),
+          _DateBadge(date: selectedDate!),
         ],
         if (sessions.length > 1) ...[
-          const SizedBox(height: 20),
-          _baLabel('Select Session'),
-          const SizedBox(height: 10),
-          _BaSessionRow(
+          const SizedBox(height: 18),
+          _sectionLabel('Select Session'),
+          const SizedBox(height: 8),
+          _SessionRow(
             sessions:       sessions,
             selectedSlotId: selectedSlotId,
             onSelected:     onPickSession,
@@ -1200,10 +1186,10 @@ class _BaBody extends StatelessWidget {
           ),
         ],
         if (selectedAvail != null) ...[
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           if (selectedAvail!.bookingMode == 1 ||
               (selectedAvail!.bookingMode == 3 && dayIsToday))
-            _BaQueueCard(
+            _QueueCard(
               avail:             selectedAvail!,
               queueOpenTimeStr:  queueOpenTimeStr,
               isQueueOpen:       isQueueOpen,
@@ -1211,10 +1197,9 @@ class _BaBody extends StatelessWidget {
               isEstimateLoading: isEstimateLoading,
             )
           else
-            _BaSlotPicker(
+            _SlotPicker(
               slots:       buildSlots(selectedAvail!),
               selected:    selectedTime,
-              isDark:      isDark,
               isToday:     dayIsToday,
               bookedTimes: bookedTimes,
               onSelected:  onPickTime,
@@ -1225,28 +1210,30 @@ class _BaBody extends StatelessWidget {
   }
 }
 
-Widget _baLabel(String text) => Text(
-  text.toUpperCase(),
-  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700,
-      color: kTextMid, letterSpacing: 1.1),
-);
+Widget _sectionLabel(String t) => Text(
+      t.toUpperCase(),
+      style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: kTextMuted,
+          letterSpacing: 0.8),
+    );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CALENDAR STRIP
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaCalendarStrip extends StatefulWidget {
+// ════════════════════════════════════════════════════════════════════
+//  CALENDAR STRIP
+// ════════════════════════════════════════════════════════════════════
+class _CalendarStrip extends StatefulWidget {
   final Map<String, List<DoctorAvailabilityModel>> grouped;
   final DateTime?              selectedDate;
   final ValueChanged<DateTime> onDateSelected;
-  const _BaCalendarStrip({
-    required this.grouped,
-    required this.selectedDate,
+  const _CalendarStrip({
+    required this.grouped, required this.selectedDate,
     required this.onDateSelected,
   });
-  @override State<_BaCalendarStrip> createState() => _BaCalendarStripState();
+  @override State<_CalendarStrip> createState() => _CalendarStripState();
 }
 
-class _BaCalendarStripState extends State<_BaCalendarStrip> {
+class _CalendarStripState extends State<_CalendarStrip> {
   final _scroll = ScrollController();
   static const _cw = 52.0, _gap = 6.0, _days = 28;
 
@@ -1276,25 +1263,20 @@ class _BaCalendarStripState extends State<_BaCalendarStrip> {
   }
 
   bool _avail(DateTime dt) {
-    const n = [
-      'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
-    ];
+    const n = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     final s = widget.grouped[n[(dt.weekday - 1).clamp(0, 6)]];
-    if (s == null || s.isEmpty) return false;
-    return s.any((a) => _baBookable(a.bookingMode, _baIsToday(dt)));
+    return s?.any((a) => _bookable(a.bookingMode, _isToday(dt))) == true;
   }
 
   Color? _dot(DateTime dt) {
-    const n = [
-      'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'
-    ];
+    const n = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     final s = widget.grouped[n[(dt.weekday - 1).clamp(0, 6)]];
     if (s == null) return null;
-    final isToday = _baIsToday(dt);
-    final b = s.where((a) => _baBookable(a.bookingMode, isToday)).toList();
+    final isToday = _isToday(dt);
+    final b = s.where((a) => _bookable(a.bookingMode, isToday)).toList();
     if (b.isEmpty) return null;
-    if (b.any((a) => a.bookingMode == 1) && isToday) return kOrange;
-    if (b.any((a) => a.bookingMode == 3)) return isToday ? kOrange : kPrimary;
+    if (b.any((a) => a.bookingMode == 1) && isToday) return kWarning;
+    if (b.any((a) => a.bookingMode == 3)) return isToday ? kWarning : kPrimary;
     return kPrimary;
   }
 
@@ -1306,25 +1288,34 @@ class _BaCalendarStripState extends State<_BaCalendarStrip> {
     for (int i = 0; i < _days; i++) {
       final d = today.add(Duration(days: i));
       if (lastM == null || d.month != lastM.month) {
-        items.add(_CalItem.header(
-            '${_baFullMonths[d.month - 1]} ${d.year}'));
+        items.add(_CalItem.header('${_fullMonths[d.month - 1]} ${d.year}'));
         lastM = d;
       }
       items.add(_CalItem.date(d));
     }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _baLabel('Select Date'),
+      _sectionLabel('Select Date'),
       const SizedBox(height: 10),
       SizedBox(
-        height: 88,
+        height: 86,
         child: ListView.builder(
           controller:      _scroll,
           scrollDirection: Axis.horizontal,
           itemCount:       items.length,
           itemBuilder: (_, i) {
-            final item  = items[i];
-            if (item.isHeader) return _BaMonthLabel(label: item.label!);
+            final item = items[i];
+            if (item.isHeader) {
+              return Container(
+                alignment: Alignment.bottomLeft,
+                padding: const EdgeInsets.only(right: 10, bottom: 10),
+                child: Text(item.label!,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: kTextMuted)),
+              );
+            }
             final dt    = item.dt!;
             final avail = _avail(dt);
             final dot   = _dot(dt);
@@ -1337,46 +1328,59 @@ class _BaCalendarStripState extends State<_BaCalendarStrip> {
               child: GestureDetector(
                 onTap: avail ? () => widget.onDateSelected(dt) : null,
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: const Duration(milliseconds: 180),
                   width: _cw,
                   decoration: BoxDecoration(
                     color: isSel
-                        ? kTextDark
-                        : (avail ? kCardBg : Colors.transparent),
+                        ? kPrimary
+                        : (avail ? Colors.white : Colors.transparent),
                     borderRadius: BorderRadius.circular(12),
                     border: isSel
                         ? null
                         : (avail ? Border.all(color: kBorder) : null),
+                    boxShadow: isSel
+                        ? [BoxShadow(
+                            color: kPrimary.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3))]
+                        : null,
                   ),
                   child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                    Text(_baDayAbbr[dt.weekday - 1], style: TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.w600,
-                      color: isSel
-                          ? Colors.white.withOpacity(0.7)
-                          : (avail
-                              ? (dt.weekday >= 6 ? kPrimary : kTextMid)
-                              : kTextMid.withOpacity(0.3)),
-                    )),
-                    const SizedBox(height: 4),
-                    Text('${dt.day}', style: TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.w800,
-                      color: isSel
-                          ? Colors.white
-                          : (avail
-                              ? kTextDark
-                              : kTextMid.withOpacity(0.3)),
-                    )),
-                    const SizedBox(height: 5),
-                    Container(width: 6, height: 6,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isSel
-                            ? Colors.white.withOpacity(0.6)
-                            : (dot ?? Colors.transparent),
-                      )),
-                  ]),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(_dayAbbr[dt.weekday - 1],
+                          style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isSel
+                                  ? Colors.white.withOpacity(0.8)
+                                  : (avail
+                                      ? (dt.weekday >= 6
+                                          ? kPrimary
+                                          : kTextMuted)
+                                      : kTextMuted.withOpacity(0.3)))),
+                      const SizedBox(height: 4),
+                      Text('${dt.day}',
+                          style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: isSel
+                                  ? Colors.white
+                                  : (avail
+                                      ? kTextPrimary
+                                      : kTextMuted.withOpacity(0.3)))),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 5, height: 5,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSel
+                              ? Colors.white.withOpacity(0.7)
+                              : (dot ?? Colors.transparent),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -1391,130 +1395,126 @@ class _CalItem {
   final bool isHeader; final String? label; final DateTime? dt;
   const _CalItem._({required this.isHeader, this.label, this.dt});
   factory _CalItem.header(String l) => _CalItem._(isHeader: true, label: l);
-  factory _CalItem.date(DateTime d) => _CalItem._(isHeader: false, dt: d);
+  factory _CalItem.date(DateTime d)  => _CalItem._(isHeader: false, dt: d);
 }
 
-class _BaMonthLabel extends StatelessWidget {
-  final String label;
-  const _BaMonthLabel({required this.label});
-  @override
-  Widget build(BuildContext context) => Container(
-    alignment: Alignment.bottomLeft,
-    padding: const EdgeInsets.only(right: 10, bottom: 10),
-    child: Text(label, style: const TextStyle(
-        fontSize: 11, fontWeight: FontWeight.w700, color: kTextMid)),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DATE BADGE
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaDateBadge extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  DATE BADGE
+// ════════════════════════════════════════════════════════════════════
+class _DateBadge extends StatelessWidget {
   final DateTime date;
-  const _BaDateBadge({required this.date});
+  const _DateBadge({required this.date});
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-    decoration: BoxDecoration(
-      color: kPrimaryBg,
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: kPrimary.withOpacity(0.3)),
-    ),
-    child: Row(children: [
-      const Icon(Icons.event_rounded, size: 15, color: kPrimary),
-      const SizedBox(width: 8),
-      Text(_baFmtFull(date), style: const TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w700, color: kPrimary)),
-    ]),
-  );
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: kPrimaryLight,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: kPrimary.withOpacity(0.3)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.event_rounded, size: 14, color: kPrimary),
+          const SizedBox(width: 8),
+          Text(_fmtFull(date),
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kPrimary)),
+        ]),
+      );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SESSION ROW
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaSessionRow extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  SESSION ROW
+// ════════════════════════════════════════════════════════════════════
+class _SessionRow extends StatelessWidget {
   final List<DoctorAvailabilityModel> sessions;
   final int?                          selectedSlotId;
   final ValueChanged<int?>            onSelected;
   final String Function(String?)      fmtTime;
-  const _BaSessionRow({
-    required this.sessions,
-    required this.selectedSlotId,
-    required this.onSelected,
-    required this.fmtTime,
+
+  const _SessionRow({
+    required this.sessions, required this.selectedSlotId,
+    required this.onSelected, required this.fmtTime,
   });
 
-  Color _modeColor(int? m) {
-    switch (m) {
-      case 1:  return kOrange;
-      case 2:  return kPrimary;
-      case 3:  return kGreen;
-      default: return kTextMid;
-    }
-  }
+  Color _modeColor(int? m) => switch (m) {
+    1 => kWarning, 2 => kPrimary, 3 => kSuccess, _ => kTextMuted,
+  };
+
+  String _modeLabel(int? m) => switch (m) {
+    1 => 'Queue', 2 => 'Slots', 3 => 'Queue + Slots', _ => 'Session',
+  };
 
   @override
   Widget build(BuildContext context) => Column(
-    children: sessions.map((s) {
-      final sel   = selectedSlotId == s.slotId;
-      final color = _modeColor(s.bookingMode);
-      return GestureDetector(
-        onTap: () => onSelected(s.slotId),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: sel ? kTextDark : kCardBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-                color: sel ? kTextDark : kBorder,
-                width: sel ? 1.5 : 0.5),
-          ),
-          child: Row(children: [
-            Icon(Icons.access_time_rounded, size: 15,
-                color: sel ? Colors.white : kPrimary),
-            const SizedBox(width: 10),
-            Expanded(child: Text(
-              '${fmtTime(s.startTime)}  –  ${fmtTime(s.endTime)}',
-              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
-                  color: sel ? Colors.white : kTextDark),
-            )),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        children: sessions.map((s) {
+          final sel   = selectedSlotId == s.slotId;
+          final color = _modeColor(s.bookingMode);
+          return GestureDetector(
+            onTap: () => onSelected(s.slotId),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: sel
-                    ? Colors.white.withOpacity(0.15)
-                    : color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
+                color: sel ? kPrimary : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: sel ? kPrimary : kBorder,
+                    width: sel ? 1.5 : 1),
               ),
-              child: Text(
-                s.bookingMode == 1
-                    ? 'Queue'
-                    : s.bookingMode == 2 ? 'Slots' : 'Queue + Slots',
-                style: TextStyle(fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: sel ? Colors.white : color),
-              ),
+              child: Row(children: [
+                Icon(Icons.access_time_rounded,
+                    size: 15,
+                    color: sel ? Colors.white : kPrimary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '${fmtTime(s.startTime)}  –  ${fmtTime(s.endTime)}',
+                    style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: sel ? Colors.white : kTextPrimary),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: sel
+                        ? Colors.white.withOpacity(0.15)
+                        : color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _modeLabel(s.bookingMode),
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: sel ? Colors.white : color),
+                  ),
+                ),
+              ]),
             ),
-          ]),
-        ),
+          );
+        }).toList(),
       );
-    }).toList(),
-  );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// QUEUE CARD  ← integrated queuePreviewEstimate result
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaQueueCard extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  QUEUE CARD
+// ════════════════════════════════════════════════════════════════════
+class _QueueCard extends StatelessWidget {
   final DoctorAvailabilityModel avail;
   final String? queueOpenTimeStr;
   final bool    isQueueOpen;
   final String? estimatedWaitTime;
   final bool    isEstimateLoading;
 
-  const _BaQueueCard({
+  const _QueueCard({
     required this.avail,
     this.queueOpenTimeStr,
     this.isQueueOpen      = true,
@@ -1524,10 +1524,10 @@ class _BaQueueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final noteColor = isQueueOpen ? kGreen : kRed;
+    final noteColor = isQueueOpen ? kSuccess : kError;
     final noteBg    = isQueueOpen
-        ? kGreen.withValues(alpha: 0.08)
-        : kRed.withValues(alpha: 0.08);
+        ? kGreenLight.withOpacity(0.4)
+        : kRedLight.withOpacity(0.4);
     final noteIcon  = isQueueOpen
         ? Icons.check_circle_rounded
         : Icons.access_time_rounded;
@@ -1536,83 +1536,93 @@ class _BaQueueCard extends StatelessWidget {
         : 'Queue booking is open';
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _sectionLabel('Queue Booking'),
+      const SizedBox(height: 8),
 
-      // ── 1. Open / closed status ───────────────────────────────────────
+      // Open/closed status
       Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
           color: noteBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: noteColor.withValues(alpha: 0.3)),
+          border: Border.all(color: noteColor.withOpacity(0.3)),
         ),
         child: Row(children: [
-          Icon(noteIcon, size: 16, color: noteColor),
+          Icon(noteIcon, size: 15, color: noteColor),
           const SizedBox(width: 8),
-          Expanded(child: Text(noteText, style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600, color: noteColor))),
+          Expanded(
+            child: Text(noteText,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: noteColor)),
+          ),
         ]),
       ),
-
       const SizedBox(height: 8),
 
-      // ── 2. Estimated wait time banner (loading → value → hidden) ──────
+      // Estimate banner
       AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 250),
         transitionBuilder: (child, anim) =>
             FadeTransition(opacity: anim, child: child),
         child: isEstimateLoading
             ? _EstimateBanner.loading(key: const ValueKey('loading'))
-            : (estimatedWaitTime != null && estimatedWaitTime!.isNotEmpty)
+            : (estimatedWaitTime?.isNotEmpty == true)
                 ? _EstimateBanner.value(
                     key: const ValueKey('value'),
-                    text: estimatedWaitTime!,
-                  )
+                    text: estimatedWaitTime!)
                 : const SizedBox.shrink(key: ValueKey('empty')),
       ),
 
-      const SizedBox(height: 8),
+      if (estimatedWaitTime?.isNotEmpty == true || isEstimateLoading)
+        const SizedBox(height: 8),
 
-      // ── 3. Walk-in queue card ─────────────────────────────────────────
+      // Walk-in card
       Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: kOrange.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kOrange.withValues(alpha: 0.3)),
+          color: kAmberLight.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kWarning.withOpacity(0.3)),
         ),
         child: Row(children: [
           Container(
-            width: 48, height: 48,
+            width: 44, height: 44,
             decoration: BoxDecoration(
-              color: kOrange.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
+              color: kWarning.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(11),
             ),
             child: const Icon(Icons.confirmation_number_rounded,
-                size: 22, color: kOrange),
+                size: 20, color: kWarning),
           ),
-          const SizedBox(width: 14),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Walk-in Queue', style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700,
-                  color: kTextDark)),
-              const SizedBox(height: 3),
-              Text('Show up today · ${avail.slotDuration ?? 10} min per patient',
-                style: const TextStyle(fontSize: 12, color: kTextMid)),
-            ],
-          )),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Walk-in Queue',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary)),
+                const SizedBox(height: 2),
+                Text('Show up today  ·  ${avail.slotDuration ?? 10} min per patient',
+                    style: const TextStyle(
+                        fontSize: 12, color: kTextSecondary)),
+              ],
+            ),
+          ),
         ]),
       ),
     ]);
   }
 }
 
-/// Small helper widget for the estimate banner — keeps _BaQueueCard tidy.
 class _EstimateBanner extends StatelessWidget {
-  final bool   _isLoading;
+  final bool    _isLoading;
   final String? _text;
 
   const _EstimateBanner.loading({super.key})
@@ -1621,88 +1631,90 @@ class _EstimateBanner extends StatelessWidget {
       : _isLoading = false, _text = text;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: kCyan.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kCyan.withValues(alpha: 0.25)),
-      ),
-      child: Row(children: [
-        if (_isLoading)
-          const SizedBox(
-            width: 14, height: 14,
-            child: CircularProgressIndicator(strokeWidth: 1.8, color: kCyan),
-          )
-        else
-          const Icon(Icons.hourglass_top_rounded, size: 15, color: kCyan),
-        const SizedBox(width: 8),
-        if (_isLoading)
-          const Text('Fetching estimated wait time…',
-            style: TextStyle(fontSize: 12, color: kTextMid))
-        else
-          Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: const TextStyle(fontSize: 12, color: kCyan),
-                children: [
-                  const TextSpan(text: 'Estimated wait time: '),
-                  TextSpan(
-                    text: _text,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13),
-                  ),
-                ],
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: kInfoLight.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: kInfo.withOpacity(0.25)),
+        ),
+        child: Row(children: [
+          if (_isLoading)
+            const SizedBox(
+              width: 14, height: 14,
+              child: CircularProgressIndicator(
+                  strokeWidth: 1.8, color: kInfo),
+            )
+          else
+            const Icon(Icons.hourglass_top_rounded,
+                size: 14, color: kInfo),
+          const SizedBox(width: 8),
+          if (_isLoading)
+            const Text('Fetching estimated wait time…',
+                style: TextStyle(fontSize: 12, color: kTextMuted))
+          else
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: const TextStyle(fontSize: 12, color: kInfo),
+                  children: [
+                    const TextSpan(text: 'Estimated wait: '),
+                    TextSpan(
+                      text: _text,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-      ]),
-    );
-  }
+        ]),
+      );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SLOT PICKER
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaSlotPicker extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  SLOT PICKER
+// ════════════════════════════════════════════════════════════════════
+class _SlotPicker extends StatelessWidget {
   final List<String>         slots;
   final String?              selected;
-  final bool                 isDark;
   final bool                 isToday;
   final Set<String>          bookedTimes;
   final ValueChanged<String> onSelected;
-  const _BaSlotPicker({
-    required this.slots, required this.selected,
-    required this.isDark, required this.bookedTimes, required this.onSelected,
+
+  const _SlotPicker({
+    required this.slots,       required this.selected,
+    required this.bookedTimes, required this.onSelected,
     this.isToday = false,
   });
 
   int _mins(String slot) {
-    final p = slot.split(':');
-    final h = int.tryParse(p[0]) ?? 0;
-    final r = p[1].split(' ');
-    final m = int.tryParse(r[0]) ?? 0;
-    final s = r[1];
-    var hr  = h;
-    if (s == 'PM' && hr != 12) hr += 12;
-    if (s == 'AM' && hr == 12) hr = 0;
+    final p  = slot.split(':');
+    final h  = int.tryParse(p[0]) ?? 0;
+    final r  = p[1].split(' ');
+    final m  = int.tryParse(r[0]) ?? 0;
+    final sf = r[1];
+    var hr   = h;
+    if (sf == 'PM' && hr != 12) hr += 12;
+    if (sf == 'AM' && hr == 12) hr = 0;
     return hr * 60 + m;
   }
 
   @override
   Widget build(BuildContext context) {
     if (slots.isEmpty) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.symmetric(vertical: 24),
-        child: Text('No slots available',
-          style: TextStyle(color: kTextMid, fontSize: 13)),
-      ));
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Center(
+          child: Text('No slots available',
+              style: TextStyle(color: kTextMuted, fontSize: 13)),
+        ),
+      );
     }
-    final now     = DateTime.now();
-    final nowMins = isToday ? now.hour * 60 + now.minute : -1;
-
+    final nowMins = isToday
+        ? DateTime.now().hour * 60 + DateTime.now().minute : -1;
     final morning   = slots.where((s) => _mins(s) < 720).toList();
     final afternoon = slots.where((s) {
       final m = _mins(s); return m >= 720 && m < 1020;
@@ -1710,55 +1722,68 @@ class _BaSlotPicker extends StatelessWidget {
     final evening   = slots.where((s) => _mins(s) >= 1020).toList();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _baLabel('Select Time Slot'),
+      _sectionLabel('Select Time Slot'),
       const SizedBox(height: 12),
       if (morning.isNotEmpty) ...[
-        _SlotHeader(icon: Icons.wb_sunny_outlined, label: 'Morning'),
+        _SlotGroupHeader(
+            icon: Icons.wb_sunny_outlined, label: 'Morning'),
         const SizedBox(height: 8),
-        _SlotGrid(slots: morning, selected: selected, isDark: isDark,
-            booked: bookedTimes, nowMins: nowMins, onSelected: onSelected),
+        _SlotGrid(
+            slots: morning, selected: selected,
+            booked: bookedTimes, nowMins: nowMins,
+            onSelected: onSelected),
         const SizedBox(height: 14),
       ],
       if (afternoon.isNotEmpty) ...[
-        _SlotHeader(icon: Icons.wb_twilight_outlined, label: 'Afternoon'),
+        _SlotGroupHeader(
+            icon: Icons.wb_twilight_outlined, label: 'Afternoon'),
         const SizedBox(height: 8),
-        _SlotGrid(slots: afternoon, selected: selected, isDark: isDark,
-            booked: bookedTimes, nowMins: nowMins, onSelected: onSelected),
+        _SlotGrid(
+            slots: afternoon, selected: selected,
+            booked: bookedTimes, nowMins: nowMins,
+            onSelected: onSelected),
         const SizedBox(height: 14),
       ],
       if (evening.isNotEmpty) ...[
-        _SlotHeader(icon: Icons.nights_stay_outlined, label: 'Evening'),
+        _SlotGroupHeader(
+            icon: Icons.nights_stay_outlined, label: 'Evening'),
         const SizedBox(height: 8),
-        _SlotGrid(slots: evening, selected: selected, isDark: isDark,
-            booked: bookedTimes, nowMins: nowMins, onSelected: onSelected),
+        _SlotGrid(
+            slots: evening, selected: selected,
+            booked: bookedTimes, nowMins: nowMins,
+            onSelected: onSelected),
       ],
     ]);
   }
 }
 
-class _SlotHeader extends StatelessWidget {
-  final IconData icon; final String label;
-  const _SlotHeader({required this.icon, required this.label});
+class _SlotGroupHeader extends StatelessWidget {
+  final IconData icon;
+  final String   label;
+  const _SlotGroupHeader({required this.icon, required this.label});
   @override
   Widget build(BuildContext context) => Row(children: [
-    Icon(icon, size: 13, color: kTextMid),
-    const SizedBox(width: 5),
-    Text(label, style: const TextStyle(
-        fontSize: 12, fontWeight: FontWeight.w600, color: kTextMid)),
-  ]);
+        Icon(icon, size: 13, color: kTextMuted),
+        const SizedBox(width: 5),
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kTextMuted)),
+      ]);
 }
 
 class _SlotGrid extends StatelessWidget {
   final List<String>         slots;
   final String?              selected;
-  final bool                 isDark;
   final Set<String>          booked;
-  final int                  nowMins;   // -1 means not today
+  final int                  nowMins;
   final ValueChanged<String> onSelected;
+
   const _SlotGrid({
-    required this.slots, required this.selected,
-    required this.isDark, required this.booked,
-    required this.nowMins, required this.onSelected,
+    required this.slots,    required this.selected,
+    required this.booked,   required this.nowMins,
+    required this.onSelected,
   });
 
   int _slotMins(String slot) {
@@ -1775,48 +1800,52 @@ class _SlotGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-    spacing: 8, runSpacing: 8,
-    children: slots.map((slot) {
-      final isSel    = selected == slot;
-      final isBooked = booked.contains(slot);
-      final isPast   = nowMins >= 0 && _slotMins(slot) <= nowMins;
-      final disabled = isBooked || isPast;
-      return GestureDetector(
-        onTap: disabled ? null : () => onSelected(slot),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: disabled
-                ? (isDark ? _kDarkSurface : const Color(0xFFF3F4F6))
-                : isSel ? kPrimary
-                : (isDark ? _kDarkSurface : kCardBg),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: disabled
-                  ? const Color(0xFFD1D5DB)
-                  : (isSel ? kPrimary : kBorder),
+        spacing: 8, runSpacing: 8,
+        children: slots.map((slot) {
+          final isSel    = selected == slot;
+          final isBooked = booked.contains(slot);
+          final isPast   = nowMins >= 0 && _slotMins(slot) <= nowMins;
+          final disabled = isBooked || isPast;
+
+          return GestureDetector(
+            onTap: disabled ? null : () => onSelected(slot),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: disabled
+                    ? const Color(0xFFF7F8FA)
+                    : isSel
+                        ? kPrimary
+                        : Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: disabled
+                      ? kBorder
+                      : (isSel ? kPrimary : kBorder),
+                ),
+              ),
+              child: Text(slot,
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: disabled
+                          ? kTextMuted
+                          : (isSel ? Colors.white : kTextPrimary),
+                      decoration:
+                          isBooked ? TextDecoration.lineThrough : null,
+                      decorationColor: kTextMuted)),
             ),
-          ),
-          child: Text(slot, style: TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w600,
-            color: disabled
-                ? const Color(0xFFD1D5DB)
-                : (isSel ? Colors.white : kTextDark),
-            decoration: isBooked ? TextDecoration.lineThrough : null,
-            decorationColor: const Color(0xFFD1D5DB),
-          )),
-        ),
+          );
+        }).toList(),
       );
-    }).toList(),
-  );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIRM BAR
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaConfirmBar extends StatelessWidget {
-  final bool         isDark;
+// ════════════════════════════════════════════════════════════════════
+//  CONFIRM BAR
+// ════════════════════════════════════════════════════════════════════
+class _ConfirmBar extends StatelessWidget {
   final bool         isQueue;
   final bool         isReschedule;
   final DateTime?    selectedDate;
@@ -1825,25 +1854,27 @@ class _BaConfirmBar extends StatelessWidget {
   final double?      fee;
   final bool         isLoading;
   final VoidCallback onConfirm;
-  const _BaConfirmBar({
-    required this.isDark, required this.isQueue,
-    required this.selectedDate, required this.selectedSlot,
-    required this.fee, required this.isLoading, required this.onConfirm,
+
+  const _ConfirmBar({
+    required this.isQueue,      required this.selectedDate,
+    required this.selectedSlot, required this.fee,
+    required this.isLoading,    required this.onConfirm,
     this.queueStartTime, this.isReschedule = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final dateStr = selectedDate != null ? _baFmtFull(selectedDate!) : '';
+    final dateStr = selectedDate != null ? _fmtFull(selectedDate!) : '';
     final label   = isQueue
-        ? 'Confirm Queue  ·  $dateStr'
+        ? 'Queue  ·  $dateStr'
         : '$selectedSlot  ·  $dateStr';
+
     return Container(
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, 12 + MediaQuery.of(context).padding.bottom),
-      decoration: BoxDecoration(
-        color: isDark ? _kDarkSurface : kCardBg,
-        border: const Border(top: BorderSide(color: kBorder, width: 0.5)),
+          14, 10, 14, 10 + MediaQuery.of(context).padding.bottom),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: kBorder)),
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         if (selectedSlot != null || isQueue)
@@ -1852,57 +1883,72 @@ class _BaConfirmBar extends StatelessWidget {
             child: Row(children: [
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('Selected slot',
-                  style: TextStyle(fontSize: 10.5, color: kTextMid)),
-                Text(label, style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700,
-                    color: kTextDark),
-                  overflow: TextOverflow.ellipsis),
+                    style: TextStyle(
+                        fontSize: 11, color: kTextMuted)),
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary),
+                    overflow: TextOverflow.ellipsis),
               ]),
               const Spacer(),
               if (fee != null)
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  const Text('Consult fee',
-                    style: TextStyle(fontSize: 10.5, color: kTextMid)),
-                  Text('₹${fee!.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 15,
-                        fontWeight: FontWeight.w700, color: kGreen)),
-                ]),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const Text('Consult fee',
+                        style: TextStyle(
+                            fontSize: 11, color: kTextMuted)),
+                    Text('₹${fee!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: kSuccess)),
+                  ],
+                ),
             ]),
           ),
         SizedBox(
-          width: double.infinity, height: 50,
+          width: double.infinity,
+          height: 48,
           child: ElevatedButton(
             onPressed: isLoading ? null : onConfirm,
             style: ElevatedButton.styleFrom(
               backgroundColor:         kPrimary,
               foregroundColor:         Colors.white,
-              disabledBackgroundColor: kPrimary.withOpacity(0.6),
+              disabledBackgroundColor: kPrimaryLight,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14)),
+                  borderRadius: BorderRadius.circular(12)),
             ),
             child: isLoading
-                ? const SizedBox(width: 22, height: 22,
+                ? const SizedBox(
+                    width: 20, height: 20,
                     child: CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2.5))
-                : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(
-                      isReschedule
-                          ? Icons.edit_calendar_rounded
-                          : (isQueue
-                              ? Icons.confirmation_number_rounded
-                              : Icons.calendar_month_rounded),
-                      size: 17,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isReschedule
-                          ? 'Reschedule Appointment'
-                          : 'Confirm Appointment',
-                      style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700),
-                    ),
-                  ]),
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isReschedule
+                            ? Icons.edit_calendar_rounded
+                            : (isQueue
+                                ? Icons.confirmation_number_rounded
+                                : Icons.calendar_month_rounded),
+                        size: 17,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        isReschedule
+                            ? 'Reschedule Appointment'
+                            : 'Confirm Appointment',
+                        style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
           ),
         ),
       ]),
@@ -1910,45 +1956,57 @@ class _BaConfirmBar extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// NO AVAILABILITY
-// ─────────────────────────────────────────────────────────────────────────────
-class _BaNoAvail extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  NO AVAILABILITY
+// ════════════════════════════════════════════════════════════════════
+class _NoAvail extends StatelessWidget {
   final VoidCallback onBack;
-  const _BaNoAvail({required this.onBack});
+  const _NoAvail({required this.onBack});
+
   @override
   Widget build(BuildContext context) => Center(
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 72, height: 72,
-          decoration: const BoxDecoration(
-              color: kPrimaryBg, shape: BoxShape.circle),
-          child: const Icon(Icons.event_busy_rounded,
-              size: 32, color: kPrimary)),
-        const SizedBox(height: 16),
-        const Text('No availability found', style: TextStyle(
-            fontSize: 17, fontWeight: FontWeight.w700, color: kTextDark)),
-        const SizedBox(height: 8),
-        const Text(
-          'This doctor has no available slots at the moment.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: kTextMid, height: 1.5),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 60, height: 60,
+              decoration: const BoxDecoration(
+                  color: kPrimaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.event_busy_rounded,
+                  size: 28, color: kPrimary),
+            ),
+            const SizedBox(height: 14),
+            const Text('No availability found',
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
+            const SizedBox(height: 6),
+            const Text(
+              'This doctor has no available slots at the moment.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 13, color: kTextSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              height: 44,
+              child: ElevatedButton(
+                onPressed: onBack,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Go Back',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
         ),
-
-        const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: onBack,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimary, foregroundColor: Colors.white,
-            elevation: 0,
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-          child: const Text('Go Back'),
-        ),
-      ]),
-    ),
-  );
+      );
 }

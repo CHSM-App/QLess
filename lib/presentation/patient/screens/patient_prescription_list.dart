@@ -9,93 +9,66 @@ import 'package:qless/presentation/patient/screens/print_prescription_screen.dar
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/core/network/token_provider.dart';
 
-// ── Colour palette ────────────────────────────────────────────────
-const kPrimary = Color(0xFF1A73E8);
-const kPrimaryBg = Color(0xFFE8F0FE);
-const kBg = Color(0xFFF4F6FB);
-const kCardBg = Colors.white;
-const kTextDark = Color(0xFF1F2937);
-const kTextMid = Color(0xFF6B7280);
-const kBorder = Color(0xFFE5E7EB);
-const kRed = Color(0xFFEA4335);
-const kGreen = Color(0xFF34A853);
-const kOrange = Color(0xFFF59E0B);
-const kPurple = Color(0xFF8B5CF6);
-const kCyan = Color(0xFF06B6D4);
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
 
-// ── Member avatar colours ─────────────────────────────────────────
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder  = Color(0xFFEDF2F7);
+const kDivider = Color(0xFFE5E7EB);
+
+const kError      = Color(0xFFFC8181);
+const kRedLight   = Color(0xFFFEE2E2);
+const kSuccess    = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+const kWarning    = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+const kPurple     = Color(0xFF9F7AEA);
+const kPurpleLight= Color(0xFFEDE9FE);
+const kInfo       = Color(0xFF3B82F6);
+const kInfoLight  = Color(0xFFDBEAFE);
+
+// ── Avatar palette ────────────────────────────────────────────────
 const _kAvatarColors = [
-  Color(0xFF1A73E8),
-  Color(0xFF34A853),
-  Color(0xFFF59E0B),
-  Color(0xFF8B5CF6),
-  Color(0xFF06B6D4),
-  Color(0xFFEA4335),
+  kPrimary, kSuccess, kWarning, kPurple, kInfo, kError,
 ];
-
-Color _avatarColor(int index) => _kAvatarColors[index % _kAvatarColors.length];
+Color _avatarColor(int i) => _kAvatarColors[i % _kAvatarColors.length];
 
 String _initials(String name) {
-  final parts = name.trim().split(' ').where((w) => w.isNotEmpty).toList();
-  if (parts.isEmpty) return '?';
-  if (parts.length == 1) return parts[0][0].toUpperCase();
-  return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  final p = name.trim().split(' ').where((w) => w.isNotEmpty).toList();
+  if (p.isEmpty) return '?';
+  if (p.length == 1) return p[0][0].toUpperCase();
+  return '${p[0][0]}${p[1][0]}'.toUpperCase();
 }
 
-// ── Date filter options ───────────────────────────────────────────
-enum _DateFilter {
-  all,
-  today,
-  thisWeek,
-  thisMonth,
-  last3Months,
-  last6Months,
-  thisYear,
-  custom,
-}
+// ── Date filter ───────────────────────────────────────────────────
+enum _DateFilter { all, today, thisWeek, thisMonth, last3Months, last6Months, thisYear, custom }
 
 extension _DateFilterLabel on _DateFilter {
-  String get label {
-    switch (this) {
-      case _DateFilter.all:
-        return 'All Time';
-      case _DateFilter.today:
-        return 'Today';
-      case _DateFilter.thisWeek:
-        return 'This Week';
-      case _DateFilter.thisMonth:
-        return 'This Month';
-      case _DateFilter.last3Months:
-        return 'Last 3 Months';
-      case _DateFilter.last6Months:
-        return 'Last 6 Months';
-      case _DateFilter.thisYear:
-        return 'This Year';
-      case _DateFilter.custom:
-        return 'Custom Range';
-    }
-  }
-
-  IconData get icon {
-    switch (this) {
-      case _DateFilter.all:
-        return Icons.all_inclusive_rounded;
-      case _DateFilter.today:
-        return Icons.today_rounded;
-      case _DateFilter.thisWeek:
-        return Icons.view_week_rounded;
-      case _DateFilter.thisMonth:
-        return Icons.calendar_month_rounded;
-      case _DateFilter.last3Months:
-        return Icons.date_range_rounded;
-      case _DateFilter.last6Months:
-        return Icons.date_range_rounded;
-      case _DateFilter.thisYear:
-        return Icons.calendar_today_rounded;
-      case _DateFilter.custom:
-        return Icons.tune_rounded;
-    }
-  }
+  String get label => switch (this) {
+    _DateFilter.all         => 'All Time',
+    _DateFilter.today       => 'Today',
+    _DateFilter.thisWeek    => 'This Week',
+    _DateFilter.thisMonth   => 'This Month',
+    _DateFilter.last3Months => 'Last 3 Months',
+    _DateFilter.last6Months => 'Last 6 Months',
+    _DateFilter.thisYear    => 'This Year',
+    _DateFilter.custom      => 'Custom Range',
+  };
+  IconData get icon => switch (this) {
+    _DateFilter.all         => Icons.all_inclusive_rounded,
+    _DateFilter.today       => Icons.today_rounded,
+    _DateFilter.thisWeek    => Icons.view_week_rounded,
+    _DateFilter.thisMonth   => Icons.calendar_month_rounded,
+    _DateFilter.last3Months => Icons.date_range_rounded,
+    _DateFilter.last6Months => Icons.date_range_rounded,
+    _DateFilter.thisYear    => Icons.calendar_today_rounded,
+    _DateFilter.custom      => Icons.tune_rounded,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -103,7 +76,6 @@ extension _DateFilterLabel on _DateFilter {
 // ════════════════════════════════════════════════════════════════════
 class PatientPrescriptionListScreen extends ConsumerStatefulWidget {
   const PatientPrescriptionListScreen({super.key});
-
   @override
   ConsumerState<PatientPrescriptionListScreen> createState() =>
       _PatientPrescriptionListScreenState();
@@ -120,11 +92,11 @@ class _PatientPrescriptionListScreenState
   ProviderSubscription<PatientLoginState>? _patientSub;
   ProviderSubscription<TokenState>? _tokenSub;
 
-  _DateFilter _dateFilter = _DateFilter.all;
-  DateTime? _customFrom;
-  DateTime? _customTo;
-  bool _sortNewestFirst = true;
-  static const int _filterAll = -1;
+  _DateFilter _dateFilter    = _DateFilter.all;
+  DateTime?   _customFrom;
+  DateTime?   _customTo;
+  bool        _sortNewestFirst = true;
+  static const int _filterAll  = -1;
   static const int _filterSelf = -2;
   int _memberFilter = _filterAll;
 
@@ -137,37 +109,27 @@ class _PatientPrescriptionListScreenState
       ref.read(patientLoginViewModelProvider.notifier).loadFromStoragePatient();
     });
     _patientSub = ref.listenManual<PatientLoginState>(
-      patientLoginViewModelProvider,
-      (prev, next) => _tryFetch(),
-    );
+        patientLoginViewModelProvider, (_, __) => _tryFetch());
     _tokenSub = ref.listenManual<TokenState>(
-      tokenProvider,
-      (prev, next) => _tryFetch(),
-    );
+        tokenProvider, (_, __) => _tryFetch());
     WidgetsBinding.instance.addPostFrameCallback((_) => _tryFetch());
   }
 
   void _tryFetch() {
-    final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    final patientId  = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     final tokenState = ref.read(tokenProvider);
-    final tokenReady =
-        !tokenState.isLoading && (tokenState.accessToken ?? '').isNotEmpty;
+    final tokenReady = !tokenState.isLoading && (tokenState.accessToken ?? '').isNotEmpty;
     if (tokenReady && patientId == 0) {
       ref.read(patientLoginViewModelProvider.notifier).loadFromStoragePatient();
       return;
     }
     if (patientId > 0 && tokenReady && !_hasFetched) {
       _hasFetched = true;
-      ref
-          .read(prescriptionViewModelProvider.notifier)
-          .patientPrescriptionList(patientId);
+      ref.read(prescriptionViewModelProvider.notifier).patientPrescriptionList(patientId);
     }
-
     if (tokenReady && patientId > 0 && !_hasFetchedFamily) {
       _hasFetchedFamily = true;
-      ref
-          .read(familyViewModelProvider.notifier)
-          .fetchAllFamilyMembers(patientId);
+      ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(patientId);
     }
   }
 
@@ -184,69 +146,51 @@ class _PatientPrescriptionListScreenState
 
   bool _passesDateFilter(PatientPrescription p) {
     final now = DateTime.now();
-    final d = p.prescriptionDate;
-    switch (_dateFilter) {
-      case _DateFilter.all:
-        return true;
-      case _DateFilter.today:
-        return d.year == now.year && d.month == now.month && d.day == now.day;
-      case _DateFilter.thisWeek:
-        final start = now.subtract(Duration(days: now.weekday - 1));
-        final from = DateTime(start.year, start.month, start.day);
-        return d.isAfter(from.subtract(const Duration(seconds: 1)));
-      case _DateFilter.thisMonth:
-        return d.year == now.year && d.month == now.month;
-      case _DateFilter.last3Months:
-        return d.isAfter(now.subtract(const Duration(days: 90)));
-      case _DateFilter.last6Months:
-        return d.isAfter(now.subtract(const Duration(days: 180)));
-      case _DateFilter.thisYear:
-        return d.year == now.year;
-      case _DateFilter.custom:
-        if (_customFrom != null && d.isBefore(_customFrom!)) return false;
-        if (_customTo != null &&
-            d.isAfter(_customTo!.add(const Duration(days: 1))))
-          return false;
-        return true;
-    }
+    final d   = p.prescriptionDate;
+    return switch (_dateFilter) {
+      _DateFilter.all         => true,
+      _DateFilter.today       => d.year == now.year && d.month == now.month && d.day == now.day,
+      _DateFilter.thisWeek    => () {
+          final from = DateTime(now.year, now.month, now.day)
+              .subtract(Duration(days: now.weekday - 1));
+          return d.isAfter(from.subtract(const Duration(seconds: 1)));
+        }(),
+      _DateFilter.thisMonth   => d.year == now.year && d.month == now.month,
+      _DateFilter.last3Months => d.isAfter(now.subtract(const Duration(days: 90))),
+      _DateFilter.last6Months => d.isAfter(now.subtract(const Duration(days: 180))),
+      _DateFilter.thisYear    => d.year == now.year,
+      _DateFilter.custom      => () {
+          if (_customFrom != null && d.isBefore(_customFrom!)) return false;
+          if (_customTo != null && d.isAfter(_customTo!.add(const Duration(days: 1)))) return false;
+          return true;
+        }(),
+    };
   }
 
   List<PatientPrescription> _filtered(
-    List<PatientPrescription> source,
-    String statusFilter,
-    int patientId,
-    String patientName,
-    List<FamilyMember> members,
+    List<PatientPrescription> src, String statusFilter,
+    int patientId, String patientName, List<FamilyMember> members,
   ) {
-    var list = source.where((p) {
+    var list = src.where((p) {
       if (statusFilter != 'all' && p.status != statusFilter) return false;
-      if (!_passesMemberFilter(p, patientId, patientName, members))
-        return false;
+      if (!_passesMemberFilter(p, patientId, patientName, members)) return false;
       if (!_passesDateFilter(p)) return false;
       if (_search.trim().isNotEmpty) {
         final q = _search.toLowerCase();
         if (!(p.diagnosis ?? '').toLowerCase().contains(q) &&
             !p.prescriptionId.toString().contains(q) &&
-            !p.doctorName.toLowerCase().contains(q))
-          return false;
+            !p.doctorName.toLowerCase().contains(q)) return false;
       }
       return true;
     }).toList();
-
-    list.sort(
-      (a, b) => _sortNewestFirst
-          ? b.prescriptionDate.compareTo(a.prescriptionDate)
-          : a.prescriptionDate.compareTo(b.prescriptionDate),
-    );
+    list.sort((a, b) => _sortNewestFirst
+        ? b.prescriptionDate.compareTo(a.prescriptionDate)
+        : a.prescriptionDate.compareTo(b.prescriptionDate));
     return list;
   }
 
-  bool _passesMemberFilter(
-    PatientPrescription p,
-    int patientId,
-    String patientName,
-    List<FamilyMember> members,
-  ) {
+  bool _passesMemberFilter(PatientPrescription p, int patientId,
+      String patientName, List<FamilyMember> members) {
     if (_memberFilter == _filterAll) return true;
     if (_memberFilter == _filterSelf) {
       if (patientId > 0 && p.patientId == patientId) return true;
@@ -255,31 +199,15 @@ class _PatientPrescriptionListScreenState
     }
     if (_memberFilter > 0 && p.patientId == _memberFilter) return true;
     final member = members
-        .where((m) => m.memberId == _memberFilter)
         .cast<FamilyMember?>()
-        .firstWhere((m) => m != null, orElse: () => null);
+        .firstWhere((m) => m?.memberId == _memberFilter, orElse: () => null);
     final memberName = member?.memberName?.trim().toLowerCase();
-    return memberName != null &&
-        memberName.isNotEmpty &&
+    return memberName != null && memberName.isNotEmpty &&
         p.patientName.toLowerCase() == memberName;
   }
 
   String _fmtDate(DateTime d) {
-    const m = [
-      '',
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return '${d.day} ${m[d.month]} ${d.year}';
   }
 
@@ -293,10 +221,8 @@ class _PatientPrescriptionListScreenState
           patientId: ref.read(patientLoginViewModelProvider).patientId ?? 0,
         ),
         transitionsBuilder: (_, anim, __, child) => SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(1.0, 0.0),
-            end: Offset.zero,
-          ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic)),
           child: child,
         ),
         transitionDuration: const Duration(milliseconds: 300),
@@ -310,78 +236,41 @@ class _PatientPrescriptionListScreenState
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _DateFilterSheet(
-        current: _dateFilter,
-        customFrom: _customFrom,
-        customTo: _customTo,
-        sortNewest: _sortNewestFirst,
-        onApply: (filter, from, to, newest) {
-          setState(() {
-            _dateFilter = filter;
-            _customFrom = from;
-            _customTo = to;
-            _sortNewestFirst = newest;
-          });
-        },
+        current: _dateFilter, customFrom: _customFrom,
+        customTo: _customTo, sortNewest: _sortNewestFirst,
+        onApply: (filter, from, to, newest) => setState(() {
+          _dateFilter = filter; _customFrom = from;
+          _customTo = to; _sortNewestFirst = newest;
+        }),
       ),
     );
   }
 
-  bool get _hasActiveFilter =>
-      _dateFilter != _DateFilter.all || !_sortNewestFirst;
-
-  // ── Resolve the label shown inside the trigger button ────────────
-  String _memberLabel(String patientName, List<FamilyMember> members) {
-    if (_memberFilter == _filterAll) return 'All';
-    if (_memberFilter == _filterSelf) {
-      return patientName.isNotEmpty ? patientName.split(' ').first : 'Self';
-    }
-    final m = members
-        .cast<FamilyMember?>()
-        .firstWhere((m) => m?.memberId == _memberFilter, orElse: () => null);
-    return m?.memberName?.split(' ').first ?? 'Member';
-  }
+  bool get _hasActiveFilter => _dateFilter != _DateFilter.all || !_sortNewestFirst;
 
   @override
   Widget build(BuildContext context) {
-    final patientState = ref.watch(patientLoginViewModelProvider);
-    final patientId = patientState.patientId ?? 0;
-    final patientName = patientState.name ?? 'Patient';
-    final familyState = ref.watch(familyViewModelProvider);
+    final patientState  = ref.watch(patientLoginViewModelProvider);
+    final patientId     = patientState.patientId ?? 0;
+    final patientName   = patientState.name ?? 'Patient';
+    final familyState   = ref.watch(familyViewModelProvider);
     final familyMembers = familyState.allfamilyMembers.maybeWhen(
-      data: (members) => members,
-      orElse: () => const <FamilyMember>[],
-    );
-    final tokenState = ref.watch(tokenProvider);
-    final tokenReady =
-        !tokenState.isLoading && (tokenState.accessToken ?? '').isNotEmpty;
-    final waitingAuth = !tokenReady || patientId == 0;
+      data: (m) => m, orElse: () => const <FamilyMember>[]);
+    final tokenState    = ref.watch(tokenProvider);
+    final tokenReady    = !tokenState.isLoading && (tokenState.accessToken ?? '').isNotEmpty;
+    final waitingAuth   = !tokenReady || patientId == 0;
 
-    final apiList =
-        _state.prescriptionsListPatient ?? const <PrescriptionModel>[];
-    final mapped = apiList
-        .map(
-          (m) => PatientPrescription.fromModel(
-            m,
-            fallbackPatientId: patientId,
-            fallbackPatientName: patientName,
-          ),
-        )
-        .toList();
+    final apiList = _state.prescriptionsListPatient ?? const <PrescriptionModel>[];
+    final mapped  = apiList.map((m) => PatientPrescription.fromModel(m,
+        fallbackPatientId: patientId, fallbackPatientName: patientName)).toList();
 
-    final all = _filtered(mapped, 'all', patientId, patientName, familyMembers);
-    final active =
-        _filtered(mapped, 'active', patientId, patientName, familyMembers);
-    final past = _filtered(
-          mapped,
-          'completed',
-          patientId,
-          patientName,
-          familyMembers,
-        ) +
-        _filtered(mapped, 'expired', patientId, patientName, familyMembers);
+    final all    = _filtered(mapped, 'all',       patientId, patientName, familyMembers);
+    final active = _filtered(mapped, 'active',    patientId, patientName, familyMembers);
+    final past   = _filtered(mapped, 'completed', patientId, patientName, familyMembers)
+                 + _filtered(mapped, 'expired',   patientId, patientName, familyMembers);
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           Column(
@@ -394,9 +283,9 @@ class _PatientPrescriptionListScreenState
                 child: TabBarView(
                   controller: _tabCtrl,
                   children: [
-                    _buildListBody(all, waitAuth: waitingAuth),
+                    _buildListBody(all,    waitAuth: waitingAuth),
                     _buildListBody(active, waitAuth: waitingAuth),
-                    _buildListBody(past, waitAuth: waitingAuth),
+                    _buildListBody(past,   waitAuth: waitingAuth),
                   ],
                 ),
               ),
@@ -404,70 +293,62 @@ class _PatientPrescriptionListScreenState
           ),
           if (_state.isLoading)
             Container(
-              color: Colors.black.withOpacity(0.25),
-              child: const Center(
-                child: CircularProgressIndicator(color: kPrimary),
-              ),
+              color: Colors.black.withOpacity(0.2),
+              child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildAppBar(
-    int total,
-    String patientName,
-    List<FamilyMember> members,
-  ) =>
+  // ---------------------------------------------------------------------------
+  // App Bar
+  // ---------------------------------------------------------------------------
+
+  Widget _buildAppBar(int total, String patientName, List<FamilyMember> members) =>
       Container(
-        decoration: const BoxDecoration(
-          color: kCardBg,
-          border: Border(bottom: BorderSide(color: kBorder, width: 0.5)),
-        ),
+        color: Colors.white,
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 14, 14),
+            padding: const EdgeInsets.fromLTRB(6, 6, 14, 12),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: Colors.black,
-                    size: 18,
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 36, height: 36,
+                    margin: const EdgeInsets.only(left: 6),
+                    decoration: BoxDecoration(
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        size: 15, color: kPrimary),
                   ),
-                  onPressed: () => Navigator.pop(context),
                 ),
-                const SizedBox(width: 2),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Prescriptions',
-                        style: TextStyle(
-                          color: kTextDark,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$total records',
-                        style:
-                            const TextStyle(color: kTextMid, fontSize: 12),
-                      ),
+                      const Text('Prescriptions',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary,
+                              letterSpacing: -0.2)),
+                      Text('$total records',
+                          style: const TextStyle(
+                              fontSize: 11, color: kTextMuted)),
                     ],
                   ),
                 ),
-                // ── FIXED: Custom popup member dropdown ──────────
                 _MemberDropdown(
                   selected: _memberFilter,
                   patientName: patientName,
                   members: members,
-                  onChanged: (val) =>
-                      setState(() => _memberFilter = val),
+                  onChanged: (val) => setState(() => _memberFilter = val),
                 ),
               ],
             ),
@@ -475,97 +356,75 @@ class _PatientPrescriptionListScreenState
         ),
       );
 
+  // ---------------------------------------------------------------------------
+  // Search + Filter Row
+  // ---------------------------------------------------------------------------
+
   Widget _buildSearchFilterRow() => Container(
-        color: kCardBg,
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
         child: Row(
           children: [
             Expanded(
               child: SizedBox(
-                height: 42,
+                height: 40,
                 child: TextField(
                   controller: _searchCtrl,
                   onChanged: (v) => setState(() => _search = v),
-                  style:
-                      const TextStyle(fontSize: 13, color: kTextDark),
+                  style: const TextStyle(fontSize: 13, color: kTextPrimary),
                   decoration: InputDecoration(
-                    hintText: 'Search diagnosis, Rx, doctor...',
-                    hintStyle: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFFB0B8C8),
-                    ),
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: kPrimary,
-                      size: 18,
-                    ),
+                    hintText: 'Search diagnosis, Rx, doctor…',
+                    hintStyle: const TextStyle(fontSize: 12, color: kTextMuted),
+                    prefixIcon: const Icon(Icons.search_rounded, color: kPrimary, size: 17),
                     suffixIcon: _search.isNotEmpty
                         ? GestureDetector(
-                            onTap: () => setState(() {
-                              _search = '';
-                              _searchCtrl.clear();
-                            }),
-                            child: const Icon(
-                              Icons.close_rounded,
-                              color: kTextMid,
-                              size: 16,
+                            onTap: () => setState(() { _search = ''; _searchCtrl.clear(); }),
+                            child: Container(
+                              margin: const EdgeInsets.all(10),
+                              width: 18, height: 18,
+                              decoration: const BoxDecoration(
+                                  color: kTextMuted, shape: BoxShape.circle),
+                              child: const Icon(Icons.close_rounded,
+                                  color: Colors.white, size: 11),
                             ),
                           )
                         : null,
                     filled: true,
-                    fillColor: kBg,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 0,
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: kBorder),
-                    ),
+                    fillColor: const Color(0xFFF7F8FA),
+                    contentPadding: EdgeInsets.zero,
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: kBorder),
-                    ),
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: kBorder)),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: kPrimary, width: 1.5),
-                    ),
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: const BorderSide(color: kPrimary, width: 1.5)),
                   ),
                 ),
               ),
             ),
             const SizedBox(width: 8),
+            // Filter button
             GestureDetector(
               onTap: _showFilterSheet,
               child: Container(
-                width: 42,
-                height: 42,
+                width: 40, height: 40,
                 decoration: BoxDecoration(
-                  color: _hasActiveFilter ? kPrimary : kBg,
+                  color: _hasActiveFilter ? kPrimary : const Color(0xFFF7F8FA),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                      color: _hasActiveFilter ? kPrimary : kBorder),
+                  border: Border.all(color: _hasActiveFilter ? kPrimary : kBorder),
                 ),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    Icon(
-                      Icons.tune_rounded,
-                      color: _hasActiveFilter ? Colors.white : kPrimary,
-                      size: 20,
-                    ),
+                    Icon(Icons.tune_rounded,
+                        color: _hasActiveFilter ? Colors.white : kPrimary, size: 18),
                     if (_hasActiveFilter)
                       Positioned(
-                        top: 7,
-                        right: 7,
+                        top: 7, right: 7,
                         child: Container(
-                          width: 7,
-                          height: 7,
+                          width: 6, height: 6,
                           decoration: const BoxDecoration(
-                            color: kOrange,
-                            shape: BoxShape.circle,
-                          ),
+                              color: kWarning, shape: BoxShape.circle),
                         ),
                       ),
                   ],
@@ -573,14 +432,13 @@ class _PatientPrescriptionListScreenState
               ),
             ),
             const SizedBox(width: 8),
+            // Sort button
             GestureDetector(
-              onTap: () =>
-                  setState(() => _sortNewestFirst = !_sortNewestFirst),
+              onTap: () => setState(() => _sortNewestFirst = !_sortNewestFirst),
               child: Container(
-                width: 42,
-                height: 42,
+                width: 40, height: 40,
                 decoration: BoxDecoration(
-                  color: kBg,
+                  color: const Color(0xFFF7F8FA),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: kBorder),
                 ),
@@ -588,8 +446,7 @@ class _PatientPrescriptionListScreenState
                   _sortNewestFirst
                       ? Icons.arrow_downward_rounded
                       : Icons.arrow_upward_rounded,
-                  color: kPrimary,
-                  size: 18,
+                  color: kPrimary, size: 17,
                 ),
               ),
             ),
@@ -597,29 +454,29 @@ class _PatientPrescriptionListScreenState
         ),
       );
 
+  // ---------------------------------------------------------------------------
+  // Active Filter Chips
+  // ---------------------------------------------------------------------------
+
   Widget _buildActiveFilterChips() => Container(
-        color: kCardBg,
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
         child: Row(
           children: [
             if (_dateFilter != _DateFilter.all)
               _filterChip(
                 icon: _dateFilter.icon,
-                label: _dateFilter == _DateFilter.custom &&
-                        _customFrom != null
-                    ? '${_fmtDate(_customFrom!)} – ${_customTo != null ? _fmtDate(_customTo!) : '...'}'
+                label: _dateFilter == _DateFilter.custom && _customFrom != null
+                    ? '${_fmtDate(_customFrom!)} – ${_customTo != null ? _fmtDate(_customTo!) : '…'}'
                     : _dateFilter.label,
-                onRemove: () =>
-                    setState(() => _dateFilter = _DateFilter.all),
+                onRemove: () => setState(() => _dateFilter = _DateFilter.all),
               ),
             if (!_sortNewestFirst) ...[
-              if (_dateFilter != _DateFilter.all)
-                const SizedBox(width: 6),
+              if (_dateFilter != _DateFilter.all) const SizedBox(width: 6),
               _filterChip(
                 icon: Icons.arrow_upward_rounded,
                 label: 'Oldest First',
-                onRemove: () =>
-                    setState(() => _sortNewestFirst = true),
+                onRemove: () => setState(() => _sortNewestFirst = true),
               ),
             ],
           ],
@@ -632,54 +489,47 @@ class _PatientPrescriptionListScreenState
     required VoidCallback onRemove,
   }) =>
       Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: kPrimaryBg,
-          borderRadius: BorderRadius.circular(20),
+          color: kPrimaryLight,
+          borderRadius: BorderRadius.circular(8),
           border: Border.all(color: kPrimary.withOpacity(0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: kPrimary, size: 12),
+            Icon(icon, color: kPrimary, size: 11),
             const SizedBox(width: 5),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                color: kPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 11, color: kPrimary, fontWeight: FontWeight.w600)),
             const SizedBox(width: 5),
             GestureDetector(
               onTap: onRemove,
-              child: const Icon(Icons.close_rounded,
-                  color: kPrimary, size: 13),
+              child: const Icon(Icons.close_rounded, color: kPrimary, size: 12),
             ),
           ],
         ),
       );
 
+  // ---------------------------------------------------------------------------
+  // Tab Bar
+  // ---------------------------------------------------------------------------
+
   Widget _buildTabBar(int all, int active, int past) => Container(
-        color: kCardBg,
+        color: Colors.white,
         child: Column(
           children: [
             TabBar(
               controller: _tabCtrl,
               labelColor: kPrimary,
-              unselectedLabelColor: kTextMid,
+              unselectedLabelColor: kTextMuted,
               indicatorColor: kPrimary,
-              indicatorWeight: 2.5,
-              labelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
+              indicatorWeight: 2,
+              labelStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              unselectedLabelStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
               tabs: [
                 Tab(text: 'All ($all)'),
                 Tab(text: 'Active ($active)'),
@@ -691,29 +541,28 @@ class _PatientPrescriptionListScreenState
         ),
       );
 
-  Widget _buildListBody(
-    List<PatientPrescription> items, {
-    required bool waitAuth,
-  }) {
+  // ---------------------------------------------------------------------------
+  // List Body
+  // ---------------------------------------------------------------------------
+
+  Widget _buildListBody(List<PatientPrescription> items, {required bool waitAuth}) {
     if (waitAuth) {
       return const Center(
-          child: CircularProgressIndicator(color: kPrimary));
+          child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5));
     }
-    if (_state.error != null && items.isEmpty)
-      return _errorState(_state.error!);
+    if (_state.error != null && items.isEmpty) return _errorState(_state.error!);
     if (items.isEmpty && !_state.isLoading) return _emptyState();
     return RefreshIndicator(
       color: kPrimary,
-      onRefresh: () => ref
-          .read(prescriptionViewModelProvider.notifier)
+      strokeWidth: 2,
+      onRefresh: () => ref.read(prescriptionViewModelProvider.notifier)
           .patientPrescriptionList(
-            ref.read(patientLoginViewModelProvider).patientId ?? 0,
-          ),
+              ref.read(patientLoginViewModelProvider).patientId ?? 0),
       child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 30),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (_, i) => _PrescriptionCompactCard(
+        itemBuilder: (_, i) => _PrescriptionCard(
           prescription: items[i],
           fmtDate: _fmtDate,
           onTap: () => _openDetail(items[i]),
@@ -726,37 +575,29 @@ class _PatientPrescriptionListScreenState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.receipt_long_outlined,
-              size: 52,
-              color: kPrimary.withOpacity(0.2),
+            Container(
+              width: 60, height: 60,
+              decoration: const BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.receipt_long_outlined, size: 28, color: kPrimary),
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'No prescriptions found',
-              style: TextStyle(
-                fontSize: 15,
-                color: kTextMid,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Try a different filter or search',
-              style: TextStyle(
-                  fontSize: 12, color: Color(0xFFB0B8C8)),
-            ),
+            const SizedBox(height: 12),
+            const Text('No prescriptions found',
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w600, color: kTextPrimary)),
+            const SizedBox(height: 4),
+            const Text('Try a different filter or search',
+                style: TextStyle(fontSize: 12, color: kTextMuted)),
             if (_hasActiveFilter) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               TextButton.icon(
                 onPressed: () => setState(() {
                   _dateFilter = _DateFilter.all;
                   _sortNewestFirst = true;
                 }),
-                icon: const Icon(Icons.clear_all_rounded, size: 16),
-                label: const Text('Clear Filters'),
-                style:
-                    TextButton.styleFrom(foregroundColor: kPrimary),
+                icon: const Icon(Icons.clear_all_rounded, size: 15),
+                label: const Text('Clear Filters',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                style: TextButton.styleFrom(foregroundColor: kPrimary),
               ),
             ],
           ],
@@ -769,32 +610,31 @@ class _PatientPrescriptionListScreenState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.wifi_off_rounded,
-                  size: 50, color: kRed),
-              const SizedBox(height: 12),
-              Text(
-                msg,
-                textAlign: TextAlign.center,
-                style:
-                    const TextStyle(fontSize: 13, color: kTextMid),
+              Container(
+                width: 56, height: 56,
+                decoration: const BoxDecoration(color: kRedLight, shape: BoxShape.circle),
+                child: const Icon(Icons.wifi_off_rounded, size: 26, color: kError),
               ),
+              const SizedBox(height: 12),
+              Text(msg,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, color: kTextSecondary)),
               const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => ref
-                    .read(prescriptionViewModelProvider.notifier)
-                    .patientPrescriptionList(
-                      ref
-                              .read(patientLoginViewModelProvider)
-                              .patientId ??
-                          0,
-                    ),
-                icon: const Icon(Icons.refresh_rounded, size: 16),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+              SizedBox(
+                height: 38,
+                child: ElevatedButton.icon(
+                  onPressed: () => ref.read(prescriptionViewModelProvider.notifier)
+                      .patientPrescriptionList(
+                          ref.read(patientLoginViewModelProvider).patientId ?? 0),
+                  icon: const Icon(Icons.refresh_rounded, size: 15),
+                  label: const Text('Retry',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
               ),
@@ -805,7 +645,7 @@ class _PatientPrescriptionListScreenState
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  CUSTOM MEMBER DROPDOWN  (replaces the broken DropdownButton)
+//  MEMBER DROPDOWN
 // ════════════════════════════════════════════════════════════════════
 class _MemberDropdown extends StatelessWidget {
   final int selected;
@@ -813,163 +653,109 @@ class _MemberDropdown extends StatelessWidget {
   final List<FamilyMember> members;
   final ValueChanged<int> onChanged;
 
-  static const int _filterAll = -1;
+  static const int _filterAll  = -1;
   static const int _filterSelf = -2;
 
   const _MemberDropdown({
-    required this.selected,
-    required this.patientName,
-    required this.members,
-    required this.onChanged,
+    required this.selected, required this.patientName,
+    required this.members,  required this.onChanged,
   });
 
   String get _triggerLabel {
-    if (selected == _filterAll) return 'All';
-    if (selected == _filterSelf) {
-      return patientName.isNotEmpty
-          ? patientName.split(' ').first
-          : 'Self';
-    }
-    final m = members
-        .cast<FamilyMember?>()
-        .firstWhere((m) => m?.memberId == selected,
-            orElse: () => null);
+    if (selected == _filterAll)  return 'All';
+    if (selected == _filterSelf) return patientName.isNotEmpty ? patientName.split(' ').first : 'Self';
+    final m = members.cast<FamilyMember?>()
+        .firstWhere((m) => m?.memberId == selected, orElse: () => null);
     return m?.memberName?.split(' ').first ?? 'Member';
   }
 
   Widget _triggerAvatar() {
     if (selected == _filterAll) {
       return Container(
-        width: 22,
-        height: 22,
+        width: 22, height: 22,
         decoration: BoxDecoration(
-          color: kBg,
-          shape: BoxShape.circle,
-          border: Border.all(color: kBorder),
-        ),
-        child: const Icon(Icons.people_rounded,
-            color: kTextMid, size: 12),
+            color: kPrimaryLight, shape: BoxShape.circle,
+            border: Border.all(color: kPrimary.withOpacity(0.3))),
+        child: const Icon(Icons.people_rounded, color: kPrimary, size: 12),
       );
     }
     String name;
     Color color;
     if (selected == _filterSelf) {
-      name = patientName;
+      name  = patientName;
       color = kPrimary;
     } else {
-      final m = members
-          .cast<FamilyMember?>()
-          .firstWhere((m) => m?.memberId == selected,
-              orElse: () => null);
-      name = m?.memberName ?? 'M';
-      final idx =
-          members.indexWhere((m) => m.memberId == selected);
+      final m   = members.cast<FamilyMember?>()
+          .firstWhere((m) => m?.memberId == selected, orElse: () => null);
+      name  = m?.memberName ?? 'M';
+      final idx = members.indexWhere((m) => m.memberId == selected);
       color = _avatarColor(idx + 1);
     }
     return Container(
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-      ),
+      width: 22, height: 22,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       alignment: Alignment.center,
-      child: Text(
-        _initials(name),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 8,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      child: Text(_initials(name),
+          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700)),
     );
   }
 
   void _show(BuildContext context) async {
-    final RenderBox button =
-        context.findRenderObject() as RenderBox;
-    final RenderBox overlay = Navigator.of(context)
-        .overlay!
-        .context
-        .findRenderObject() as RenderBox;
-    final RelativeRect position = RelativeRect.fromRect(
+    final button  = context.findRenderObject() as RenderBox;
+    final overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+    final position = RelativeRect.fromRect(
       Rect.fromPoints(
-        button.localToGlobal(
-            button.size.bottomLeft(Offset.zero),
-            ancestor: overlay),
-        button.localToGlobal(
-            button.size.bottomRight(Offset.zero),
-            ancestor: overlay),
+        button.localToGlobal(button.size.bottomLeft(Offset.zero), ancestor: overlay),
+        button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
       ),
       Offset.zero & overlay.size,
     );
 
-    // Build menu items
     final items = <PopupMenuEntry<int>>[
-      // ── Section: All ─────────────────────────────────────────
       _MemberPopupItem(
-        value: _filterAll,
-        selected: selected == _filterAll,
+        value: _filterAll, selected: selected == _filterAll,
         avatarWidget: Container(
-          width: 28,
-          height: 28,
+          width: 28, height: 28,
           decoration: BoxDecoration(
-            color: kBg,
-            shape: BoxShape.circle,
-            border: Border.all(color: kBorder),
-          ),
-          child: const Icon(Icons.people_rounded,
-              color: kTextMid, size: 14),
+              color: kPrimaryLight, shape: BoxShape.circle),
+          child: const Icon(Icons.people_rounded, color: kPrimary, size: 14),
         ),
-        name: 'All members',
-        subtitle: null,
+        name: 'All members', subtitle: null,
       ),
       const PopupMenuDivider(height: 1),
-      // ── Section header ────────────────────────────────────────
       const _SectionHeader('SELF'),
       _MemberPopupItem(
-        value: _filterSelf,
-        selected: selected == _filterSelf,
-        avatarWidget: _AvatarCircle(
-            name: patientName, color: kPrimary, size: 28),
+        value: _filterSelf, selected: selected == _filterSelf,
+        avatarWidget: _AvatarCircle(name: patientName, color: kPrimary, size: 28),
         name: patientName.isNotEmpty ? patientName : 'Self',
         subtitle: 'Self',
       ),
       if (members.isNotEmpty) ...[
         const PopupMenuDivider(height: 1),
-        const _SectionHeader('FAMILY MEMBERS'),
-        ...members
-            .where((m) => (m.memberId ?? 0) > 0)
-            .toList()
-            .asMap()
-            .entries
-            .map((e) => _MemberPopupItem(
-                  value: e.value.memberId!,
-                  selected: selected == e.value.memberId,
-                  avatarWidget: _AvatarCircle(
-                    name: e.value.memberName ?? 'M',
-                    color: _avatarColor(e.key + 1),
-                    size: 28,
-                  ),
-                  name: e.value.memberName ?? 'Member',
-                  subtitle: e.value.relationName,
-                )),
+        const _SectionHeader('FAMILY'),
+        ...members.where((m) => (m.memberId ?? 0) > 0).toList()
+            .asMap().entries.map((e) => _MemberPopupItem(
+              value: e.value.memberId!,
+              selected: selected == e.value.memberId,
+              avatarWidget: _AvatarCircle(
+                  name: e.value.memberName ?? 'M',
+                  color: _avatarColor(e.key + 1), size: 28),
+              name: e.value.memberName ?? 'Member',
+              subtitle: e.value.relationName,
+            )),
       ],
     ];
 
     final result = await showMenu<int>(
-      context: context,
-      position: position,
-      items: items,
+      context: context, position: position, items: items,
       color: Colors.white,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: kBorder, width: 0.8),
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: kBorder),
       ),
       elevation: 8,
       constraints: const BoxConstraints(minWidth: 200, maxWidth: 240),
     );
-
     if (result != null) onChanged(result);
   }
 
@@ -978,10 +764,9 @@ class _MemberDropdown extends StatelessWidget {
     return GestureDetector(
       onTap: () => _show(context),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: kBg,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: kBorder),
         ),
@@ -991,24 +776,14 @@ class _MemberDropdown extends StatelessWidget {
             _triggerAvatar(),
             const SizedBox(width: 6),
             ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 80),
-              child: Text(
-                _triggerLabel,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: kTextDark,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
+              constraints: const BoxConstraints(maxWidth: 72),
+              child: Text(_triggerLabel,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+                  overflow: TextOverflow.ellipsis, maxLines: 1),
             ),
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.keyboard_arrow_down_rounded,
-              color: kTextDark,
-              size: 18,
-            ),
+            const SizedBox(width: 3),
+            const Icon(Icons.keyboard_arrow_down_rounded, color: kTextPrimary, size: 17),
           ],
         ),
       ),
@@ -1016,39 +791,25 @@ class _MemberDropdown extends StatelessWidget {
   }
 }
 
-// ── Section header popup entry ────────────────────────────────────
 class _SectionHeader extends PopupMenuEntry<int> {
   final String label;
   const _SectionHeader(this.label);
-
-  @override
-  double get height => 32;
-
-  @override
-  bool represents(int? value) => false;
-
-  @override
-  State<_SectionHeader> createState() => _SectionHeaderState();
+  @override double get height => 28;
+  @override bool represents(int? value) => false;
+  @override State<_SectionHeader> createState() => _SectionHeaderState();
 }
 
 class _SectionHeaderState extends State<_SectionHeader> {
   @override
   Widget build(BuildContext context) => Padding(
-        padding:
-            const EdgeInsets.fromLTRB(14, 10, 14, 4),
-        child: Text(
-          widget.label,
-          style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: kTextMid,
-            letterSpacing: 0.6,
-          ),
-        ),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 3),
+        child: Text(widget.label,
+            style: const TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w700,
+                color: kTextMuted, letterSpacing: 0.6)),
       );
 }
 
-// ── Member popup item ─────────────────────────────────────────────
 class _MemberPopupItem extends PopupMenuEntry<int> {
   final int value;
   final bool selected;
@@ -1057,126 +818,81 @@ class _MemberPopupItem extends PopupMenuEntry<int> {
   final String? subtitle;
 
   const _MemberPopupItem({
-    required this.value,
-    required this.selected,
-    required this.avatarWidget,
-    required this.name,
-    required this.subtitle,
+    required this.value, required this.selected,
+    required this.avatarWidget, required this.name, required this.subtitle,
   });
 
-  @override
-  double get height => 54;
-
-  @override
-  bool represents(int? v) => v == value;
-
-  @override
-  State<_MemberPopupItem> createState() => _MemberPopupItemState();
+  @override double get height => 52;
+  @override bool represents(int? v) => v == value;
+  @override State<_MemberPopupItem> createState() => _MemberPopupItemState();
 }
 
 class _MemberPopupItemState extends State<_MemberPopupItem> {
   @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => Navigator.of(context).pop(widget.value),
-      child: Container(
-        color: widget.selected
-            ? kPrimaryBg
-            : Colors.transparent,
-        padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            widget.avatarWidget,
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    widget.name,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: widget.selected
-                          ? kPrimary
-                          : kTextDark,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (widget.subtitle != null) ...[
-                    const SizedBox(height: 1),
-                    Text(
-                      widget.subtitle!,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: kTextMid,
-                      ),
-                    ),
+  Widget build(BuildContext context) => InkWell(
+        onTap: () => Navigator.of(context).pop(widget.value),
+        child: Container(
+          color: widget.selected ? kPrimaryLight : Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              widget.avatarWidget,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(widget.name,
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600,
+                            color: widget.selected ? kPrimary : kTextPrimary),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    if (widget.subtitle != null) ...[
+                      const SizedBox(height: 1),
+                      Text(widget.subtitle!,
+                          style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-            if (widget.selected)
-              const Icon(Icons.check_rounded,
-                  color: kPrimary, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Avatar circle helper ──────────────────────────────────────────
-class _AvatarCircle extends StatelessWidget {
-  final String name;
-  final Color color;
-  final double size;
-
-  const _AvatarCircle({
-    required this.name,
-    required this.color,
-    required this.size,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: color,
-          shape: BoxShape.circle,
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          _initials(name),
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: size * 0.33,
-            fontWeight: FontWeight.w700,
+              if (widget.selected)
+                const Icon(Icons.check_rounded, color: kPrimary, size: 15),
+            ],
           ),
         ),
       );
 }
 
+class _AvatarCircle extends StatelessWidget {
+  final String name;
+  final Color color;
+  final double size;
+  const _AvatarCircle({required this.name, required this.color, required this.size});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size, height: size,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        alignment: Alignment.center,
+        child: Text(_initials(name),
+            style: TextStyle(
+                color: Colors.white, fontSize: size * 0.33, fontWeight: FontWeight.w700)),
+      );
+}
+
 // ════════════════════════════════════════════════════════════════════
-//  DATE FILTER BOTTOM SHEET
+//  DATE FILTER SHEET
 // ════════════════════════════════════════════════════════════════════
 class _DateFilterSheet extends StatefulWidget {
   final _DateFilter current;
-  final DateTime? customFrom;
-  final DateTime? customTo;
+  final DateTime? customFrom, customTo;
   final bool sortNewest;
   final void Function(_DateFilter, DateTime?, DateTime?, bool) onApply;
 
   const _DateFilterSheet({
-    required this.current,
-    required this.customFrom,
-    required this.customTo,
-    required this.sortNewest,
-    required this.onApply,
+    required this.current, required this.customFrom,
+    required this.customTo, required this.sortNewest, required this.onApply,
   });
 
   @override
@@ -1185,25 +901,20 @@ class _DateFilterSheet extends StatefulWidget {
 
 class _DateFilterSheetState extends State<_DateFilterSheet> {
   late _DateFilter _sel;
-  late DateTime? _from;
-  late DateTime? _to;
+  late DateTime? _from, _to;
   late bool _newest;
 
   @override
   void initState() {
     super.initState();
-    _sel = widget.current;
-    _from = widget.customFrom;
-    _to = widget.customTo;
+    _sel    = widget.current;
+    _from   = widget.customFrom;
+    _to     = widget.customTo;
     _newest = widget.sortNewest;
   }
 
   String _fmt(DateTime d) {
-    const m = [
-      '',
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec',
-    ];
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return '${d.day} ${m[d.month]} ${d.year}';
   }
 
@@ -1215,13 +926,11 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
       lastDate: DateTime.now().add(const Duration(days: 365)),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-            colorScheme:
-                const ColorScheme.light(primary: kPrimary)),
+            colorScheme: const ColorScheme.light(primary: kPrimary)),
         child: child!,
       ),
     );
-    if (picked != null)
-      setState(() => isFrom ? _from = picked : _to = picked);
+    if (picked != null) setState(() => isFrom ? _from = picked : _to = picked);
   }
 
   @override
@@ -1229,84 +938,58 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        MediaQuery.of(context).padding.bottom + 16,
-      ),
+          16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Handle
           Center(
             child: Container(
-              margin:
-                  const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 36, height: 4,
               decoration: BoxDecoration(
-                color: const Color(0xFFE0E0E0),
-                borderRadius: BorderRadius.circular(2),
-              ),
+                  color: kBorder, borderRadius: BorderRadius.circular(2)),
             ),
           ),
           Row(
             children: [
-              const Text(
-                'Filter by Date',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kTextDark,
-                ),
-              ),
+              const Text('Filter by Date',
+                  style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
               const Spacer(),
               TextButton(
                 onPressed: () => setState(() {
-                  _sel = _DateFilter.all;
-                  _from = null;
-                  _to = null;
-                  _newest = true;
+                  _sel = _DateFilter.all; _from = null; _to = null; _newest = true;
                 }),
-                child: const Text(
-                  'Reset',
-                  style: TextStyle(
-                      color: kRed,
-                      fontWeight: FontWeight.w600),
-                ),
+                child: const Text('Reset',
+                    style: TextStyle(color: kError, fontWeight: FontWeight.w600, fontSize: 13)),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Wrap(
-            spacing: 8,
-            runSpacing: 8,
+            spacing: 7, runSpacing: 7,
             children: _DateFilter.values
                 .where((f) => f != _DateFilter.custom)
                 .map((f) => _optionChip(f))
                 .toList(),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
+          // Custom range
           GestureDetector(
-            onTap: () =>
-                setState(() => _sel = _DateFilter.custom),
+            onTap: () => setState(() => _sel = _DateFilter.custom),
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: _sel == _DateFilter.custom
-                    ? kPrimaryBg
-                    : kBg,
-                borderRadius: BorderRadius.circular(12),
+                color: _sel == _DateFilter.custom ? kPrimaryLight : const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: _sel == _DateFilter.custom
-                      ? kPrimary
-                      : kBorder,
-                  width:
-                      _sel == _DateFilter.custom ? 1.5 : 1,
+                  color: _sel == _DateFilter.custom ? kPrimary : kBorder,
+                  width: _sel == _DateFilter.custom ? 1.5 : 1,
                 ),
               ),
               child: Column(
@@ -1314,47 +997,24 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
                 children: [
                   Row(
                     children: [
-                      Icon(
-                        Icons.tune_rounded,
-                        color: _sel == _DateFilter.custom
-                            ? kPrimary
-                            : kTextMid,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Custom Date Range',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: _sel == _DateFilter.custom
-                              ? kPrimary
-                              : kTextMid,
-                        ),
-                      ),
+                      Icon(Icons.tune_rounded,
+                          color: _sel == _DateFilter.custom ? kPrimary : kTextMuted, size: 15),
+                      const SizedBox(width: 7),
+                      Text('Custom Date Range',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600,
+                              color: _sel == _DateFilter.custom ? kPrimary : kTextMuted)),
                     ],
                   ),
                   if (_sel == _DateFilter.custom) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        Expanded(
-                          child: _datePicker(
-                            label: 'From',
-                            value: _from,
-                            onTap: () =>
-                                _pickDate(isFrom: true),
-                          ),
-                        ),
+                        Expanded(child: _datePicker(label: 'From', value: _from,
+                            onTap: () => _pickDate(isFrom: true))),
                         const SizedBox(width: 8),
-                        Expanded(
-                          child: _datePicker(
-                            label: 'To',
-                            value: _to,
-                            onTap: () =>
-                                _pickDate(isFrom: false),
-                          ),
-                        ),
+                        Expanded(child: _datePicker(label: 'To', value: _to,
+                            onTap: () => _pickDate(isFrom: false))),
                       ],
                     ),
                   ],
@@ -1362,40 +1022,26 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Sort Order',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: kTextDark,
-            ),
-          ),
+          const SizedBox(height: 14),
+          const Text('Sort Order',
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(
-                child: _sortBtn(
-                  label: 'Newest First',
-                  icon: Icons.arrow_downward_rounded,
-                  selected: _newest,
-                  onTap: () => setState(() => _newest = true),
-                ),
-              ),
+              Expanded(child: _sortBtn(
+                  label: 'Newest First', icon: Icons.arrow_downward_rounded,
+                  selected: _newest, onTap: () => setState(() => _newest = true))),
               const SizedBox(width: 8),
-              Expanded(
-                child: _sortBtn(
-                  label: 'Oldest First',
-                  icon: Icons.arrow_upward_rounded,
-                  selected: !_newest,
-                  onTap: () => setState(() => _newest = false),
-                ),
-              ),
+              Expanded(child: _sortBtn(
+                  label: 'Oldest First', icon: Icons.arrow_upward_rounded,
+                  selected: !_newest, onTap: () => setState(() => _newest = false))),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
+            height: 46,
             child: ElevatedButton(
               onPressed: () {
                 widget.onApply(_sel, _from, _to, _newest);
@@ -1404,18 +1050,11 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: kPrimary,
                 foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
-              child: const Text(
-                'Apply Filter',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700),
-              ),
+              child: const Text('Apply Filter',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             ),
           ),
         ],
@@ -1428,47 +1067,32 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
     return GestureDetector(
       onTap: () => setState(() => _sel = f),
       child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
         decoration: BoxDecoration(
-          color: sel ? kPrimary : kBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: sel ? kPrimary : kBorder,
-            width: sel ? 1.5 : 1,
-          ),
+          color: sel ? kPrimary : const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: sel ? kPrimary : kBorder, width: sel ? 1.5 : 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(f.icon,
-                color: sel ? Colors.white : kTextMid,
-                size: 13),
+            Icon(f.icon, color: sel ? Colors.white : kTextMuted, size: 12),
             const SizedBox(width: 5),
-            Text(
-              f.label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: sel ? Colors.white : kTextMid,
-              ),
-            ),
+            Text(f.label,
+                style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w600,
+                    color: sel ? Colors.white : kTextSecondary)),
           ],
         ),
       ),
     );
   }
 
-  Widget _datePicker({
-    required String label,
-    required DateTime? value,
-    required VoidCallback onTap,
-  }) =>
+  Widget _datePicker({required String label, required DateTime? value, required VoidCallback onTap}) =>
       GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
@@ -1476,28 +1100,18 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
           ),
           child: Row(
             children: [
-              const Icon(Icons.calendar_today_rounded,
-                  color: kPrimary, size: 14),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: const TextStyle(
-                            fontSize: 10, color: kTextMid)),
-                    Text(
-                      value != null ? _fmt(value) : 'Select',
+              const Icon(Icons.calendar_today_rounded, color: kPrimary, size: 13),
+              const SizedBox(width: 7),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: const TextStyle(fontSize: 10, color: kTextMuted)),
+                  Text(value != null ? _fmt(value) : 'Select',
                       style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: value != null
-                            ? kTextDark
-                            : kTextMid,
-                      ),
-                    ),
-                  ],
-                ),
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: value != null ? kTextPrimary : kTextMuted)),
+                ],
               ),
             ],
           ),
@@ -1505,38 +1119,27 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
       );
 
   Widget _sortBtn({
-    required String label,
-    required IconData icon,
-    required bool selected,
-    required VoidCallback onTap,
+    required String label, required IconData icon,
+    required bool selected, required VoidCallback onTap,
   }) =>
       GestureDetector(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: selected ? kPrimary : kBg,
+            color: selected ? kPrimary : const Color(0xFFF7F8FA),
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-                color: selected ? kPrimary : kBorder),
+            border: Border.all(color: selected ? kPrimary : kBorder),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon,
-                  color:
-                      selected ? Colors.white : kTextMid,
-                  size: 15),
+              Icon(icon, color: selected ? Colors.white : kTextMuted, size: 14),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? Colors.white : kTextMid,
-                ),
-              ),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: selected ? Colors.white : kTextSecondary)),
             ],
           ),
         ),
@@ -1544,126 +1147,104 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  COMPACT PRESCRIPTION CARD
+//  PRESCRIPTION CARD
 // ════════════════════════════════════════════════════════════════════
-class _PrescriptionCompactCard extends StatelessWidget {
+class _PrescriptionCard extends StatelessWidget {
   final PatientPrescription prescription;
   final String Function(DateTime) fmtDate;
   final VoidCallback onTap;
 
-  const _PrescriptionCompactCard({
-    required this.prescription,
-    required this.fmtDate,
-    required this.onTap,
+  const _PrescriptionCard({
+    required this.prescription, required this.fmtDate, required this.onTap,
   });
 
-  Color get _statusColor => switch (prescription.status) {
-        'active' => kGreen,
-        'completed' => kPrimary,
-        _ => kTextMid,
-      };
+  Color get _statusFg => switch (prescription.status) {
+    'active'    => kSuccess,
+    'completed' => kPrimary,
+    _           => kTextMuted,
+  };
+  Color get _statusBg => switch (prescription.status) {
+    'active'    => kGreenLight,
+    'completed' => kPrimaryLight,
+    _           => const Color(0xFFF7F8FA),
+  };
   String get _statusLabel => switch (prescription.status) {
-        'active' => 'Active',
-        'completed' => 'Completed',
-        _ => 'Expired',
-      };
+    'active'    => 'Active',
+    'completed' => 'Completed',
+    _           => 'Expired',
+  };
   IconData get _statusIcon => switch (prescription.status) {
-        'active' => Icons.check_circle_rounded,
-        'completed' => Icons.task_alt_rounded,
-        _ => Icons.cancel_outlined,
-      };
+    'active'    => Icons.check_circle_rounded,
+    'completed' => Icons.task_alt_rounded,
+    _           => Icons.cancel_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: kCardBg,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0D000000),
-            blurRadius: 10,
-            offset: Offset(0, 3),
-          ),
-        ],
         border: Border.all(
           color: prescription.status == 'active'
-              ? kGreen.withOpacity(0.25)
+              ? kSuccess.withOpacity(0.3)
               : kBorder,
-          width: 1.1,
         ),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
+        ],
       ),
       child: Column(
         children: [
-          // ── Top strip ────────────────────────────────────────
+          // ── Top strip ──────────────────────────────────────
           Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: prescription.status == 'active'
-                  ? kGreen.withOpacity(0.04)
-                  : kBg,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(13),
-              ),
+                  ? kGreenLight.withOpacity(0.4)
+                  : const Color(0xFFF7F8FA),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
             ),
             child: Row(
               children: [
+                // Rx badge
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: kPrimaryBg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
+                      color: kPrimaryLight, borderRadius: BorderRadius.circular(6)),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.receipt_rounded,
-                          color: kPrimary, size: 11),
+                      const Icon(Icons.receipt_rounded, color: kPrimary, size: 10),
                       const SizedBox(width: 4),
-                      Text(
-                        'Rx #${prescription.prescriptionId}',
-                        style: const TextStyle(
-                          color: kPrimary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+                      Text('Rx #${prescription.prescriptionId}',
+                          style: const TextStyle(
+                              color: kPrimary, fontSize: 11, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
-                const SizedBox(width: 6),
-                const Icon(Icons.calendar_today_rounded,
-                    color: kTextMid, size: 11),
+                const SizedBox(width: 8),
+                const Icon(Icons.calendar_today_rounded, color: kTextMuted, size: 10),
                 const SizedBox(width: 3),
-                Text(
-                  fmtDate(prescription.prescriptionDate),
-                  style: const TextStyle(
-                      fontSize: 11, color: kTextMid),
-                ),
+                Text(fmtDate(prescription.prescriptionDate),
+                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
                 const Spacer(),
+                // Status badge
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 7, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: _statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      color: _statusBg, borderRadius: BorderRadius.circular(6)),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_statusIcon,
-                          color: _statusColor, size: 10),
+                      Icon(_statusIcon, color: _statusFg, size: 10),
                       const SizedBox(width: 3),
-                      Text(
-                        _statusLabel,
-                        style: TextStyle(
-                          color: _statusColor,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      Text(_statusLabel,
+                          style: TextStyle(
+                              color: _statusFg, fontSize: 10, fontWeight: FontWeight.w700)),
                     ],
                   ),
                 ),
@@ -1671,10 +1252,9 @@ class _PrescriptionCompactCard extends StatelessWidget {
             ),
           ),
 
-          // ── Body ─────────────────────────────────────────────
+          // ── Body ───────────────────────────────────────────
           Padding(
-            padding:
-                const EdgeInsets.fromLTRB(12, 10, 12, 0),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1682,194 +1262,114 @@ class _PrescriptionCompactCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      width: 28,
-                      height: 28,
+                      width: 30, height: 30,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [
-                            Color(0xFF1558C0),
-                            kPrimary
-                          ],
+                          colors: [kPrimaryDark, kPrimary],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
-                        borderRadius:
-                            BorderRadius.circular(7),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon(
-                          Icons.person_rounded,
-                          color: Colors.white,
-                          size: 15),
+                      child: const Icon(Icons.person_rounded, color: Colors.white, size: 15),
                     ),
-                    const SizedBox(width: 7),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            prescription.doctorName,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: kTextDark,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            prescription.specialization,
-                            style: const TextStyle(
-                                fontSize: 10,
-                                color: kTextMid),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          Text(prescription.doctorName,
+                              style: const TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(prescription.specialization,
+                              style: const TextStyle(fontSize: 10, color: kTextMuted),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                       ),
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 8),
 
                 // Patient row
                 Row(
                   children: [
                     Container(
-                      width: 22,
-                      height: 22,
-                      decoration: const BoxDecoration(
-                        color: kPrimary,
-                        shape: BoxShape.circle,
-                      ),
+                      width: 22, height: 22,
+                      decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
                       alignment: Alignment.center,
                       child: Text(
-                        prescription.patientName
-                            .split(' ')
-                            .where((w) => w.isNotEmpty)
-                            .take(1)
-                            .map((w) => w[0].toUpperCase())
-                            .join(),
+                        prescription.patientName.split(' ')
+                            .where((w) => w.isNotEmpty).take(1)
+                            .map((w) => w[0].toUpperCase()).join(),
                         style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                        ),
+                            color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
                       ),
                     ),
-                    const SizedBox(width: 5),
+                    const SizedBox(width: 6),
                     Flexible(
-                      child: Text(
-                        prescription.patientName,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kTextDark,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      child: Text(prescription.patientName,
+                          style: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.w600, color: kTextPrimary),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
                     ),
-                    if (prescription.patientAge != null &&
-                        prescription.patientAge! > 0) ...[
+                    if (prescription.patientAge != null && prescription.patientAge! > 0) ...[
                       const SizedBox(width: 5),
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
-                          color: kBg,
-                          borderRadius:
-                              BorderRadius.circular(4),
-                          border:
-                              Border.all(color: kBorder),
+                          color: kPrimaryLight,
+                          borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(
-                          '${prescription.patientAge} yrs',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: kTextMid,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: Text('${prescription.patientAge} yrs',
+                            style: const TextStyle(
+                                fontSize: 9, color: kPrimary, fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ],
                 ),
-
                 const SizedBox(height: 8),
               ],
             ),
           ),
 
-          // ── Bottom row ────────────────────────────────────────
+          // ── Bottom strip ───────────────────────────────────
           Container(
             decoration: const BoxDecoration(
-              border: Border(
-                  top: BorderSide(
-                      color: kBorder, width: 0.8)),
-            ),
-            padding: const EdgeInsets.symmetric(
-                horizontal: 12, vertical: 7),
+                border: Border(top: BorderSide(color: kBorder))),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             child: Row(
               children: [
                 _miniChip(
-                  icon: Icons.medication_rounded,
-                  label:
-                      '${prescription.medicines.length} Med',
-                  color: kPurple,
-                ),
-                if (prescription.followUpDate !=
-                    null) ...[
+                    icon: Icons.medication_rounded,
+                    label: '${prescription.medicines.length} Med',
+                    fg: kPurple, bg: kPurpleLight),
+                if (prescription.followUpDate != null) ...[
                   const SizedBox(width: 6),
                   _miniChip(
-                    icon: Icons.event_rounded,
-                    label:
-                        '${fmtDate(prescription.followUpDate!)}. Follow-up',
-                    color: kOrange,
-                  ),
+                      icon: Icons.event_rounded,
+                      label: '${fmtDate(prescription.followUpDate!)} · Follow-up',
+                      fg: kWarning, bg: kAmberLight),
                 ],
                 const Spacer(),
                 GestureDetector(
                   onTap: onTap,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 11, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color(0xFF1558C0),
-                          kPrimary
-                        ],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius:
-                          BorderRadius.circular(8),
-                    ),
+                        color: kPrimary, borderRadius: BorderRadius.circular(8)),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
-                            Icons.visibility_rounded,
-                            color: Colors.white,
-                            size: 12),
-                        SizedBox(width: 5),
-                        Text(
-                          'View Prescription',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
+                        Icon(Icons.visibility_rounded, color: Colors.white, size: 12),
                         SizedBox(width: 4),
-                        Icon(
-                            Icons
-                                .arrow_forward_ios_rounded,
-                            color: Colors.white,
-                            size: 10),
+                        Text('View',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 11,
+                                fontWeight: FontWeight.w700)),
+                        SizedBox(width: 3),
+                        Icon(Icons.arrow_forward_ios_rounded, color: Colors.white, size: 9),
                       ],
                     ),
                   ),
@@ -1883,30 +1383,20 @@ class _PrescriptionCompactCard extends StatelessWidget {
   }
 
   Widget _miniChip({
-    required IconData icon,
-    required String label,
-    required Color color,
+    required IconData icon, required String label,
+    required Color fg, required Color bg,
   }) =>
       Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 7, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.09),
-          borderRadius: BorderRadius.circular(6),
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 10),
+            Icon(icon, color: fg, size: 10),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: color,
-              ),
-            ),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
           ],
         ),
       );
@@ -1937,90 +1427,53 @@ class _PatientPrescriptionViewScreenState
   late PatientPrescription _rx;
 
   String _fmtDate(DateTime d) {
-    const m = [
-      '',
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec',
-    ];
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return '${d.day} ${m[d.month]} ${d.year}';
   }
 
   String _fmtDateTime(DateTime d) {
-    const months = [
-      '',
-      'January','February','March','April','May','June',
-      'July','August','September','October','November','December',
-    ];
-    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
-    final min = d.minute.toString().padLeft(2, '0');
+    const months = ['','January','February','March','April','May','June',
+        'July','August','September','October','November','December'];
+    final h    = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final min  = d.minute.toString().padLeft(2, '0');
     final ampm = d.hour < 12 ? 'AM' : 'PM';
     return '${d.day} ${months[d.month]} ${d.year}  ·  $h:$min $ampm';
   }
 
   static const _typeColor = {
-    1: Color(0xFF2B7FFF),
-    2: Color(0xFF8B5CF6),
-    3: Color(0xFFEF4444),
-    4: Color(0xFF06B6D4),
-    5: Color(0xFF10B981),
-    6: Color(0xFFF59E0B),
+    1: kInfo, 2: kPurple, 3: kError,
+    4: kPrimary, 5: kSuccess, 6: kWarning,
   };
   static const _typeLabel = {
-    1: 'Tablet',
-    2: 'Syrup',
-    3: 'Injection',
-    4: 'Drops',
-    5: 'Lotion',
-    6: 'Spray',
+    1: 'Tablet', 2: 'Syrup', 3: 'Injection',
+    4: 'Drops',  5: 'Lotion', 6: 'Spray',
   };
   static const _typeIcon = {
-    1: Icons.medication_rounded,
-    2: Icons.local_drink_rounded,
-    3: Icons.vaccines_rounded,
-    4: Icons.water_drop_rounded,
-    5: Icons.soap_rounded,
-    6: Icons.air_rounded,
+    1: Icons.medication_rounded,   2: Icons.local_drink_rounded,
+    3: Icons.vaccines_rounded,     4: Icons.water_drop_rounded,
+    5: Icons.soap_rounded,         6: Icons.air_rounded,
   };
-
-  void _snack(String msg, Color c) =>
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg),
-          backgroundColor: c,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
 
   @override
   void initState() {
     super.initState();
     _rx = widget.fallback;
-    Future.microtask(() {
-      ref
-          .read(prescriptionViewModelProvider.notifier)
-          .patientPrescriptionDetails(widget.prescriptionId);
-    });
+    Future.microtask(() => ref.read(prescriptionViewModelProvider.notifier)
+        .patientPrescriptionDetails(widget.prescriptionId));
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(prescriptionViewModelProvider);
+    final state   = ref.watch(prescriptionViewModelProvider);
     final details = state.prescriptionDetailsPatient;
     if (details != null && details.isNotEmpty) {
-      _rx = PatientPrescription.fromFlatList(
-        details,
-        fallbackPatientId:
-            ref.read(patientLoginViewModelProvider).patientId ?? 0,
-        fallbackPatientName:
-            ref.read(patientLoginViewModelProvider).name ?? 'Patient',
-      );
+      _rx = PatientPrescription.fromFlatList(details,
+          fallbackPatientId:   ref.read(patientLoginViewModelProvider).patientId ?? 0,
+          fallbackPatientName: ref.read(patientLoginViewModelProvider).name ?? 'Patient');
     }
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           Column(
@@ -2032,30 +1485,19 @@ class _PatientPrescriptionViewScreenState
                   children: [
                     _buildClinicCard(),
                     Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
                       child: Column(
                         children: [
                           _buildPatientRow(),
-                          _vg(10),
                           if (_rx.diagnosis?.isNotEmpty == true) ...[
-                            _buildDiagnosisCard(),
-                            _vg(10),
-                          ],
+                            _vg(10), _buildDiagnosisCard()],
                           if (_rx.symptoms?.isNotEmpty == true) ...[
-                            _buildSymptomsCard(),
-                            _vg(10),
-                          ],
-                          _buildMedicinesCard(),
-                          _vg(10),
-                          _buildNotesRow(),
-                          _vg(10),
+                            _vg(10), _buildSymptomsCard()],
+                          _vg(10), _buildMedicinesCard(),
+                          _vg(10), _buildNotesRow(),
                           if (_rx.followUpDate != null) ...[
-                            _buildFollowUpCard(),
-                            _vg(10),
-                          ],
-                          _buildFooter(),
-                          _vg(10),
+                            _vg(10), _buildFollowUpCard()],
+                          _vg(10), _buildFooter(), _vg(10),
                         ],
                       ),
                     ),
@@ -2067,11 +1509,9 @@ class _PatientPrescriptionViewScreenState
           ),
           if (state.isLoading)
             Container(
-              color: Colors.black.withOpacity(0.2),
+              color: Colors.black.withOpacity(0.15),
               child: const Center(
-                child:
-                    CircularProgressIndicator(color: kPrimary),
-              ),
+                  child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
             ),
         ],
       ),
@@ -2079,31 +1519,29 @@ class _PatientPrescriptionViewScreenState
   }
 
   Widget _buildHeader() => Container(
-        color: kCardBg,
+        color: Colors.white,
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding:
-                const EdgeInsets.fromLTRB(4, 6, 14, 10),
+            padding: const EdgeInsets.fromLTRB(6, 8, 14, 10),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: kTextDark,
-                      size: 18),
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const SizedBox(width: 2),
-                const Text(
-                  'Prescription Details',
-                  style: TextStyle(
-                    color: kTextDark,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.2,
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 36, height: 36,
+                    margin: const EdgeInsets.only(left: 6),
+                    decoration: BoxDecoration(
+                        color: kPrimaryLight, borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded,
+                        size: 15, color: kPrimary),
                   ),
                 ),
+                const SizedBox(width: 10),
+                const Text('Prescription Details',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700,
+                        color: kTextPrimary, letterSpacing: -0.2)),
               ],
             ),
           ),
@@ -2111,133 +1549,90 @@ class _PatientPrescriptionViewScreenState
       );
 
   Widget _buildClinicCard() => Container(
-        margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+        margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
         decoration: BoxDecoration(
-          color: kCardBg,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-                color: Color(0x0D000000),
-                blurRadius: 10,
-                offset: Offset(0, 3)),
-          ],
-          border: Border.all(color: kBorder, width: 1),
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 12, offset: const Offset(0, 4))],
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
           children: [
+            // Clinic header — teal gradient
             Container(
               width: double.infinity,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF1558C0), kPrimary],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
+                    colors: [kPrimaryDark, kPrimary],
+                    begin: Alignment.topLeft, end: Alignment.bottomRight),
               ),
-              padding:
-                  const EdgeInsets.fromLTRB(14, 14, 14, 12),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 36, height: 36,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.22),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                        Icons.local_hospital_rounded,
-                        color: Colors.white,
-                        size: 20),
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.local_hospital_rounded,
+                        color: Colors.white, size: 18),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _rx.clinicName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          '${_rx.clinicAddress}  ·  Ph: ${_rx.clinicContact}',
-                          style: TextStyle(
-                              color:
-                                  Colors.white.withOpacity(0.82),
-                              fontSize: 11),
-                        ),
+                        Text(_rx.clinicName,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 2),
+                        Text('${_rx.clinicAddress}  ·  Ph: ${_rx.clinicContact}',
+                            style: TextStyle(
+                                color: Colors.white.withOpacity(0.82), fontSize: 11)),
                       ],
                     ),
                   ),
                 ],
               ),
             ),
+            // Doctor sub-strip
             Container(
               width: double.infinity,
-              color: const Color(0xFF3D8EF0),
-              padding:
-                  const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              color: kPrimaryDark,
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
               child: Row(
                 children: [
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          _rx.doctorName,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                        Text(_rx.doctorName,
+                            style: const TextStyle(
+                                color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
                         const SizedBox(height: 2),
-                        Text(
-                          '${_rx.qualification}  ·  ${_rx.specialization}',
-                          style: TextStyle(
-                              color:
-                                  Colors.white.withOpacity(0.78),
-                              fontSize: 11),
-                        ),
-                        if (_rx.regNo?.isNotEmpty == true)
-                          Text(
-                            'Reg. No. ${_rx.regNo}',
+                        Text('${_rx.qualification}  ·  ${_rx.specialization}',
                             style: TextStyle(
-                                color: Colors.white
-                                    .withOpacity(0.65),
-                                fontSize: 10),
-                          ),
+                                color: Colors.white.withOpacity(0.78), fontSize: 11)),
+                        if (_rx.regNo?.isNotEmpty == true)
+                          Text('Reg. ${_rx.regNo}',
+                              style: TextStyle(
+                                  color: Colors.white.withOpacity(0.65), fontSize: 10)),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                          color:
-                              Colors.white.withOpacity(0.35)),
+                      border: Border.all(color: Colors.white.withOpacity(0.35)),
                     ),
-                    child: Text(
-                      'Rx #${_rx.prescriptionId}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
+                    child: Text('Rx #${_rx.prescriptionId}',
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
@@ -2247,26 +1642,17 @@ class _PatientPrescriptionViewScreenState
       );
 
   Widget _buildPatientRow() => _card(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
-              decoration: const BoxDecoration(
-                  color: kPrimary, shape: BoxShape.circle),
+              width: 44, height: 44,
+              decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
               alignment: Alignment.center,
               child: Text(
-                _rx.patientName
-                    .split(' ')
-                    .map((w) => w.isNotEmpty ? w[0] : '')
-                    .take(2)
-                    .join(),
+                _rx.patientName.split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join(),
                 style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800),
+                    color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700),
               ),
             ),
             const SizedBox(width: 12),
@@ -2274,22 +1660,16 @@ class _PatientPrescriptionViewScreenState
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    _rx.patientName,
-                    style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: kTextDark),
-                  ),
+                  Text(_rx.patientName,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
                   const SizedBox(height: 4),
                   Wrap(
-                    spacing: 6,
+                    spacing: 5,
                     children: [
-                      if (_rx.patientAge != null &&
-                          _rx.patientAge! > 0)
+                      if (_rx.patientAge != null && _rx.patientAge! > 0)
                         _chip('${_rx.patientAge} yrs'),
-                      if (_rx.patientGender?.isNotEmpty ==
-                          true)
+                      if (_rx.patientGender?.isNotEmpty == true)
                         _chip(_rx.patientGender!),
                       if (_rx.tokenNumber != null)
                         _chip('Token #${_rx.tokenNumber}'),
@@ -2301,17 +1681,11 @@ class _PatientPrescriptionViewScreenState
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text('Date',
-                    style: TextStyle(
-                        fontSize: 10, color: kTextMid)),
+                const Text('Date', style: TextStyle(fontSize: 10, color: kTextMuted)),
                 const SizedBox(height: 2),
-                Text(
-                  _fmtDate(_rx.prescriptionDate),
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: kTextDark),
-                ),
+                Text(_fmtDate(_rx.prescriptionDate),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
               ],
             ),
           ],
@@ -2322,24 +1696,18 @@ class _PatientPrescriptionViewScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionLabel('SYMPTOMS'),
+            _sectionLabel('SYMPTOMS', kWarning),
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E7),
+                color: kAmberLight.withOpacity(0.5),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: const Color(0xFFFDE68A)),
+                border: Border.all(color: kAmberLight),
               ),
-              child: Text(
-                _rx.symptoms!,
-                style: const TextStyle(
-                    fontSize: 13,
-                    color: kTextDark,
-                    height: 1.45),
-              ),
+              child: Text(_rx.symptoms!,
+                  style: const TextStyle(fontSize: 13, color: kTextPrimary, height: 1.45)),
             ),
           ],
         ),
@@ -2349,41 +1717,30 @@ class _PatientPrescriptionViewScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionLabel('DIAGNOSIS'),
+            _sectionLabel('DIAGNOSIS', kPrimary),
             const SizedBox(height: 10),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                  color: kPrimaryBg,
-                  borderRadius: BorderRadius.circular(10)),
+                  color: kPrimaryLight, borderRadius: BorderRadius.circular(10)),
               child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    margin: const EdgeInsets.only(top: 2),
                     padding: const EdgeInsets.all(5),
+                    margin: const EdgeInsets.only(top: 1),
                     decoration: BoxDecoration(
-                      color: kPrimary.withOpacity(0.12),
-                      borderRadius:
-                          BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                        Icons.biotech_rounded,
-                        color: kPrimary,
-                        size: 14),
+                        color: kPrimary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(6)),
+                    child: const Icon(Icons.biotech_rounded, color: kPrimary, size: 13),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      _rx.diagnosis!,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          color: kTextDark,
-                          fontWeight: FontWeight.w500,
-                          height: 1.45),
-                    ),
+                    child: Text(_rx.diagnosis!,
+                        style: const TextStyle(
+                            fontSize: 13, color: kTextPrimary,
+                            fontWeight: FontWeight.w500, height: 1.45)),
                   ),
                 ],
               ),
@@ -2398,271 +1755,143 @@ class _PatientPrescriptionViewScreenState
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(14, 14, 14, 10),
-              child: _sectionLabel('MEDICINES'),
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
+              child: _sectionLabel('MEDICINES', kPrimary),
             ),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final w = constraints.maxWidth - 24;
-                final c1 = w * 0.28;
-                final c2 = w * 0.30;
-                final c3 = w * 0.24;
-                final c4 = w * 0.18;
-                return Column(
-                  children: [
-                    Container(
-                      color: kBg,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 7),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                              width: c1,
-                              child:
-                                  const _ColHead('MEDICINE')),
-                          SizedBox(
-                            width: c2,
-                            child: const Text(
-                              'FREQ/DOSE',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: kTextMid,
-                                letterSpacing: 0.3,
-                              ),
-                              maxLines: 1,
-                              overflow:
-                                  TextOverflow.ellipsis,
-                            ),
-                          ),
-                          SizedBox(
-                            width: c3,
-                            child: const Text(
-                              'TIMING',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: kTextMid,
-                                letterSpacing: 0.3,
-                              ),
-                              maxLines: 1,
-                              overflow:
-                                  TextOverflow.ellipsis,
-                            ),
-                          ),
-                          SizedBox(
-                            width: c4,
-                            child: const Text(
-                              'DURATION',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: kTextMid,
-                                letterSpacing: 0.3,
-                              ),
-                              maxLines: 1,
-                              overflow:
-                                  TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
+            LayoutBuilder(builder: (context, constraints) {
+              final w  = constraints.maxWidth - 24;
+              final c1 = w * 0.28, c2 = w * 0.30, c3 = w * 0.24, c4 = w * 0.18;
+              return Column(
+                children: [
+                  Container(
+                    color: const Color(0xFFF7F8FA),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    child: Row(
+                      children: [
+                        SizedBox(width: c1, child: const _ColHead('MEDICINE')),
+                        SizedBox(width: c2, child: const _ColHead2('FREQ/DOSE')),
+                        SizedBox(width: c3, child: const _ColHead2('TIMING')),
+                        SizedBox(width: c4, child: const _ColHead2('DURATION')),
+                      ],
                     ),
-                    const Divider(
-                        height: 1, color: kBorder),
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics:
-                          const NeverScrollableScrollPhysics(),
-                      itemCount: _rx.medicines.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(
-                              height: 1,
-                              color: kBorder,
-                              indent: 12),
-                      itemBuilder: (_, i) {
-                        final m = _rx.medicines[i];
-                        final c = _typeColor[
-                                m.medicineTypeId] ??
-                            kTextMid;
-                        final lbl = _typeLabel[
-                                m.medicineTypeId] ??
-                            m.mediTypeName ??
-                            'Unknown';
-                        final ic = _typeIcon[
-                                m.medicineTypeId] ??
-                            Icons.medication_rounded;
-                        return _MedRow(
-                          med: m,
-                          color: c,
-                          typeLabel: lbl,
-                          typeIcon: ic,
-                          c1: c1,
-                          c2: c2,
-                          c3: c3,
-                          c4: c4,
-                        );
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
+                  ),
+                  const Divider(height: 1, color: kBorder),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _rx.medicines.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: kBorder, indent: 12),
+                    itemBuilder: (_, i) {
+                      final m   = _rx.medicines[i];
+                      final c   = _typeColor[m.medicineTypeId] ?? kTextMuted;
+                      final lbl = _typeLabel[m.medicineTypeId] ?? m.mediTypeName ?? 'Med';
+                      final ic  = _typeIcon[m.medicineTypeId] ?? Icons.medication_rounded;
+                      return _MedRow(
+                          med: m, color: c, typeLabel: lbl, typeIcon: ic,
+                          c1: c1, c2: c2, c3: c3, c4: c4);
+                    },
+                  ),
+                ],
+              );
+            }),
           ],
         ),
       );
 
   Widget _buildNotesRow() {
     final hasClinical = _rx.clinicalNotes?.isNotEmpty == true;
-    final hasAdvice = _rx.advice?.isNotEmpty == true;
+    final hasAdvice   = _rx.advice?.isNotEmpty == true;
     if (!hasClinical && !hasAdvice) return const SizedBox.shrink();
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (hasClinical)
-          Expanded(
-            child: _noteBox(
-              color: const Color(0xFFF0F4FF),
-              borderColor: const Color(0xFFBFD0FF),
-              iconColor: kPrimary,
-              icon: Icons.notes_rounded,
-              title: 'CLINICAL INSTRUCTIONS',
-              text: _rx.clinicalNotes!,
-            ),
-          ),
-        if (hasClinical && hasAdvice)
-          const SizedBox(width: 10),
-        if (hasAdvice)
-          Expanded(
-            child: _noteBox(
-              color: const Color(0xFFF0FFF4),
-              borderColor: const Color(0xFFA7F3D0),
-              iconColor: kGreen,
-              icon: Icons.medical_information_rounded,
-              title: "DOCTOR'S ADVICE",
-              text: _rx.advice!,
-            ),
-          ),
+        if (hasClinical) Expanded(child: _noteBox(
+          color: kInfoLight.withOpacity(0.3), borderColor: kInfoLight,
+          iconColor: kInfo, icon: Icons.notes_rounded,
+          title: 'CLINICAL INSTRUCTIONS', text: _rx.clinicalNotes!)),
+        if (hasClinical && hasAdvice) const SizedBox(width: 10),
+        if (hasAdvice) Expanded(child: _noteBox(
+          color: kGreenLight.withOpacity(0.4), borderColor: kGreenLight,
+          iconColor: kSuccess, icon: Icons.medical_information_rounded,
+          title: "DOCTOR'S ADVICE", text: _rx.advice!)),
       ],
     );
   }
 
   Widget _noteBox({
-    required Color color,
-    required Color borderColor,
-    required Color iconColor,
-    required IconData icon,
-    required String title,
-    required String text,
+    required Color color, required Color borderColor, required Color iconColor,
+    required IconData icon, required String title, required String text,
   }) =>
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: borderColor),
-        ),
+            color: color, borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(icon, color: iconColor, size: 13),
-                const SizedBox(width: 5),
-                Text(
-                  title,
+            Row(children: [
+              Icon(icon, color: iconColor, size: 12),
+              const SizedBox(width: 5),
+              Text(title,
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: iconColor,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              text,
-              style: const TextStyle(
-                  fontSize: 12,
-                  color: kTextDark,
-                  height: 1.5),
-            ),
+                      fontSize: 10, fontWeight: FontWeight.w700,
+                      color: iconColor, letterSpacing: 0.4)),
+            ]),
+            const SizedBox(height: 7),
+            Text(text,
+                style: const TextStyle(fontSize: 12, color: kTextPrimary, height: 1.5)),
           ],
         ),
       );
 
-  Widget _buildFollowUpCard() {
-    final followDate = _rx.followUpDate!;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0FFF4),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFA7F3D0)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: kGreen.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(12),
+  Widget _buildFollowUpCard() => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: kGreenLight.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kGreenLight),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                  color: kSuccess.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12)),
+              child: const Icon(Icons.event_available_rounded, color: kSuccess, size: 20),
             ),
-            child: const Icon(Icons.event_available_rounded,
-                color: kGreen, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'NEXT FOLLOW-UP',
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: kGreen,
-                      letterSpacing: 0.6),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _fmtDateTime(followDate),
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: kTextDark),
-                ),
-                if (_rx.followUpRoom?.isNotEmpty == true ||
-                    _rx.followUpInstruction?.isNotEmpty ==
-                        true) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('NEXT FOLLOW-UP',
+                      style: TextStyle(
+                          fontSize: 10, fontWeight: FontWeight.w700,
+                          color: kSuccess, letterSpacing: 0.5)),
                   const SizedBox(height: 3),
-                  Text(
-                    [
-                      if (_rx.followUpRoom?.isNotEmpty ==
-                          true)
-                        _rx.followUpRoom!,
-                      if (_rx.followUpInstruction
-                              ?.isNotEmpty ==
-                          true)
-                        _rx.followUpInstruction!,
-                    ].join('  ·  '),
-                    style: const TextStyle(
-                        fontSize: 11, color: kTextMid),
-                  ),
+                  Text(_fmtDateTime(_rx.followUpDate!),
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  if (_rx.followUpRoom?.isNotEmpty == true ||
+                      _rx.followUpInstruction?.isNotEmpty == true) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (_rx.followUpRoom?.isNotEmpty == true) _rx.followUpRoom!,
+                        if (_rx.followUpInstruction?.isNotEmpty == true) _rx.followUpInstruction!,
+                      ].join('  ·  '),
+                      style: const TextStyle(fontSize: 11, color: kTextMuted),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
+        ),
+      );
 
   Widget _buildFooter() => Row(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -2671,14 +1900,11 @@ class _PatientPrescriptionViewScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('This prescription is valid for 30 days.',
-                    style: TextStyle(
-                        fontSize: 11, color: kTextMid)),
-                SizedBox(height: 3),
-                Text(
-                    'Dispensed by licensed pharmacist only.',
-                    style: TextStyle(
-                        fontSize: 11, color: kTextMid)),
+                Text('Valid for 30 days from issue date.',
+                    style: TextStyle(fontSize: 11, color: kTextMuted)),
+                SizedBox(height: 2),
+                Text('Dispensed by licensed pharmacist only.',
+                    style: TextStyle(fontSize: 11, color: kTextMuted)),
               ],
             ),
           ),
@@ -2686,196 +1912,131 @@ class _PatientPrescriptionViewScreenState
             width: 140,
             child: Column(
               children: [
-                const Divider(
-                    color: kTextDark, thickness: 0.8),
-                const SizedBox(height: 4),
-                Text(
-                  _rx.doctorName,
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: kTextDark),
-                  textAlign: TextAlign.center,
-                ),
-                Text(
-                  '${_rx.qualification}  ·  ${_rx.specialization}',
-                  style: const TextStyle(
-                      fontSize: 10, color: kTextMid),
-                  textAlign: TextAlign.center,
-                ),
+                const Divider(color: kTextPrimary, thickness: 0.8),
+                const SizedBox(height: 3),
+                Text(_rx.doctorName,
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+                    textAlign: TextAlign.center),
+                Text('${_rx.qualification}  ·  ${_rx.specialization}',
+                    style: const TextStyle(fontSize: 10, color: kTextMuted),
+                    textAlign: TextAlign.center),
               ],
             ),
           ),
         ],
       );
 
-Widget _buildBottomBar() => Container(
-      padding: EdgeInsets.fromLTRB(
-        12, 10, 12,
-        MediaQuery.of(context).padding.bottom + 10,
-      ),
-      decoration: const BoxDecoration(
-        color: kCardBg,
-        boxShadow: [
-          BoxShadow(
-              color: Color(0x1A000000),
-              blurRadius: 16,
-              offset: Offset(0, -3)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              // ← CHANGED: navigate to PDF page
-       onTap: () => Navigator.push(
-  context,
-  PageRouteBuilder(
-    pageBuilder: (_, anim, __) =>
-        PatientPrescriptionPdfScreen(prescription: _rx),
-    transitionsBuilder: (_, anim, __, child) => SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0.0, 1.0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-          parent: anim, curve: Curves.easeOutCubic)),
-      child: child,
-    ),
-    transitionDuration: const Duration(milliseconds: 350),
-  ),
-),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1558C0), kPrimary],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
+  Widget _buildBottomBar() => Container(
+        padding: EdgeInsets.fromLTRB(
+            14, 10, 14, MediaQuery.of(context).padding.bottom + 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: const Border(top: BorderSide(color: kBorder)),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 16, offset: const Offset(0, -3))
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(child: _bottomBtn(
+              icon: Icons.download_rounded, label: 'Download',
+              onTap: () => Navigator.push(context, PageRouteBuilder(
+                pageBuilder: (_, __, ___) =>
+                    PatientPrescriptionPdfScreen(prescription: _rx),
+                transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                  position: Tween<Offset>(
+                      begin: const Offset(0, 1), end: Offset.zero)
+                      .animate(CurvedAnimation(
+                          parent: anim, curve: Curves.easeOutCubic)),
+                  child: child,
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.download_rounded,
-                        color: Colors.white, size: 18),
-                    SizedBox(width: 7),
-                    Text('Download',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13)),
-                  ],
+                transitionDuration: const Duration(milliseconds: 350),
+              )),
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: _bottomBtn(
+              icon: Icons.share_rounded, label: 'Share',
+              onTap: () => Navigator.push(context, PageRouteBuilder(
+                pageBuilder: (_, __, ___) =>
+                    PatientPrescriptionPdfScreen(prescription: _rx),
+                transitionsBuilder: (_, anim, __, child) => SlideTransition(
+                  position: Tween<Offset>(
+                      begin: const Offset(0, 1), end: Offset.zero)
+                      .animate(CurvedAnimation(
+                          parent: anim, curve: Curves.easeOutCubic)),
+                  child: child,
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: GestureDetector(
-              // ← CHANGED: navigate to PDF page and auto-share
-     onTap: () => Navigator.push(
-  context,
-  PageRouteBuilder(
-    pageBuilder: (_, anim, __) =>
-        PatientPrescriptionPdfScreen(prescription: _rx),
-    transitionsBuilder: (_, anim, __, child) => SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0.0, 1.0),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-          parent: anim, curve: Curves.easeOutCubic)),
-      child: child,
-    ),
-    transitionDuration: const Duration(milliseconds: 350),
-  ),
-),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 13),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1558C0), kPrimary],
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.share_rounded,
-                        color: Colors.white, size: 18),
-                    SizedBox(width: 7),
-                    Text('Share',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
+                transitionDuration: const Duration(milliseconds: 350),
+              )),
+            )),
+          ],
+        ),
+      );
 
-  Widget _card({
-    required Widget child,
-    EdgeInsetsGeometry padding = const EdgeInsets.all(14),
-  }) =>
+  Widget _bottomBtn({
+    required IconData icon, required String label, required VoidCallback onTap}) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+              color: kPrimary, borderRadius: BorderRadius.circular(12)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 17),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+            ],
+          ),
+        ),
+      );
+
+  Widget _card({required Widget child,
+      EdgeInsetsGeometry padding = const EdgeInsets.all(14)}) =>
       Container(
         width: double.infinity,
         padding: padding,
         decoration: BoxDecoration(
-          color: kCardBg,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          boxShadow: const [
+          border: Border.all(color: kBorder),
+          boxShadow: [
             BoxShadow(
-                color: Color(0x0B000000),
-                blurRadius: 10,
-                offset: Offset(0, 2)),
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12, offset: const Offset(0, 4))
           ],
         ),
         child: child,
       );
 
-  Widget _sectionLabel(String t) => Row(
+  Widget _sectionLabel(String t, Color color) => Row(
         children: [
           Container(
-            width: 3,
-            height: 14,
+            width: 3, height: 13,
             decoration: BoxDecoration(
-                color: kPrimary,
-                borderRadius: BorderRadius.circular(2)),
+                color: color, borderRadius: BorderRadius.circular(2)),
           ),
           const SizedBox(width: 7),
-          Text(
-            t,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              color: kPrimary,
-              letterSpacing: 0.8,
-            ),
-          ),
+          Text(t,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w700,
+                  color: color, letterSpacing: 0.6)),
         ],
       );
 
   Widget _chip(String t) => Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 7, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: kBg,
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: Text(
-          t,
-          style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: kTextMid),
-        ),
+            color: kPrimaryLight, borderRadius: BorderRadius.circular(6)),
+        child: Text(t,
+            style: const TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w500, color: kPrimary)),
       );
 
   Widget _vg(double h) => SizedBox(height: h);
@@ -2892,34 +2053,22 @@ class _MedRow extends StatelessWidget {
   final double c1, c2, c3, c4;
 
   const _MedRow({
-    required this.med,
-    required this.color,
-    required this.typeLabel,
-    required this.typeIcon,
-    required this.c1,
-    required this.c2,
-    required this.c3,
-    required this.c4,
+    required this.med, required this.color, required this.typeLabel,
+    required this.typeIcon, required this.c1, required this.c2,
+    required this.c3, required this.c4,
   });
 
-  List<String> _splitSlots(String? raw,
-      {String fallback = '-'}) {
-    final parts =
-        (raw ?? '').split('-').map((p) => p.trim()).toList();
-    while (parts.length < 3) parts.add(fallback);
-    return parts
-        .take(3)
-        .map((p) => p.isEmpty ? fallback : p)
-        .toList();
+  List<String> _splitSlots(String? raw, {String fb = '-'}) {
+    final parts = (raw ?? '').split('-').map((p) => p.trim()).toList();
+    while (parts.length < 3) parts.add(fb);
+    return parts.take(3).map((p) => p.isEmpty ? fb : p).toList();
   }
 
   @override
   Widget build(BuildContext context) {
     final dose = _splitSlots(med.doseDisplay);
-
     return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -2933,44 +2082,31 @@ class _MedRow extends StatelessWidget {
                       ? med.medicineName!
                       : 'Med #${med.medicineId ?? '-'}',
                   style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: kTextDark),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                      fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+                  maxLines: 2, overflow: TextOverflow.ellipsis,
                 ),
                 if (med.extraInfo?.isNotEmpty == true) ...[
                   const SizedBox(height: 2),
-                  Text(
-                    med.extraInfo!,
-                    style: TextStyle(
-                        fontSize: 10, color: color),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(med.extraInfo!,
+                      style: TextStyle(fontSize: 10, color: color),
+                      maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
                 const SizedBox(height: 4),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 5, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
+                      color: color.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4)),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(typeIcon, color: color, size: 9),
                       const SizedBox(width: 3),
                       Flexible(
-                        child: Text(
-                          typeLabel,
-                          style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: color),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        child: Text(typeLabel,
+                            style: TextStyle(
+                                fontSize: 9, fontWeight: FontWeight.w700, color: color),
+                            overflow: TextOverflow.ellipsis),
                       ),
                     ],
                   ),
@@ -2981,71 +2117,47 @@ class _MedRow extends StatelessWidget {
           SizedBox(
             width: c2,
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 6, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 5),
               decoration: BoxDecoration(
-                color: kBg,
+                color: const Color(0xFFF7F8FA),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: kBorder),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  IntrinsicHeight(
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceEvenly,
-                      children: const [
-                        Expanded(child: _SlotHead('M')),
-                        Expanded(child: _SlotHead('A')),
-                        Expanded(child: _SlotHead('N')),
-                      ],
-                    ),
-                  ),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: const [
+                    Expanded(child: _SlotHead('M')),
+                    Expanded(child: _SlotHead('A')),
+                    Expanded(child: _SlotHead('N')),
+                  ]),
                   const SizedBox(height: 3),
-                  const Divider(
-                      height: 1,
-                      thickness: 0.8,
-                      color: kBorder),
+                  const Divider(height: 1, thickness: 0.8, color: kBorder),
                   const SizedBox(height: 3),
-                  Row(
-                    mainAxisAlignment:
-                        MainAxisAlignment.spaceEvenly,
-                    children: [
-                      Expanded(child: _SlotVal(dose[0])),
-                      Expanded(child: _SlotVal(dose[1])),
-                      Expanded(child: _SlotVal(dose[2])),
-                    ],
-                  ),
+                  Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+                    Expanded(child: _SlotVal(dose[0])),
+                    Expanded(child: _SlotVal(dose[1])),
+                    Expanded(child: _SlotVal(dose[2])),
+                  ]),
                 ],
               ),
             ),
           ),
           SizedBox(
             width: c3,
-            child: Text(
-              med.timing ?? '-',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: kTextDark),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(med.timing ?? '-',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w600, color: kTextPrimary),
+                maxLines: 2, overflow: TextOverflow.ellipsis),
           ),
           SizedBox(
             width: c4,
-            child: Text(
-              med.duration ?? '-',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: kTextDark),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Text(med.duration ?? '-',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700, color: kTextPrimary),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
           ),
         ],
       ),
@@ -3057,14 +2169,9 @@ class _SlotHead extends StatelessWidget {
   final String text;
   const _SlotHead(this.text);
   @override
-  Widget build(BuildContext context) => Text(
-        text,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: kTextMid),
-      );
+  Widget build(BuildContext context) => Text(text,
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kTextMuted));
 }
 
 class _SlotVal extends StatelessWidget {
@@ -3074,14 +2181,10 @@ class _SlotVal extends StatelessWidget {
   Widget build(BuildContext context) => FittedBox(
         fit: BoxFit.scaleDown,
         alignment: Alignment.center,
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: kTextDark),
-        ),
+        child: Text(text,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
       );
 }
 
@@ -3089,167 +2192,109 @@ class _ColHead extends StatelessWidget {
   final String text;
   const _ColHead(this.text);
   @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.w700,
-          color: kTextMid,
-          letterSpacing: 0.3,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      );
+  Widget build(BuildContext context) => Text(text,
+      style: const TextStyle(
+          fontSize: 9, fontWeight: FontWeight.w700, color: kTextMuted, letterSpacing: 0.3),
+      maxLines: 1, overflow: TextOverflow.ellipsis);
+}
+
+class _ColHead2 extends StatelessWidget {
+  final String text;
+  const _ColHead2(this.text);
+  @override
+  Widget build(BuildContext context) => Text(text,
+      textAlign: TextAlign.center,
+      style: const TextStyle(
+          fontSize: 9, fontWeight: FontWeight.w700, color: kTextMuted, letterSpacing: 0.3),
+      maxLines: 1, overflow: TextOverflow.ellipsis);
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  ADAPTER MODELS  (unchanged)
+//  ADAPTER MODELS  (unchanged logic, palette only)
 // ════════════════════════════════════════════════════════════════════
 DateTime? _tryParseDate(String? raw) {
   if (raw == null || raw.trim().isEmpty) return null;
   return DateTime.tryParse(raw);
 }
-
-DateTime _parseDateOrNow(String? raw) =>
-    _tryParseDate(raw) ?? DateTime.now();
-
+DateTime _parseDateOrNow(String? raw) => _tryParseDate(raw) ?? DateTime.now();
 String _statusFromFollowUp(DateTime? followUpDate) {
   if (followUpDate == null) return 'completed';
-  return followUpDate.isAfter(DateTime.now())
-      ? 'active'
-      : 'completed';
+  return followUpDate.isAfter(DateTime.now()) ? 'active' : 'completed';
 }
 
 class PatientPrescription {
-  final int prescriptionId;
-  final int patientId;
-  final String patientName;
-  final int? patientAge;
-  final String? patientGender;
-  final int? tokenNumber;
-  final String? regNo;
-  final String? followUpRoom;
-  final String? followUpInstruction;
-  final String doctorName;
-  final String qualification;
-  final String specialization;
-  final String clinicName;
-  final String clinicAddress;
-  final String clinicContact;
+  final int prescriptionId, patientId;
+  final String patientName, doctorName, qualification, specialization,
+      clinicName, clinicAddress, clinicContact, status;
+  final int? patientAge, tokenNumber;
+  final String? patientGender, regNo, followUpRoom, followUpInstruction,
+      symptoms, diagnosis, clinicalNotes, advice;
   final DateTime prescriptionDate;
-  final String? symptoms;
-  final String? diagnosis;
-  final String? clinicalNotes;
   final DateTime? followUpDate;
-  final String? advice;
   final List<PrescriptionMedicineItem> medicines;
-  final String status;
 
   const PatientPrescription({
-    required this.prescriptionId,
-    required this.patientId,
-    required this.patientName,
-    this.patientAge,
-    this.patientGender,
-    this.tokenNumber,
-    this.regNo,
-    this.followUpRoom,
-    this.followUpInstruction,
-    required this.doctorName,
-    required this.qualification,
-    required this.specialization,
-    required this.clinicName,
-    required this.clinicAddress,
-    required this.clinicContact,
-    required this.prescriptionDate,
-    required this.symptoms,
-    required this.diagnosis,
-    required this.clinicalNotes,
-    required this.followUpDate,
-    required this.advice,
-    required this.medicines,
-    required this.status,
+    required this.prescriptionId, required this.patientId,
+    required this.patientName, required this.doctorName,
+    required this.qualification, required this.specialization,
+    required this.clinicName, required this.clinicAddress,
+    required this.clinicContact, required this.prescriptionDate,
+    required this.medicines, required this.status,
+    this.patientAge, this.tokenNumber, this.patientGender,
+    this.regNo, this.followUpRoom, this.followUpInstruction,
+    this.symptoms, this.diagnosis, this.clinicalNotes,
+    this.followUpDate, this.advice,
   });
 
-  factory PatientPrescription.fromModel(
-    PrescriptionModel model, {
-    required int fallbackPatientId,
-    required String fallbackPatientName,
-  }) {
+  factory PatientPrescription.fromModel(PrescriptionModel model,
+      {required int fallbackPatientId, required String fallbackPatientName}) {
     final followUp = _tryParseDate(model.followUpDate);
-    final flatMeds =
-        (model.medicines == null || model.medicines!.isEmpty)
-            ? [
-                if (model.medicineId != null ||
-                    model.medicineName != null)
-                  PrescriptionMedicineItem.fromFlatModel(
-                      model),
-              ]
-            : <PrescriptionMedicineItem>[];
+    final flatMeds = (model.medicines == null || model.medicines!.isEmpty)
+        ? [if (model.medicineId != null || model.medicineName != null)
+            PrescriptionMedicineItem.fromFlatModel(model)]
+        : <PrescriptionMedicineItem>[];
     return PatientPrescription(
       prescriptionId: model.prescriptionId ?? 0,
       patientId: model.patientId ?? fallbackPatientId,
-      patientName:
-          model.patientName ?? fallbackPatientName,
+      patientName: model.patientName ?? fallbackPatientName,
       doctorName: model.doctorName ??
-          (model.doctorId != null
-              ? 'Doctor #${model.doctorId}'
-              : 'Doctor'),
+          (model.doctorId != null ? 'Doctor #${model.doctorId}' : 'Doctor'),
       qualification: model.qualification ?? '-',
       specialization: model.specialization ?? '-',
       clinicName: model.clinicName ?? 'Clinic',
       clinicAddress: model.clinicAddress ?? '-',
       clinicContact: model.clinicContact ?? '-',
-      prescriptionDate:
-          _parseDateOrNow(model.prescriptionDate),
-      symptoms: model.symptoms,
-      diagnosis: model.diagnosis,
-      clinicalNotes: model.clinicalNotes,
-      followUpDate: followUp,
+      prescriptionDate: _parseDateOrNow(model.prescriptionDate),
+      symptoms: model.symptoms, diagnosis: model.diagnosis,
+      clinicalNotes: model.clinicalNotes, followUpDate: followUp,
       advice: model.advice,
-      medicines: (model.medicines ??
-                  const <PrescriptionMedicineModel>[])
-              .map(PrescriptionMedicineItem.fromModel)
-              .toList() +
-          flatMeds,
+      medicines: (model.medicines ?? const <PrescriptionMedicineModel>[])
+              .map(PrescriptionMedicineItem.fromModel).toList() + flatMeds,
       status: _statusFromFollowUp(followUp),
     );
   }
 
-  factory PatientPrescription.fromFlatList(
-    List<PrescriptionModel> items, {
-    required int fallbackPatientId,
-    required String fallbackPatientName,
-  }) {
-    final first = items.first;
+  factory PatientPrescription.fromFlatList(List<PrescriptionModel> items,
+      {required int fallbackPatientId, required String fallbackPatientName}) {
+    final first    = items.first;
     final followUp = _tryParseDate(first.followUpDate);
-    final meds = items
-        .map(PrescriptionMedicineItem.fromFlatModel)
-        .where((m) =>
-            m.medicineId != null || m.medicineName != null)
-        .toList();
+    final meds     = items.map(PrescriptionMedicineItem.fromFlatModel)
+        .where((m) => m.medicineId != null || m.medicineName != null).toList();
     return PatientPrescription(
       prescriptionId: first.prescriptionId ?? 0,
       patientId: first.patientId ?? fallbackPatientId,
-      patientName:
-          first.patientName ?? fallbackPatientName,
+      patientName: first.patientName ?? fallbackPatientName,
       doctorName: first.doctorName ??
-          (first.doctorId != null
-              ? 'Doctor #${first.doctorId}'
-              : 'Doctor'),
+          (first.doctorId != null ? 'Doctor #${first.doctorId}' : 'Doctor'),
       qualification: first.qualification ?? '-',
       specialization: first.specialization ?? '-',
       clinicName: first.clinicName ?? 'Clinic',
       clinicAddress: first.clinicAddress ?? '-',
       clinicContact: first.clinicContact ?? '-',
-      prescriptionDate:
-          _parseDateOrNow(first.prescriptionDate),
-      symptoms: first.symptoms,
-      diagnosis: first.diagnosis,
-      clinicalNotes: first.clinicalNotes,
-      followUpDate: followUp,
-      advice: first.advice,
-      medicines: meds,
+      prescriptionDate: _parseDateOrNow(first.prescriptionDate),
+      symptoms: first.symptoms, diagnosis: first.diagnosis,
+      clinicalNotes: first.clinicalNotes, followUpDate: followUp,
+      advice: first.advice, medicines: meds,
       status: _statusFromFollowUp(followUp),
     );
   }
@@ -3258,57 +2303,31 @@ class PatientPrescription {
 class PrescriptionMedicineItem {
   final int? medicineId;
   final int medicineTypeId;
-  final String? mediTypeName;
-  final String? medicineName;
-  final String? frequency;
-  final String? duration;
-  final String? timing;
-  final String? tabletDosage;
-  final String? syrupDosageMl;
-  final String? injDosage;
-  final String? injRoute;
-  final String? dropsCount;
-  final String? dropsApplication;
-  final String? lotionApplyArea;
-  final String? sprayPuffs;
-  final String? sprayUsage;
-  final String? lotionUsage;
+  final String? mediTypeName, medicineName, frequency, duration, timing,
+      tabletDosage, syrupDosageMl, injDosage, injRoute, dropsCount,
+      dropsApplication, lotionApplyArea, sprayPuffs, sprayUsage, lotionUsage;
 
   const PrescriptionMedicineItem({
-    required this.medicineId,
-    required this.medicineTypeId,
-    required this.mediTypeName,
-    required this.medicineName,
-    required this.frequency,
-    required this.duration,
-    required this.timing,
-    required this.tabletDosage,
-    required this.syrupDosageMl,
-    required this.injDosage,
-    required this.injRoute,
-    required this.dropsCount,
-    required this.dropsApplication,
-    required this.lotionApplyArea,
-    required this.sprayPuffs,
-    required this.sprayUsage,
-    required this.lotionUsage,
+    required this.medicineId, required this.medicineTypeId,
+    required this.mediTypeName, required this.medicineName,
+    required this.frequency, required this.duration, required this.timing,
+    required this.tabletDosage, required this.syrupDosageMl,
+    required this.injDosage, required this.injRoute, required this.dropsCount,
+    required this.dropsApplication, required this.lotionApplyArea,
+    required this.sprayPuffs, required this.sprayUsage, required this.lotionUsage,
   });
 
   String? get extraInfo {
     if (injRoute?.trim().isNotEmpty == true) return injRoute;
-    if (dropsApplication?.trim().isNotEmpty == true)
-      return dropsApplication;
-    if (lotionApplyArea?.trim().isNotEmpty == true)
-      return lotionApplyArea;
+    if (dropsApplication?.trim().isNotEmpty == true) return dropsApplication;
+    if (lotionApplyArea?.trim().isNotEmpty == true) return lotionApplyArea;
     if (sprayUsage?.trim().isNotEmpty == true) return sprayUsage;
     return null;
   }
 
   String get doseDisplay {
-    if (tabletDosage?.trim().isNotEmpty == true)
-      return tabletDosage!;
-    if (syrupDosageMl?.trim().isNotEmpty == true)
-      return '$syrupDosageMl';
+    if (tabletDosage?.trim().isNotEmpty == true) return tabletDosage!;
+    if (syrupDosageMl?.trim().isNotEmpty == true) return syrupDosageMl!;
     if (injDosage?.trim().isNotEmpty == true) return injDosage!;
     if (dropsCount?.trim().isNotEmpty == true) return dropsCount!;
     if (sprayPuffs?.trim().isNotEmpty == true) return sprayPuffs!;
@@ -3316,49 +2335,27 @@ class PrescriptionMedicineItem {
     return '-';
   }
 
-  factory PrescriptionMedicineItem.fromModel(
-      PrescriptionMedicineModel model) {
-    return PrescriptionMedicineItem(
-      medicineId: model.medicineId,
-      medicineTypeId: model.medicineTypeId ?? 1,
-      mediTypeName: null,
-      medicineName: null,
-      frequency: model.frequency,
-      duration: model.duration,
-      timing: model.timing,
-      tabletDosage: model.tabletDosage,
-      syrupDosageMl: model.syrupDosageMl,
-      injDosage: model.injDosage,
-      injRoute: model.injRoute,
-      dropsCount: model.dropsCount,
-      dropsApplication: model.dropsApplication,
-      lotionApplyArea: model.lotionApplyArea,
-      sprayPuffs: model.sprayPuffs,
-      sprayUsage: model.sprayUsage,
-      lotionUsage: model.lotionUsage,
-    );
-  }
+  factory PrescriptionMedicineItem.fromModel(PrescriptionMedicineModel model) =>
+      PrescriptionMedicineItem(
+        medicineId: model.medicineId, medicineTypeId: model.medicineTypeId ?? 1,
+        mediTypeName: null, medicineName: null,
+        frequency: model.frequency, duration: model.duration, timing: model.timing,
+        tabletDosage: model.tabletDosage, syrupDosageMl: model.syrupDosageMl,
+        injDosage: model.injDosage, injRoute: model.injRoute,
+        dropsCount: model.dropsCount, dropsApplication: model.dropsApplication,
+        lotionApplyArea: model.lotionApplyArea, sprayPuffs: model.sprayPuffs,
+        sprayUsage: model.sprayUsage, lotionUsage: model.lotionUsage,
+      );
 
-  factory PrescriptionMedicineItem.fromFlatModel(
-      PrescriptionModel model) {
-    return PrescriptionMedicineItem(
-      medicineId: model.medicineId,
-      medicineTypeId: model.medicineTypeId ?? 1,
-      mediTypeName: model.mediTypeName,
-      medicineName: model.medicineName,
-      frequency: model.frequency,
-      duration: model.duration,
-      timing: model.timing,
-      tabletDosage: model.tabletDosage,
-      syrupDosageMl: model.syrupDosageMl,
-      injDosage: model.injDosage,
-      injRoute: model.injRoute,
-      dropsCount: model.dropsCount,
-      dropsApplication: model.dropsApplication,
-      lotionApplyArea: model.lotionApplyArea,
-      sprayPuffs: model.sprayPuffs,
-      sprayUsage: model.sprayUsage,
-      lotionUsage: model.lotionUsage,
-    );
-  }
+  factory PrescriptionMedicineItem.fromFlatModel(PrescriptionModel model) =>
+      PrescriptionMedicineItem(
+        medicineId: model.medicineId, medicineTypeId: model.medicineTypeId ?? 1,
+        mediTypeName: model.mediTypeName, medicineName: model.medicineName,
+        frequency: model.frequency, duration: model.duration, timing: model.timing,
+        tabletDosage: model.tabletDosage, syrupDosageMl: model.syrupDosageMl,
+        injDosage: model.injDosage, injRoute: model.injRoute,
+        dropsCount: model.dropsCount, dropsApplication: model.dropsApplication,
+        lotionApplyArea: model.lotionApplyArea, sprayPuffs: model.sprayPuffs,
+        sprayUsage: model.sprayUsage, lotionUsage: model.lotionUsage,
+      );
 }

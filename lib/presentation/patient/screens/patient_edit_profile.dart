@@ -5,38 +5,35 @@ import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
-// ── Colour palette ────────────────────────────────────────────────
-const kPrimary   = Color(0xFF1A73E8);
-const kPrimaryBg = Color(0xFFE8F0FE);
-const kBg        = Color(0xFFF4F6FB);
-const kCardBg    = Colors.white;
-const kTextDark  = Color(0xFF1F2937);
-const kTextMid   = Color(0xFF6B7280);
-const kBorder    = Color(0xFFE5E7EB);
-const kRed       = Color(0xFFEA4335);
-const kGreen     = Color(0xFF34A853);
-const kOrange    = Color(0xFFF59E0B);
-const kPurple    = Color(0xFF8B5CF6);
-const kCyan      = Color(0xFF06B6D4);
-const kMuted     = Color(0xFF9CA3AF);
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
 
-void main() => runApp(const MyApp());
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: kBg,
-        colorScheme: ColorScheme.fromSeed(seedColor: kPrimary),
-      ),
-      home: const PatientEditProfilePage(),
-    );
-  }
-}
+const kBorder  = Color(0xFFEDF2F7);
+
+const kError      = Color(0xFFFC8181);
+const kRedLight   = Color(0xFFFEE2E2);
+
+const kSuccess    = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+
+const kWarning    = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+
+const kPurple      = Color(0xFF9F7AEA);
+const kPurpleLight = Color(0xFFEDE9FE);
+
+const kInfo      = Color(0xFF3B82F6);
+const kInfoLight = Color(0xFFDBEAFE);
+
+// =============================================================================
+// Page
+// =============================================================================
 
 class PatientEditProfilePage extends ConsumerStatefulWidget {
   const PatientEditProfilePage({super.key});
@@ -45,23 +42,23 @@ class PatientEditProfilePage extends ConsumerStatefulWidget {
       _PatientEditProfilePageState();
 }
 
-class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage> {
-  final _formKey = GlobalKey<FormState>();
-
-  final _nameController    = TextEditingController();
-  final _mobileController  = TextEditingController();
-  final _emailController   = TextEditingController();
-  final _addressController = TextEditingController();
-  final _weightController  = TextEditingController();
+class _PatientEditProfilePageState
+    extends ConsumerState<PatientEditProfilePage> {
+  final _formKey          = GlobalKey<FormState>();
+  final _nameController   = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _emailController  = TextEditingController();
+  final _addressController= TextEditingController();
+  final _weightController = TextEditingController();
 
   String    _selectedGender     = 'Female';
   String    _selectedBloodGroup = 'B+';
   DateTime? _selectedDob        = DateTime(1992, 3, 12);
 
-  late final ProviderSubscription<PatientLoginState> _patientLoginSub;
+  late final ProviderSubscription<PatientLoginState> _sub;
   bool _didFetchProfile = false;
-  bool _didPrefill = false;
-  bool _didSubmit = false;
+  bool _didPrefill      = false;
+  bool _didSubmit       = false;
 
   final _bloodGroups = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−'];
   final _genders     = ['Male', 'Female', 'Other'];
@@ -71,10 +68,14 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
     'Other' : Icons.transgender_rounded,
   };
 
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
   @override
   void initState() {
     super.initState();
-    _patientLoginSub = ref.listenManual<PatientLoginState>(
+    _sub = ref.listenManual<PatientLoginState>(
       patientLoginViewModelProvider,
       (prev, next) {
         _maybeFetchProfile(next);
@@ -91,7 +92,7 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
 
   @override
   void dispose() {
-    _patientLoginSub.close();
+    _sub.close();
     _nameController.dispose();
     _mobileController.dispose();
     _emailController.dispose();
@@ -118,11 +119,11 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
     if (details == null) return;
     _didPrefill = true;
 
-    _setTextIfPresent(_nameController, details.name ?? state.name);
-    _setTextIfPresent(_mobileController, details.mobileNo ?? state.mobileNo);
-    _setTextIfPresent(_emailController, details.email ?? state.email);
-    _setTextIfPresent(_addressController, details.address);
-    _setTextIfPresent(_weightController, details.weight);
+    _set(_nameController,    details.name    ?? state.name);
+    _set(_mobileController,  details.mobileNo ?? state.mobileNo);
+    _set(_emailController,   details.email   ?? state.email);
+    _set(_addressController, details.address);
+    _set(_weightController,  details.weight);
 
     _applyGender(details);
     _applyBloodGroup(details);
@@ -132,10 +133,9 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
 
   void _handleSubmit(PatientLoginState? prev, PatientLoginState next) {
     if (!_didSubmit) return;
-    final prevSuccess = prev?.isSuccess ?? false;
-    if (next.isSuccess && !prevSuccess) {
+    if (next.isSuccess && !(prev?.isSuccess ?? false)) {
       _didSubmit = false;
-      _showSnack('Profile updated successfully', success: true);
+      _snack('Profile updated successfully', success: true);
       final mobile = next.mobileNo;
       if (mobile != null && mobile.trim().isNotEmpty) {
         ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
@@ -148,39 +148,37 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
     }
     if (next.error != null && next.error != prev?.error) {
       _didSubmit = false;
-      _showSnack(next.error ?? 'Failed to update profile', success: false);
+      _snack(next.error ?? 'Failed to update profile', success: false);
     }
   }
 
-  void _setTextIfPresent(TextEditingController ctrl, String? value) {
-    final v = value?.trim();
-    if (v == null || v.isEmpty) return;
-    ctrl.text = v;
+  void _set(TextEditingController c, String? v) {
+    final s = v?.trim();
+    if (s != null && s.isNotEmpty) c.text = s;
   }
 
-  void _applyGender(Patients details) {
-    final g = details.gender?.trim();
+  void _applyGender(Patients d) {
+    final g = d.gender?.trim();
     if (g != null && g.isNotEmpty && _genders.contains(g)) {
       _selectedGender = g;
       return;
     }
-    final id = details.genderId;
-    if (id == 2) {
-      _selectedGender = 'Female';
-    } else if (id == 3) {
-      _selectedGender = 'Other';
-    } else if (id == 1) {
-      _selectedGender = 'Male';
+    final id = d.genderId;
+    if (id == 2) _selectedGender = 'Female';
+    else if (id == 3) _selectedGender = 'Other';
+    else if (id == 1) _selectedGender = 'Male';
+  }
+
+  void _applyBloodGroup(Patients d) {
+    final bg = d.bloodGroup?.trim();
+    if (bg != null && bg.isNotEmpty && _bloodGroups.contains(bg)) {
+      _selectedBloodGroup = bg;
     }
   }
 
-  void _applyBloodGroup(Patients details) {
-    final bg = details.bloodGroup?.trim();
-    if (bg != null && bg.isNotEmpty) {
-      final match = _bloodGroups.contains(bg) ? bg : null;
-      if (match != null) _selectedBloodGroup = match;
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Actions
+  // ---------------------------------------------------------------------------
 
   Future<void> _pickDob() async {
     final picked = await showDatePicker(
@@ -191,9 +189,7 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: const ColorScheme.light(
-            primary: kPrimary,
-            onPrimary: Colors.white,
-          ),
+              primary: kPrimary, onPrimary: Colors.white),
         ),
         child: child!,
       ),
@@ -203,47 +199,43 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
 
   String get _formattedDob {
     if (_selectedDob == null) return 'Select date of birth';
-    return '${_selectedDob!.day.toString().padLeft(2, '0')} / '
-        '${_selectedDob!.month.toString().padLeft(2, '0')} / '
+    return '${_selectedDob!.day.toString().padLeft(2, '0')}/'
+        '${_selectedDob!.month.toString().padLeft(2, '0')}/'
         '${_selectedDob!.year}';
   }
 
   void _save() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    final state = ref.read(patientLoginViewModelProvider);
+    final state     = ref.read(patientLoginViewModelProvider);
     final patientId = state.patientId ?? 0;
-    final genderId = _genderIdFor(_selectedGender);
-    final bloodGroupId = _bloodGroupIdFor(_selectedBloodGroup);
 
     final patient = Patients(
-      patientId: patientId > 0 ? patientId : null,
-      name: _nameController.text.trim(),
-      mobileNo: _mobileController.text.trim(),
-      email: _emailController.text.trim(),
-      address: _addressController.text.trim(),
-      genderId: genderId,
-      DOB: _selectedDob,
-      bloodGroupId: bloodGroupId,
-      weight: _weightController.text.trim(),
+      patientId:   patientId > 0 ? patientId : null,
+      name:        _nameController.text.trim(),
+      mobileNo:    _mobileController.text.trim(),
+      email:       _emailController.text.trim(),
+      address:     _addressController.text.trim(),
+      genderId:    _genderIdFor(_selectedGender),
+      DOB:         _selectedDob,
+      bloodGroupId:_bloodGroupIdFor(_selectedBloodGroup),
+      weight:      _weightController.text.trim(),
     );
 
     _didSubmit = true;
     ref.read(patientLoginViewModelProvider.notifier).addPatient(patient);
   }
 
-  int? _genderIdFor(String gender) {
-    final idx = _genders.indexOf(gender);
-    if (idx < 0) return null;
-    return idx + 1;
+  int? _genderIdFor(String g) {
+    final i = _genders.indexOf(g);
+    return i < 0 ? null : i + 1;
   }
 
-  int? _bloodGroupIdFor(String bloodGroup) {
-    final idx = _bloodGroups.indexOf(bloodGroup);
-    if (idx < 0) return null;
-    return idx + 1;
+  int? _bloodGroupIdFor(String bg) {
+    final i = _bloodGroups.indexOf(bg);
+    return i < 0 ? null : i + 1;
   }
 
-  void _showSnack(String msg, {required bool success}) {
+  void _snack(String msg, {required bool success}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -253,15 +245,19 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
                   ? Icons.check_circle_outline_rounded
                   : Icons.error_outline_rounded,
               color: Colors.white,
-              size: 18,
+              size: 15,
             ),
             const SizedBox(width: 8),
-            Expanded(child: Text(msg)),
+            Expanded(
+                child: Text(msg,
+                    style: const TextStyle(fontSize: 13, color: Colors.white))),
           ],
         ),
-        backgroundColor: success ? kGreen : kRed,
+        backgroundColor: success ? kPrimary : kError,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
       ),
     );
   }
@@ -276,159 +272,123 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
     return null;
   }
 
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBg,
-
-      // ── AppBar — NO save button ──────────────────────────────
-      appBar: AppBar(
-        backgroundColor: kCardBg,
-        elevation: 0,
-        centerTitle: true,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: kBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kBorder),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 16, color: kTextDark),
-          ),
-        ),
-        title: const Text(
-          'Edit Profile',
-          style: TextStyle(
-              fontSize: 17, fontWeight: FontWeight.w700, color: kTextDark),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(height: 1, color: kBorder),
-        ),
-      ),
-
+      backgroundColor: Colors.white,
+      appBar: _buildAppBar(),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-
-              // ── Avatar ───────────────────────────────────────
+              // Avatar
               _avatarCard(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-              // ── Personal info ─────────────────────────────────
+              // Personal info
               _sectionCard(
-                accentColor: kPrimary,
+                icon: Icons.person_outline_rounded,
+                iconFg: kPrimary,
+                iconBg: kPrimaryLight,
                 title: 'Personal Information',
                 children: [
-                  _fieldLabel('Full Name'),
-                  const SizedBox(height: 6),
-                  _inputField(
-                    controller: _nameController,
-                    hint: 'Enter your full name',
-                    icon: Icons.person_outline_rounded,
-                    iconColor: kPrimary,
-                    isFocused: true,
-                    validator: (v) => _required(v, 'Full name'),
-                    capitalization: TextCapitalization.words,
+                  _twoColRow(
+                    left: _field(
+                      label: 'Full Name',
+                      controller: _nameController,
+                      hint: 'Enter full name',
+                      icon: Icons.person_outline_rounded,
+                      iconColor: kPrimary,
+                      validator: (v) => _required(v, 'Full name'),
+                      capitalization: TextCapitalization.words,
+                    ),
+                    right: _mobileField(),
                   ),
-                  const SizedBox(height: 14),
-                  _fieldLabel('Mobile Number'),
-                  const SizedBox(height: 6),
-                  _mobileField(),
-                  const SizedBox(height: 14),
-                  _fieldLabel('Email Address'),
-                  const SizedBox(height: 6),
-                  _inputField(
+                  const SizedBox(height: 12),
+                  _field(
+                    label: 'Email Address',
                     controller: _emailController,
                     hint: 'patient@example.com',
                     icon: Icons.email_outlined,
                     iconColor: kPurple,
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) {
-                        return 'Email is required';
-                      }
-                      if (!RegExp(r'^[^@]+@[^@]+\.[^@]+')
-                          .hasMatch(v.trim())) {
+                      if (v == null || v.trim().isEmpty) return 'Email is required';
+                      if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) {
                         return 'Enter a valid email';
                       }
                       return null;
                     },
                   ),
-                  const SizedBox(height: 14),
-                  _fieldLabel('Address'),
-                  const SizedBox(height: 6),
-                  _inputField(
+                  const SizedBox(height: 12),
+                  _field(
+                    label: 'Address',
                     controller: _addressController,
                     hint: 'Enter your full address',
                     icon: Icons.location_on_outlined,
-                    iconColor: kOrange,
-                    maxLines: 3,
+                    iconColor: kWarning,
+                    maxLines: 2,
                     validator: (v) => _required(v, 'Address'),
                     capitalization: TextCapitalization.sentences,
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
 
-              // ── Medical info ──────────────────────────────────
+              // Medical info
               _sectionCard(
-                accentColor: kRed,
+                icon: Icons.medical_information_outlined,
+                iconFg: kError,
+                iconBg: kRedLight,
                 title: 'Medical Information',
                 children: [
+                  // Gender
                   _fieldLabel('Gender'),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   _genderSelector(),
-                  const SizedBox(height: 14),
-                  _fieldLabel('Date of Birth'),
-                  const SizedBox(height: 6),
-                  _dobField(),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 12),
+
+                  // DOB + Weight row
+                  _twoColRow(
+                    left: _dobTile(),
+                    right: _weightField(),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Blood group
                   _fieldLabel('Blood Group'),
-                  const SizedBox(height: 8),
-                  _bloodGroupPicker(),
-                  const SizedBox(height: 14),
-                  _fieldLabel('Weight'),
                   const SizedBox(height: 6),
-                  _weightField(),
+                  _bloodGroupPicker(),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
 
-              // ── Buttons — ONLY at bottom ──────────────────────
+              // Buttons
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 15),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         side: const BorderSide(color: kBorder),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        backgroundColor: kCardBg,
+                            borderRadius: BorderRadius.circular(10)),
+                        foregroundColor: kTextSecondary,
                       ),
-                      child: const Text(
-                        'Cancel',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: kTextMid,
-                        ),
-                      ),
+                      child: const Text('Cancel',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
@@ -436,25 +396,19 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kPrimary,
                         foregroundColor: Colors.white,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 15),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text(
-                        'Save Changes',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      child: const Text('Save Changes',
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
             ],
           ),
         ),
@@ -462,268 +416,335 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
     );
   }
 
-  // ── Avatar card ────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // AppBar
+  // ---------------------------------------------------------------------------
+
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      centerTitle: true,
+      leading: GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          margin: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: kPrimaryLight,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(Icons.arrow_back_ios_new_rounded,
+              size: 15, color: kPrimary),
+        ),
+      ),
+      title: const Text(
+        'Edit Profile',
+        style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: kTextPrimary,
+            letterSpacing: -0.2),
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: kBorder),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Avatar Card
+  // ---------------------------------------------------------------------------
+
   Widget _avatarCard() {
-    final displayName = _nameController.text.trim().isNotEmpty
+    final name = _nameController.text.trim().isNotEmpty
         ? _nameController.text.trim()
         : 'Patient';
+    final initials = name.trim().split(RegExp(r'\s+')).take(2)
+        .map((w) => w[0].toUpperCase()).join();
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 18),
       decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
+        ],
       ),
       child: Column(
         children: [
           Stack(
             children: [
               Container(
-                width: 88,
-                height: 88,
+                width: 72,
+                height: 72,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kPrimaryBg,
-                  border: Border.all(color: kPrimary, width: 2.5),
+                  gradient: const LinearGradient(
+                    colors: [kPrimary, kPrimaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(Icons.person, size: 44, color: kPrimary),
+                alignment: Alignment.center,
+                child: Text(initials,
+                    style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
               ),
               Positioned(
-                bottom: 2,
-                right: 2,
+                bottom: 0,
+                right: 0,
                 child: GestureDetector(
                   onTap: () {},
                   child: Container(
-                    width: 28,
-                    height: 28,
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
-                      color: kOrange,
+                      color: kWarning,
                       shape: BoxShape.circle,
-                      border: Border.all(color: kCardBg, width: 2.5),
+                      border: Border.all(color: Colors.white, width: 2),
                     ),
-                    child: const Icon(Icons.edit,
-                        size: 13, color: Colors.white),
+                    child: const Icon(Icons.edit_rounded,
+                        size: 12, color: Colors.white),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            displayName,
-            style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: kTextDark),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Tap icon to change photo',
-            style: TextStyle(fontSize: 12, color: kTextMid),
-          ),
+          const SizedBox(height: 8),
+          Text(name,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary)),
+          const SizedBox(height: 2),
+          const Text('Tap icon to change photo',
+              style: TextStyle(fontSize: 11, color: kTextMuted)),
         ],
       ),
     );
   }
 
-  // ── Section card ───────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Section Card
+  // ---------------------------------------------------------------------------
+
   Widget _sectionCard({
-    required Color accentColor,
+    required IconData icon,
+    required Color iconFg,
+    required Color iconBg,
     required String title,
     required List<Widget> children,
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4)),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(children: [
             Container(
-              width: 4,
-              height: 18,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
+                  color: iconBg, borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, size: 15, color: iconFg),
             ),
             const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: kTextDark,
-              ),
-            ),
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
           ]),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+          const Divider(height: 1, color: kBorder),
+          const SizedBox(height: 14),
           ...children,
         ],
       ),
     );
   }
 
-  // ── Field label ────────────────────────────────────────────────
-  Widget _fieldLabel(String label) {
-    return Text(
-      label,
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: kTextMid,
-        letterSpacing: 0.5,
-      ),
+  // ---------------------------------------------------------------------------
+  // Field helpers
+  // ---------------------------------------------------------------------------
+
+  Widget _twoColRow({required Widget left, required Widget right}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 10),
+        Expanded(child: right),
+      ],
     );
   }
 
-  // ── Generic input field ────────────────────────────────────────
-  Widget _inputField({
+  Widget _fieldLabel(String label) => Padding(
+        padding: const EdgeInsets.only(bottom: 0),
+        child: Text(label,
+            style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: kTextSecondary,
+                letterSpacing: 0.3)),
+      );
+
+  InputDecoration _dec({
+    required String hint,
+    required IconData icon,
+    required Color iconColor,
+    Widget? suffix,
+  }) =>
+      InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+        prefixIcon: Icon(icon, size: 17, color: iconColor),
+        suffixIcon: suffix,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: kBorder),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: kPrimary, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: kError),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: kError, width: 1.5),
+        ),
+        errorStyle: const TextStyle(fontSize: 10.5, color: kError),
+      );
+
+  Widget _field({
+    required String label,
     required TextEditingController controller,
     required String hint,
     required IconData icon,
     required Color iconColor,
-    bool isFocused = false,
     int maxLines = 1,
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization capitalization = TextCapitalization.none,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      textCapitalization: capitalization,
-      style: const TextStyle(fontSize: 14, color: kTextDark),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: kMuted, fontSize: 14),
-        prefixIcon: Icon(icon, color: iconColor, size: 20),
-        filled: true,
-        fillColor: isFocused ? const Color(0xFFF8FAFF) : kBg,
-        contentPadding: maxLines > 1
-            ? const EdgeInsets.symmetric(horizontal: 16, vertical: 14)
-            : const EdgeInsets.symmetric(vertical: 15),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kBorder),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel(label),
+        const SizedBox(height: 5),
+        TextFormField(
+          controller: controller,
+          maxLines: maxLines,
+          keyboardType: keyboardType,
+          textCapitalization: capitalization,
+          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          decoration: _dec(hint: hint, icon: icon, iconColor: iconColor),
+          validator: validator,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: isFocused ? kPrimary : kBorder,
-            width: isFocused ? 1.5 : 1,
-          ),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kPrimary, width: 1.8),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kRed),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kRed, width: 1.8),
-        ),
-        errorStyle: const TextStyle(fontSize: 11.5, color: kRed),
-      ),
-      validator: validator,
+      ],
     );
   }
 
-  // ── Mobile field ───────────────────────────────────────────────
   Widget _mobileField() {
-    return TextFormField(
-      controller: _mobileController,
-      keyboardType: TextInputType.phone,
-      maxLength: 10,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      style: const TextStyle(fontSize: 14, color: kTextDark),
-      decoration: InputDecoration(
-        hintText: '3001234567',
-        hintStyle: const TextStyle(color: kMuted, fontSize: 14),
-        counterText: '',
-        prefixIcon: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.phone_outlined, color: kCyan, size: 18),
-              const SizedBox(width: 6),
-              const Text('🇵🇰 +92',
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: kTextDark)),
-              const SizedBox(width: 4),
-              const Icon(Icons.keyboard_arrow_down_rounded,
-                  color: kMuted, size: 16),
-              const SizedBox(width: 6),
-              Container(width: 1, height: 20, color: kBorder),
-              const SizedBox(width: 2),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Mobile Number'),
+        const SizedBox(height: 5),
+        TextFormField(
+          controller: _mobileController,
+          keyboardType: TextInputType.phone,
+          maxLength: 10,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          decoration: InputDecoration(
+            hintText: '10-digit number',
+            hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+            counterText: '',
+            prefixIcon: const Icon(Icons.phone_outlined,
+                color: kPrimary, size: 17),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBorder),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kPrimary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kError),
+            ),
+            errorStyle: const TextStyle(fontSize: 10.5, color: kError),
           ),
+          validator: (v) {
+            if (v == null || v.trim().isEmpty) return 'Mobile is required';
+            if (!RegExp(r'^\d{10}$').hasMatch(v.trim())) {
+              return 'Enter valid 10-digit number';
+            }
+            return null;
+          },
         ),
-        filled: true,
-        fillColor: kBg,
-        contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kPrimary, width: 1.8),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kRed),
-        ),
-        errorStyle: const TextStyle(fontSize: 11.5, color: kRed),
-      ),
-      validator: (v) {
-        if (v == null || v.trim().isEmpty) return 'Mobile is required';
-        if (!RegExp(r'^\d{10}$').hasMatch(v.trim())) {
-          return 'Enter valid 10-digit number';
-        }
-        return null;
-      },
+      ],
     );
   }
 
-  // ── Gender selector ────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Gender Selector
+  // ---------------------------------------------------------------------------
+
   Widget _genderSelector() {
     return Row(
-      children: _genders.map((g) {
-        final isSelected = _selectedGender == g;
-        final index = _genders.indexOf(g);
+      children: _genders.asMap().entries.map((e) {
+        final i   = e.key;
+        final g   = e.value;
+        final sel = _selectedGender == g;
         return Expanded(
           child: Padding(
-            padding:
-                EdgeInsets.only(right: index < _genders.length - 1 ? 8 : 0),
+            padding: EdgeInsets.only(right: i < _genders.length - 1 ? 8 : 0),
             child: GestureDetector(
               onTap: () => setState(() => _selectedGender = g),
               child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 48,
+                duration: const Duration(milliseconds: 160),
+                height: 42,
                 decoration: BoxDecoration(
-                  color: isSelected ? kPrimaryBg : kBg,
-                  borderRadius: BorderRadius.circular(12),
+                  color: sel ? kPrimary : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isSelected ? kPrimary : kBorder,
-                    width: isSelected ? 1.8 : 1,
+                    color: sel ? kPrimary : kBorder,
+                    width: sel ? 1.5 : 1,
                   ),
                 ),
                 child: Row(
@@ -731,20 +752,15 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
                   children: [
                     Icon(
                       _genderIcons[g] ?? Icons.person_outline_rounded,
-                      size: 18,
-                      color: isSelected ? kPrimary : kMuted,
+                      size: 15,
+                      color: sel ? Colors.white : kTextMuted,
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      g,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: isSelected ? kPrimary : kTextMid,
-                      ),
-                    ),
+                    const SizedBox(width: 4),
+                    Text(g,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: sel ? Colors.white : kTextSecondary)),
                   ],
                 ),
               ),
@@ -755,131 +771,146 @@ class _PatientEditProfilePageState extends ConsumerState<PatientEditProfilePage>
     );
   }
 
-  // ── DOB field ──────────────────────────────────────────────────
-  Widget _dobField() {
-    return GestureDetector(
-      onTap: _pickDob,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
-        decoration: BoxDecoration(
-          color: kBg,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kBorder),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.cake_outlined, color: kOrange, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                _formattedDob,
-                style: TextStyle(
-                  fontSize: 14,
-                  color:
-                      _selectedDob != null ? kTextDark : kMuted,
-                ),
-              ),
+  // ---------------------------------------------------------------------------
+  // DOB Tile
+  // ---------------------------------------------------------------------------
+
+  Widget _dobTile() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Date of Birth'),
+        const SizedBox(height: 5),
+        GestureDetector(
+          onTap: _pickDob,
+          child: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder),
             ),
-            const Icon(Icons.calendar_today_outlined,
-                color: kMuted, size: 18),
-          ],
+            child: Row(
+              children: [
+                const Icon(Icons.calendar_month_outlined,
+                    size: 16, color: kWarning),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _formattedDob,
+                    style: TextStyle(
+                        fontSize: 13,
+                        color: _selectedDob != null
+                            ? kTextPrimary
+                            : kTextMuted),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  // ── Blood group picker ─────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Blood Group Picker
+  // ---------------------------------------------------------------------------
+
   Widget _bloodGroupPicker() {
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 7,
+      runSpacing: 7,
       children: _bloodGroups.map((g) {
-        final isSelected = _selectedBloodGroup == g;
+        final sel = _selectedBloodGroup == g;
         return GestureDetector(
           onTap: () => setState(() => _selectedBloodGroup = g),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 60,
-            height: 42,
+            duration: const Duration(milliseconds: 160),
+            width: 52,
+            height: 38,
             decoration: BoxDecoration(
-              color: isSelected ? kRed : kBg,
-              borderRadius: BorderRadius.circular(10),
+              color: sel ? kError : Colors.white,
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected ? kRed : kBorder,
+                color: sel ? kError : kBorder,
               ),
             ),
-            child: Center(
-              child: Text(
-                g,
+            alignment: Alignment.center,
+            child: Text(g,
                 style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.white : kTextMid,
-                ),
-              ),
-            ),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: sel ? Colors.white : kTextSecondary)),
           ),
         );
       }).toList(),
     );
   }
 
-  // ── Weight field ───────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Weight Field
+  // ---------------------------------------------------------------------------
+
   Widget _weightField() {
-    return TextFormField(
-      controller: _weightController,
-      keyboardType:
-          const TextInputType.numberWithOptions(decimal: true),
-      inputFormatters: [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
-      ],
-      style: const TextStyle(fontSize: 14, color: kTextDark),
-      decoration: InputDecoration(
-        hintText: 'e.g. 65.5',
-        hintStyle: const TextStyle(color: kMuted, fontSize: 14),
-        prefixIcon: const Icon(Icons.monitor_weight_outlined,
-            color: kGreen, size: 20),
-        suffixIcon: Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              color: kBorder,
-              borderRadius: BorderRadius.circular(8),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Weight'),
+        const SizedBox(height: 5),
+        TextFormField(
+          controller: _weightController,
+          keyboardType:
+              const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
+          ],
+          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          decoration: InputDecoration(
+            hintText: 'e.g. 65.5',
+            hintStyle:
+                const TextStyle(color: kTextMuted, fontSize: 13),
+            prefixIcon: const Icon(Icons.monitor_weight_outlined,
+                size: 17, color: Color(0xFF38A169)),
+            suffixIcon: Padding(
+              padding: const EdgeInsets.only(right: 10),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 9),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: kBorder,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('kg',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: kTextSecondary)),
+              ),
             ),
-            child: const Text(
-              'kg',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: kTextMid),
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBorder),
             ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kPrimary, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kError),
+            ),
+            errorStyle: const TextStyle(fontSize: 10.5, color: kError),
           ),
+          validator: _validateWeight,
         ),
-        filled: true,
-        fillColor: kBg,
-        contentPadding: const EdgeInsets.symmetric(vertical: 15),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kBorder),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kPrimary, width: 1.8),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: kRed),
-        ),
-        errorStyle: const TextStyle(fontSize: 11.5, color: kRed),
-      ),
-      validator: _validateWeight,
+      ],
     );
   }
 }

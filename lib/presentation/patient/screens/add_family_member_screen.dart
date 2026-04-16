@@ -6,18 +6,26 @@ import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
 
-// ── Colour palette ────────────────────────────────────────────────
-const kPrimary   = Color(0xFF1A73E8);
-const kPrimaryBg = Color(0xFFE8F0FE);
-const kBg        = Color(0xFFF4F6FB);
-const kTextDark  = Color(0xFF1F2937);
-const kTextMid   = Color(0xFF6B7280);
-const kBorder    = Color(0xFFE5E7EB);
-const kRed       = Color(0xFFEA4335);
-const kGreen     = Color(0xFF34A853);
-const kCyan      = Color(0xFF06B6D4);
-const kCyanBg    = Color(0xFFF0F9FF);
-const kCyanBorder = Color(0xFFBAE6FD);
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary       = Color(0xFF26C6B0);
+const kPrimaryDark   = Color(0xFF2BB5A0);
+const kPrimaryLight  = Color(0xFFD9F5F1);
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder        = Color(0xFFEDF2F7);
+const kError         = Color(0xFFFC8181);
+const kRedLight      = Color(0xFFFEE2E2);
+const kInfo          = Color(0xFF3B82F6);
+const kInfoLight     = Color(0xFFDBEAFE);
+const kWarning       = Color(0xFFF6AD55);
+const kAmberLight    = Color(0xFFFEF3C7);
+
+// =============================================================================
+// Screen
+// =============================================================================
 
 class AddFamilyMemberScreen extends ConsumerStatefulWidget {
   final FamilyMember?       existingMember;
@@ -51,16 +59,16 @@ class AddFamilyMemberScreen extends ConsumerStatefulWidget {
 
 class _AddFamilyMemberScreenState
     extends ConsumerState<AddFamilyMemberScreen> {
-  final _formKey        = GlobalKey<FormState>();
-  final _nameCtrl       = TextEditingController();
-  final _mobileCtrl     = TextEditingController();
-  final _dobCtrl        = TextEditingController();
+  final _formKey    = GlobalKey<FormState>();
+  final _nameCtrl   = TextEditingController();
+  final _mobileCtrl = TextEditingController();
+  final _dobCtrl    = TextEditingController();
 
-  int?     _selectedGenderId;
-  int?     _selectedRelationId;
+  int?      _selectedGenderId;
+  int?      _selectedRelationId;
   DateTime? _selectedDate;
-  bool     _isConfirmed = false;
-  bool     _didSubmit   = false;
+  bool      _isConfirmed = false;
+  bool      _didSubmit   = false;
 
   bool get _isEditing => widget.existingMember != null;
 
@@ -77,14 +85,14 @@ class _AddFamilyMemberScreenState
   void _prefillIfEditing() {
     final m = widget.existingMember;
     if (m == null) return;
-    _nameCtrl.text   = m.memberName ?? '';
-    _mobileCtrl.text = m.mobileNo   ?? '';
+    _nameCtrl.text      = m.memberName ?? '';
+    _mobileCtrl.text    = m.mobileNo   ?? '';
     _selectedGenderId   = m.genderId;
     _selectedRelationId = m.relationId;
-    _isConfirmed = true;
+    _isConfirmed        = true;
     if (m.dob != null) {
-      _selectedDate   = m.dob;
-      _dobCtrl.text   = _fmtDate(m.dob!);
+      _selectedDate = m.dob;
+      _dobCtrl.text = _fmtDate(m.dob!);
     }
   }
 
@@ -101,8 +109,8 @@ class _AddFamilyMemberScreenState
   // ---------------------------------------------------------------------------
 
   String _fmtDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')} / '
-      '${d.month.toString().padLeft(2, '0')} / '
+      '${d.day.toString().padLeft(2, '0')}/'
+      '${d.month.toString().padLeft(2, '0')}/'
       '${d.year}';
 
   int _calcAge(DateTime dob) {
@@ -119,7 +127,8 @@ class _AddFamilyMemberScreenState
 
   RelationModel? get _selRelation => widget.relationOptions
       .cast<RelationModel?>()
-      .firstWhere((r) => r?.relationId == _selectedRelationId, orElse: () => null);
+      .firstWhere((r) => r?.relationId == _selectedRelationId,
+          orElse: () => null);
 
   // ---------------------------------------------------------------------------
   // Actions
@@ -148,10 +157,10 @@ class _AddFamilyMemberScreenState
 
   void _onSave() {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedGenderId == null) { _snack('Please select a gender.'); return; }
-    if (_selectedDate    == null) { _snack('Please select a date of birth.'); return; }
-    if (_selectedRelationId == null) { _snack('Please select a relation.'); return; }
-    if (!_isConfirmed)            { _snack('Please confirm the details are accurate.'); return; }
+    if (_selectedGenderId == null)  { _snack('Please select a gender.');        return; }
+    if (_selectedDate == null)       { _snack('Please select date of birth.');   return; }
+    if (_selectedRelationId == null) { _snack('Please select a relation.');      return; }
+    if (!_isConfirmed)               { _snack('Please confirm the details.');    return; }
 
     final patientId = ref.read(patientLoginViewModelProvider).patientId;
     if (patientId == null || patientId == 0) {
@@ -168,21 +177,39 @@ class _AddFamilyMemberScreenState
       dob:          _selectedDate,
       relationId:   _selectedRelationId,
       relationName: _selRelation?.relation,
-      mobileNo:     _mobileCtrl.text.trim().isEmpty ? null : _mobileCtrl.text.trim(),
+      mobileNo:     _mobileCtrl.text.trim().isEmpty
+          ? null
+          : _mobileCtrl.text.trim(),
     );
 
-    debugPrint('SUBMIT DATA: ${member.toJson()}');
     _didSubmit = true;
     ref.read(familyViewModelProvider.notifier).addFamilyMember(member);
   }
 
-  void _snack(String msg) {
+  void _snack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
+        content: Row(
+          children: [
+            Icon(
+              isError
+                  ? Icons.error_outline_rounded
+                  : Icons.check_circle_outline_rounded,
+              size: 15,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(msg,
+                  style: const TextStyle(fontSize: 13, color: Colors.white)),
+            ),
+          ],
+        ),
+        backgroundColor: isError ? kError : kPrimary,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: kTextDark,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
       ),
     );
   }
@@ -216,69 +243,108 @@ class _AddFamilyMemberScreenState
           Navigator.of(context).pop(result);
         });
       }
-      if (next.error != null && next.error != prev?.error) _snack(next.error!);
+      if (next.error != null && next.error != prev?.error) {
+        _snack(next.error!, isError: true);
+      }
     });
 
     final state = ref.watch(familyViewModelProvider);
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                 child: Form(
                   key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Progress
                       _buildProgressBar(),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 16),
 
-                      // Name
-                      _label('Member name', required: true),
-                      const SizedBox(height: 6),
+                      // ── Name ──────────────────────────────────────
+                      _label('Full Name', required: true),
+                      const SizedBox(height: 5),
                       _nameField(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 13),
 
-                      // Gender
+                      // ── Gender ────────────────────────────────────
                       _label('Gender', required: true),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       _genderChips(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 13),
 
-                      // DOB
-                      _label('Date of birth', required: true),
-                      const SizedBox(height: 6),
-                      _dobField(),
-                      if (_selectedDate != null) ...[
-                        const SizedBox(height: 4),
-                        Text('Age: ${_calcAge(_selectedDate!)} years',
-                            style: const TextStyle(
-                                fontSize: 12, color: kCyan, fontWeight: FontWeight.w500)),
-                      ],
-                      const SizedBox(height: 16),
+                      // ── DOB + Relation row ────────────────────────
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _label('Date of Birth', required: true),
+                                const SizedBox(height: 5),
+                                _dobField(),
+                                if (_selectedDate != null) ...[
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: kPrimaryLight,
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          '${_calcAge(_selectedDate!)} yrs',
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                              color: kPrimary),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _label('Relation', required: true),
+                                const SizedBox(height: 5),
+                                _relationDropdown(),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 13),
 
-                      // Relation
-                      _label('Relation', required: true),
-                      const SizedBox(height: 6),
-                      _relationDropdown(),
-                      const SizedBox(height: 16),
-
-                      // Mobile
-                      _label('Mobile number', optional: true),
-                      const SizedBox(height: 6),
+                      // ── Mobile ────────────────────────────────────
+                      _label('Mobile Number', optional: true),
+                      const SizedBox(height: 5),
                       _mobileField(),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 7),
                       _mobileHint(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 13),
 
-                      // Confirm
+                      // ── Confirm ───────────────────────────────────
                       _confirmBox(),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
@@ -292,25 +358,29 @@ class _AddFamilyMemberScreenState
   }
 
   // ---------------------------------------------------------------------------
-  // Header & progress
+  // Header
   // ---------------------------------------------------------------------------
 
   Widget _buildHeader() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: kBorder)),
+      ),
       child: Row(
         children: [
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),
             child: Container(
-              width: 36, height: 36,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
-                color: kPrimaryBg,
+                color: kPrimaryLight,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  size: 16, color: kPrimary),
+                  size: 15, color: kPrimary),
             ),
           ),
           const SizedBox(width: 12),
@@ -318,12 +388,17 @@ class _AddFamilyMemberScreenState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                _isEditing ? 'Edit member' : 'Add new member',
-                style: const TextStyle(fontSize: 17,
-                    fontWeight: FontWeight.w600, color: kTextDark),
+                _isEditing ? 'Edit Member' : 'Add New Member',
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary,
+                    letterSpacing: -0.2),
               ),
-              const Text('Fill in the details below',
-                  style: TextStyle(fontSize: 12, color: kTextMid)),
+              const Text(
+                'Fill in the details below',
+                style: TextStyle(fontSize: 12, color: kTextMuted),
+              ),
             ],
           ),
         ],
@@ -334,33 +409,40 @@ class _AddFamilyMemberScreenState
   Widget _buildProgressBar() {
     return Row(
       children: [
-        _ProgStep(active: false, done: true),
-        const SizedBox(width: 6),
-        _ProgStep(active: true, done: false),
-        const SizedBox(width: 6),
-        _ProgStep(active: false, done: false),
+        _ProgStep(done: true,  active: false),
+        const SizedBox(width: 5),
+        _ProgStep(done: false, active: true),
+        const SizedBox(width: 5),
+        _ProgStep(done: false, active: false),
       ],
     );
   }
 
   // ---------------------------------------------------------------------------
-  // Form fields
+  // Form helpers
   // ---------------------------------------------------------------------------
 
-  Widget _label(String text, {bool required = false, bool optional = false}) {
+  Widget _label(String text,
+      {bool required = false, bool optional = false}) {
     return RichText(
       text: TextSpan(
         text: text,
-        style: const TextStyle(fontSize: 13,
-            fontWeight: FontWeight.w500, color: kTextDark),
+        style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: kTextPrimary),
         children: [
           if (required)
-            const TextSpan(text: ' *',
-                style: TextStyle(color: kRed, fontSize: 13)),
+            const TextSpan(
+                text: ' *',
+                style: TextStyle(color: kError, fontSize: 12)),
           if (optional)
-            const TextSpan(text: '  (optional)',
-                style: TextStyle(color: kPrimary,
-                    fontSize: 12, fontWeight: FontWeight.w400)),
+            const TextSpan(
+                text: '  optional',
+                style: TextStyle(
+                    color: kTextMuted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400)),
         ],
       ),
     );
@@ -368,33 +450,35 @@ class _AddFamilyMemberScreenState
 
   InputDecoration _dec(String hint, {Widget? suffix}) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+    hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+    contentPadding:
+        const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
     filled: true,
     fillColor: Colors.white,
     suffixIcon: suffix,
     enabledBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: kBorder, width: 0.8),
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: kBorder, width: 1),
     ),
     focusedBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       borderSide: const BorderSide(color: kPrimary, width: 1.5),
     ),
     errorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: kRed, width: 1),
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: kError, width: 1),
     ),
     focusedErrorBorder: OutlineInputBorder(
-      borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: kRed, width: 1.5),
+      borderRadius: BorderRadius.circular(10),
+      borderSide: const BorderSide(color: kError, width: 1.5),
     ),
+    errorStyle: const TextStyle(fontSize: 11, color: kError),
   );
 
   Widget _nameField() => TextFormField(
     controller: _nameCtrl,
     textCapitalization: TextCapitalization.words,
-    style: const TextStyle(fontSize: 14, color: kTextDark),
+    style: const TextStyle(fontSize: 14, color: kTextPrimary),
     decoration: _dec('Enter full name'),
     validator: (v) =>
         (v == null || v.trim().isEmpty) ? 'Name is required' : null,
@@ -408,22 +492,25 @@ class _AddFamilyMemberScreenState
         child: GestureDetector(
           onTap: () => setState(() => _selectedGenderId = opt.genderId),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+            duration: const Duration(milliseconds: 160),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: sel ? kPrimary : Colors.white,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
                 color: sel ? kPrimary : kBorder,
-                width: sel ? 1.5 : 0.8,
+                width: sel ? 1.5 : 1,
               ),
             ),
-            child: Text(opt.gender ?? '',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: sel ? Colors.white : kTextMid,
-                )),
+            child: Text(
+              opt.gender ?? '',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: sel ? Colors.white : kTextSecondary,
+              ),
+            ),
           ),
         ),
       );
@@ -434,29 +521,33 @@ class _AddFamilyMemberScreenState
     controller: _dobCtrl,
     readOnly: true,
     onTap: _pickDate,
-    style: const TextStyle(fontSize: 14, color: kTextDark),
+    style: const TextStyle(fontSize: 13, color: kTextPrimary),
     decoration: _dec(
-      'DD / MM / YYYY',
+      'DD/MM/YYYY',
       suffix: GestureDetector(
         onTap: _pickDate,
         child: const Padding(
           padding: EdgeInsets.all(10),
-          child: Icon(Icons.calendar_today_outlined,
-              size: 18, color: kTextMid),
+          child: Icon(Icons.calendar_month_outlined,
+              size: 17, color: kTextMuted),
         ),
       ),
     ),
     validator: (v) =>
-        (v == null || v.trim().isEmpty) ? 'Date of birth is required' : null,
+        (v == null || v.trim().isEmpty) ? 'Required' : null,
   );
 
   Widget _relationDropdown() => DropdownButtonFormField<int>(
     value: _selectedRelationId,
     decoration: _dec(''),
-    icon: const Icon(Icons.keyboard_arrow_down_rounded, color: kTextMid),
-    hint: const Text('Select relation',
-        style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 14)),
-    style: const TextStyle(fontSize: 14, color: kTextDark),
+    isExpanded: true,
+    icon: const Icon(Icons.keyboard_arrow_down_rounded,
+        size: 18, color: kTextMuted),
+    hint: const Text('Select',
+        style: TextStyle(color: kTextMuted, fontSize: 13)),
+    style: const TextStyle(fontSize: 13, color: kTextPrimary),
+    dropdownColor: Colors.white,
+    borderRadius: BorderRadius.circular(12),
     items: widget.relationOptions
         .map((r) => DropdownMenuItem<int>(
               value: r.relationId,
@@ -464,85 +555,97 @@ class _AddFamilyMemberScreenState
             ))
         .toList(),
     onChanged: (val) => setState(() => _selectedRelationId = val),
-    validator: (v) => v == null ? 'Please select a relation' : null,
+    validator: (v) => v == null ? 'Required' : null,
   );
 
   Widget _mobileField() => TextFormField(
     controller: _mobileCtrl,
     keyboardType: TextInputType.phone,
-    style: const TextStyle(fontSize: 14, color: kTextDark),
+    style: const TextStyle(fontSize: 14, color: kTextPrimary),
     inputFormatters: [
       FilteringTextInputFormatter.digitsOnly,
       LengthLimitingTextInputFormatter(10),
     ],
-    decoration: _dec('Enter 10-digit number'),
+    decoration: _dec('10-digit mobile number'),
   );
 
   Widget _mobileHint() => Container(
-    padding: const EdgeInsets.all(10),
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
     decoration: BoxDecoration(
-      color: kCyanBg,
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: kCyanBorder, width: 0.8),
+      color: kInfoLight.withOpacity(0.4),
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: kInfoLight, width: 1),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF0891B2)),
+        const Icon(Icons.info_outline_rounded, size: 13, color: kInfo),
         const SizedBox(width: 6),
-        const Expanded(
-          child: Text(
-            'This number will be used to access your benefits and cannot be changed once verified.',
-            style: TextStyle(fontSize: 12, color: Color(0xFF0C4A6E), height: 1.5),
+        Expanded(
+          child: const Text(
+            'This number will be used to access benefits and cannot be changed once verified.',
+            style: TextStyle(
+                fontSize: 11, color: kInfo, height: 1.5),
           ),
         ),
         const SizedBox(width: 8),
         GestureDetector(
-          onTap: () {}, // TODO: verify flow
-          child: const Text('Verify now',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+          onTap: () {},
+          child: const Text(
+            'Verify',
+            style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
                 color: kPrimary,
                 decoration: TextDecoration.underline,
-              )),
+                decorationColor: kPrimary),
+          ),
         ),
       ],
     ),
   );
 
-  Widget _confirmBox() => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: kBorder, width: 0.8),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 20, height: 20,
-          child: Checkbox(
-            value: _isConfirmed,
-            onChanged: (v) => setState(() => _isConfirmed = v ?? false),
-            activeColor: kPrimary,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            side: const BorderSide(color: Color(0xFFD1D5DB)),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity.compact,
-          ),
+  Widget _confirmBox() => GestureDetector(
+    onTap: () => setState(() => _isConfirmed = !_isConfirmed),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _isConfirmed ? kPrimaryLight.withOpacity(0.5) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _isConfirmed ? kPrimary : kBorder,
+          width: _isConfirmed ? 1.5 : 1,
         ),
-        const SizedBox(width: 10),
-        const Expanded(
-          child: Text(
-            'I confirm that the above details provided are accurate. '
-            "I acknowledge it's my responsibility to provide correct "
-            'and updated information for availing benefits/services.',
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF4B5563), height: 1.5),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 18,
+            height: 18,
+            child: Checkbox(
+              value: _isConfirmed,
+              onChanged: (v) => setState(() => _isConfirmed = v ?? false),
+              activeColor: kPrimary,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4)),
+              side: const BorderSide(color: kTextMuted),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'I confirm the details provided are accurate and acknowledge my responsibility to provide correct information for availing benefits/services.',
+              style: TextStyle(
+                  fontSize: 11.5,
+                  color: kTextSecondary,
+                  height: 1.55),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -553,36 +656,40 @@ class _AddFamilyMemberScreenState
   Widget _saveButton({required bool isLoading}) {
     final enabled = _isConfirmed && !isLoading;
     return Container(
-      color: Colors.white,
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: kBorder)),
+      ),
       child: SizedBox(
         width: double.infinity,
-        height: 52,
+        height: 48,
         child: ElevatedButton(
           onPressed: enabled ? _onSave : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimary,
-            disabledBackgroundColor: const Color(0xFF93C5FD),
+            disabledBackgroundColor: kPrimaryLight,
             foregroundColor: Colors.white,
             elevation: 0,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
+                borderRadius: BorderRadius.circular(12)),
           ),
           child: isLoading
               ? const SizedBox(
-                  width: 22, height: 22,
+                  width: 20,
+                  height: 20,
                   child: CircularProgressIndicator(
                       strokeWidth: 2.5, color: Colors.white),
                 )
               : Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.check_circle_outline_rounded, size: 18),
-                    const SizedBox(width: 8),
+                    const Icon(Icons.check_circle_outline_rounded, size: 17),
+                    const SizedBox(width: 6),
                     Text(
-                      _isEditing ? 'Update & continue' : 'Save & continue',
-                      style: const TextStyle(fontSize: 15,
-                          fontWeight: FontWeight.w500),
+                      _isEditing ? 'Update & Continue' : 'Save & Continue',
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
@@ -592,9 +699,9 @@ class _AddFamilyMemberScreenState
   }
 }
 
-// ---------------------------------------------------------------------------
-// Progress step widget
-// ---------------------------------------------------------------------------
+// =============================================================================
+// Progress step
+// =============================================================================
 
 class _ProgStep extends StatelessWidget {
   final bool active;
@@ -606,11 +713,16 @@ class _ProgStep extends StatelessWidget {
     final color = done
         ? kPrimary
         : active
-            ? kCyan
+            ? kPrimary.withOpacity(0.4)
             : kBorder;
     return Expanded(
-      child: Container(height: 3, decoration: BoxDecoration(
-        color: color, borderRadius: BorderRadius.circular(2))),
+      child: Container(
+        height: 3,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
     );
   }
 }

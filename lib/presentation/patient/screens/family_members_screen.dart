@@ -5,19 +5,58 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
-// ── Colour palette ────────────────────────────────────────────────
-const kPrimary   = Color(0xFF1A73E8);
-const kPrimaryBg = Color(0xFFE8F0FE);
-const kBg        = Color(0xFFF4F6FB);
-const kCardBg    = Colors.white;
-const kTextDark  = Color(0xFF1F2937);
-const kTextMid   = Color(0xFF6B7280);
-const kBorder    = Color(0xFFE5E7EB);
-const kRed       = Color(0xFFEA4335);
-const kGreen     = Color(0xFF34A853);
-const kOrange    = Color(0xFFF59E0B);
-const kPurple    = Color(0xFF8B5CF6);
-const kCyan      = Color(0xFF06B6D4);
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary       = Color(0xFF26C6B0);
+const kPrimaryDark   = Color(0xFF2BB5A0);
+const kPrimaryLight  = Color(0xFFD9F5F1);
+const kBgLight       = Colors.white;
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder        = Color(0xFFEDF2F7);
+const kDivider       = Color(0xFFE5E7EB);
+const kCardBg        = Colors.white;
+const kBg            = Colors.white;
+
+const kSuccess       = Color(0xFF68D391);
+const kWarning       = Color(0xFFF6AD55);
+const kError         = Color(0xFFFC8181);
+const kInfo          = Color(0xFF3B82F6);
+const kPurple        = Color(0xFF9F7AEA);
+const kIndigo        = Color(0xFF7F9CF5);
+
+const kBlueLight     = Color(0xFFDBEAFE);
+const kGreenLight    = Color(0xFFDCFCE7);
+const kAmberLight    = Color(0xFFFEF3C7);
+const kPurpleLight   = Color(0xFFEDE9FE);
+const kRedLight      = Color(0xFFFEE2E2);
+
+// ── Shadow helper ─────────────────────────────────────────────────────────────
+BoxDecoration _cardDecoration({
+  Color color = kCardBg,
+  double radius = 14,
+  bool elevated = true,
+}) =>
+    BoxDecoration(
+      color: color,
+      borderRadius: BorderRadius.circular(radius),
+      border: Border.all(color: kBorder),
+      boxShadow: elevated
+          ? [
+              BoxShadow(
+                color: const Color(0xFF000000).withOpacity(0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ]
+          : null,
+    );
+
+// =============================================================================
+// Screen
+// =============================================================================
 
 class FamilyMembersScreen extends ConsumerStatefulWidget {
   const FamilyMembersScreen({super.key});
@@ -44,9 +83,9 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
     super.initState();
     Future.microtask(_ensurePatientIdAndFetch);
     Future.microtask(_ensureSelfProfile);
-    _searchController.addListener(() {
-      setState(() => _searchQuery = _searchController.text.toLowerCase());
-    });
+    _searchController.addListener(
+      () => setState(() => _searchQuery = _searchController.text.toLowerCase()),
+    );
   }
 
   @override
@@ -86,7 +125,9 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
     if (hasSelfDetails) return;
     final mobile = state.mobileNo;
     if (mobile != null && mobile.trim().isNotEmpty) {
-      await ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+      await ref
+          .read(patientLoginViewModelProvider.notifier)
+          .checkPhonePatient(mobile);
     }
   }
 
@@ -105,24 +146,29 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
   bool _isSelf(FamilyMember m, int patientId) {
     final relation = m.relationName?.trim().toLowerCase();
     if (relation == 'self') return true;
-    // Only fallback to memberId match when relation isn't set
     final relationEmpty = relation == null || relation.isEmpty;
     return relationEmpty && patientId != 0 && m.memberId == patientId;
   }
 
+  // Teal-centric avatar palette
   Color _avatarBg(int index) {
-    const colors = [kPrimaryBg, Color(0xFFCFFAFE), Color(0xFFDCFCE7),
-                    Color(0xFFEDE9FE), Color(0xFFFEF3C7)];
+    const colors = [
+      kPrimaryLight,
+      kBlueLight,
+      kGreenLight,
+      kPurpleLight,
+      kAmberLight,
+    ];
     return colors[index % colors.length];
   }
 
   Color _avatarFg(int index) {
-    const colors = [kPrimary, kCyan, kGreen, kPurple, kOrange];
+    const colors = [kPrimary, kInfo, kSuccess, kPurple, kWarning];
     return colors[index % colors.length];
   }
 
   // ---------------------------------------------------------------------------
-  // Navigation
+  // Navigation / actions
   // ---------------------------------------------------------------------------
 
   Future<void> _refresh() async {
@@ -155,32 +201,79 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
   Future<void> _onDeleteMember(FamilyMember member) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
+      builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Remove Member',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600,
-                color: kTextDark)),
-        content: Text(
-          'Remove ${member.memberName ?? 'this member'} from your family list?',
-          style: const TextStyle(fontSize: 14, color: kTextMid),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon badge
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: kRedLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.person_remove_outlined,
+                    size: 22, color: kError),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Remove Member',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Remove ${member.memberName ?? 'this member'} from your family list?',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13, color: kTextSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: kBorder),
+                        foregroundColor: kTextSecondary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text('Cancel',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kError,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text('Remove',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: kTextMid)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remove'),
-          ),
-        ],
       ),
     );
 
@@ -188,13 +281,7 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       final memberId = member.memberId;
       if (memberId == null || memberId == 0) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Unable to delete: missing member id'),
-            backgroundColor: kRed,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSnack('Unable to delete: missing member id', isError: true);
         return;
       }
 
@@ -206,26 +293,39 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       if (familyState.isSuccess) {
         await _refresh();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message ?? 'Member deleted successfully'),
-            backgroundColor: kGreen,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        _showSnack(message ?? 'Member deleted successfully');
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              message ?? familyState.error ?? 'Failed to delete member',
-            ),
-            backgroundColor: kRed,
-            behavior: SnackBarBehavior.floating,
-          ),
+        _showSnack(
+          message ?? familyState.error ?? 'Failed to delete member',
+          isError: true,
         );
       }
     }
+  }
+
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_outline,
+              size: 16,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+                child: Text(msg,
+                    style: const TextStyle(fontSize: 13, color: Colors.white))),
+          ],
+        ),
+        backgroundColor: isError ? kError : kPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -243,10 +343,10 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
     });
 
     final familyState = ref.watch(familyViewModelProvider);
-    final loginState = ref.watch(patientLoginViewModelProvider);
+    final loginState  = ref.watch(patientLoginViewModelProvider);
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
@@ -276,7 +376,8 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       return _buildEmptyState(
         icon: Icons.lock_outline_rounded,
         message: 'Please login again\nto load members',
-        iconColor: kOrange,
+        iconColor: kWarning,
+        bgColor: kAmberLight,
       );
     }
 
@@ -285,13 +386,13 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       data: (list) => list.isNotEmpty ? list.first : null,
       orElse: () => null,
     );
-    final rawSelfName = selfDetails?.name ?? state.name;
-    final selfName = (rawSelfName != null && rawSelfName.trim().isNotEmpty)
+    final rawSelfName  = selfDetails?.name ?? state.name;
+    final selfName     = (rawSelfName != null && rawSelfName.trim().isNotEmpty)
         ? rawSelfName.trim()
         : 'You';
-    final selfMobile = selfDetails?.mobileNo ?? state.mobileNo;
+    final selfMobile   = selfDetails?.mobileNo ?? state.mobileNo;
 
-    final hasSelf = members.any((m) => _isSelf(m, patientId));
+    final hasSelf    = members.any((m) => _isSelf(m, patientId));
     final selfMember = (!hasSelf && patientId != 0)
         ? FamilyMember(
             familyId:     patientId,
@@ -309,7 +410,6 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       ...members,
     ];
 
-    // Filter by search
     final filtered = _searchQuery.isEmpty
         ? displayMembers
         : displayMembers
@@ -322,30 +422,32 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       return _buildEmptyState(
         icon: Icons.people_outline_rounded,
         message: _searchQuery.isEmpty
-            ? 'No family members found'
+            ? 'No family members yet.\nTap + to add one.'
             : 'No results for "$_searchQuery"',
-        iconColor: kCyan,
+        iconColor: kPrimary,
+        bgColor: kPrimaryLight,
       );
     }
 
     return RefreshIndicator(
       color: kPrimary,
+      strokeWidth: 2,
       onRefresh: _refresh,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final member = filtered[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _FamilyMemberCard(
-              member:    member,
-              age:       member.dob != null ? _ageFrom(member.dob!) : null,
-              isSelf:    _isSelf(member, patientId),
-              avatarBg:  _avatarBg(index),
-              avatarFg:  _avatarFg(index),
-              onEdit:    () => _onEditMember(member),
-              onDelete:  () => _onDeleteMember(member),
+              member:   member,
+              age:      member.dob != null ? _ageFrom(member.dob!) : null,
+              isSelf:   _isSelf(member, patientId),
+              avatarBg: _avatarBg(index),
+              avatarFg: _avatarFg(index),
+              onEdit:   () => _onEditMember(member),
+              onDelete: () => _onDeleteMember(member),
             ),
           );
         },
@@ -358,49 +460,74 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
   // ---------------------------------------------------------------------------
 
   Widget _buildHeader() {
-    final name = ref.read(patientLoginViewModelProvider).name ?? 'Patient';
+    final name     = ref.read(patientLoginViewModelProvider).name ?? 'Patient';
     final initials = name.trim().isNotEmpty
         ? name.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
         : '?';
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      color: kBg,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Row(
         children: [
+          // Back button
           GestureDetector(
             onTap: () => Navigator.pop(context),
             child: Container(
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: kPrimaryBg,
+                color: kPrimaryLight,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  size: 16, color: kPrimary),
+                  size: 15, color: kPrimary),
             ),
           ),
           const SizedBox(width: 12),
+
+          // Title block
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Family Members',
-                    style: TextStyle(fontSize: 17,
-                        fontWeight: FontWeight.w600, color: kTextDark)),
-                const SizedBox(height: 1),
-                Text('Manage your family health profiles',
-                    style: const TextStyle(fontSize: 11.5, color: kTextMid)),
+              children: const [
+                Text(
+                  'Family Members',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                      letterSpacing: -0.2),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'Manage your health profiles',
+                  style: TextStyle(fontSize: 12, color: kTextMuted),
+                ),
               ],
             ),
           ),
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: kPrimary,
-            child: Text(initials,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
-                    color: Colors.white)),
+
+          // Avatar
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [kPrimary, kPrimaryDark],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              initials,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -409,12 +536,12 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
 
   Widget _buildSearchBar() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+      color: kBg,
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
       child: Container(
-        height: 40,
+        height: 42,
         decoration: BoxDecoration(
-          color: kBg,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: kBorder),
         ),
@@ -422,15 +549,16 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
           children: [
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Icon(Icons.search_rounded, size: 18, color: kTextMid),
+              child: Icon(Icons.search_rounded, size: 17, color: kTextMuted),
             ),
             Expanded(
               child: TextField(
                 controller: _searchController,
-                style: const TextStyle(fontSize: 14, color: kTextDark),
+                style: const TextStyle(
+                    fontSize: 14, color: kTextPrimary),
                 decoration: const InputDecoration(
-                  hintText: 'Search members...',
-                  hintStyle: TextStyle(fontSize: 14, color: kTextMid),
+                  hintText: 'Search members…',
+                  hintStyle: TextStyle(fontSize: 14, color: kTextMuted),
                   border: InputBorder.none,
                   isDense: true,
                 ),
@@ -439,9 +567,16 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
             if (_searchQuery.isNotEmpty)
               GestureDetector(
                 onTap: () => _searchController.clear(),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Icon(Icons.close_rounded, size: 16, color: kTextMid),
+                child: Container(
+                  margin: const EdgeInsets.only(right: 10),
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: kTextMuted,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      size: 12, color: Colors.white),
                 ),
               ),
           ],
@@ -452,37 +587,53 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
 
   Widget _buildAddButton() {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+      color: kBg,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
       child: SizedBox(
         width: double.infinity,
-        height: 52,
-        child: ElevatedButton.icon(
+        height: 48,
+        child: ElevatedButton(
           onPressed: _onAddMember,
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimary,
             foregroundColor: Colors.white,
             elevation: 0,
+            shadowColor: Colors.transparent,
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
+                borderRadius: BorderRadius.circular(12)),
           ),
-          icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
-          label: const Text('Add New Member',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.add_rounded, size: 19),
+              SizedBox(width: 6),
+              Text('Add New Member',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w600)),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildLoading() {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5),
-          SizedBox(height: 12),
-          Text('Loading members...',
-              style: TextStyle(fontSize: 14, color: kTextMid)),
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: CircularProgressIndicator(
+              color: kPrimary,
+              strokeWidth: 2.5,
+              backgroundColor: kPrimaryLight,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text('Loading members…',
+              style: TextStyle(fontSize: 13, color: kTextMuted)),
         ],
       ),
     );
@@ -495,21 +646,42 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 40, color: kRed),
-            const SizedBox(height: 10),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                  color: kRedLight, shape: BoxShape.circle),
+              child: const Icon(Icons.wifi_off_rounded,
+                  size: 26, color: kError),
+            ),
+            const SizedBox(height: 12),
+            const Text('Failed to load',
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: kTextPrimary)),
+            const SizedBox(height: 4),
             Text(message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: kTextMid)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _refresh,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                style: const TextStyle(
+                    fontSize: 12, color: kTextSecondary, height: 1.5)),
+            const SizedBox(height: 18),
+            SizedBox(
+              height: 38,
+              child: ElevatedButton(
+                onPressed: _refresh,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                ),
+                child: const Text('Retry',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
               ),
-              child: const Text('Retry'),
             ),
           ],
         ),
@@ -521,6 +693,7 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
     required IconData icon,
     required String message,
     required Color iconColor,
+    required Color bgColor,
   }) {
     return Center(
       child: Column(
@@ -530,25 +703,27 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
+              color: bgColor,
               shape: BoxShape.circle,
             ),
-            child: Icon(icon, size: 30, color: iconColor),
+            child: Icon(icon, size: 28, color: iconColor),
           ),
           const SizedBox(height: 12),
-          Text(message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: kTextMid,
-                  height: 1.5)),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+                fontSize: 13, color: kTextSecondary, height: 1.6),
+          ),
         ],
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
+// =============================================================================
 // Member Card
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 class _FamilyMemberCard extends StatelessWidget {
   final FamilyMember  member;
@@ -571,36 +746,36 @@ class _FamilyMemberCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final relation  = member.relationName ?? '';
-    final gender    = member.genderName   ?? '';
-    final ageText   = age != null ? '$age yrs' : '';
-    final letter    = member.avatarLetter;
+    final relation = member.relationName ?? '';
+    final gender   = member.genderName   ?? '';
+    final ageText  = age != null ? '$age yrs' : '';
+    final letter   = member.avatarLetter;
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorder),
-      ),
+      decoration: _cardDecoration(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            // ── Avatar ──
+            // ── Avatar ──────────────────────────────────────────────
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 48,
-                  height: 48,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     color: avatarBg,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   alignment: Alignment.center,
-                  child: Text(letter,
-                      style: TextStyle(fontSize: 16,
-                          fontWeight: FontWeight.w600, color: avatarFg)),
+                  child: Text(
+                    letter,
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: avatarFg),
+                  ),
                 ),
                 if (isSelf)
                   Positioned(
@@ -612,7 +787,8 @@ class _FamilyMemberCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: kPrimary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                        border:
+                            Border.all(color: Colors.white, width: 2),
                       ),
                       child: const Icon(Icons.check_rounded,
                           size: 9, color: Colors.white),
@@ -622,59 +798,79 @@ class _FamilyMemberCard extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // ── Info ──
+            // ── Info ─────────────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(member.memberName ?? '',
-                      style: const TextStyle(fontSize: 15,
-                          fontWeight: FontWeight.w500, color: kTextDark),
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          member.memberName ?? '',
+                          style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isSelf)
+                        _Badge(
+                          'You',
+                          bg: kPrimaryLight,
+                          fg: kPrimary,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
                   Wrap(
                     spacing: 5,
                     runSpacing: 4,
                     children: [
-
-                  
-                     if (relation.isNotEmpty)
-                        _Badge(relation, bg: kPrimaryBg, fg: kPrimary),
+                      if (relation.isNotEmpty && relation.toLowerCase() != 'self')
+                        _Badge(relation, bg: kPrimaryLight, fg: kPrimary),
                       if (gender.isNotEmpty)
-                        _Badge(gender, bg: kBg, fg: kTextMid),
+                        _Badge(
+                          gender,
+                          bg: const Color(0xFFF0F4FF),
+                          fg: kIndigo,
+                        ),
                       if (ageText.isNotEmpty)
-                        _Badge(ageText,
-                            bg: const Color(0xFFCFFAFE),
-                            fg: const Color(0xFF0891B2)),
+                        _Badge(
+                          ageText,
+                          bg: kGreenLight,
+                          fg: const Color(0xFF38A169),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
 
-            // ── Actions ──
-            if (!isSelf)
-              Row(
-                mainAxisSize: MainAxisSize.min,
+            // ── Actions ───────────────────────────────────────────────
+            if (!isSelf) ...[
+              const SizedBox(width: 8),
+              Column(
                 children: [
                   _IconBtn(
-                    icon:    Icons.edit_outlined,
-                    bg:      kPrimaryBg,
+                    icon:    Icons.edit_rounded,
+                    bg:      kPrimaryLight,
                     fg:      kPrimary,
                     onTap:   onEdit,
                     tooltip: 'Edit',
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(height: 6),
                   _IconBtn(
                     icon:    Icons.delete_outline_rounded,
-                    bg:      const Color(0xFFFEE2E2),
-                    fg:      kRed,
+                    bg:      kRedLight,
+                    fg:      kError,
                     onTap:   onDelete,
                     tooltip: 'Remove',
                   ),
                 ],
               ),
+            ],
           ],
         ),
       ),
@@ -682,27 +878,30 @@ class _FamilyMemberCard extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
+// =============================================================================
 // Tiny reusable widgets
-// ---------------------------------------------------------------------------
+// =============================================================================
 
 class _Badge extends StatelessWidget {
   final String label;
   final Color  bg;
   final Color  fg;
+
   const _Badge(this.label, {required this.bg, required this.fg});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(label,
-          style: TextStyle(fontSize: 11,
-              fontWeight: FontWeight.w500, color: fg)),
+      child: Text(
+        label,
+        style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600, color: fg),
+      ),
     );
   }
 }
@@ -713,8 +912,14 @@ class _IconBtn extends StatelessWidget {
   final Color        fg;
   final VoidCallback onTap;
   final String       tooltip;
-  const _IconBtn({required this.icon, required this.bg, required this.fg,
-      required this.onTap, required this.tooltip});
+
+  const _IconBtn({
+    required this.icon,
+    required this.bg,
+    required this.fg,
+    required this.onTap,
+    required this.tooltip,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -729,7 +934,7 @@ class _IconBtn extends StatelessWidget {
             color: bg,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 16, color: fg),
+          child: Icon(icon, size: 15, color: fg),
         ),
       ),
     );

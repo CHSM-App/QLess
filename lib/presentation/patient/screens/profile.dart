@@ -10,57 +10,66 @@ import 'package:qless/presentation/patient/screens/patient_edit_profile.dart'
     show PatientEditProfilePage;
 import 'package:qless/presentation/shared/screens/continue_as.dart';
 
-// ── Colour palette ─────────────────────────────────────────────
-const kPrimary    = Color(0xFF1A73E8);
-const kPrimaryBg  = Color(0xFFE8F0FE);
-const kPrimaryText= Color(0xFF1558A8);
-const kBg         = Color(0xFFF7F8FA);
-const kCardBg     = Colors.white;
-const kTextDark   = Color(0xFF111827);
-const kTextMid    = Color(0xFF6B7280);
-const kTextLight  = Color(0xFF9CA3AF);
-const kBorder     = Color(0xFFE5E7EB);
-const kRed        = Color(0xFFDC2626);
-const kRedBg      = Color(0xFFFEF2F2);
-const kRedText    = Color(0xFFA02B2B);
-const kRedBadgeBg = Color(0xFFFDEBEB);
-const kGreen      = Color(0xFF1E7D3A);
-const kGreenBg    = Color(0xFFE6F4EA);
-const kOrange     = Color(0xFFC2620A);
-const kOrangeBg   = Color(0xFFFFF7ED);
-const kPurple     = Color(0xFF7C3AED);
-const kPurpleBg   = Color(0xFFF5F3FF);
-const kCyan       = Color(0xFF0891B2);
-const kCyanBg     = Color(0xFFEFF9F6);
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder   = Color(0xFFEDF2F7);
+const kDivider  = Color(0xFFE5E7EB);
+
+const kError    = Color(0xFFFC8181);
+const kRedLight = Color(0xFFFEE2E2);
+
+const kSuccess      = Color(0xFF68D391);
+const kGreenLight   = Color(0xFFDCFCE7);
+
+const kWarning      = Color(0xFFF6AD55);
+const kAmberLight   = Color(0xFFFEF3C7);
+
+const kPurple       = Color(0xFF9F7AEA);
+const kPurpleLight  = Color(0xFFEDE9FE);
+
+const kInfo         = Color(0xFF3B82F6);
+const kInfoLight    = Color(0xFFDBEAFE);
+
+const kIndigo       = Color(0xFF7F9CF5);
+const kIndigoLight  = Color(0xFFE0E7FF);
+
+// =============================================================================
+// Screen
+// =============================================================================
 
 class PatientProfilePage extends ConsumerStatefulWidget {
   const PatientProfilePage({super.key});
 
   @override
-  ConsumerState<PatientProfilePage> createState() =>
-      _PatientProfilePageState();
+  ConsumerState<PatientProfilePage> createState() => _PatientProfilePageState();
 }
 
 class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
-  late final ProviderSubscription<PatientLoginState> _patientLoginSub;
+  late final ProviderSubscription<PatientLoginState> _sub;
   bool _didFetchProfile = false;
 
   @override
   void initState() {
     super.initState();
-    _patientLoginSub = ref.listenManual<PatientLoginState>(
+    _sub = ref.listenManual<PatientLoginState>(
       patientLoginViewModelProvider,
       (prev, next) => _maybeFetchProfile(next),
     );
     Future.microtask(() {
-      final state = ref.read(patientLoginViewModelProvider);
-      _maybeFetchProfile(state);
+      _maybeFetchProfile(ref.read(patientLoginViewModelProvider));
     });
   }
 
   @override
   void dispose() {
-    _patientLoginSub.close();
+    _sub.close();
     super.dispose();
   }
 
@@ -69,65 +78,72 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     final mobile = state.mobileNo;
     if (mobile != null && mobile.trim().isNotEmpty) {
       _didFetchProfile = true;
-      ref
-          .read(patientLoginViewModelProvider.notifier)
-          .checkPhonePatient(mobile);
+      ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final patientState = ref.watch(patientLoginViewModelProvider);
-    final patientDetails = patientState.patientPhoneCheck.maybeWhen(
+    final state   = ref.watch(patientLoginViewModelProvider);
+    final details = state.patientPhoneCheck.maybeWhen(
       data: (list) => list.isNotEmpty ? list.first : null,
       orElse: () => null,
     );
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: Colors.white,
       appBar: _buildAppBar(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 100),
         child: Column(
           children: [
-            _buildProfileCard(patientState, patientDetails),
-            const SizedBox(height: 12),
-            _buildStatsRow(patientDetails),
-            const SizedBox(height: 12),
+            _buildProfileCard(state, details),
+            const SizedBox(height: 10),
+            _buildStatsRow(details),
+            const SizedBox(height: 10),
             _buildEditButton(context),
-            const SizedBox(height: 16),
-            _buildAccountSection(context, ref, patientState, patientDetails),
-            const SizedBox(height: 32),
+            const SizedBox(height: 14),
+            _buildAccountSection(context, ref, state, details),
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
 
-  // ── AppBar ─────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // AppBar
+  // ---------------------------------------------------------------------------
+
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
-      backgroundColor: kCardBg,
+      backgroundColor: Colors.white,
       elevation: 0,
       automaticallyImplyLeading: false,
       centerTitle: true,
       title: const Text(
         'My Profile',
         style: TextStyle(
-          color: kTextDark,
-          fontSize: 15,
-          fontWeight: FontWeight.w600,
-        ),
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: kTextPrimary,
+            letterSpacing: -0.2),
       ),
-    
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(0.5),
-        child: Container(color: kBorder, height: 0.5),
+        preferredSize: const Size.fromHeight(1),
+        child: Container(color: kBorder, height: 1),
       ),
     );
   }
 
-  // ── Profile Card ───────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Profile Card
+  // ---------------------------------------------------------------------------
+
   Widget _buildProfileCard(PatientLoginState state, Patients? details) {
     final displayName = details?.name ?? state.name ?? 'Patient';
     final email       = details?.email ?? state.email ?? '';
@@ -141,13 +157,20 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     final contactLine = _joinNonEmpty([email, mobile], separator: ' · ');
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
       decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: kBorder, width: 0.5),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -155,26 +178,28 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Initials avatar
+              // Gradient avatar
               Container(
-                width: 60,
-                height: 60,
+                width: 54,
+                height: 54,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: kPrimaryBg,
-                  border: Border.all(color: kPrimary, width: 2),
+                  gradient: const LinearGradient(
+                    colors: [kPrimary, kPrimaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
                 child: Text(
                   initials,
                   style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                    color: kPrimary,
-                  ),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -182,32 +207,27 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                     Text(
                       displayName,
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: kTextDark,
-                      ),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary),
                     ),
                     if (contactLine.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        contactLine,
-                        style: const TextStyle(
-                            fontSize: 12, color: kTextMid),
-                      ),
+                      const SizedBox(height: 2),
+                      Text(contactLine,
+                          style: const TextStyle(
+                              fontSize: 11, color: kTextMuted)),
                     ],
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Wrap(
                       spacing: 5,
                       runSpacing: 4,
                       children: [
                         if (gender.isNotEmpty)
-                          _badge(gender, kPrimaryText, kPrimaryBg),
+                          _badge(gender, kPrimary, kPrimaryLight),
                         if (age != null)
-                          _badge('Age $age', kPrimaryText, kPrimaryBg),
-                        if (bloodGroup != null &&
-                            bloodGroup.trim().isNotEmpty)
-                          _badge(
-                              '$bloodGroup Blood', kRedText, kRedBadgeBg),
+                          _badge('$age yrs', kPrimary, kPrimaryLight),
+                        if (bloodGroup != null && bloodGroup.trim().isNotEmpty)
+                          _badge('$bloodGroup', kError, kRedLight),
                       ],
                     ),
                   ],
@@ -218,199 +238,169 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
 
           const _Divider(),
 
-          // Info rows
-          _infoRow(Icons.calendar_today_rounded, kPrimary, kPrimaryBg,
-              'Date of birth', dob ?? '—'),
-          const SizedBox(height: 10),
-          _infoRow(Icons.location_on_outlined, kGreen, kGreenBg,
-              'Address', 'Savantavadi, Maharashtra'),
-          const SizedBox(height: 10),
-          _infoRow(Icons.monitor_weight_outlined, kOrange, kOrangeBg,
-              'Weight · Height',
-              '${weight?.trim().isNotEmpty == true ? '$weight kg' : '58 kg'} · 162 cm'),
+          // Info rows — compact 3-column grid
+          Row(
+            children: [
+              Expanded(
+                child: _infoTile(
+                  Icons.calendar_today_rounded,
+                  kPrimary,
+                  kPrimaryLight,
+                  'Date of Birth',
+                  dob ?? '—',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _infoTile(
+                  Icons.monitor_weight_outlined,
+                  kWarning,
+                  kAmberLight,
+                  'Weight',
+                  weight?.trim().isNotEmpty == true
+                      ? '${weight!.trim()} kg'
+                      : '58 kg',
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _infoTile(
+                  Icons.location_on_outlined,
+                  const Color(0xFF38A169),
+                  kGreenLight,
+                  'Location',
+                  'Maharashtra',
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _badge(String label, Color fg, Color bg) {
+  Widget _badge(String label, Color fg, Color bg) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration:
+            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+      );
+
+  Widget _infoTile(
+      IconData icon, Color iconFg, Color iconBg, String label, String value) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
       decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(20),
+        color: iconBg.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: iconBg),
       ),
-      child: Text(
-        label,
-        style:
-            TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg),
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, Color iconColor, Color iconBg,
-      String label, String value) {
-    return Row(
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: iconBg,
-            borderRadius: BorderRadius.circular(7),
-          ),
-          child: Icon(icon, size: 13, color: iconColor),
-        ),
-        const SizedBox(width: 10),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label,
-                style:
-                    const TextStyle(fontSize: 11, color: kTextMid)),
-            const SizedBox(height: 2),
-            Text(value,
-                style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: kTextDark)),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // ——— Personal Info Popup ————————————————————————————————
-  void _showPersonalInfoSheet(
-    BuildContext context,
-    PatientLoginState state,
-    Patients? details,
-  ) {
-    final name = details?.name ?? state.name ?? '—';
-    final mobile = details?.mobileNo ?? state.mobileNo ?? '—';
-    final email = details?.email ?? state.email ?? '—';
-    final gender = _displayGender(details);
-    final genderText = gender.isNotEmpty ? gender : '—';
-    final dob = _formatDob(details?.DOB) ?? '—';
-    final age = _ageFromDob(details?.DOB);
-    final ageText = age != null ? '$age' : '—';
-    final blood = details?.bloodGroup?.trim();
-    final bloodText = (blood != null && blood.isNotEmpty) ? blood : '—';
-    final weight = details?.weight?.trim();
-    final weightText =
-        (weight != null && weight.isNotEmpty) ? '$weight kg' : '—';
-    final address = details?.address?.trim();
-    final addressText =
-        (address != null && address.isNotEmpty) ? address : '—';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _PersonalInfoSheet(
-        name: name,
-        mobile: mobile,
-        email: email,
-        gender: genderText,
-        dob: dob,
-        age: ageText,
-        bloodGroup: bloodText,
-        weight: weightText,
-        address: addressText,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: iconFg),
+          const SizedBox(height: 5),
+          Text(label,
+              style: const TextStyle(fontSize: 10, color: kTextMuted)),
+          const SizedBox(height: 1),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary),
+              overflow: TextOverflow.ellipsis),
+        ],
       ),
     );
   }
 
-  // ── Stats Row ──────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Stats Row
+  // ---------------------------------------------------------------------------
+
   Widget _buildStatsRow(Patients? details) {
     final blood = details?.bloodGroup;
-
     final stats = [
-      _StatItem('12',   'Visits',  kPrimary),
-      _StatItem('3',    'Family',  kPurple),
-      _StatItem(blood?.trim().isNotEmpty == true ? blood! : '5',
-                'Records', kCyan),
+      _StatItem('12', 'Visits',  kPrimary,  kPrimaryLight),
+      _StatItem('3',  'Family',  kPurple,   kPurpleLight),
+      _StatItem(
+        blood?.trim().isNotEmpty == true ? blood! : '5',
+        'Records',
+        kInfo,
+        kInfoLight,
+      ),
     ];
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: Row(
-        children: stats
-            .map(
-              (s) => Expanded(
-                child: Container(
-                  margin: EdgeInsets.only(
-                      right: s == stats.last ? 0 : 8),
-                  decoration: BoxDecoration(
-                    color: kCardBg,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kBorder, width: 0.5),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  child: Column(
-                    children: [
-                      Text(
-                        s.value,
-                        style: TextStyle(
+        children: stats.asMap().entries.map((e) {
+          final i = e.key;
+          final s = e.value;
+          return Expanded(
+            child: Container(
+              margin: EdgeInsets.only(right: i < stats.length - 1 ? 8 : 0),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: s.bgColor,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: s.color.withOpacity(0.2)),
+              ),
+              child: Column(
+                children: [
+                  Text(s.value,
+                      style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
-                          color: s.color,
-                        ),
-                      ),
-                      Container(
-                        width: 6,
-                        height: 6,
-                        margin: const EdgeInsets.symmetric(vertical: 5),
-                        decoration: BoxDecoration(
-                          color: s.color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      Text(
-                        s.label,
-                        style: const TextStyle(
-                            fontSize: 10, color: kTextLight),
-                      ),
-                    ],
-                  ),
-                ),
+                          color: s.color)),
+                  const SizedBox(height: 3),
+                  Text(s.label,
+                      style: const TextStyle(
+                          fontSize: 11, color: kTextMuted)),
+                ],
               ),
-            )
-            .toList(),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
 
-  // ── Edit Button ────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Edit Button
+  // ---------------------------------------------------------------------------
+
   Widget _buildEditButton(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
       child: OutlinedButton.icon(
         onPressed: () => Navigator.push(
           context,
-          MaterialPageRoute(
-              builder: (_) => const PatientEditProfilePage()),
+          MaterialPageRoute(builder: (_) => const PatientEditProfilePage()),
         ),
         icon: const Icon(Icons.edit_outlined, size: 14, color: kPrimary),
-        label: const Text(
-          'Edit Profile',
-          style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: kPrimary),
-        ),
+        label: const Text('Edit Profile',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: kPrimary)),
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(double.infinity, 44),
+          minimumSize: const Size(double.infinity, 42),
           side: const BorderSide(color: kPrimary, width: 1.5),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12)),
-          backgroundColor: kCardBg,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          backgroundColor: Colors.white,
         ),
       ),
     );
   }
 
-  // ── Account Section ────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Account Section
+  // ---------------------------------------------------------------------------
+
   Widget _buildAccountSection(
     BuildContext context,
     WidgetRef ref,
@@ -421,76 +411,81 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Padding(
-          padding: EdgeInsets.only(left: 14, bottom: 8),
+          padding: EdgeInsets.only(left: 16, bottom: 8),
           child: Text(
             'ACCOUNT',
             style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: kTextLight,
-              letterSpacing: 0.8,
-            ),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: kTextMuted,
+                letterSpacing: 1),
           ),
         ),
         Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12),
+          margin: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: kCardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kBorder, width: 0.5),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
             children: [
               _menuRow(
-                icon: Icons.person_outline,
-                iconColor: kPrimary,
-                iconBg: kPrimaryBg,
-                title: 'Personal information',
+                icon: Icons.person_outline_rounded,
+                iconFg: kPrimary,
+                iconBg: kPrimaryLight,
+                title: 'Personal Information',
                 subtitle: 'Name, DOB, gender',
-                onTap: () => _showPersonalInfoSheet(context, state, details),
+                onTap: () =>
+                    _showPersonalInfoSheet(context, state, details),
               ),
-    
               _menuRow(
                 icon: Icons.description_outlined,
-                iconColor: kCyan,
-                iconBg: kCyanBg,
-                title: 'Medical records',
+                iconFg: kInfo,
+                iconBg: kInfoLight,
+                title: 'Medical Records',
                 subtitle: 'Reports, prescriptions',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const PatientPrescriptionListScreen(),
-                  ),
+                      builder: (_) =>
+                          const PatientPrescriptionListScreen()),
                 ),
               ),
               _menuRow(
                 icon: Icons.group_outlined,
-                iconColor: kPurple,
-                iconBg: kPurpleBg,
-                title: 'Family members',
+                iconFg: kPurple,
+                iconBg: kPurpleLight,
+                title: 'Family Members',
                 subtitle: '3 members added',
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const FamilyMembersScreen(),
-                  ),
+                      builder: (_) => const FamilyMembersScreen()),
                 ),
               ),
               _menuRow(
                 icon: Icons.notifications_outlined,
-                iconColor: kOrange,
-                iconBg: kOrangeBg,
+                iconFg: kWarning,
+                iconBg: kAmberLight,
                 title: 'Notifications',
                 subtitle: 'Alerts & reminders',
               ),
               _menuRow(
                 icon: Icons.logout_rounded,
-                iconColor: kRed,
-                iconBg: kRedBg,
-                title: 'Log out',
+                iconFg: kError,
+                iconBg: kRedLight,
+                title: 'Log Out',
                 subtitle: 'Sign out of account',
-                titleColor: kRed,
-                chevronColor: const Color(0xFFFCA5A5),
+                titleColor: kError,
+                chevronColor: kError.withOpacity(0.4),
                 showDivider: false,
                 onTap: () => _showLogoutDialog(context, ref),
               ),
@@ -503,12 +498,12 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
 
   Widget _menuRow({
     required IconData icon,
-    required Color iconColor,
+    required Color iconFg,
     required Color iconBg,
     required String title,
     required String subtitle,
-    Color titleColor = kTextDark,
-    Color chevronColor = kTextLight,
+    Color titleColor = kTextPrimary,
+    Color chevronColor = kTextMuted,
     bool showDivider = true,
     VoidCallback? onTap,
   }) {
@@ -516,52 +511,48 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
       children: [
         InkWell(
           onTap: onTap ?? () {},
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           child: Padding(
             padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
             child: Row(
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: iconBg,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, size: 15, color: iconColor),
+                  child: Icon(icon, size: 16, color: iconFg),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: titleColor),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                            fontSize: 11, color: kTextLight),
-                      ),
+                      Text(title,
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: titleColor)),
+                      const SizedBox(height: 1),
+                      Text(subtitle,
+                          style: const TextStyle(
+                              fontSize: 11, color: kTextMuted)),
                     ],
                   ),
                 ),
                 Icon(Icons.chevron_right_rounded,
-                    size: 16, color: chevronColor),
+                    size: 17, color: chevronColor),
               ],
             ),
           ),
         ),
         if (showDivider)
           const Divider(
-              height: 0.5,
-              thickness: 0.5,
+              height: 1,
+              thickness: 1,
               color: kBorder,
               indent: 14,
               endIndent: 14),
@@ -569,51 +560,136 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     );
   }
 
-  // ── Logout Dialog ──────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Logout Dialog
+  // ---------------------------------------------------------------------------
+
   void _showLogoutDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16)),
-        title: const Text('Confirm logout',
-            style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text(
-            'You will be signed out and returned to the start screen.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                    color: kRedLight, shape: BoxShape.circle),
+                child: const Icon(Icons.logout_rounded,
+                    size: 22, color: kError),
+              ),
+              const SizedBox(height: 12),
+              const Text('Log Out?',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+              const SizedBox(height: 6),
+              const Text(
+                'You will be signed out and returned to the start screen.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13, color: kTextSecondary, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: kBorder),
+                        foregroundColor: kTextSecondary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text('Cancel',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await ref
+                            .read(tokenProvider.notifier)
+                            .clearTokens();
+                        await ref
+                            .read(patientLoginViewModelProvider.notifier)
+                            .logout();
+                        if (!context.mounted) return;
+                        Navigator.of(context, rootNavigator: true)
+                            .pushAndRemoveUntil(
+                          MaterialPageRoute(
+                              builder: (_) => const ContinueAsScreen()),
+                          (_) => false,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kError,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                      ),
+                      child: const Text('Log Out',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await ref.read(tokenProvider.notifier).clearTokens();
-              await ref
-                  .read(patientLoginViewModelProvider.notifier)
-                  .logout();
-              if (!context.mounted) return;
-              Navigator.of(context, rootNavigator: true)
-                  .pushAndRemoveUntil(
-                MaterialPageRoute(
-                    builder: (_) => const ContinueAsScreen()),
-                (_) => false,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Log out'),
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  // ── Helpers ────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Personal Info Sheet
+  // ---------------------------------------------------------------------------
+
+  void _showPersonalInfoSheet(
+      BuildContext context, PatientLoginState state, Patients? details) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PersonalInfoSheet(
+        name:       details?.name ?? state.name ?? '—',
+        mobile:     details?.mobileNo ?? state.mobileNo ?? '—',
+        email:      details?.email ?? state.email ?? '—',
+        gender:     _displayGender(details).isNotEmpty
+            ? _displayGender(details)
+            : '—',
+        dob:        _formatDob(details?.DOB) ?? '—',
+        age:        _ageFromDob(details?.DOB)?.toString() ?? '—',
+        bloodGroup: (details?.bloodGroup?.trim().isNotEmpty == true)
+            ? details!.bloodGroup!
+            : '—',
+        weight:     (details?.weight?.trim().isNotEmpty == true)
+            ? '${details!.weight!.trim()} kg'
+            : '—',
+        address:    (details?.address?.trim().isNotEmpty == true)
+            ? details!.address!
+            : '—',
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
   String _initials(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty) return 'P';
@@ -624,8 +700,8 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   String? _formatDob(DateTime? dob) {
     if (dob == null) return null;
     const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return '${dob.day} ${months[dob.month - 1]} ${dob.year}';
   }
@@ -634,9 +710,9 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     if (dob == null) return null;
     final now = DateTime.now();
     var age = now.year - dob.year;
-    final hasHadBirthday = (now.month > dob.month) ||
+    final hadBirthday = now.month > dob.month ||
         (now.month == dob.month && now.day >= dob.day);
-    if (!hasHadBirthday) age -= 1;
+    if (!hadBirthday) age--;
     return age >= 0 ? age : null;
   }
 
@@ -650,27 +726,27 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     return 'Male';
   }
 
-  String _joinNonEmpty(List<String> values, {String separator = ' '}) {
-    return values
-        .map((v) => v.trim())
-        .where((v) => v.isNotEmpty)
-        .join(separator);
-  }
+  String _joinNonEmpty(List<String> values, {String separator = ' '}) =>
+      values.map((v) => v.trim()).where((v) => v.isNotEmpty).join(separator);
 }
 
-// ── Shared divider ─────────────────────────────────────────────
+// =============================================================================
+// Shared divider
+// =============================================================================
+
 class _Divider extends StatelessWidget {
   const _Divider();
   @override
-  Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 14),
-      child: Divider(height: 0.5, thickness: 0.5, color: kBorder),
-    );
-  }
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Divider(height: 1, thickness: 1, color: kBorder),
+      );
 }
 
-// ——— Personal Info Bottom Sheet —————————————————————————————
+// =============================================================================
+// Personal Info Bottom Sheet
+// =============================================================================
+
 class _PersonalInfoSheet extends StatelessWidget {
   const _PersonalInfoSheet({
     required this.name,
@@ -684,190 +760,103 @@ class _PersonalInfoSheet extends StatelessWidget {
     required this.address,
   });
 
-  final String name;
-  final String mobile;
-  final String email;
-  final String gender;
-  final String dob;
-  final String age;
-  final String bloodGroup;
-  final String weight;
-  final String address;
+  final String name, mobile, email, gender, dob, age, bloodGroup, weight, address;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+          bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 12),
+          // Handle
+          const SizedBox(height: 10),
           Container(
-            width: 40,
+            width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: kBorder,
-              borderRadius: BorderRadius.circular(2),
-            ),
+                color: kBorder, borderRadius: BorderRadius.circular(2)),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // Sheet header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
-                    color: kPrimaryBg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.person_outline,
-                      size: 18, color: kPrimary),
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.person_outline_rounded,
+                      size: 17, color: kPrimary),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 const Expanded(
-                  child: Text(
-                    'Personal Information',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: kTextDark,
-                    ),
-                  ),
+                  child: Text('Personal Information',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary)),
                 ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: Container(
-                    width: 32,
-                    height: 32,
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
-                      color: kCardBg,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: kBorder),
-                    ),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: kBorder)),
                     child: const Icon(Icons.close_rounded,
-                        size: 16, color: kTextMid),
+                        size: 15, color: kTextMuted),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           const Divider(height: 1, color: kBorder),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
 
-          _SheetInfoRow(
-            icon: Icons.person,
-            iconColor: kPrimary,
-            iconBg: kPrimaryBg,
-            label: 'Name',
-            value: name,
-          ),
-          _SheetInfoRow(
-            icon: Icons.phone_outlined,
-            iconColor: kGreen,
-            iconBg: kGreenBg,
-            label: 'Mobile',
-            value: mobile,
-          ),
-          _SheetInfoRow(
-            icon: Icons.email_outlined,
-            iconColor: kCyan,
-            iconBg: kCyanBg,
-            label: 'Email',
-            value: email,
-          ),
-          _SheetInfoRow(
-            icon: Icons.wc_outlined,
-            iconColor: kPurple,
-            iconBg: kPurpleBg,
-            label: 'Gender',
-            value: gender,
-          ),
-          _SheetInfoRow(
-            icon: Icons.calendar_today_rounded,
-            iconColor: kPrimary,
-            iconBg: kPrimaryBg,
-            label: 'Date of birth',
-            value: dob,
-          ),
-          _SheetInfoRow(
-            icon: Icons.cake_outlined,
-            iconColor: kOrange,
-            iconBg: kOrangeBg,
-            label: 'Age',
-            value: age,
-          ),
-          _SheetInfoRow(
-            icon: Icons.bloodtype_outlined,
-            iconColor: kRed,
-            iconBg: kRedBg,
-            label: 'Blood group',
-            value: bloodGroup,
-          ),
-          _SheetInfoRow(
-            icon: Icons.monitor_weight_outlined,
-            iconColor: kOrange,
-            iconBg: kOrangeBg,
-            label: 'Weight',
-            value: weight,
-          ),
-          _SheetInfoRow(
-            icon: Icons.location_on_outlined,
-            iconColor: kGreen,
-            iconBg: kGreenBg,
-            label: 'Address',
-            value: address,
-            isLast: true,
-          ),
+          _row(Icons.person_rounded,          kPrimary,  kPrimaryLight, 'Name',         name),
+          _row(Icons.phone_outlined,           const Color(0xFF38A169), kGreenLight, 'Mobile',       mobile),
+          _row(Icons.email_outlined,           kInfo,     kInfoLight,    'Email',         email),
+          _row(Icons.wc_outlined,              kPurple,   kPurpleLight,  'Gender',        gender),
+          _row(Icons.calendar_today_rounded,   kPrimary,  kPrimaryLight, 'Date of Birth', dob),
+          _row(Icons.cake_outlined,            kWarning,  kAmberLight,   'Age',           age),
+          _row(Icons.bloodtype_outlined,       kError,    kRedLight,     'Blood Group',   bloodGroup),
+          _row(Icons.monitor_weight_outlined,  kWarning,  kAmberLight,   'Weight',        weight),
+          _row(Icons.location_on_outlined,     const Color(0xFF38A169), kGreenLight, 'Address', address,
+              isLast: true),
 
           const SizedBox(height: 16),
         ],
       ),
     );
   }
-}
 
-class _SheetInfoRow extends StatelessWidget {
-  const _SheetInfoRow({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.label,
-    required this.value,
-    this.isLast = false,
-  });
-
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String label;
-  final String value;
-  final bool isLast;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _row(IconData icon, Color fg, Color bg, String label, String value,
+      {bool isLast = false}) {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
           child: Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: Icon(icon, size: 14, color: iconColor),
+                    color: bg, borderRadius: BorderRadius.circular(8)),
+                child: Icon(icon, size: 14, color: fg),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -875,15 +864,14 @@ class _SheetInfoRow extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(label,
-                        style:
-                            const TextStyle(fontSize: 11, color: kTextMid)),
+                        style: const TextStyle(
+                            fontSize: 11, color: kTextMuted)),
                     const SizedBox(height: 2),
                     Text(value,
                         style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextDark,
-                        )),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: kTextPrimary)),
                   ],
                 ),
               ),
@@ -891,15 +879,23 @@ class _SheetInfoRow extends StatelessWidget {
           ),
         ),
         if (!isLast)
-          const Divider(height: 0.5, thickness: 0.5, color: kBorder),
+          const Divider(
+              height: 1,
+              thickness: 1,
+              color: kBorder,
+              indent: 16,
+              endIndent: 16),
       ],
     );
   }
 }
 
-// ── Stat item model ────────────────────────────────────────────
+// =============================================================================
+// Stat item model
+// =============================================================================
+
 class _StatItem {
   final String value, label;
-  final Color color;
-  const _StatItem(this.value, this.label, this.color);
+  final Color color, bgColor;
+  const _StatItem(this.value, this.label, this.color, this.bgColor);
 }
