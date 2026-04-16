@@ -107,6 +107,7 @@ static const _activePill  = Color(0x1A6366F1); // match doctor 10% indigo tint
         themeMode: widget.themeMode,
         onTabChange: _setTab,
       ),
+      
       const DoctorSearchScreen(),
       AppointmentScreen(key: _appointmentsKey, onTabChange: _setTab),
       const PatientProfilePage(),

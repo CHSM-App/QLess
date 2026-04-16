@@ -13,7 +13,7 @@ import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.d
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/domain/models/review_model.dart';
 
-// ─── Colour palette ───────────────────────────────────────────────────────────
+// ─── Colour palette ────────────────────────────────────────────
 const kPrimary   = Color(0xFF1A73E8);
 const kPrimaryBg = Color(0xFFE8F0FE);
 const kBg        = Color(0xFFF4F6FB);
@@ -1913,6 +1913,7 @@ class _BaNoAvail extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 13, color: kTextMid, height: 1.5),
         ),
+
         const SizedBox(height: 24),
         ElevatedButton(
           onPressed: onBack,

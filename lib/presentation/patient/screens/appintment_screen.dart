@@ -1,5 +1,5 @@
-import 'dart:async';
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -16,52 +16,51 @@ import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.d
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-// ── THEME ──
-const kPrimary = Color(0xFF0D9488);
-const kPrimaryLight = Color(0xFFCCFBF1);
-const kPrimaryDark = Color(0xFF115E59);
-const kBg = Color(0xFFF8FAFB);
-const kCardBg = Colors.white;
-const kTextDark = Color(0xFF111827);
-const kTextMid = Color(0xFF6B7280);
-const kTextLight = Color(0xFF9CA3AF);
-const kRed = Color(0xFFEF4444);
-const kRedLight = Color(0xFFFEE2E2);
-const kGreen = Color(0xFF22C55E);
-const kGreenLight = Color(0xFFDCFCE7);
-const kBlue = Color(0xFF3B82F6);
-const kBlueLight = Color(0xFFDBEAFE);
-const kAmber = Color(0xFFF59E0B);
-const kAmberLight = Color(0xFFFEF3C7);
-const kPurple = Color(0xFF8B5CF6);
-const kPurpleLight = Color(0xFFEDE9FE);
-const kDivider = Color(0xFFE5E7EB);
+// ─── Modern Teal Theme (Minimal & Compact) ──────────────────────────────────
+class _C {
+  _C._();
 
-// ── FILTER TABS ──
+  static const teal = Color(0xFF26C6B0);
+  static const tealDark = Color(0xFF2BB5A0);
+  static const tealLight = Color(0xFFD9F5F1);
+  static const tealLighter = Color(0xFFF2FCFA);
+
+  static const textPrimary = Color(0xFF2D3748);
+  static const textSlate = Color(0xFF718096);
+  static const textMuted = Color(0xFFA0AEC0);
+
+  static const border = Color(0xFFEDF2F7);
+  static const bg = Colors.white;
+  static const card = Colors.white;
+
+  static const green = Color(0xFF68D391);
+  static const amber = Color(0xFFF6AD55);
+  static const red = Color(0xFFFC8181);
+
+  static const purple = Color(0xFF9F7AEA);
+  static const indigo = Color(0xFF7F9CF5);
+
+  // Status accents (preserved for clarity)
+  static const blue = Color(0xFF3B82F6);
+  static const blueLight = Color(0xFFDBEAFE);
+  static const greenLight = Color(0xFFDCFCE7);
+  static const amberLight = Color(0xFFFEF3C7);
+  static const purpleLight = Color(0xFFEDE9FE);
+  static const redLight = Color(0xFFFEE2E2);
+  static const divider = Color(0xFFE5E7EB);
+
+  // Dark mode
+  static const darkSurface = Color(0xFF1E2A28);
+  static const darkBg = Color(0xFF0F1F1D);
+}
+
+// ── FILTER TABS (compact) ────────────────────────────────────────────────────
 const _filters = [
-  _FilterTab("all", "All", Icons.list_rounded, kPrimary, kPrimaryLight),
-  _FilterTab("today", "Today", Icons.today_rounded, kPrimary, kBlueLight),
-  _FilterTab(
-    "upcoming",
-    "Upcoming",
-    Icons.schedule_rounded,
-    kPrimary,
-    kPurpleLight,
-  ),
-  _FilterTab(
-    "completed",
-    "Completed",
-    Icons.check_circle_rounded,
-    kPrimary,
-    kGreenLight,
-  ),
-  _FilterTab(
-    "cancelled",
-    "Cancelled",
-    Icons.cancel_rounded,
-    kPrimary,
-    kRedLight,
-  ),
+  _FilterTab("all", "All", Icons.list_rounded, _C.teal, _C.tealLighter),
+  _FilterTab("today", "Today", Icons.today_rounded, _C.teal, _C.blueLight),
+  _FilterTab("upcoming", "Upcoming", Icons.schedule_rounded, _C.teal, _C.purpleLight),
+  _FilterTab("completed", "Completed", Icons.check_circle_rounded, _C.teal, _C.greenLight),
+  _FilterTab("cancelled", "Cancelled", Icons.cancel_rounded, _C.teal, _C.redLight),
 ];
 
 class _FilterTab {
@@ -73,21 +72,20 @@ class _FilterTab {
   const _FilterTab(this.key, this.label, this.icon, this.color, this.bg);
 }
 
-// ── HELPERS ──
-
+// ── HELPERS (updated colors) ─────────────────────────────────────────────────
 Color statusColor(String? s) {
   switch (s?.toLowerCase()) {
     case "upcoming":
     case "confirmed":
     case "booked":
-      return kBlue;
+      return _C.blue;
     case "complete":
     case "completed":
-      return kGreen;
+      return _C.green;
     case "cancelled":
-      return kRed;
+      return _C.red;
     default:
-      return kAmber;
+      return _C.amber;
   }
 }
 
@@ -96,14 +94,14 @@ Color statusBgColor(String? s) {
     case "upcoming":
     case "confirmed":
     case "booked":
-      return kBlueLight;
+      return _C.blueLight;
     case "complete":
     case "completed":
-      return kGreenLight;
+      return _C.greenLight;
     case "cancelled":
-      return kRedLight;
+      return _C.redLight;
     default:
-      return kAmberLight;
+      return _C.amberLight;
   }
 }
 
@@ -165,8 +163,7 @@ Future<void> openMap(double lat, double lng, String? label) async {
   if (await canLaunchUrl(uri)) await launchUrl(uri);
 }
 
-// ── FILTER LOGIC ──
-
+// ── FILTER LOGIC (unchanged) ────────────────────────────────────────────────
 bool _isToday(AppointmentList a) {
   if (a.appointmentDate == null) return false;
   final p = DateTime.tryParse(a.appointmentDate!);
@@ -174,34 +171,26 @@ bool _isToday(AppointmentList a) {
   final now = DateTime.now();
   return p.year == now.year && p.month == now.month && p.day == now.day;
 }
+
 bool _isUpcoming(AppointmentList a) {
   if (a.appointmentDate == null) return false;
-
   final p = DateTime.tryParse(a.appointmentDate!);
   if (p == null) return false;
-
   final status = a.status?.toLowerCase();
-
-  // ❌ Exclude completed & cancelled
-  if (status == 'cancelled' ||
-      status == 'completed' ||
-      status == 'complete') {
+  if (status == 'cancelled' || status == 'completed' || status == 'complete') {
     return false;
   }
-
   final now = DateTime.now();
-
-  // 👉 Remove time part (only date compare)
   final apptDay = DateTime(p.year, p.month, p.day);
   final todayDay = DateTime(now.year, now.month, now.day);
-
-  // ✅ ONLY FUTURE (today exclude)
   return apptDay.isAfter(todayDay);
 }
+
 bool _isCompleted(AppointmentList a) {
   final s = a.status?.toLowerCase();
   return s == "completed" || s == "complete";
 }
+
 bool _isCancelled(AppointmentList a) => a.status?.toLowerCase() == "cancelled";
 
 List<AppointmentList> applyFilter(
@@ -210,8 +199,7 @@ List<AppointmentList> applyFilter(
   String search,
 ) {
   return list.where((a) {
-    final matchSearch =
-        search.isEmpty ||
+    final matchSearch = search.isEmpty ||
         (a.patientName?.toLowerCase().contains(search.toLowerCase()) ?? false);
     final bool matchFilter;
     switch (filter) {
@@ -235,9 +223,8 @@ List<AppointmentList> applyFilter(
 }
 
 // ════════════════════════════════════════════════════════
-//  SCREEN
+// SCREEN (compact modern version)
 // ════════════════════════════════════════════════════════
-
 class AppointmentScreen extends ConsumerStatefulWidget {
   final ValueChanged<int>? onTabChange;
   const AppointmentScreen({super.key, this.onTabChange});
@@ -267,10 +254,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       }
     });
     Future.microtask(_ensurePatientIdAndFetch);
-    // _refreshTimer = Timer.periodic(
-    //   const Duration(seconds: 30),
-    //   (_) => _autoRefresh(),
-    // );
   }
 
   @override
@@ -280,33 +263,15 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     super.dispose();
   }
 
-
-  void _autoRefresh() {
-    if (!mounted) return;
-    final appointments = ref
-        .read(appointmentViewModelProvider)
-        .patientAppointmentsList
-        ?.valueOrNull;
-    final hasLiveQueue = appointments?.any(_isLiveQueueToday) ?? false;
-    if (!hasLiveQueue) return;
-    final patientId =
-        ref.read(patientLoginViewModelProvider).patientId ?? 0;
-    if (patientId > 0) {
-      ref
-          .read(appointmentViewModelProvider.notifier)
-          .getPatientAppointments(patientId);
-    }
+  bool _isLiveQueueToday(AppointmentList a) {
+    if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
+    if (a.bookingType != 1) return false;
+    final d = DateTime.tryParse(a.appointmentDate ?? '');
+    if (d == null) return false;
+    final now = DateTime.now();
+    final isToday = d.year == now.year && d.month == now.month && d.day == now.day;
+    return isToday && (a.queueStarted == true);
   }
-bool _isLiveQueueToday(AppointmentList a) {
-  if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
-  if (a.bookingType != 1) return false;
-  final d = DateTime.tryParse(a.appointmentDate ?? '');
-  if (d == null) return false;
-  final now = DateTime.now();
-  final isToday = d.year == now.year && d.month == now.month && d.day == now.day;
-  // ✅ Only show LIVE banner if queue has actually started
-  return isToday && (a.queueStarted == true);
-}
 
   Future<void> refreshOnVisible() async {
     _didFetch = false;
@@ -320,7 +285,6 @@ bool _isLiveQueueToday(AppointmentList a) {
     try {
       final loginNotifier = ref.read(patientLoginViewModelProvider.notifier);
       var patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
-
       if (patientId == 0) {
         if (!_isWaitingForId) {
           setState(() {
@@ -336,7 +300,6 @@ bool _isLiveQueueToday(AppointmentList a) {
           return;
         }
       }
-
       _didFetch = true;
       await ref
           .read(appointmentViewModelProvider.notifier)
@@ -391,16 +354,16 @@ bool _isLiveQueueToday(AppointmentList a) {
         ),
         content: const Text(
           'Are you sure you want to cancel this appointment?',
-          style: TextStyle(color: kTextMid, fontSize: 14),
+          style: TextStyle(color: _C.textSlate, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No', style: TextStyle(color: kTextMid)),
+            child: const Text('No', style: TextStyle(color: _C.textSlate)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: kRed,
+              backgroundColor: _C.red,
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
@@ -429,28 +392,26 @@ bool _isLiveQueueToday(AppointmentList a) {
 
   Future<void> _handleReschedule(AppointmentList a) async {
     final doctor = DoctorDetails(
-      doctorId:      a.doctorId,
-      name:          a.doctorName,
+      doctorId: a.doctorId,
+      name: a.doctorName,
       specialization: a.specialization,
-      experience:    a.experience,
-      clinicName:    a.clinicName,
+      experience: a.experience,
+      clinicName: a.clinicName,
       clinicAddress: a.clinicAddress,
-      latitude:      a.latitude,
-      longitude:     a.longitude,
+      latitude: a.latitude,
+      longitude: a.longitude,
       clinicContact: a.clinicContact,
     );
-
     final rescheduled = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => BookAppointmentScreen(
-          doctor:        doctor,
-          isReschedule:  true,
+          doctor: doctor,
+          isReschedule: true,
           appointmentId: a.appointmentId,
         ),
       ),
     );
-
     if (rescheduled == true && mounted) {
       final id = ref.read(patientLoginViewModelProvider).patientId;
       if (id != null && id != 0) {
@@ -493,28 +454,26 @@ bool _isLiveQueueToday(AppointmentList a) {
     ref.listen<ReviewState>(reviewViewModelProvider, (prev, next) {
       if (next.error != null && next.error != prev?.error) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.error!), backgroundColor: kRed),
+          SnackBar(content: Text(next.error!), backgroundColor: _C.red),
         );
       }
       if (next.isSuccess && next.isSuccess != prev?.isSuccess) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Thanks for your review!'),
-            backgroundColor: kGreen,
+            backgroundColor: _C.green,
           ),
         );
       }
     });
 
     ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
-      // Show SP-level errors (e.g. "Slot already booked", "Invalid slot")
       final prevError = prev?.error;
       if (next.error != null && next.error != prevError) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(next.error!), backgroundColor: kRed),
+          SnackBar(content: Text(next.error!), backgroundColor: _C.red),
         );
       }
-      // Reschedule success
       if (next.isSuccess &&
           next.rescheduleResponse != null &&
           next.rescheduleResponse != prev?.rescheduleResponse) {
@@ -523,11 +482,10 @@ bool _isLiveQueueToday(AppointmentList a) {
             content: Text(
               next.rescheduleResponse?.message ?? 'Appointment rescheduled',
             ),
-            backgroundColor: kGreen,
+            backgroundColor: _C.green,
           ),
         );
       }
-      // Cancel success
       if (next.isSuccess &&
           next.cancelResponse != null &&
           next.cancelResponse != prev?.cancelResponse) {
@@ -536,7 +494,7 @@ bool _isLiveQueueToday(AppointmentList a) {
             content: Text(
               next.cancelResponse?.message ?? 'Appointment cancelled',
             ),
-            backgroundColor: kGreen,
+            backgroundColor: _C.green,
           ),
         );
       }
@@ -545,59 +503,60 @@ bool _isLiveQueueToday(AppointmentList a) {
     final vmState = ref.watch(appointmentViewModelProvider);
     final asyncAppointments = vmState.patientAppointmentsList;
     final loginState = ref.watch(patientLoginViewModelProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: isDark ? _C.darkBg : _C.bg,
       floatingActionButton: Padding(
-  padding: const EdgeInsets.only(bottom: 88.0), // lift above bottom bar
-  child: FloatingActionButton.extended(
-    backgroundColor: kPrimary,
-    elevation: 4,
-    onPressed: () {
-      final onTabChange = widget.onTabChange;
-      if (onTabChange != null) {
-        onTabChange(1);
-        return;
-      }
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PatientBottomNav(
-            onToggleTheme: () {},
-            themeMode: ThemeMode.system,
-            initialTab: 1,
+        padding: const EdgeInsets.only(bottom: 88.0),
+        child: FloatingActionButton.extended(
+          backgroundColor: _C.teal,
+          elevation: 4,
+          onPressed: () {
+            final onTabChange = widget.onTabChange;
+            if (onTabChange != null) {
+              onTabChange(1);
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PatientBottomNav(
+                  onToggleTheme: () {},
+                  themeMode: ThemeMode.system,
+                  initialTab: 1,
+                ),
+              ),
+            );
+          },
+          icon: const Icon(Icons.add_rounded, color: Colors.white),
+          label: const Text(
+            "Book",
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
           ),
         ),
-      );
-    },
-    icon: const Icon(Icons.add_rounded, color: Colors.white),
-    label: const Text(
-      "Book",
-      style: TextStyle(
-        color: Colors.white,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
       ),
-    ),
-  ),
-),
       body: SafeArea(
         top: false,
         child: Column(
           children: [
-            _buildHeader(),
+            _buildHeader(isDark: isDark),
             Expanded(
               child: _isWaitingForId
                   ? _buildLoading("Loading your account...")
                   : _idMissing && (loginState.patientId ?? 0) == 0
-                  ? _buildMissingLogin()
-                  : asyncAppointments == null
-                  ? _buildLoading("Fetching appointments...")
-                  : asyncAppointments.when(
-                      loading: () => _buildLoading("Fetching appointments..."),
-                      error: (_, __) => _buildError(),
-                      data: _buildTabContent,
-                    ),
+                      ? _buildMissingLogin()
+                      : asyncAppointments == null
+                          ? _buildLoading("Fetching appointments...")
+                          : asyncAppointments.when(
+                              loading: () => _buildLoading("Fetching appointments..."),
+                              error: (_, __) => _buildError(),
+                              data: (list) => _buildTabContent(list, isDark: isDark),
+                            ),
             ),
           ],
         ),
@@ -605,15 +564,14 @@ bool _isLiveQueueToday(AppointmentList a) {
     );
   }
 
-  // ── HEADER ──
-
-  Widget _buildHeader() {
+  // ── HEADER (ultra-compact) ─────────────────────────────────────────────────
+  Widget _buildHeader({required bool isDark}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? _C.darkSurface : Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -623,26 +581,26 @@ bool _isLiveQueueToday(AppointmentList a) {
         children: [
           Padding(
             padding: EdgeInsets.fromLTRB(
-              20,
-              MediaQuery.of(context).padding.top + 16,
-              20,
+              16,
+              MediaQuery.of(context).padding.top + 10,
+              16,
               0,
             ),
             child: Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(12),
+                    color: _C.tealLighter,
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
                     Icons.calendar_month_rounded,
-                    color: kPrimary,
-                    size: 24,
+                    color: _C.teal,
+                    size: 22,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -652,14 +610,14 @@ bool _isLiveQueueToday(AppointmentList a) {
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
-                          color: kTextDark,
+                          color: _C.textPrimary,
                           letterSpacing: -0.5,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      SizedBox(height: 1),
                       Text(
                         "Manage your schedule",
-                        style: TextStyle(fontSize: 13, color: kTextMid),
+                        style: TextStyle(fontSize: 13, color: _C.textMuted),
                       ),
                     ],
                   ),
@@ -667,34 +625,35 @@ bool _isLiveQueueToday(AppointmentList a) {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
+              height: 42,
               decoration: BoxDecoration(
-                color: kBg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kDivider),
+                color: isDark ? _C.darkSurface : _C.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _C.border),
               ),
               child: TextField(
                 onChanged: (v) => setState(() => searchQuery = v),
-                style: const TextStyle(fontSize: 14, color: kTextDark),
+                style: TextStyle(fontSize: 14, color: isDark ? Colors.white : _C.textPrimary),
                 decoration: InputDecoration(
                   prefixIcon: const Icon(
                     Icons.search_rounded,
-                    color: kTextLight,
+                    color: _C.textMuted,
                     size: 20,
                   ),
                   hintText: "Search by patient name...",
-                  hintStyle: const TextStyle(color: kTextLight, fontSize: 14),
+                  hintStyle: TextStyle(color: _C.textMuted, fontSize: 14),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
                   suffixIcon: searchQuery.isNotEmpty
                       ? GestureDetector(
                           onTap: () => setState(() => searchQuery = ""),
                           child: const Icon(
                             Icons.close_rounded,
-                            color: kTextLight,
+                            color: _C.textMuted,
                             size: 18,
                           ),
                         )
@@ -703,37 +662,31 @@ bool _isLiveQueueToday(AppointmentList a) {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           TabBar(
             controller: _tabController,
             isScrollable: true,
             tabAlignment: TabAlignment.start,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             indicatorPadding: EdgeInsets.zero,
             indicator: BoxDecoration(
               color: _filters[_tabController.index].color,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             indicatorSize: TabBarIndicatorSize.tab,
             dividerColor: Colors.transparent,
             splashFactory: NoSplash.splashFactory,
             overlayColor: WidgetStateProperty.all(Colors.transparent),
-            labelPadding: const EdgeInsets.symmetric(
-              horizontal: 4,
-              vertical: 8,
-            ),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
             tabs: _filters.map((f) {
               final isSelected = _filters[_tabController.index].key == f.key;
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: isSelected ? f.color : kBg,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: isSelected ? f.color : kDivider),
+                  color: isSelected ? f.color : _C.bg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: isSelected ? f.color : _C.divider),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -743,15 +696,13 @@ bool _isLiveQueueToday(AppointmentList a) {
                       size: 13,
                       color: isSelected ? Colors.white : f.color,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Text(
                       f.label,
                       style: TextStyle(
-                        color: isSelected ? Colors.white : kTextMid,
+                        color: isSelected ? Colors.white : _C.textSlate,
                         fontSize: 12,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                       ),
                     ),
                   ],
@@ -759,252 +710,183 @@ bool _isLiveQueueToday(AppointmentList a) {
               );
             }).toList(),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
         ],
       ),
     );
   }
 
-  // ── TAB CONTENT ──
-
-  Widget _buildTabContent(List<AppointmentList> appointments) {
+  // ── TAB CONTENT ────────────────────────────────────────────────────────────
+  Widget _buildTabContent(List<AppointmentList> appointments, {required bool isDark}) {
     return TabBarView(
       controller: _tabController,
       children: _filters.map((f) {
         final filtered = applyFilter(appointments, f.key, searchQuery);
-        return _buildList(filtered, f);
+        return _buildList(filtered, f, isDark: isDark);
       }).toList(),
     );
   }
 
-// Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
-//     WidgetsBinding.instance.addPostFrameCallback((_) {
-//     if (!mounted) return;
-//     for (final a in filtered) {
-//       if (!_isLiveQueueToday(a)) continue;
-//       if (a.appointmentId == null || a.doctorId == null) continue;
-
-//       final hasEstimate = ref
-//           .read(appointmentViewModelProvider)
-//           .queueEstimates[a.appointmentId!] != null;
-
-//       if (!hasEstimate) {
-//         ref
-//             .read(appointmentViewModelProvider.notifier)
-//             .queueEstimate(
-//               AppointmentRequestModel(
-//                 appointmentId: a.appointmentId!,
-//                 doctorId: a.doctorId!,
-//               ),
-//             );
-//       }
-//     }
-//   });
-  
-//   return RefreshIndicator(
-//     color: kPrimary,
-//     onRefresh: () async {
-//       final id = ref.read(patientLoginViewModelProvider).patientId;
-//       if (id != null && id != 0) {
-//         await ref
-//             .read(appointmentViewModelProvider.notifier)
-//             .getPatientAppointments(id);
-//       }
-//     },
-//     child: ListView.builder(
-//       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-//       itemCount: filtered.length,
-//       itemBuilder: (context, index) {
-//         final a = filtered[index];
-//         final live = _isLiveQueueToday(a);
-
-//         // Get the current estimate for this appointment (if live queue)
-//         QueuePreviewResponseModel? estimate;
-//         if (live && a.appointmentId != null) {
-//           final estMap = ref.watch(appointmentViewModelProvider).queueEstimates;
-//           estimate = estMap[a.appointmentId!] as QueuePreviewResponseModel?;
-//         }
-
-//         return _AppointmentCard(
-//           appointment: a,
-//           onViewDetails: () => _openDetail(a),
-//           onReview: _canReview(a) ? () => _handleReview(context, a) : null,
-//           onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
-//           onReschedule:
-//               _canReschedule(a) ? () => _handleReschedule(a) : null,
-//           queueNumber: live ? a.queueNumber : null,
-//           isLiveQueue: live,
-//           queueEstimate: estimate,
-//         );
-//       },
-//     ),
-//   );
-// }
-
-Widget _buildList(List<AppointmentList> filtered, _FilterTab tab) {
-  // ❌ REMOVE this entire block — no more separate queueEstimate calls
-  // WidgetsBinding.instance.addPostFrameCallback((_) { ... });
-
-  return RefreshIndicator(
-    color: kPrimary,
-    onRefresh: () async {
-      final id = ref.read(patientLoginViewModelProvider).patientId;
-      if (id != null && id != 0) {
-        await ref
-            .read(appointmentViewModelProvider.notifier)
-            .getPatientAppointments(id);
-      }
-    },
-    child: ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      itemCount: filtered.length,
-      itemBuilder: (context, index) {
-        final a = filtered[index];
-        final live = _isLiveQueueToday(a);
-
-        return _AppointmentCard(
-          appointment: a,
-          onViewDetails: () => _openDetail(a),
-          onReview: _canReview(a) ? () => _handleReview(context, a) : null,
-          onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
-          onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
-          queueNumber: live ? a.myQueueNumber : null,   // ✅ use myQueueNumber
-          isLiveQueue: live,
-          // ✅ Pass data directly from AppointmentList — no separate estimate needed
-          estimatedMinutes: null,                        // not in API, keep null
-          patientsAhead: live ? a.patientsAhead : null,
-          estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
-        );
+  Widget _buildList(List<AppointmentList> filtered, _FilterTab tab, {required bool isDark}) {
+    return RefreshIndicator(
+      color: _C.teal,
+      onRefresh: () async {
+        final id = ref.read(patientLoginViewModelProvider).patientId;
+        if (id != null && id != 0) {
+          await ref
+              .read(appointmentViewModelProvider.notifier)
+              .getPatientAppointments(id);
+        }
       },
-    ),
-  );
-}
-  // ── STATES ──
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 80), // tighter padding
+        itemCount: filtered.length,
+        itemBuilder: (context, index) {
+          final a = filtered[index];
+          final live = _isLiveQueueToday(a);
+          return _AppointmentCard(
+            appointment: a,
+            onViewDetails: () => _openDetail(a),
+            onReview: _canReview(a) ? () => _handleReview(context, a) : null,
+            onCancel: _canCancel(a) ? () => _handleCancel(a) : null,
+            onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
+            queueNumber: live ? a.myQueueNumber : null,
+            isLiveQueue: live,
+            estimatedMinutes: null,
+            patientsAhead: live ? a.patientsAhead : null,
+            estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
+            isDark: isDark,
+          );
+        },
+      ),
+    );
+  }
 
+  // ── STATES ─────────────────────────────────────────────────────────────────
   Widget _buildLoading(String msg) => Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(
-          width: 40,
-          height: 40,
-          child: CircularProgressIndicator(
-            color: kPrimary,
-            strokeWidth: 3,
-            strokeCap: StrokeCap.round,
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                color: _C.teal,
+                strokeWidth: 3,
+                strokeCap: StrokeCap.round,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(msg, style: const TextStyle(color: _C.textSlate, fontSize: 14)),
+          ],
         ),
-        const SizedBox(height: 16),
-        Text(msg, style: const TextStyle(color: kTextMid, fontSize: 14)),
-      ],
-    ),
-  );
+      );
 
   Widget _buildError() => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: kRedLight,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.wifi_off_rounded, size: 32, color: kRed),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            "Something went wrong",
-            style: TextStyle(
-              color: kTextDark,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            "Couldn't load your appointments.\nPlease try again.",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: kTextMid, fontSize: 13, height: 1.5),
-          ),
-          const SizedBox(height: 20),
-          SizedBox(
-            width: 140,
-            height: 44,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: _C.redLight,
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.wifi_off_rounded, size: 32, color: _C.red),
               ),
-              onPressed: () {
-                final id = ref.read(patientLoginViewModelProvider).patientId;
-                if (id != null && id != 0) {
-                  ref
-                      .read(appointmentViewModelProvider.notifier)
-                      .getPatientAppointments(id);
-                }
-              },
-              child: const Text(
-                "Retry",
+              const SizedBox(height: 16),
+              const Text(
+                "Something went wrong",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: _C.textPrimary,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
+              const SizedBox(height: 6),
+              const Text(
+                "Couldn't load your appointments.\nPlease try again.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _C.textSlate, fontSize: 13, height: 1.5),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 140,
+                height: 44,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _C.teal,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () {
+                    final id = ref.read(patientLoginViewModelProvider).patientId;
+                    if (id != null && id != 0) {
+                      ref
+                          .read(appointmentViewModelProvider.notifier)
+                          .getPatientAppointments(id);
+                    }
+                  },
+                  child: const Text(
+                    "Retry",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 
   Widget _buildMissingLogin() => Center(
-    child: Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: kAmberLight,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.lock_outline_rounded,
-              size: 32,
-              color: kAmber,
-            ),
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: _C.amberLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.lock_outline_rounded,
+                  size: 32,
+                  color: _C.amber,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Session Expired",
+                style: TextStyle(
+                  color: _C.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                "Please login again to\nview your appointments.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: _C.textSlate, fontSize: 13, height: 1.5),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
-          const Text(
-            "Session Expired",
-            style: TextStyle(
-              color: kTextDark,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            "Please login again to\nview your appointments.",
-            textAlign: TextAlign.center,
-            style: TextStyle(color: kTextMid, fontSize: 13, height: 1.5),
-          ),
-        ],
-      ),
-    ),
-  );
+        ),
+      );
 }
 
-
+// ── COMPACT APPOINTMENT CARD ────────────────────────────────────────────────
 class _AppointmentCard extends StatelessWidget {
-final AppointmentList appointment;
+  final AppointmentList appointment;
   final VoidCallback onViewDetails;
   final VoidCallback? onReview;
   final VoidCallback? onCancel;
@@ -1014,9 +896,10 @@ final AppointmentList appointment;
   final int? estimatedMinutes;
   final int? patientsAhead;
   final String? estimatedArrivalTime;
+  final bool isDark;
 
   const _AppointmentCard({
-     required this.appointment,
+    required this.appointment,
     required this.onViewDetails,
     this.onReview,
     this.onCancel,
@@ -1026,6 +909,7 @@ final AppointmentList appointment;
     this.estimatedMinutes,
     this.patientsAhead,
     this.estimatedArrivalTime,
+    required this.isDark,
   });
 
   @override
@@ -1040,67 +924,67 @@ final AppointmentList appointment;
       clipBehavior: Clip.none,
       children: [
         Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: kCardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kDivider.withValues(alpha: 0.7)),
+            color: isDark ? _C.darkSurface : _C.card,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _C.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(isDark ? 0.15 : 0.05),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               onTap: onViewDetails,
               child: Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12), // tighter
                 child: Column(
                   children: [
-                    // ── ROW 1: Avatar | Name + Doctor | Status ──
+                    // Row 1: Avatar + Name + Status
                     Row(
                       children: [
                         Container(
-                          width: 46,
-                          height: 46,
+                          width: 42,
+                          height: 42,
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                kPrimary.withValues(alpha: 0.18),
-                                kPrimary.withValues(alpha: 0.05),
+                                _C.teal.withOpacity(0.15),
+                                _C.teal.withOpacity(0.05),
                               ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(13),
+                            borderRadius: BorderRadius.circular(11),
                           ),
                           child: Center(
                             child: Text(
                               (a.patientName ?? "?")[0].toUpperCase(),
                               style: const TextStyle(
-                                fontSize: 19,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w700,
-                                color: kPrimary,
+                                color: _C.teal,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 11),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 a.patientName ?? "Unknown",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  color: kTextDark,
+                                  color: isDark ? Colors.white : _C.textPrimary,
                                   fontSize: 14,
                                 ),
                                 maxLines: 1,
@@ -1109,14 +993,12 @@ final AppointmentList appointment;
                               const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  const Icon(Icons.person_rounded,
-                                      size: 11, color: kTextLight),
+                                  const Icon(Icons.person_rounded, size: 11, color: _C.textMuted),
                                   const SizedBox(width: 3),
                                   Expanded(
                                     child: Text(
                                       a.doctorName ?? "—",
-                                      style: const TextStyle(
-                                          color: kTextMid, fontSize: 11),
+                                      style: TextStyle(color: _C.textSlate, fontSize: 11),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -1128,8 +1010,7 @@ final AppointmentList appointment;
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 9, vertical: 5),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             color: sBg,
                             borderRadius: BorderRadius.circular(8),
@@ -1154,18 +1035,18 @@ final AppointmentList appointment;
                     ),
 
                     const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
-                      child: Divider(height: 1, color: kDivider),
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Divider(height: 1, color: _C.divider),
                     ),
 
-                    // ── ROW 2: Date | Time ──
+                    // Row 2: Date | Time (compact)
                     Row(
                       children: [
                         Expanded(
                           child: _miniInfo(
                             icon: Icons.calendar_today_rounded,
-                            iconBg: kBlueLight,
-                            iconColor: kBlue,
+                            iconBg: _C.blueLight,
+                            iconColor: _C.blue,
                             top: formatDateRelative(a.appointmentDate),
                             bottom: formatDate(a.appointmentDate),
                           ),
@@ -1173,39 +1054,37 @@ final AppointmentList appointment;
                         Expanded(
                           child: _miniInfo(
                             icon: Icons.access_time_rounded,
-                            iconBg: kGreenLight,
-                            iconColor: kGreen,
+                            iconBg: _C.greenLight,
+                            iconColor: _C.green,
                             top: formatTime(a.startTime),
-                            bottom: a.endTime != null
-                                ? "– ${formatTime(a.endTime)}"
-                                : "",
+                            bottom: a.endTime != null ? "– ${formatTime(a.endTime)}" : "",
                           ),
                         ),
                       ],
                     ),
 
-                    // ── LIVE QUEUE BANNER with estimate ──
-                if (isLiveQueue) ...[
-  const SizedBox(height: 10),
-  _LiveQueueBanner(
-    queueNumber: queueNumber,
-    estimatedMinutes: estimatedMinutes,           // ✅ flat field
-    estimatedArrivalTime: estimatedArrivalTime,   // ✅ flat field
-    patientsAhead: patientsAhead,                 // ✅ flat field
-  ),
-],
+                    // Live queue banner
+                    if (isLiveQueue) ...[
+                      const SizedBox(height: 8),
+                      _LiveQueueBanner(
+                        queueNumber: queueNumber,
+                        estimatedMinutes: estimatedMinutes,
+                        estimatedArrivalTime: estimatedArrivalTime,
+                        patientsAhead: patientsAhead,
+                      ),
+                    ],
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
 
-                    // ── ROW 3: Buttons ──
+                    // Action buttons (compact)
                     Row(
                       children: [
                         Expanded(
                           child: SizedBox(
-                            height: 38,
+                            height: 36,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: kPrimary,
+                                backgroundColor: _C.teal,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
@@ -1224,13 +1103,13 @@ final AppointmentList appointment;
                           ),
                         ),
                         if (onReview != null) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           SizedBox(
-                            height: 38,
+                            height: 36,
                             child: OutlinedButton(
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: kPrimary,
-                                side: const BorderSide(color: kPrimary),
+                                foregroundColor: _C.teal,
+                                side: const BorderSide(color: _C.teal),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
                                 ),
@@ -1238,48 +1117,47 @@ final AppointmentList appointment;
                               onPressed: onReview,
                               child: const Text(
                                 "Review",
-                                style: TextStyle(
-                                    fontWeight: FontWeight.w600, fontSize: 13),
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                               ),
                             ),
                           ),
                         ],
                         if (onReschedule != null) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           _iconBtn(
                             icon: Icons.edit_calendar_rounded,
-                            bg: kAmberLight,
-                            iconColor: kAmber,
+                            bg: _C.amberLight,
+                            iconColor: _C.amber,
                             onTap: onReschedule!,
                           ),
                         ],
                         if (onCancel != null) ...[
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                           _iconBtn(
                             icon: Icons.cancel_rounded,
-                            bg: kRedLight,
-                            iconColor: kRed,
+                            bg: _C.redLight,
+                            iconColor: _C.red,
                             onTap: onCancel!,
                           ),
                         ],
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         if (hasMap) ...[
                           _iconBtn(
                             icon: Icons.map_rounded,
-                            bg: kBlueLight,
-                            iconColor: kBlue,
+                            bg: _C.blueLight,
+                            iconColor: _C.blue,
                             onTap: () => openMap(
                               a.latitude!,
                               a.longitude!,
                               a.clinicName,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 6),
                         ],
                         _iconBtn(
                           icon: Icons.call_rounded,
-                          bg: kPrimaryLight,
-                          iconColor: kPrimary,
+                          bg: _C.tealLighter,
+                          iconColor: _C.teal,
                           onTap: () {},
                         ),
                       ],
@@ -1291,20 +1169,19 @@ final AppointmentList appointment;
           ),
         ),
 
-        // ── QUEUE NUMBER BADGE ──
+        // Queue badge
         if (queueNumber != null)
           Positioned(
-            top: -8,
+            top: -7,
             left: 12,
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
               decoration: BoxDecoration(
-                color: kPrimary,
+                color: _C.teal,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: kPrimary.withValues(alpha: 0.35),
+                    color: _C.teal.withOpacity(0.35),
                     blurRadius: 6,
                     offset: const Offset(0, 2),
                   ),
@@ -1342,19 +1219,20 @@ final AppointmentList appointment;
           ),
           child: Icon(icon, size: 12, color: iconColor),
         ),
-        const SizedBox(width: 7),
+        const SizedBox(width: 6),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(top,
-                style: const TextStyle(
-                    color: kTextDark,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600)),
+            Text(
+              top,
+              style: TextStyle(
+                color: isDark ? Colors.white : _C.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
             if (bottom.isNotEmpty)
-              Text(bottom,
-                  style:
-                      const TextStyle(color: kTextMid, fontSize: 11)),
+              Text(bottom, style: TextStyle(color: _C.textSlate, fontSize: 11)),
           ],
         ),
       ],
@@ -1368,33 +1246,28 @@ final AppointmentList appointment;
     required VoidCallback onTap,
   }) {
     return SizedBox(
-      height: 38,
-      width: 38,
+      height: 36,
+      width: 36,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: bg,
           elevation: 0,
           padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
         onPressed: onTap,
-        child: Icon(icon, color: iconColor, size: 17),
+        child: Icon(icon, color: iconColor, size: 16),
       ),
     );
   }
 }
 
-
-// ── 3. _LiveQueueBanner CLASS (poora replace kara) ────────────
-
+// ── LIVE QUEUE BANNER (compact) ─────────────────────────────────────────────
 class _LiveQueueBanner extends StatefulWidget {
   final int? queueNumber;
   final int? estimatedMinutes;
   final String? estimatedArrivalTime;
   final int? patientsAhead;
-
   const _LiveQueueBanner({
     this.queueNumber,
     this.estimatedMinutes,
@@ -1406,21 +1279,15 @@ class _LiveQueueBanner extends StatefulWidget {
   State<_LiveQueueBanner> createState() => _LiveQueueBannerState();
 }
 
-class _LiveQueueBannerState extends State<_LiveQueueBanner>
-    with SingleTickerProviderStateMixin {
+class _LiveQueueBannerState extends State<_LiveQueueBanner> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _pulse;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.35, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
-    );
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+    _pulse = Tween<double>(begin: 0.35, end: 1.0).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -1437,18 +1304,16 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
   @override
   Widget build(BuildContext context) {
     final q = widget.queueNumber;
-
     return Column(
       children: [
-        // ── Top row: queue position + LIVE chip ──
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: kGreen.withValues(alpha: 0.07),
+            color: _C.green.withOpacity(0.07),
             borderRadius: _hasEstimate
                 ? const BorderRadius.vertical(top: Radius.circular(12))
                 : BorderRadius.circular(12),
-            border: Border.all(color: kGreen.withValues(alpha: 0.28)),
+            border: Border.all(color: _C.green.withOpacity(0.28)),
           ),
           child: Row(
             children: [
@@ -1459,31 +1324,26 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                   height: 9,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: kGreen.withValues(alpha: _pulse.value),
+                    color: _C.green.withOpacity(_pulse.value),
                   ),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 9),
               Expanded(
                 child: RichText(
                   text: TextSpan(
-                    style:
-                        const TextStyle(fontSize: 13, color: kTextDark),
+                    style: const TextStyle(fontSize: 13, color: _C.textPrimary),
                     children: [
                       const TextSpan(
-                        text: 'Your queue position  ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: kTextMid,
-                        ),
+                        text: 'Your queue position ',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _C.textSlate),
                       ),
                       TextSpan(
                         text: q != null ? '#$q' : '—',
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: q != null ? kGreen : kTextMid,
+                          color: q != null ? _C.green : _C.textSlate,
                         ),
                       ),
                     ],
@@ -1491,10 +1351,9 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: kGreen,
+                  color: _C.green,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Row(
@@ -1517,99 +1376,71 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
             ],
           ),
         ),
-
-        // ── Bottom row: estimate (fakt jeva data aahe) ──
         if (_hasEstimate)
           Container(
             width: double.infinity,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: kAmber.withValues(alpha: 0.07),
-              borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(12)),
+              color: _C.amber.withOpacity(0.07),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
               border: Border(
-                left: BorderSide(
-                    color: kGreen.withValues(alpha: 0.28), width: 1),
-                right: BorderSide(
-                    color: kGreen.withValues(alpha: 0.28), width: 1),
-                bottom: BorderSide(
-                    color: kGreen.withValues(alpha: 0.28), width: 1),
+                left: BorderSide(color: _C.green.withOpacity(0.28), width: 1),
+                right: BorderSide(color: _C.green.withOpacity(0.28), width: 1),
+                bottom: BorderSide(color: _C.green.withOpacity(0.28), width: 1),
               ),
             ),
-            child:
-        Row(
-  children: [
-    const Icon(Icons.hourglass_top_rounded,
-        size: 13, color: kAmber),
-    const SizedBox(width: 6),
-
-    if (widget.patientsAhead == 0)
-      const Text(
-        'Your turn now',
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: kAmber,
-        ),
-      )
-    else if (widget.estimatedMinutes != null)
-      Text(
-        '~${widget.estimatedMinutes} min wait',
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: kAmber,
-        ),
-      ),
-
-    if (widget.estimatedArrivalTime != null) ...[
-      const SizedBox(width: 6),
-      Text(
-        '(~${widget.estimatedArrivalTime})',
-        style: const TextStyle(
-            fontSize: 12, color: kTextMid),
-      ),
-    ],
-
-    if (widget.patientsAhead != null) ...[
-      const Spacer(),
-      Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 7, vertical: 2),
-        decoration: BoxDecoration(
-          color: kAmber.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          widget.patientsAhead == 0
-              ? 'Next'
-              : '${widget.patientsAhead} ahead',
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: kAmber,
-          ),
-        ),
-      ),
-    ],
-  ],
-),
+            child: Row(
+              children: [
+                const Icon(Icons.hourglass_top_rounded, size: 13, color: _C.amber),
+                const SizedBox(width: 6),
+                if (widget.patientsAhead == 0)
+                  const Text(
+                    'Your turn now',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _C.amber),
+                  )
+                else if (widget.estimatedMinutes != null)
+                  Text(
+                    '~${widget.estimatedMinutes} min wait',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _C.amber),
+                  ),
+                if (widget.estimatedArrivalTime != null) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '(~${widget.estimatedArrivalTime})',
+                    style: const TextStyle(fontSize: 12, color: _C.textSlate),
+                  ),
+                ],
+                if (widget.patientsAhead != null) ...[
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _C.amber.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      widget.patientsAhead == 0 ? 'Next' : '${widget.patientsAhead} ahead',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _C.amber,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
       ],
     );
   }
 }
 
-// ════════════════════════════════════════════════════════
-//  DETAIL BOTTOM SHEET
-// ════════════════════════════════════════════════════════
-
+// ── DETAIL BOTTOM SHEET (compact) ───────────────────────────────────────────
 class _AppointmentDetailSheet extends StatelessWidget {
   final AppointmentList appointment;
   final VoidCallback? onCancel;
   final VoidCallback? onReschedule;
-
   const _AppointmentDetailSheet({
     required this.appointment,
     this.onCancel,
@@ -1635,54 +1466,53 @@ class _AppointmentDetailSheet extends StatelessWidget {
         ),
         child: Column(
           children: [
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Container(
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: kDivider,
+                color: _C.divider,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Expanded(
               child: ListView(
                 controller: controller,
-                padding: EdgeInsets.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  // ── HERO BANNER ──
+                  // Hero banner (compact)
                   Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [kPrimary.withValues(alpha: 0.9), kPrimaryDark],
+                        colors: [_C.teal.withOpacity(0.9), _C.tealDark],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(18),
                     ),
                     child: Row(
                       children: [
                         Container(
-                          width: 62,
-                          height: 62,
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(18),
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                           child: Center(
                             child: Text(
                               (a.patientName ?? "?")[0].toUpperCase(),
                               style: const TextStyle(
-                                fontSize: 28,
+                                fontSize: 26,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1690,31 +1520,26 @@ class _AppointmentDetailSheet extends StatelessWidget {
                               Text(
                                 a.patientName ?? "Unknown",
                                 style: const TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 19,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 3),
                               Text(
-                                "${a.gender ?? "—"}  ·  DOB: ${formatDate(a.dob)}",
+                                "${a.gender ?? "—"} · DOB: ${formatDate(a.dob)}",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.white.withValues(alpha: 0.8),
+                                  color: Colors.white.withOpacity(0.85),
                                 ),
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 8),
                               Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.18),
+                                  color: Colors.white.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.3),
-                                  ),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -1738,344 +1563,211 @@ class _AppointmentDetailSheet extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
 
-                  const SizedBox(height: 24),
-
-                  // ── SCHEDULE ──
                   _sheetSection("Schedule"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _scheduleChip(
+                          icon: Icons.calendar_today_rounded,
+                          color: _C.blue,
+                          bg: _C.blueLight,
+                          label: "Date",
+                          value: formatDate(a.appointmentDate),
+                          sub: formatDateRelative(a.appointmentDate),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _scheduleChip(
+                          icon: Icons.access_time_filled_rounded,
+                          color: _C.green,
+                          bg: _C.greenLight,
+                          label: "Time",
+                          value: formatTime(a.startTime),
+                          sub: a.endTime != null ? "Ends ${formatTime(a.endTime)}" : "",
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  _sheetSection("Doctor"),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _C.bg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _C.divider),
+                    ),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: _scheduleChip(
-                            icon: Icons.calendar_today_rounded,
-                            color: kBlue,
-                            bg: kBlueLight,
-                            label: "Date",
-                            value: formatDate(a.appointmentDate),
-                            sub: formatDateRelative(a.appointmentDate),
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(colors: [_C.teal.withOpacity(0.15), _C.teal.withOpacity(0.04)]),
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                          child: const Icon(Icons.person_rounded, color: _C.teal, size: 24),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _scheduleChip(
-                            icon: Icons.access_time_filled_rounded,
-                            color: kGreen,
-                            bg: kGreenLight,
-                            label: "Time",
-                            value: formatTime(a.startTime),
-                            sub: a.endTime != null
-                                ? "Ends ${formatTime(a.endTime)}"
-                                : "",
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                a.doctorName ?? "—",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: _C.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                a.specialization ?? "—",
+                                style: TextStyle(color: _C.teal, fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                              if (a.experience != null) ...[
+                                const SizedBox(height: 2),
+                                Text("${a.experience} yrs experience", style: TextStyle(color: _C.textSlate, fontSize: 11)),
+                              ],
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
 
-                  const SizedBox(height: 24),
-
-                  // ── DOCTOR ──
-                  _sheetSection("Doctor"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: kBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: kDivider),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  kPrimary.withValues(alpha: 0.15),
-                                  kPrimary.withValues(alpha: 0.04),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.person_rounded,
-                              color: kPrimary,
-                              size: 26,
-                            ),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  a.doctorName ?? "—",
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: kTextDark,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Text(
-                                  a.specialization ?? "—",
-                                  style: const TextStyle(
-                                    color: kPrimary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                if (a.experience != null) ...[
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    "${a.experience} yrs experience",
-                                    style: const TextStyle(
-                                      color: kTextMid,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── CLINIC ──
                   _sheetSection("Clinic"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: kBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: kDivider),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: kAmberLight,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.local_hospital_rounded,
-                                  color: kAmber,
-                                  size: 22,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      a.clinicName ?? "—",
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                        color: kTextDark,
-                                      ),
-                                    ),
-                                    if (a.clinicAddress != null) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        a.clinicAddress!,
-                                        style: const TextStyle(
-                                          color: kTextMid,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: _C.bg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _C.divider),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(color: _C.amberLight, borderRadius: BorderRadius.circular(10)),
+                              child: const Icon(Icons.local_hospital_rounded, color: _C.amber, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(a.clinicName ?? "—", style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _C.textPrimary)),
+                                  if (a.clinicAddress != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(a.clinicAddress!, style: TextStyle(color: _C.textSlate, fontSize: 12)),
                                   ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (hasMap) ...[
-                            const SizedBox(height: 14),
-                            const Divider(height: 1, color: kDivider),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              width: double.infinity,
-                              height: 42,
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kBlueLight,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                ),
-                                onPressed: () => openMap(
-                                  a.latitude!,
-                                  a.longitude!,
-                                  a.clinicName,
-                                ),
-                                icon: const Icon(
-                                  Icons.map_rounded,
-                                  color: kBlue,
-                                  size: 18,
-                                ),
-                                label: const Text(
-                                  "Open in Google Maps",
-                                  style: TextStyle(
-                                    color: kBlue,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
+                                ],
                               ),
                             ),
                           ],
+                        ),
+                        if (hasMap) ...[
+                          const SizedBox(height: 12),
+                          const Divider(height: 1, color: _C.divider),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 40,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _C.blueLight,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () => openMap(a.latitude!, a.longitude!, a.clinicName),
+                              icon: const Icon(Icons.map_rounded, color: _C.blue, size: 17),
+                              label: const Text(
+                                "Open in Google Maps",
+                                style: TextStyle(color: _C.blue, fontWeight: FontWeight.w600, fontSize: 13),
+                              ),
+                            ),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
                   ),
+                  const SizedBox(height: 20),
 
-                  const SizedBox(height: 24),
-
-                  // ── DETAILS ──
                   _sheetSection("Details"),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: kBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: kDivider),
-                      ),
-                      child: Column(
-                        children: [
-                          _detailRow(
-                            Icons.badge_rounded,
-                            kBlueLight,
-                            kBlue,
-                            "Patient Name",
-                            a.patientName ?? "—",
-                          ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _C.bg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _C.divider),
+                    ),
+                    child: Column(
+                      children: [
+                        _detailRow(Icons.badge_rounded, _C.blueLight, _C.blue, "Patient Name", a.patientName ?? "—"),
+                        _dividerLine(),
+                        _detailRow(Icons.wc_rounded, _C.purpleLight, _C.purple, "Gender", a.gender ?? "—"),
+                        _dividerLine(),
+                        _detailRow(Icons.cake_rounded, _C.amberLight, _C.amber, "Date of Birth", formatDate(a.dob)),
+                        if (a.queueNumber != null) ...[
                           _dividerLine(),
-                          _detailRow(
-                            Icons.wc_rounded,
-                            kPurpleLight,
-                            kPurple,
-                            "Gender",
-                            a.gender ?? "—",
-                          ),
-                          _dividerLine(),
-                          _detailRow(
-                            Icons.cake_rounded,
-                            kAmberLight,
-                            kAmber,
-                            "Date of Birth",
-                            formatDate(a.dob),
-                          ),
-                          if (a.queueNumber != null) ...[
-                            _dividerLine(),
-                            _detailRow(
-                              Icons.queue_rounded,
-                              kGreenLight,
-                              kGreen,
-                              "Queue Number",
-                              "Q #${a.queueNumber}",
-                            ),
-                          ],
-                          if (a.bookingFor != null) ...[
-                            _dividerLine(),
-                            _detailRow(
-                              Icons.people_rounded,
-                              kPurpleLight,
-                              kPurple,
-                              "Booking For",
-                              a.bookingFor!,
-                            ),
-                          ],
+                          _detailRow(Icons.queue_rounded, _C.greenLight, _C.green, "Queue Number", "Q #${a.queueNumber}"),
                         ],
-                      ),
+                        if (a.bookingFor != null) ...[
+                          _dividerLine(),
+                          _detailRow(Icons.people_rounded, _C.purpleLight, _C.purple, "Booking For", a.bookingFor!),
+                        ],
+                      ],
                     ),
                   ),
-
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
 
                   if (onReschedule != null || onCancel != null)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                      padding: const EdgeInsets.only(bottom: 12),
                       child: Row(
                         children: [
                           if (onReschedule != null)
                             Expanded(
                               child: SizedBox(
-                                height: 48,
+                                height: 46,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: kAmberLight,
+                                    backgroundColor: _C.amberLight,
                                     elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(13),
-                                    ),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                   onPressed: onReschedule,
-                                  icon: const Icon(
-                                    Icons.edit_calendar_rounded,
-                                    color: kAmber,
-                                    size: 18,
-                                  ),
-                                  label: const Text(
-                                    "Reschedule",
-                                    style: TextStyle(
-                                      color: kAmber,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
+                                  icon: const Icon(Icons.edit_calendar_rounded, color: _C.amber, size: 18),
+                                  label: const Text("Reschedule", style: TextStyle(color: _C.amber, fontWeight: FontWeight.w700, fontSize: 14)),
                                 ),
                               ),
                             ),
-                          if (onReschedule != null && onCancel != null)
-                            const SizedBox(width: 12),
+                          if (onReschedule != null && onCancel != null) const SizedBox(width: 10),
                           if (onCancel != null)
                             Expanded(
                               child: SizedBox(
-                                height: 48,
+                                height: 46,
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: kRedLight,
+                                    backgroundColor: _C.redLight,
                                     elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(13),
-                                    ),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                   ),
                                   onPressed: onCancel,
-                                  icon: const Icon(
-                                    Icons.cancel_rounded,
-                                    color: kRed,
-                                    size: 18,
-                                  ),
-                                  label: const Text(
-                                    "Cancel",
-                                    style: TextStyle(
-                                      color: kRed,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                    ),
-                                  ),
+                                  icon: const Icon(Icons.cancel_rounded, color: _C.red, size: 18),
+                                  label: const Text("Cancel", style: TextStyle(color: _C.red, fontWeight: FontWeight.w700, fontSize: 14)),
                                 ),
                               ),
                             ),
@@ -2083,32 +1775,23 @@ class _AppointmentDetailSheet extends StatelessWidget {
                       ),
                     ),
 
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: SizedBox(
-                      height: 50,
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimary,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(
-                          "Close",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                          ),
-                        ),
+                  SizedBox(
+                    height: 48,
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _C.teal,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        "Close",
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -2118,18 +1801,15 @@ class _AppointmentDetailSheet extends StatelessWidget {
     );
   }
 
-  Widget _sheetSection(String title) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Text(
-      title.toUpperCase(),
-      style: const TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w800,
-        color: kTextLight,
-        letterSpacing: 1.2,
-      ),
-    ),
-  );
+  Widget _sheetSection(String title) => Text(
+        title.toUpperCase(),
+        style: const TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+          color: _C.textMuted,
+          letterSpacing: 1.2,
+        ),
+      );
 
   Widget _scheduleChip({
     required IconData icon,
@@ -2140,96 +1820,54 @@ class _AppointmentDetailSheet extends StatelessWidget {
     required String sub,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: kBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kDivider),
+        color: _C.bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _C.divider),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(icon, size: 16, color: color),
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, size: 15, color: color),
           ),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            style: const TextStyle(
-              color: kTextMid,
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(color: _C.textSlate, fontSize: 11, fontWeight: FontWeight.w500)),
           const SizedBox(height: 2),
-          Text(
-            value,
-            style: const TextStyle(
-              color: kTextDark,
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (sub.isNotEmpty)
-            Text(sub, style: const TextStyle(color: kTextMid, fontSize: 11)),
+          Text(value, style: TextStyle(color: _C.textPrimary, fontSize: 14, fontWeight: FontWeight.w700)),
+          if (sub.isNotEmpty) Text(sub, style: TextStyle(color: _C.textSlate, fontSize: 11)),
         ],
       ),
     );
   }
 
-  Widget _detailRow(
-    IconData icon,
-    Color bg,
-    Color color,
-    String label,
-    String value,
-  ) {
+  Widget _detailRow(IconData icon, Color bg, Color color, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(8),
-            ),
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
             child: Icon(icon, size: 14, color: color),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: kTextMid,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            child: Text(label, style: TextStyle(color: _C.textSlate, fontSize: 12, fontWeight: FontWeight.w500)),
           ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: kTextDark,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          Text(value, style: TextStyle(color: _C.textPrimary, fontSize: 13, fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 
-  Widget _dividerLine() =>
-      const Divider(height: 1, color: kDivider, indent: 14, endIndent: 14);
+  Widget _dividerLine() => const Divider(height: 1, color: _C.divider, indent: 12, endIndent: 12);
 }
 
-
+// Review dialog remains unchanged (font sizes & theme already match)
 class AppointmentReviewInput {
   final int rating;
   final String comment;
@@ -2245,16 +1883,14 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
   final commentCtrl = TextEditingController();
   int rating = 0;
   int hoveredRating = 0;
-
   const starColors = [
     Colors.transparent,
-    Color(0xFFE24B4A), // 1 - red
-    Color(0xFFEF9F27), // 2 - amber
-    Color(0xFF639922), // 3 - green
-    Color(0xFF1D9E75), // 4 - teal
-    Color(0xFF378ADD), // 5 - blue
+    Color(0xFFE24B4A),
+    Color(0xFFEF9F27),
+    Color(0xFF639922),
+    Color(0xFF1D9E75),
+    Color(0xFF378ADD),
   ];
-
   const starLabels = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
 
   return showDialog<AppointmentReviewInput>(
@@ -2264,11 +1900,8 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setState) {
         final activeRating = hoveredRating > 0 ? hoveredRating : rating;
-
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
           titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
           title: Row(
@@ -2278,28 +1911,17 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                 backgroundColor: const Color(0xFFE6F1FB),
                 child: Text(
                   doctorInitials ?? doctorName.substring(0, 2).toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF185FA5),
-                  ),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF185FA5)),
                 ),
               ),
               const SizedBox(width: 12),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Rate your visit',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                  ),
+                  const Text('Rate your visit', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                   Text(
                     'Dr. $doctorName${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w400,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w400),
                   ),
                 ],
               ),
@@ -2310,19 +1932,13 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Divider(height: 28),
-              const Text(
-                'How was your appointment experience?',
-                style: TextStyle(fontSize: 13, color: Colors.grey),
-              ),
+              const Text('How was your appointment experience?', style: TextStyle(fontSize: 13, color: Colors.grey)),
               const SizedBox(height: 12),
-              // Stars
               Row(
                 children: List.generate(5, (i) {
                   final idx = i + 1;
                   final filled = idx <= activeRating;
-                  final color = activeRating > 0
-                      ? starColors[activeRating]
-                      : Colors.grey.shade300;
+                  final color = activeRating > 0 ? starColors[activeRating] : Colors.grey.shade300;
                   return GestureDetector(
                     onTap: () => setState(() {
                       rating = idx;
@@ -2334,9 +1950,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                       child: Padding(
                         padding: const EdgeInsets.only(right: 4),
                         child: Icon(
-                          filled
-                              ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
+                          filled ? Icons.star_rounded : Icons.star_outline_rounded,
                           size: 32,
                           color: filled ? color : Colors.grey.shade300,
                         ),
@@ -2352,11 +1966,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                     ? Text(
                         starLabels[activeRating],
                         key: ValueKey(activeRating),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: starColors[activeRating],
-                        ),
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: starColors[activeRating]),
                       )
                     : const SizedBox(height: 16),
               ),
@@ -2381,10 +1991,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF378ADD),
-                      width: 1.2,
-                    ),
+                    borderSide: const BorderSide(color: Color(0xFF378ADD), width: 1.2),
                   ),
                 ),
               ),
@@ -2399,13 +2006,10 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 11),
                       side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () => Navigator.pop(ctx),
-                    child: const Text('Cancel',
-                        style: TextStyle(color: Colors.grey)),
+                    child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -2414,24 +2018,13 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF378ADD),
-                      disabledBackgroundColor:
-                          const Color(0xFF378ADD).withOpacity(0.4),
+                      disabledBackgroundColor: const Color(0xFF378ADD).withOpacity(0.4),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 11),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
-                    onPressed: rating <= 0
-                        ? null
-                        : () => Navigator.pop(
-                              ctx,
-                              AppointmentReviewInput(
-                                rating: rating,
-                                comment: commentCtrl.text.trim(),
-                              ),
-                            ),
+                    onPressed: rating <= 0 ? null : () => Navigator.pop(ctx, AppointmentReviewInput(rating: rating, comment: commentCtrl.text.trim())),
                     child: const Text('Submit review'),
                   ),
                 ),
@@ -2444,3 +2037,5 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
     ),
   );
 }
+
+
