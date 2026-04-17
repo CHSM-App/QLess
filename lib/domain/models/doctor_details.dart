@@ -93,6 +93,8 @@ class DoctorDetails {
 
   @JsonKey(name: 'booking_start_time')
   final String? bookingStartTime;
+  @JsonKey(name: 'is_recently_visited')
+  final String? isRecentlyVisited;
 
   DoctorDetails({
     this.doctorId,
@@ -127,6 +129,7 @@ class DoctorDetails {
     this.maxQueueLength,
     this.isQueueFull,
     this.bookingStartTime,
+    this.isRecentlyVisited,
   });
 
   factory DoctorDetails.fromJson(Map<String, dynamic> json) =>

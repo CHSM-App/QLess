@@ -32,6 +32,7 @@ class AddFamilyMemberScreen extends ConsumerStatefulWidget {
   final List<GenderModel>   genderOptions;
   final List<RelationModel> relationOptions;
 
+
   const AddFamilyMemberScreen({
     super.key,
     this.existingMember,
@@ -265,8 +266,8 @@ class _AddFamilyMemberScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Progress
-                      _buildProgressBar(),
-                      const SizedBox(height: 16),
+                      // _buildProgressBar(),
+                      // const SizedBox(height: 16),
 
                       // ── Name ──────────────────────────────────────
                       _label('Full Name', required: true),
@@ -338,8 +339,8 @@ class _AddFamilyMemberScreenState
                       _label('Mobile Number', optional: true),
                       const SizedBox(height: 5),
                       _mobileField(),
-                      const SizedBox(height: 7),
-                      _mobileHint(),
+                      // const SizedBox(height: 7),
+                      // _mobileHint(),
                       const SizedBox(height: 13),
 
                       // ── Confirm ───────────────────────────────────

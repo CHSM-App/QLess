@@ -197,8 +197,9 @@ final showAppBar = true;
 
   Widget _buildMobileLayout(bool showAppBar) {
     return Scaffold(
-      backgroundColor: DoctorNavTheme.scaffoldBg,
+      backgroundColor: const Color(0xFFEEF2FF),
       extendBody: true,
+      extendBodyBehindAppBar: true,
       appBar: showAppBar ? _buildAppBar() : null,
       body: Stack(
         children: [
@@ -439,19 +440,9 @@ final showAppBar = true;
             borderRadius: BorderRadius.circular(30),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 14,
-                offset: const Offset(0, 6),
-              ),
-              BoxShadow(
-                color: Colors.black.withOpacity(0.14),
-                blurRadius: 24,
-                offset: const Offset(0, 14),
-              ),
-              BoxShadow(
-                color: Colors.white.withOpacity(0.25),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
+                color: Colors.black.withOpacity(0.10),
+                blurRadius: 12,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -462,12 +453,11 @@ final showAppBar = true;
               child: Container(
                 height: 64,
                 decoration: BoxDecoration(
-                  // Very light teal wash (was plain white)
-                  color: DoctorNavTheme.tealLighter.withOpacity(0.72),
+                  color: const Color(0x12FFFFFF),
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: DoctorNavTheme.tealLight.withOpacity(0.7),
-                    width: 1.2,
+                    color: const Color(0x66FFFFFF),
+                    width: 1.6,
                   ),
                 ),
                 child: LayoutBuilder(
