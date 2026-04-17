@@ -4,22 +4,32 @@ import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 
-class _C {
-  _C._();
-  static const teal = Color(0xFF26C6B0);
-  static const tealLight = Color(0xFFD9F5F1);
-  static const textPrimary = Color(0xFF2D3748);
-  static const textMuted = Color(0xFFA0AEC0);
-  static const border = Color(0xFFEDF2F7);
-  static const bg = Color(0xFFF8FFFE);
-  static const card = Colors.white;
-  static const red = Color(0xFFFC8181);
-  static const green = Color(0xFF68D391);
-}
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
 
-// ─────────────────────────────────────────────
-// Main Page
-// ─────────────────────────────────────────────
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder  = Color(0xFFEDF2F7);
+const kDivider = Color(0xFFE5E7EB);
+
+const kError      = Color(0xFFFC8181);
+const kRedLight   = Color(0xFFFEE2E2);
+const kSuccess    = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+const kWarning    = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+const kPurple     = Color(0xFF9F7AEA);
+const kPurpleLight= Color(0xFFEDE9FE);
+const kInfo       = Color(0xFF3B82F6);
+const kInfoLight  = Color(0xFFDBEAFE);
+
+// ════════════════════════════════════════════════════════════════════
+//  DOCTOR MEDICINE PAGE
+// ════════════════════════════════════════════════════════════════════
 class DoctorMedicinePage extends ConsumerStatefulWidget {
   const DoctorMedicinePage({super.key});
 
@@ -28,25 +38,28 @@ class DoctorMedicinePage extends ConsumerStatefulWidget {
 }
 
 class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
-  final _searchController = TextEditingController();
-  int _selectedType = 0;
-  bool _hasFetched = false;
+  final _searchCtrl = TextEditingController();
+  int  _selectedType = 0;
+  bool _hasFetched   = false;
 
-  static const _types = ['All', 'Tablet', 'Lotion', 'Syrup', 'Injection', 'Drops', 'Spray'];
+  static const _types = [
+    'All', 'Tablet', 'Lotion', 'Syrup', 'Injection', 'Drops', 'Spray'
+  ];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshMedicines(force: false));
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _refresh(force: false));
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
-  void _refreshMedicines({required bool force}) {
+  void _refresh({required bool force}) {
     if (_hasFetched && !force) return;
     final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
     if (doctorId == 0) return;
@@ -54,408 +67,537 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
     ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
   }
 
-  void _goToAddMedicine() async {
+  Future<void> _goToAdd() async {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const AddMedicinePage()),
     );
-    if (result == true) _refreshMedicines(force: true);
+    if (result == true) _refresh(force: true);
   }
 
   void _confirmDelete(Medicine medicine) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Remove Medicine?', style: TextStyle(fontWeight: FontWeight.w600)),
-        content: Text('Remove "${medicine.medicineName ?? 'this medicine'}" permanently?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: _C.red),
-            onPressed: () async {
-              Navigator.pop(context);
-              await ref.read(prescriptionViewModelProvider.notifier).deleteMedicine(medicine.medicineId ?? 0);
-              _refreshMedicines(force: true);
-              _showSnack('Medicine removed');
-            },
-            child: const Text('Remove'),
-          ),
-        ],
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 48, height: 48,
+              decoration: const BoxDecoration(
+                  color: kRedLight, shape: BoxShape.circle),
+              child: const Icon(Icons.delete_outline_rounded,
+                  size: 22, color: kError),
+            ),
+            const SizedBox(height: 12),
+            const Text('Remove Medicine?',
+                style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
+            const SizedBox(height: 6),
+            Text(
+              'Remove "${medicine.medicineName ?? 'this medicine'}" permanently?',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 13, color: kTextSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: kBorder),
+                    foregroundColor: kTextSecondary,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                  ),
+                  child: const Text('Cancel',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    Navigator.pop(context);
+                    await ref
+                        .read(prescriptionViewModelProvider.notifier)
+                        .deleteMedicine(medicine.medicineId ?? 0);
+                    _refresh(force: true);
+                    _snack('Medicine removed');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kError,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                  ),
+                  child: const Text('Remove',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ]),
+          ]),
+        ),
       ),
     );
   }
 
-  void _showSnack(String msg) {
+  void _snack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
-        backgroundColor: _C.green,
+        content: Row(children: [
+          Icon(
+            isError
+                ? Icons.error_outline_rounded
+                : Icons.check_circle_outline_rounded,
+            color: Colors.white, size: 15,
+          ),
+          const SizedBox(width: 8),
+          Expanded(child: Text(msg,
+              style: const TextStyle(fontSize: 13, color: Colors.white))),
+        ]),
+        backgroundColor: isError ? kError : kPrimary,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
       ),
     );
   }
 
   List<Medicine> _filtered(List<Medicine> list) {
-    final query = _searchController.text.toLowerCase().trim();
+    final q = _searchCtrl.text.toLowerCase().trim();
     return list.where((m) {
-      final typeMatch = _selectedType == 0 || m.medTypeName == _types[_selectedType];
-      final searchMatch = query.isEmpty ||
-          (m.medicineName?.toLowerCase().contains(query) ?? false) ||
-          (m.medTypeName?.toLowerCase().contains(query) ?? false);
+      final typeMatch = _selectedType == 0 ||
+          m.medTypeName == _types[_selectedType];
+      final searchMatch = q.isEmpty ||
+          (m.medicineName?.toLowerCase().contains(q) ?? false) ||
+          (m.medTypeName?.toLowerCase().contains(q) ?? false);
       return typeMatch && searchMatch;
     }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(doctorLoginViewModelProvider);
+    final state          = ref.watch(doctorLoginViewModelProvider);
     final medicinesAsync = state.medicines ?? const AsyncValue.loading();
 
     return Scaffold(
-      backgroundColor: _C.bg,
-      body: Column(
-        children: [
-          _TopBar(
-            searchController: _searchController,
-            selectedType: _selectedType,
-            types: _types,
-            onSearchChanged: () => setState(() {}),
-            onTypeSelected: (i) => setState(() => _selectedType = i),
-          ),
+      backgroundColor: Colors.white,
+      body: Column(children: [
+        _TopBar(
+          searchCtrl:       _searchCtrl,
+          selectedType:     _selectedType,
+          types:            _types,
+          onSearchChanged:  () => setState(() {}),
+          onTypeSelected:   (i) => setState(() => _selectedType = i),
+        ),
 
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 6),
-            child: medicinesAsync.when(
-              data: (list) => _CountRow(count: _filtered(list).length, total: list.length),
-              loading: () => const Text('Loading medicines...', style: TextStyle(color: _C.textMuted)),
-              error: (_, __) => const SizedBox(),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+          child: medicinesAsync.when(
+            data: (list) => _CountRow(
+                count: _filtered(list).length, total: list.length),
+            loading: () => const Text('Loading medicines…',
+                style: TextStyle(fontSize: 12, color: kTextMuted)),
+            error: (_, __) => const SizedBox(),
+          ),
+        ),
+
+        Expanded(
+          child: medicinesAsync.when(
+            loading: () => const Center(
+              child: SizedBox(
+                width: 28, height: 28,
+                child: CircularProgressIndicator(
+                    color: kPrimary, strokeWidth: 2.5),
+              ),
             ),
-          ),
-
-          Expanded(
-            child: medicinesAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: _C.teal)),
-              error: (_, __) => _ErrorState(onRetry: () => _refreshMedicines(force: true)),
-              data: (medicines) {
-                final filtered = _filtered(medicines);
-                if (filtered.isEmpty) {
-                  return _EmptyState(hasFilters: _selectedType != 0 || _searchController.text.isNotEmpty);
-                }
-
-                return LayoutBuilder(
-                  builder: (context, constraints) {
-                    final isWideScreen = constraints.maxWidth > 900;
-
-                    return RefreshIndicator(
-                      color: _C.teal,
-                      onRefresh: () async => _refreshMedicines(force: true),
-                      child: isWideScreen
-                          ? _buildCompactGrid(filtered)
-                          : _buildCompactList(filtered),
-                    );
-                  },
+            error: (_, __) => _ErrorState(
+                onRetry: () => _refresh(force: true)),
+            data: (medicines) {
+              final filtered = _filtered(medicines);
+              if (filtered.isEmpty) {
+                return _EmptyState(
+                  hasFilters: _selectedType != 0 ||
+                      _searchCtrl.text.isNotEmpty,
                 );
-              },
-            ),
+              }
+              return LayoutBuilder(builder: (_, constraints) {
+                final isWide = constraints.maxWidth > 900;
+                return RefreshIndicator(
+                  color: kPrimary,
+                  strokeWidth: 2,
+                  onRefresh: () async => _refresh(force: true),
+                  child: isWide
+                      ? _buildGrid(filtered)
+                      : _buildList(filtered),
+                );
+              });
+            },
           ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _goToAddMedicine,
-        backgroundColor: _C.teal,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Add Medicine', style: TextStyle(fontWeight: FontWeight.w700)),
-      ),
-    );
-  }
-
-  // Compact List (Mobile)
-  Widget _buildCompactList(List<Medicine> medicines) {
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 90),
-      itemCount: medicines.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) => _CompactMedicineCard(
-        medicine: medicines[i],
-        onDelete: () => _confirmDelete(medicines[i]),
+        ),
+      ]),
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 80),
+        child: FloatingActionButton.extended(
+          onPressed: _goToAdd,
+          backgroundColor: kPrimary,
+          elevation: 3,
+          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+          label: const Text('Add Medicine',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white)),
+        ),
       ),
     );
   }
 
-  // Compact Grid (Tablet/Desktop)
-  Widget _buildCompactGrid(List<Medicine> medicines) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 90),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 340,
-        childAspectRatio: 3.4,
-        crossAxisSpacing: 14,
-        mainAxisSpacing: 14,
-      ),
-      itemCount: medicines.length,
-      itemBuilder: (_, i) => _CompactMedicineCard(
-        medicine: medicines[i],
-        onDelete: () => _confirmDelete(medicines[i]),
-      ),
-    );
-  }
+  Widget _buildList(List<Medicine> medicines) => ListView.separated(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 140),
+        itemCount: medicines.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (_, i) => _MedicineCard(
+          medicine: medicines[i],
+          onDelete: () => _confirmDelete(medicines[i]),
+        ),
+      );
+
+  Widget _buildGrid(List<Medicine> medicines) => GridView.builder(
+        padding: const EdgeInsets.fromLTRB(14, 6, 14, 100),
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 320,
+          childAspectRatio: 3.2,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+        ),
+        itemCount: medicines.length,
+        itemBuilder: (_, i) => _MedicineCard(
+          medicine: medicines[i],
+          onDelete: () => _confirmDelete(medicines[i]),
+        ),
+      );
 }
 
-// ─────────────────────────────────────────────
-// Compact Medicine Card (Main Focus)
-// ─────────────────────────────────────────────
-class _CompactMedicineCard extends StatelessWidget {
-  const _CompactMedicineCard({required this.medicine, required this.onDelete});
+// ════════════════════════════════════════════════════════════════════
+//  MEDICINE CARD
+// ════════════════════════════════════════════════════════════════════
+class _TypeStyle {
+  final Color bg, fg;
+  final IconData icon;
+  const _TypeStyle({required this.bg, required this.fg, required this.icon});
+}
 
+const _typeStyles = <String, _TypeStyle>{
+  'Tablet':    _TypeStyle(bg: kPrimaryLight, fg: kPrimary,   icon: Icons.medication_rounded),
+  'Lotion':    _TypeStyle(bg: kPurpleLight,  fg: kPurple,    icon: Icons.science_outlined),
+  'Syrup':     _TypeStyle(bg: kGreenLight,   fg: kSuccess,   icon: Icons.local_drink_outlined),
+  'Injection': _TypeStyle(bg: kAmberLight,   fg: kWarning,   icon: Icons.colorize_outlined),
+  'Drops':     _TypeStyle(bg: kInfoLight,    fg: kInfo,      icon: Icons.water_drop_outlined),
+  'Spray':     _TypeStyle(bg: kGreenLight,   fg: kSuccess,   icon: Icons.air_outlined),
+};
+
+class _MedicineCard extends StatelessWidget {
   final Medicine medicine;
   final VoidCallback onDelete;
-
-  static const _typeStyles = {
-    'Tablet': _TypeStyle(bg: Color(0xFFE0F2FE), fg: Color(0xFF26C6B0), icon: Icons.medication_rounded),
-    'Lotion': _TypeStyle(bg: Color(0xFFF3E8FF), fg: Color(0xFF7C3AED), icon: Icons.science_outlined),
-    'Syrup': _TypeStyle(bg: Color(0xFFDCFCE7), fg: Color(0xFF10B981), icon: Icons.local_drink_outlined),
-    'Injection': _TypeStyle(bg: Color(0xFFFEF3C7), fg: Color(0xFFF59E0B), icon: Icons.colorize_outlined),
-    'Drops': _TypeStyle(bg: Color(0xFFEDE9FE), fg: Color(0xFF7C3AED), icon: Icons.water_drop_outlined),
-    'Spray': _TypeStyle(bg: Color(0xFFDCFCE7), fg: Color(0xFF10B981), icon: Icons.air_outlined),
-  };
+  const _MedicineCard({required this.medicine, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
     final style = _typeStyles[medicine.medTypeName] ??
-        const _TypeStyle(bg: Color(0xFFF1F5F9), fg: Colors.grey, icon: Icons.medication_outlined);
+        const _TypeStyle(
+            bg: Color(0xFFF7F8FA), fg: kTextMuted,
+            icon: Icons.medication_outlined);
 
     return Container(
       decoration: BoxDecoration(
-        color: _C.card,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _C.border),
-        boxShadow: const [
-          BoxShadow(color: Color(0x05000000), blurRadius: 8, offset: Offset(0, 2)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2)),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          // Icon
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(children: [
+        // Icon badge
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
               color: style.bg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(style.icon, color: style.fg, size: 22),
-          ),
+              borderRadius: BorderRadius.circular(10)),
+          child: Icon(style.icon, color: style.fg, size: 19),
+        ),
+        const SizedBox(width: 10),
 
-          const SizedBox(width: 12),
-
-          // Info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  medicine.medicineName ?? '—',
+        // Info
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(medicine.medicineName ?? '—',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: _C.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+              const SizedBox(height: 3),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
                     color: style.bg,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    medicine.medTypeName ?? '—',
+                    borderRadius: BorderRadius.circular(6)),
+                child: Text(medicine.medTypeName ?? '—',
                     style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: style.fg,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Delete Button
-          GestureDetector(
-            onTap: onDelete,
-            child: Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(
-                color: _C.red.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(10),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: style.fg)),
               ),
-              child: Icon(Icons.delete_outline_rounded, color: _C.red, size: 18),
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+
+        // Delete
+        GestureDetector(
+          onTap: onDelete,
+          child: Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+                color: kRedLight,
+                borderRadius: BorderRadius.circular(9)),
+            child: const Icon(Icons.delete_outline_rounded,
+                color: kError, size: 16),
+          ),
+        ),
+      ]),
     );
   }
 }
 
-class _TypeStyle {
-  const _TypeStyle({required this.bg, required this.fg, required this.icon});
-  final Color bg, fg;
-  final IconData icon;
-}
-
-// Top Bar, CountRow, EmptyState, ErrorState (compact version)
+// ════════════════════════════════════════════════════════════════════
+//  TOP BAR
+// ════════════════════════════════════════════════════════════════════
 class _TopBar extends StatelessWidget {
+  final TextEditingController searchCtrl;
+  final int selectedType;
+  final List<String> types;
+  final VoidCallback onSearchChanged;
+  final ValueChanged<int> onTypeSelected;
+
   const _TopBar({
-    required this.searchController,
+    required this.searchCtrl,
     required this.selectedType,
     required this.types,
     required this.onSearchChanged,
     required this.onTypeSelected,
   });
 
-  final TextEditingController searchController;
-  final int selectedType;
-  final List<String> types;
-  final VoidCallback onSearchChanged;
-  final ValueChanged<int> onTypeSelected;
-
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: _C.card,
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
-      child: Column(
-        children: [
-          // Search
-          Container(
-            height: 48,
-            decoration: BoxDecoration(
-              border: Border.all(color: _C.border),
-              borderRadius: BorderRadius.circular(14),
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Column(children: [
+        // Search bar
+        Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kBorder),
+          ),
+          child: Row(children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 11),
+              child: Icon(Icons.search_rounded, size: 17, color: kTextMuted),
             ),
-            child: TextField(
-              controller: searchController,
-              onChanged: (_) => onSearchChanged(),
-              style: const TextStyle(fontSize: 14.5),
-              decoration: InputDecoration(
-                hintText: 'Search medicines...',
-                hintStyle: TextStyle(color: _C.textMuted, fontSize: 14.5),
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                suffixIcon: searchController.text.isNotEmpty
-                    ? IconButton(icon: const Icon(Icons.close, size: 18), onPressed: () {
-                        searchController.clear();
-                        onSearchChanged();
-                      })
-                    : null,
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            Expanded(
+              child: TextField(
+                controller: searchCtrl,
+                onChanged: (_) => onSearchChanged(),
+                style: const TextStyle(fontSize: 13, color: kTextPrimary),
+                decoration: const InputDecoration(
+                  hintText: 'Search medicines…',
+                  hintStyle: TextStyle(fontSize: 13, color: kTextMuted),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12),
+            if (searchCtrl.text.isNotEmpty)
+              GestureDetector(
+                onTap: () { searchCtrl.clear(); onSearchChanged(); },
+                child: Container(
+                  margin: const EdgeInsets.only(right: 10),
+                  width: 18, height: 18,
+                  decoration: const BoxDecoration(
+                      color: kTextMuted, shape: BoxShape.circle),
+                  child: const Icon(Icons.close_rounded,
+                      size: 11, color: Colors.white),
+                ),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 8),
 
-          // Filter Chips (Compact)
-          SizedBox(
-            height: 34,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: types.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemBuilder: (context, i) {
-                final selected = selectedType == i;
-                return GestureDetector(
-                  onTap: () => onTypeSelected(i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: selected ? _C.teal : _C.card,
-                      border: Border.all(color: selected ? _C.teal : _C.border),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      types[i],
-                      style: TextStyle(
-                        fontSize: 12.8,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: selected ? Colors.white : _C.textMuted,
-                      ),
-                    ),
+        // Filter chips — pill style
+        SizedBox(
+          height: 32,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: types.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            itemBuilder: (_, i) {
+              final sel = selectedType == i;
+              return GestureDetector(
+                onTap: () => onTypeSelected(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: sel ? kPrimary : Colors.white,
+                    border: Border.all(
+                        color: sel ? kPrimary : kBorder),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                );
-              },
-            ),
+                  child: Text(types[i],
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: sel
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: sel ? Colors.white : kTextSecondary)),
+                ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ]),
     );
   }
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  COUNT ROW
+// ════════════════════════════════════════════════════════════════════
 class _CountRow extends StatelessWidget {
-  const _CountRow({required this.count, required this.total});
   final int count, total;
+  const _CountRow({required this.count, required this.total});
 
   @override
-  Widget build(BuildContext context) => Row(
-        children: [
-          Text('$count medicine${count != 1 ? 's' : ''}',
-              style: TextStyle(fontSize: 13.5, color: _C.textMuted)),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
-            decoration: BoxDecoration(color: _C.tealLight, borderRadius: BorderRadius.circular(20)),
-            child: Text('$total total', style: TextStyle(fontSize: 12, color: _C.teal, fontWeight: FontWeight.w600)),
-          ),
-        ],
-      );
+  Widget build(BuildContext context) => Row(children: [
+        Text('$count medicine${count != 1 ? 's' : ''}',
+            style: const TextStyle(
+                fontSize: 12, color: kTextMuted)),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(20)),
+          child: Text('$total total',
+              style: const TextStyle(
+                  fontSize: 11,
+                  color: kPrimary,
+                  fontWeight: FontWeight.w600)),
+        ),
+      ]);
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  EMPTY STATE
+// ════════════════════════════════════════════════════════════════════
 class _EmptyState extends StatelessWidget {
   final bool hasFilters;
   const _EmptyState({this.hasFilters = false});
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.medication_outlined, size: 42, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text(hasFilters ? 'No matching medicines' : 'No medicines added yet',
-                style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 6),
-            Text(
-              hasFilters ? 'Try different filter or search' : 'Tap + to add new medicine',
-              style: TextStyle(fontSize: 13.5, color: _C.textMuted),
-            ),
-          ],
-        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 60, height: 60,
+            decoration: const BoxDecoration(
+                color: kPrimaryLight, shape: BoxShape.circle),
+            child: const Icon(Icons.medication_outlined,
+                size: 28, color: kPrimary),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            hasFilters ? 'No matching medicines' : 'No medicines added yet',
+            style: const TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w600,
+                color: kTextPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            hasFilters
+                ? 'Try a different filter or search'
+                : 'Tap + to add a new medicine',
+            style: const TextStyle(fontSize: 12, color: kTextMuted),
+          ),
+        ]),
       );
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  ERROR STATE
+// ════════════════════════════════════════════════════════════════════
 class _ErrorState extends StatelessWidget {
   final VoidCallback onRetry;
   const _ErrorState({required this.onRetry});
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline_rounded, size: 42, color: Colors.redAccent),
-            const SizedBox(height: 16),
-            const Text('Failed to load', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 20),
-            ElevatedButton(onPressed: onRetry, child: const Text('Retry')),
-          ],
-        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 60, height: 60,
+            decoration: const BoxDecoration(
+                color: kRedLight, shape: BoxShape.circle),
+            child: const Icon(Icons.wifi_off_rounded,
+                size: 26, color: kError),
+          ),
+          const SizedBox(height: 12),
+          const Text('Failed to load',
+              style: TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w600,
+                  color: kTextPrimary)),
+          const SizedBox(height: 4),
+          const Text('Please check your connection',
+              style: TextStyle(fontSize: 12, color: kTextMuted)),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 38,
+            child: ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Retry',
+                  style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ),
+          ),
+        ]),
       );
 }

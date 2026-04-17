@@ -3,17 +3,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-const kPrimaryBlue = Color(0xFF1A73E8);
-const kLightBlue = Color(0xFFE8F0FE);
-const kAccentGreen = Color(0xFF34A853);
-const kRedAccent = Color(0xFFEA4335);
-const kSurface = Color(0xFFF8F9FA);
-const kCardBg = Color(0xFFFFFFFF);
-const kTextDark = Color(0xFF1F2937);
-const kTextMuted = Color(0xFF6B7280);
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder  = Color(0xFFEDF2F7);
 const kDivider = Color(0xFFE5E7EB);
 
+const kError    = Color(0xFFFC8181);
+const kRedLight = Color(0xFFFEE2E2);
+const kSuccess  = Color(0xFF68D391);
+
+// ════════════════════════════════════════════════════════════════════
+//  ADD MEDICINE PAGE
+// ════════════════════════════════════════════════════════════════════
 class AddMedicinePage extends ConsumerStatefulWidget {
   const AddMedicinePage({super.key});
 
@@ -23,34 +31,29 @@ class AddMedicinePage extends ConsumerStatefulWidget {
 
 class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     with SingleTickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
+  final _formKey  = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
 
   Medicine? _selectedType;
   bool _isEnsuringDoctorId = false;
 
-  late AnimationController _animCtrl;
-  late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
+  late final AnimationController _animCtrl;
+  late final Animation<double>   _fadeAnim;
+  late final Animation<Offset>   _slideAnim;
 
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 500),
-    );
+        vsync: this, duration: const Duration(milliseconds: 420));
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.06),
-      end: Offset.zero,
+      begin: const Offset(0, 0.05), end: Offset.zero,
     ).animate(CurvedAnimation(parent: _animCtrl, curve: Curves.easeOutCubic));
     _animCtrl.forward();
 
     Future.microtask(
-      () =>
-          ref.read(doctorLoginViewModelProvider.notifier).fetchMedicineTypes(),
-    );
+        () => ref.read(doctorLoginViewModelProvider.notifier).fetchMedicineTypes());
   }
 
   @override
@@ -60,7 +63,10 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     super.dispose();
   }
 
-  // ─── Save ─────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Save
+  // ---------------------------------------------------------------------------
+
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_selectedType == null) {
@@ -68,15 +74,15 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       return;
     }
 
-    final notifier = ref.read(doctorLoginViewModelProvider.notifier);
-    var loginState = ref.read(doctorLoginViewModelProvider);
-    var doctorId = loginState.doctorId ?? 0;
+    final notifier   = ref.read(doctorLoginViewModelProvider.notifier);
+    var   loginState = ref.read(doctorLoginViewModelProvider);
+    var   doctorId   = loginState.doctorId ?? 0;
 
     if (doctorId == 0 && !_isEnsuringDoctorId) {
       _isEnsuringDoctorId = true;
       await notifier.loadFromStorage();
       loginState = ref.read(doctorLoginViewModelProvider);
-      doctorId = loginState.doctorId ?? 0;
+      doctorId   = loginState.doctorId ?? 0;
       _isEnsuringDoctorId = false;
     }
 
@@ -87,9 +93,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
 
     final medicine = Medicine(
       medicineName: _nameCtrl.text.trim(),
-      medTypeId: _selectedType!.medTypeId,
-      medTypeName: _selectedType!.medTypeName,
-      doctorId: doctorId,
+      medTypeId:    _selectedType!.medTypeId,
+      medTypeName:  _selectedType!.medTypeName,
+      doctorId:     doctorId,
     );
 
     final response = await ref
@@ -101,68 +107,81 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       _nameCtrl.clear();
       setState(() => _selectedType = null);
       _snack('Medicine added successfully');
-      await Future.delayed(const Duration(milliseconds: 900));
+      await Future.delayed(const Duration(milliseconds: 800));
       if (mounted) Navigator.pop(context, true);
     } else {
       _snack(response['message'] ?? 'Failed to add medicine', isError: true);
     }
   }
 
-  // ─── Snackbar ─────────────────────────────────────────────────────
   void _snack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Row(
-            children: [
-              Icon(
-                isError
-                    ? Icons.error_outline_rounded
-                    : Icons.check_circle_outline_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  msg,
-                  style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: isError ? kRedAccent : kAccentGreen,
+          content: Row(children: [
+            Icon(
+              isError
+                  ? Icons.error_outline_rounded
+                  : Icons.check_circle_outline_rounded,
+              color: Colors.white, size: 15,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(msg,
+                style: const TextStyle(fontSize: 13, color: Colors.white))),
+          ]),
+          backgroundColor: isError ? kError : kPrimary,
           behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
+          margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           duration: const Duration(seconds: 3),
         ),
       );
   }
 
-  // ─── Build ────────────────────────────────────────────────────────
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final isSaving = ref.watch(
-      doctorLoginViewModelProvider.select((s) => s.isLoading),
-    );
+    final isSaving   = ref.watch(
+        doctorLoginViewModelProvider.select((s) => s.isLoading));
     final typesAsync = ref.watch(
-      doctorLoginViewModelProvider.select((s) => s.medicineTypes),
-    );
+        doctorLoginViewModelProvider.select((s) => s.medicineTypes));
 
     ref.listen(doctorLoginViewModelProvider.select((s) => s.error), (_, error) {
       if (error != null) _snack(error, isError: true);
     });
 
     return Scaffold(
-      backgroundColor: kSurface,
-      appBar: _buildAppBar(),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            margin: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                size: 15, color: kPrimary),
+          ),
+        ),
+        title: const Text('Add Medicine',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+                letterSpacing: -0.2)),
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: kBorder),
+        ),
+      ),
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SlideTransition(
@@ -170,27 +189,25 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
           child: Form(
             key: _formKey,
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+              padding: const EdgeInsets.fromLTRB(14, 16, 14, 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeroBanner(),
-                  const SizedBox(height: 24),
-                  _buildSectionCard(
-                    children: [
-                      _buildFieldLabel('Medicine Name', isRequired: true),
-                      const SizedBox(height: 10),
-                      _buildNameField(),
-                      const SizedBox(height: 22),
-                      Container(height: 1, color: kDivider),
-                      const SizedBox(height: 22),
-                      _buildFieldLabel('Medicine Type', isRequired: true),
-                      const SizedBox(height: 10),
-                      _buildTypeSelector(typesAsync),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  _buildSaveButton(isSaving),
+                  _heroBanner(),
+                  const SizedBox(height: 16),
+                  _sectionCard(children: [
+                    _fieldLabel('Medicine Name', isRequired: true),
+                    const SizedBox(height: 8),
+                    _nameField(),
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: kDivider),
+                    const SizedBox(height: 16),
+                    _fieldLabel('Medicine Type', isRequired: true),
+                    const SizedBox(height: 8),
+                    _typeSelector(typesAsync),
+                  ]),
+                  const SizedBox(height: 18),
+                  _saveButton(isSaving),
                 ],
               ),
             ),
@@ -200,488 +217,336 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     );
   }
 
-  // ─── AppBar ───────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: kCardBg,
-      elevation: 0,
-      centerTitle: true,
-      scrolledUnderElevation: 1,
-      shadowColor: kDivider,
-      leading: _BackButton(),
-      title: const Text(
-        'Add Medicine',
-        style: TextStyle(
-          fontSize: 17,
-          fontWeight: FontWeight.w700,
-          color: kTextDark,
-          letterSpacing: -0.3,
-        ),
-      ),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 1, color: kDivider),
-      ),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Hero Banner
+  // ---------------------------------------------------------------------------
 
-  // ─── Hero banner ──────────────────────────────────────────────────
-  Widget _buildHeroBanner() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1A73E8), Color(0xFF4D9EFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: kPrimaryBlue.withOpacity(0.28),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+  Widget _heroBanner() => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [kPrimary, kPrimaryDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+                color: kPrimary.withOpacity(0.25),
+                blurRadius: 14,
+                offset: const Offset(0, 6)),
+          ],
+        ),
+        child: Row(children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 46, height: 46,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
-              Icons.medication_rounded,
-              color: Colors.white,
-              size: 26,
-            ),
+            child: const Icon(Icons.medication_rounded,
+                color: Colors.white, size: 22),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'New Medicine',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-                SizedBox(height: 3),
-                Text(
-                  'Add to your medicine library',
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
+                Text('New Medicine',
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+                SizedBox(height: 2),
+                Text('Add to your medicine library',
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w400)),
               ],
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.18),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Text(
-              'NEW',
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: 1.2,
-              ),
-            ),
+            child: const Text('NEW',
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 1.0)),
           ),
-        ],
-      ),
-    );
-  }
+        ]),
+      );
 
-  // ─── Section card ─────────────────────────────────────────────────
-  Widget _buildSectionCard({required List<Widget> children}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kDivider),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: children,
-      ),
-    );
-  }
+  // ---------------------------------------------------------------------------
+  // Section Card
+  // ---------------------------------------------------------------------------
 
-  // ─── Field label ──────────────────────────────────────────────────
-  Widget _buildFieldLabel(String label, {bool isRequired = false}) {
-    return Row(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: kTextDark,
-            letterSpacing: -0.1,
-          ),
+  Widget _sectionCard({required List<Widget> children}) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4)),
+          ],
         ),
-        if (isRequired) ...[
-          const SizedBox(width: 5),
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: kPrimaryBlue,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  // ─── Name field ───────────────────────────────────────────────────
-  Widget _buildNameField() {
-    return TextFormField(
-      controller: _nameCtrl,
-      textCapitalization: TextCapitalization.words,
-      style: const TextStyle(
-        fontSize: 14,
-        color: kTextDark,
-        fontWeight: FontWeight.w500,
-      ),
-      decoration: InputDecoration(
-        hintText: 'e.g. Paracetamol',
-        hintStyle: const TextStyle(color: kTextMuted, fontSize: 14),
-        prefixIcon: Container(
-          margin: const EdgeInsets.only(left: 14, right: 10),
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: kLightBlue,
-            borderRadius: BorderRadius.circular(9),
-          ),
-          child: const Icon(
-            Icons.medication_outlined,
-            color: kPrimaryBlue,
-            size: 18,
-          ),
-        ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 56),
-        filled: true,
-        fillColor: kSurface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: kDivider),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: kDivider),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: kPrimaryBlue, width: 1.8),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: kRedAccent),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(13),
-          borderSide: const BorderSide(color: kRedAccent, width: 1.8),
-        ),
-        contentPadding: const EdgeInsets.symmetric(vertical: 16),
-        errorStyle: const TextStyle(fontSize: 11.5, color: kRedAccent),
-      ),
-      validator: (v) =>
-          (v == null || v.trim().isEmpty) ? 'Medicine name is required' : null,
-    );
-  }
-
-  // ─── Type selector ────────────────────────────────────────────────
-  Widget _buildTypeSelector(dynamic typesAsync) {
-    if (typesAsync == null) {
-      return const SizedBox(
-        height: 48,
-        child: Center(
-          child: CircularProgressIndicator(strokeWidth: 2, color: kPrimaryBlue),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: children,
         ),
       );
-    }
+
+  // ---------------------------------------------------------------------------
+  // Field Label
+  // ---------------------------------------------------------------------------
+
+  Widget _fieldLabel(String label, {bool isRequired = false}) => Row(children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kTextSecondary,
+                letterSpacing: 0.2)),
+        if (isRequired) ...[
+          const SizedBox(width: 4),
+          Container(
+            width: 5, height: 5,
+            decoration: const BoxDecoration(
+                color: kPrimary, shape: BoxShape.circle),
+          ),
+        ],
+      ]);
+
+  // ---------------------------------------------------------------------------
+  // Name Field
+  // ---------------------------------------------------------------------------
+
+  Widget _nameField() => TextFormField(
+        controller: _nameCtrl,
+        textCapitalization: TextCapitalization.words,
+        style: const TextStyle(
+            fontSize: 13, color: kTextPrimary, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          hintText: 'e.g. Paracetamol',
+          hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+          prefixIcon: Container(
+            margin: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.medication_outlined,
+                color: kPrimary, size: 16),
+          ),
+          prefixIconConstraints: const BoxConstraints(minWidth: 52),
+          filled: true,
+          fillColor: const Color(0xFFF7F8FA),
+          border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBorder)),
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBorder)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+          errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kError)),
+          focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kError, width: 1.5)),
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          errorStyle: const TextStyle(fontSize: 11, color: kError),
+        ),
+        validator: (v) =>
+            (v == null || v.trim().isEmpty) ? 'Medicine name is required' : null,
+      );
+
+  // ---------------------------------------------------------------------------
+  // Type Selector
+  // ---------------------------------------------------------------------------
+
+  Widget _typeSelector(dynamic typesAsync) {
+    if (typesAsync == null) return _typeLoading();
 
     if (typesAsync is AsyncValue<List<Medicine>>) {
       return typesAsync.when(
-        loading: _buildTypeLoading,
-        error: (e, _) => _buildTypeError(),
-        data: (types) => _buildTypeList(types),
+        loading: _typeLoading,
+        error: (_, __) => _typeError(),
+        data: (types) => _typeList(types),
       );
     }
-
-    if (typesAsync is List<Medicine>) {
-      return _buildTypeList(typesAsync);
-    }
-
-    return _buildTypeError();
+    if (typesAsync is List<Medicine>) return _typeList(typesAsync);
+    return _typeError();
   }
 
-  Widget _buildTypeLoading() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: List.generate(
-        4,
-        (_) => Container(
-          width: 88,
-          height: 40,
+  Widget _typeLoading() => Wrap(
+        spacing: 8, runSpacing: 8,
+        children: List.generate(4, (_) => Container(
+          width: 80, height: 36,
           decoration: BoxDecoration(
-            color: kSurface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kDivider),
-          ),
-        ),
-      ),
-    );
-  }
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: kBorder)),
+        )),
+      );
 
-  Widget _buildTypeError() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF0F0),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFCDD2)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline_rounded, color: kRedAccent, size: 17),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              'Failed to load types',
-              style: TextStyle(fontSize: 13, color: kRedAccent),
-            ),
-          ),
+  Widget _typeError() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: kRedLight.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: kError.withOpacity(0.3)),
+        ),
+        child: Row(children: [
+          const Icon(Icons.error_outline_rounded, color: kError, size: 15),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Failed to load types',
+              style: TextStyle(fontSize: 12, color: kError))),
           GestureDetector(
-            onTap: () => ref
-                .read(doctorLoginViewModelProvider.notifier)
+            onTap: () => ref.read(doctorLoginViewModelProvider.notifier)
                 .fetchMedicineTypes(),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: kRedAccent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Text(
-                'Retry',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
+                  color: kError,
+                  borderRadius: BorderRadius.circular(7)),
+              child: const Text('Retry',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white)),
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ]),
+      );
 
-  Widget _buildTypeList(List<Medicine> types) {
+  Widget _typeList(List<Medicine> types) {
     if (types.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: kSurface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kDivider),
-        ),
-        child: const Row(
-          children: [
-            Icon(Icons.info_outline_rounded, color: kTextMuted, size: 16),
-            SizedBox(width: 8),
-            Text(
-              'No medicine types available.',
-              style: TextStyle(fontSize: 13, color: kTextMuted),
-            ),
-          ],
-        ),
+            color: const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kBorder)),
+        child: const Row(children: [
+          Icon(Icons.info_outline_rounded, color: kTextMuted, size: 15),
+          SizedBox(width: 8),
+          Text('No medicine types available.',
+              style: TextStyle(fontSize: 12, color: kTextMuted)),
+        ]),
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final minItemWidth = w > 600 ? 140.0 : 96.0;
+    return LayoutBuilder(builder: (_, constraints) {
+      final w           = constraints.maxWidth;
+      final minItemWidth = w > 600 ? 130.0 : 88.0;
 
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: types.map<Widget>((type) {
-            final sel = type.medTypeId != null
-                ? _selectedType?.medTypeId == type.medTypeId
-                : _selectedType?.medTypeName == type.medTypeName;
+      return Wrap(
+        spacing: 8, runSpacing: 8,
+        children: types.map<Widget>((type) {
+          final sel = type.medTypeId != null
+              ? _selectedType?.medTypeId == type.medTypeId
+              : _selectedType?.medTypeName == type.medTypeName;
 
-            return GestureDetector(
-              onTap: () => setState(() => _selectedType = type),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                constraints: BoxConstraints(
-                  minWidth: minItemWidth,
-                  maxWidth: w / 2 - 12,
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: sel ? kPrimaryBlue : kSurface,
-                  borderRadius: BorderRadius.circular(11),
-                  border: Border.all(
-                    color: sel ? kPrimaryBlue : kDivider,
-                    width: sel ? 1.8 : 1,
-                  ),
-                  boxShadow: sel
-                      ? [
-                          BoxShadow(
-                            color: kPrimaryBlue.withOpacity(0.22),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : [],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (sel) ...[
-                      const Icon(
-                        Icons.check_rounded,
-                        size: 14,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 5),
-                    ],
-                    Flexible(
-                      child: Text(
-                        type.medTypeName ?? '—',
+          return GestureDetector(
+            onTap: () => setState(() => _selectedType = type),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              constraints: BoxConstraints(
+                  minWidth: minItemWidth, maxWidth: w / 2 - 12),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: sel ? kPrimary : const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: sel ? kPrimary : kBorder,
+                    width: sel ? 1.5 : 1),
+                boxShadow: sel
+                    ? [BoxShadow(
+                        color: kPrimary.withOpacity(0.2),
+                        blurRadius: 6, offset: const Offset(0, 2))]
+                    : [],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (sel) ...[
+                    const Icon(Icons.check_rounded,
+                        size: 13, color: Colors.white),
+                    const SizedBox(width: 4),
+                  ],
+                  Flexible(
+                    child: Text(type.medTypeName ?? '—',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                          color: sel ? Colors.white : kTextMuted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  // ─── Save button ──────────────────────────────────────────────────
-  Widget _buildSaveButton(bool isSaving) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: isSaving ? null : _save,
-        style:
-            ElevatedButton.styleFrom(
-              backgroundColor: kPrimaryBlue,
-              disabledBackgroundColor: kPrimaryBlue.withOpacity(0.45),
-              elevation: 0,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ).copyWith(
-              overlayColor: MaterialStateProperty.resolveWith(
-                (states) => states.contains(MaterialState.pressed)
-                    ? Colors.white.withOpacity(0.12)
-                    : null,
+                            fontSize: 12,
+                            fontWeight: sel
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: sel ? Colors.white : kTextSecondary)),
+                  ),
+                ],
               ),
             ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: isSaving
-              ? const SizedBox(
-                  key: ValueKey('loading'),
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation(Colors.white),
-                  ),
-                )
-              : const Row(
-                  key: ValueKey('label'),
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.save_rounded, color: Colors.white, size: 19),
-                    SizedBox(width: 9),
-                    Text(
-                      'Save Medicine',
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                ),
-        ),
-      ),
-    );
+          );
+        }).toList(),
+      );
+    });
   }
-}
 
-// ─── Back button ──────────────────────────────────────────────────────────────
-class _BackButton extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: InkWell(
-        onTap: () => Navigator.pop(context),
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          decoration: BoxDecoration(
-            color: kSurface,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kDivider),
+  // ---------------------------------------------------------------------------
+  // Save Button
+  // ---------------------------------------------------------------------------
+
+  Widget _saveButton(bool isSaving) => SizedBox(
+        width: double.infinity, height: 48,
+        child: ElevatedButton(
+          onPressed: isSaving ? null : _save,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kPrimary,
+            disabledBackgroundColor: kPrimaryLight,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
           ),
-          child: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 16,
-            color: kTextDark,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 180),
+            child: isSaving
+                ? const SizedBox(
+                    key: ValueKey('loading'),
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.5, color: Colors.white))
+                : const Row(
+                    key: ValueKey('label'),
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.save_rounded, color: Colors.white, size: 17),
+                      SizedBox(width: 7),
+                      Text('Save Medicine',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white)),
+                    ],
+                  ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
