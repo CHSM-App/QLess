@@ -14,4 +14,8 @@ class PatientLoginUsecase {
     return patientLoginRepository.checkPhonePatient(mobileNo);
   }
 
+  Future<List<Patients>> mobileExistPatient(String mobileNo) {
+    return patientLoginRepository.mobileExistPatient(mobileNo);
+  }
+
 }

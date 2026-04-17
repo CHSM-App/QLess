@@ -27,6 +27,9 @@ class PatientLoginImpl implements PatientLoginRepository {
     return response;
   }
 
-
+  @override
+  Future<List<Patients>> mobileExistPatient(String mobileNo) {
+    return apiService.mobileExistPatient(mobileNo);
+  }
 
 }

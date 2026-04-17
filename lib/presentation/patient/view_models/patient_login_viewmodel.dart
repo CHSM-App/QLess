@@ -134,6 +134,15 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
   
 
 
+  Future<List<Patients>> mobileExistPatient(String mobileNo) async {
+    try {
+      return await usecase.mobileExistPatient(mobileNo);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return [];
+    }
+  }
+
   void clearError() => state = state.copyWith(clearError: true);
 
   Future<void> logout() async {

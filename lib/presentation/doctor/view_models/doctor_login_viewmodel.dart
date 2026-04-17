@@ -211,6 +211,15 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     state = const DoctorLoginState();
   }
 
+  Future<List<DoctorDetails>> mobileExistDoctor(String mobile) async {
+    try {
+      return await usecase.mobileExistDoctor(mobile);
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return [];
+    }
+  }
+
   Future<void> updateLeadTime(DoctorDetails doctor) async {
     try {
       state = state.copyWith(isLoading: true, error: null);

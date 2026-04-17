@@ -3,10 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
-import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/patient_registration.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
-import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 import 'package:qless/presentation/shared/screens/otp_screen.dart';
 
@@ -22,7 +20,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool get isDoctor => widget.role == 'doctor';
   final _mobileCtrl = TextEditingController();
-  bool _shouldReact = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -36,13 +34,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _snack('Enter a valid 10-digit mobile number');
       return;
     }
-    _shouldReact = true;
-    if (isDoctor) {
-      ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(mobile);
-    } else {
-      ref
-          .read(patientLoginViewModelProvider.notifier)
-          .checkPhonePatient(mobile);
+
+    setState(() => _isLoading = true);
+
+    try {
+      final List result;
+      if (isDoctor) {
+        result = await ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .mobileExistDoctor(mobile);
+      } else {
+        result = await ref
+            .read(patientLoginViewModelProvider.notifier)
+            .mobileExistPatient(mobile);
+      }
+
+      if (!mounted) return;
+
+      if (result.isNotEmpty) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OtpVerificationScreen(
+              mobileNumber: mobile,
+              role: widget.role,
+            ),
+          ),
+        );
+      } else {
+        _snack('User not found');
+      }
+    } catch (_) {
+      if (mounted) _snack('Something went wrong. Try again.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -64,70 +89,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDoctor = this.isDoctor;
-    bool isLoading = false;
-
-    if (isDoctor) {
-      final state = ref.watch(doctorLoginViewModelProvider);
-      isLoading = state.phoneCheckResult is AsyncLoading;
-
-      ref.listen<DoctorLoginState>(doctorLoginViewModelProvider, (prev, next) {
-        if (!_shouldReact) return;
-        next.phoneCheckResult.whenOrNull(
-          data: (list) {
-            _shouldReact = false;
-            if (list.isNotEmpty) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => OtpVerificationScreen(
-                    mobileNumber: _mobileCtrl.text.trim(),
-                    role: widget.role,
-                  ),
-                ),
-              );
-            } else {
-              _snack('User not found');
-            }
-          },
-          error: (e, _) {
-            _shouldReact = false;
-            _snack('Something went wrong. Try again.');
-          },
-        );
-      });
-    } else {
-      final state = ref.watch(patientLoginViewModelProvider);
-      isLoading = state.patientPhoneCheck is AsyncLoading;
-
-      ref.listen<PatientLoginState>(patientLoginViewModelProvider, (
-        prev,
-        next,
-      ) {
-        if (!_shouldReact) return;
-        next.patientPhoneCheck.whenOrNull(
-          data: (list) {
-            _shouldReact = false;
-            if (list.isNotEmpty) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => OtpVerificationScreen(
-                    mobileNumber: _mobileCtrl.text.trim(),
-                    role: widget.role,
-                  ),
-                ),
-              );
-            } else {
-              _snack('User not found');
-            }
-          },
-          error: (e, _) {
-            _shouldReact = false;
-            _snack('Something went wrong. Try again.');
-          },
-        );
-      });
-    }
+    final isLoading = _isLoading;
 
     return Scaffold(
       backgroundColor: Colors.white,

@@ -8,7 +8,9 @@ import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
@@ -134,6 +136,17 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   Future<void> _verifyOtp() async {
     if (!_isFilled) return;
     setState(() => _isLoading = true);
+
+    // Fetch full profile and save to storage
+    if (widget.role == 'doctor') {
+      await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .checkPhoneDoctor(widget.mobileNumber);
+    } else {
+      await ref
+          .read(patientLoginViewModelProvider.notifier)
+          .checkPhonePatient(widget.mobileNumber);
+    }
 
     final result = await ref
         .read(authViewModelProvider.notifier)

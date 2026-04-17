@@ -173,6 +173,35 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<List<DoctorDetails>> mobileExistDoctor(String mobile) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'mobile': mobile};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<DoctorDetails>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'login/mobileExistDoctor',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<DoctorDetails> _value;
+    try {
+      _value = _result.data!
+          .map((dynamic i) => DoctorDetails.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<List<Medicine>> fetchMedicineTypes() async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -710,6 +739,35 @@ class _ApiService implements ApiService {
           .compose(
             _dio.options,
             'login/checkPhonePatient',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<Patients> _value;
+    try {
+      _value = _result.data!
+          .map((dynamic i) => Patients.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<List<Patients>> mobileExistPatient(String mobileNo) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'mobile_no': mobileNo};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<Patients>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'login/mobileExistPatient',
             queryParameters: queryParameters,
             data: _data,
           )
