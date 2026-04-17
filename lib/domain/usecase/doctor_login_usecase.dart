@@ -28,7 +28,11 @@ class DoctorLoginUsecase {
   }
 
   Future<dynamic> updateLeadTime(DoctorDetails doctor) {
-    return doctorLoginRepository.updateLeadTime(doctor );
+    return doctorLoginRepository.updateLeadTime(doctor);
+  }
+
+  Future<List<DoctorDetails>> mobileExistDoctor(String mobile) {
+    return doctorLoginRepository.mobileExistDoctor(mobile);
   }
 
 }

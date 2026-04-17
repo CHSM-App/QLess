@@ -43,6 +43,9 @@ abstract class ApiService {
   @GET("login/checkPhoneDoctor")
   Future<List<DoctorDetails>> checkPhoneDoctor(@Query("mobile") String mobile);
 
+  @GET("login/mobileExistDoctor")
+  Future<List<DoctorDetails>> mobileExistDoctor(@Query("mobile") String mobile);
+
   @GET("doctor/users/getMedicineTypes")
   Future<List<Medicine>> fetchMedicineTypes();
 
@@ -135,6 +138,9 @@ Future<AppointmentResponseModel> endSession(
   // GET API
   @GET("login/checkPhonePatient")
   Future<List<Patients>> checkPhonePatient(@Query("mobileNo") String mobileNo);
+
+  @GET("login/mobileExistPatient")
+  Future<List<Patients>> mobileExistPatient(@Query("mobile_no") String mobileNo);
 
   @GET("patient/users/fetchFamilyMembers/{family_id}")
   Future<List<FamilyMember>> fetchFamilyMembers(

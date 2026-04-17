@@ -5,5 +5,6 @@ abstract class PatientLoginRepository {
 
   Future<List<Patients>> checkPhonePatient(String mobile);
 
-  
+  Future<List<Patients>> mobileExistPatient(String mobileNo);
+
 }
