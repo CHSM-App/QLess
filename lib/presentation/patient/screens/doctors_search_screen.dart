@@ -154,7 +154,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen>
     Future.delayed(const Duration(milliseconds: 80), () => _fadeCtrl.forward());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(doctorsViewModelProvider.notifier).fetchDoctors();
+      ref.read(doctorsViewModelProvider.notifier).fetchDoctors(ref.read(patientLoginViewModelProvider).patientId ?? 0);
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {
         ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
@@ -190,7 +190,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen>
   }
 
   Future<void> _refresh() async =>
-      ref.read(doctorsViewModelProvider.notifier).fetchDoctors();
+      ref.read(doctorsViewModelProvider.notifier).fetchDoctors(ref.read(patientLoginViewModelProvider).patientId ?? 0);
 
   @override
   Widget build(BuildContext context) {

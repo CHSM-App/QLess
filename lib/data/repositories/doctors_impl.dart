@@ -11,8 +11,8 @@ class DoctorsImpl implements DoctorsRepository {
   DoctorsImpl(this.apiService);
 
   @override
-  Future<List<DoctorDetails>> fetchDoctors() {
-    return apiService.fetchDoctors();
+  Future<List<DoctorDetails>> fetchDoctors(int patientID) {
+    return apiService.fetchDoctors(patientID);
   }
 
   @override
