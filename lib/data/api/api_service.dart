@@ -141,8 +141,8 @@ Future<AppointmentResponseModel> endSession(
     @Path("family_id") int familyId,
   );
 
-  @GET("patient/users/getDoctors")
-  Future<List<DoctorDetails>> fetchDoctors();
+  @GET("patient/users/getDoctors/{patient_id}")
+  Future<List<DoctorDetails>> fetchDoctors(@Path("patient_id") int patientId);
 
   @GET("patient/users/getDoctorAvailability/{doctor_id}")
   Future<List<DoctorAvailabilityModel>> getDoctorAvailability(

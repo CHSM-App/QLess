@@ -9,8 +9,8 @@ class DoctorsUseCase {
 
   DoctorsUseCase(this.doctorsRepository);
 
-  Future<List<DoctorDetails>> fetchDoctors() {
-    return doctorsRepository.fetchDoctors();
+  Future<List<DoctorDetails>> fetchDoctors(int patientID) {
+    return doctorsRepository.fetchDoctors(patientID);
   }
 
   Future<List<DoctorAvailabilityModel>> getDoctorAvailability(int doctorId) {

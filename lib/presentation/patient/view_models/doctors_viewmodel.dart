@@ -37,11 +37,11 @@ class DoctorsViewmodel extends StateNotifier<DoctorsState> {
   DoctorsViewmodel(this.doctorsUseCase) : super(DoctorsState(doctors: [], doctorAvailabilities: [], isLoading: false));
 
 
-  Future<void> fetchDoctors() async {
+  Future<void> fetchDoctors(int patientID) async {
     if (state.isLoading) return;
     state = state.copyWith(isLoading: true);
     try {
-      final doctors = await doctorsUseCase.fetchDoctors();
+      final doctors = await doctorsUseCase.fetchDoctors(patientID);
       state = state.copyWith(doctors: doctors, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false);
