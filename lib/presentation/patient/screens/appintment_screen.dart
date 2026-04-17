@@ -166,7 +166,7 @@ class AppointmentScreen extends ConsumerStatefulWidget {
 class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     with SingleTickerProviderStateMixin {
   String _search       = '';
-  String _filterStatus = 'all';
+  String _filterStatus = 'today';
   bool   _didFetch     = false;
   bool   _isFetching   = false;
   bool   _isWaiting    = false;
@@ -177,7 +177,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: _filters.length, vsync: this);
+    _tabCtrl = TabController(length: _filters.length, vsync: this, initialIndex: 1);
     _tabCtrl.addListener(() {
       if (!_tabCtrl.indexIsChanging) {
         setState(() => _filterStatus = _filters[_tabCtrl.index].key);
