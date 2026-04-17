@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
-import 'package:qless/core/theme/patient_theme.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
@@ -12,186 +11,144 @@ import 'package:qless/presentation/patient/screens/location_storage.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 
+// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder  = Color(0xFFEDF2F7);
+const kDivider = Color(0xFFE5E7EB);
+
+const kError      = Color(0xFFFC8181);
+const kRedLight   = Color(0xFFFEE2E2);
+const kSuccess    = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+const kWarning    = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+const kPurple     = Color(0xFF9F7AEA);
+const kPurpleLight= Color(0xFFEDE9FE);
+const kInfo       = Color(0xFF3B82F6);
+const kInfoLight  = Color(0xFFDBEAFE);
+
+// ─── Sample Doctor model ──────────────────────────────────────────────────────
 class Doctor {
   final String id, name, specialty, image, about, clinic, address;
   final double rating;
-  final int experience, patientsAhead, reviewCount;
-  final int waitMinutes;
-  final bool isAvailable;
+  final int    experience, patientsAhead, reviewCount, waitMinutes;
+  final bool   isAvailable;
   final List<String> availableSlots;
 
   Doctor({
-    required this.id,
-    required this.name,
-    required this.specialty,
-    required this.image,
-    required this.rating,
-    required this.experience,
-    required this.patientsAhead,
-    required this.waitMinutes,
-    required this.reviewCount,
-    required this.about,
-    required this.clinic,
-    required this.address,
-    required this.isAvailable,
+    required this.id, required this.name, required this.specialty,
+    required this.image, required this.rating, required this.experience,
+    required this.patientsAhead, required this.waitMinutes,
+    required this.reviewCount, required this.about, required this.clinic,
+    required this.address, required this.isAvailable,
     required this.availableSlots,
   });
 }
 
-// ─── SAMPLE DATA ─────────────────────────────────────────────────────────────
-
 final List<Doctor> sampleDoctors = [
   Doctor(
-    id: '1',
-    name: 'Dr. Anika Sharma',
-    specialty: 'Cardiologist',
-    image: 'cardio',
-    rating: 4.9,
-    experience: 12,
-    patientsAhead: 3,
-    waitMinutes: 25,
-    reviewCount: 248,
-    about:
-        'Dr. Anika Sharma is a leading Cardiologist with 12 years of experience. She specializes in preventive cardiology, heart failure management, and echocardiography.',
-    clinic: 'Apollo Heart Center',
-    address: '14 MG Road, Bangalore – 560001',
+    id: '1', name: 'Dr. Anika Sharma', specialty: 'Cardiologist',
+    image: 'cardio', rating: 4.9, experience: 12, patientsAhead: 3,
+    waitMinutes: 25, reviewCount: 248,
+    about: 'Dr. Anika Sharma is a leading Cardiologist with 12 years of experience.',
+    clinic: 'Apollo Heart Center', address: '14 MG Road, Bangalore',
     isAvailable: true,
-    availableSlots: ['9:00 AM', '9:30 AM', '10:00 AM', '11:30 AM', '2:00 PM', '3:00 PM'],
+    availableSlots: ['9:00 AM', '9:30 AM', '10:00 AM', '11:30 AM'],
   ),
   Doctor(
-    id: '2',
-    name: 'Dr. Rajesh Kumar',
-    specialty: 'Orthopedist',
-    image: 'ortho',
-    rating: 4.7,
-    experience: 8,
-    patientsAhead: 1,
-    waitMinutes: 10,
-    reviewCount: 183,
-    about:
-        'Dr. Rajesh Kumar specializes in joint replacement, sports injuries, and spine surgery with 8 years of clinical practice.',
-    clinic: 'Fortis Bone & Joint Clinic',
-    address: '22 Nehru Place, New Delhi – 110019',
+    id: '2', name: 'Dr. Rajesh Kumar', specialty: 'Orthopedist',
+    image: 'ortho', rating: 4.7, experience: 8, patientsAhead: 1,
+    waitMinutes: 10, reviewCount: 183,
+    about: 'Dr. Rajesh Kumar specializes in joint replacement and sports injuries.',
+    clinic: 'Fortis Bone & Joint Clinic', address: '22 Nehru Place, New Delhi',
     isAvailable: true,
-    availableSlots: ['10:00 AM', '10:30 AM', '11:00 AM', '4:00 PM', '4:30 PM'],
-  ),
-  Doctor(
-    id: '3',
-    name: 'Dr. Priya Nair',
-    specialty: 'Dermatologist',
-    image: 'derm',
-    rating: 4.8,
-    experience: 6,
-    patientsAhead: 5,
-    waitMinutes: 40,
-    reviewCount: 312,
-    about:
-        'Dr. Priya Nair is a board-certified Dermatologist focusing on cosmetic dermatology, acne treatment, and skin cancer screening.',
-    clinic: 'Skin Studio Clinic',
-    address: 'Plot 7, Jubilee Hills, Hyderabad – 500033',
-    isAvailable: true,
-    availableSlots: ['11:00 AM', '11:30 AM', '12:00 PM', '5:00 PM', '5:30 PM'],
-  ),
-  Doctor(
-    id: '4',
-    name: 'Dr. Mohan Verma',
-    specialty: 'Neurologist',
-    image: 'neuro',
-    rating: 4.6,
-    experience: 15,
-    patientsAhead: 0,
-    waitMinutes: 5,
-    reviewCount: 97,
-    about:
-        'Dr. Mohan Verma is a senior Neurologist specializing in epilepsy, stroke, and neurodegenerative disorders with 15 years of expertise.',
-    clinic: 'NeuroLife Institute',
-    address: '3 Park Street, Kolkata – 700016',
-    isAvailable: true,
-    availableSlots: ['9:00 AM', '9:30 AM', '3:00 PM', '3:30 PM', '4:00 PM'],
+    availableSlots: ['10:00 AM', '10:30 AM', '4:00 PM'],
   ),
 ];
-
-// ─── SPECIALTY DATA ───────────────────────────────────────────────────────────
 
 final List<Map<String, dynamic>> specialties = [
-  {'name': 'Cardiology',    'icon': Icons.favorite_rounded,        'color': 0xFFEF4444},
-  {'name': 'Orthopedics',   'icon': Icons.accessibility_new,       'color': 0xFF3B82F6},
-  {'name': 'Dermatology',   'icon': Icons.face_retouching_natural, 'color': 0xFFF59E0B},
-  {'name': 'Neurology',     'icon': Icons.psychology,              'color': 0xFF8B5CF6},
-  {'name': 'Pediatrics',    'icon': Icons.child_care,              'color': 0xFF10B981},
-  {'name': 'Dentistry',     'icon': Icons.medical_services,        'color': 0xFF06B6D4},
-  {'name': 'Ophthalmology', 'icon': Icons.visibility,              'color': 0xFFEC4899},
-  {'name': 'Gynecology',    'icon': Icons.pregnant_woman,          'color': 0xFF14B8A6},
+  {'name': 'Cardiology',    'icon': Icons.favorite_rounded,        'color': kError},
+  {'name': 'Orthopedics',   'icon': Icons.accessibility_new,       'color': kInfo},
+  {'name': 'Dermatology',   'icon': Icons.face_retouching_natural, 'color': kWarning},
+  {'name': 'Neurology',     'icon': Icons.psychology,              'color': kPurple},
+  {'name': 'Pediatrics',    'icon': Icons.child_care,              'color': kSuccess},
+  {'name': 'Dentistry',     'icon': Icons.medical_services,        'color': kPrimary},
+  {'name': 'Ophthalmology', 'icon': Icons.visibility,              'color': Color(0xFFEC4899)},
+  {'name': 'Gynecology',    'icon': Icons.pregnant_woman,          'color': kPrimary},
 ];
-
-// ─── CITY SEARCH DATA ─────────────────────────────────────────────────────────
 
 const List<String> _allCities = [
-  'Bengaluru, IN', 'Mumbai, IN',       'Delhi, IN',       'Hyderabad, IN',
-  'Pune, IN',      'Chennai, IN',      'Kolkata, IN',     'Ahmedabad, IN',
-  'Jaipur, IN',    'Surat, IN',        'Lucknow, IN',     'Kanpur, IN',
-  'Nagpur, IN',    'Indore, IN',       'Thane, IN',       'Bhopal, IN',
-  'Visakhapatnam, IN', 'Patna, IN',   'Vadodara, IN',    'Ghaziabad, IN',
-  'Ludhiana, IN',  'Agra, IN',        'Nashik, IN',      'Faridabad, IN',
-  'Meerut, IN',    'Rajkot, IN',      'Varanasi, IN',    'Srinagar, IN',
-  'Aurangabad, IN','Dhanbad, IN',     'Amritsar, IN',    'Navi Mumbai, IN',
-  'Coimbatore, IN','Madurai, IN',     'Vijayawada, IN',  'Guwahati, IN',
-  'Chandigarh, IN','Hubli, IN',       'Mysuru, IN',      'Tiruchirappalli, IN',
+  'Bengaluru, IN', 'Mumbai, IN',    'Delhi, IN',       'Hyderabad, IN',
+  'Pune, IN',      'Chennai, IN',   'Kolkata, IN',     'Ahmedabad, IN',
+  'Jaipur, IN',    'Surat, IN',     'Lucknow, IN',     'Kanpur, IN',
+  'Nagpur, IN',    'Indore, IN',    'Thane, IN',       'Bhopal, IN',
+  'Visakhapatnam, IN', 'Patna, IN', 'Vadodara, IN',   'Ghaziabad, IN',
+  'Ludhiana, IN',  'Agra, IN',     'Nashik, IN',      'Faridabad, IN',
+  'Meerut, IN',    'Rajkot, IN',   'Varanasi, IN',    'Srinagar, IN',
+  'Aurangabad, IN','Dhanbad, IN',  'Amritsar, IN',    'Navi Mumbai, IN',
+  'Coimbatore, IN','Madurai, IN',  'Vijayawada, IN',  'Guwahati, IN',
+  'Chandigarh, IN','Hubli, IN',    'Mysuru, IN',      'Tiruchirappalli, IN',
 ];
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// ── Specialty → accent mapping ────────────────────────────────────────────────
+Color _accentFor(String image) => switch (image) {
+  'cardio' => kError,
+  'ortho'  => kInfo,
+  'derm'   => kWarning,
+  'neuro'  => kPurple,
+  _        => kPrimary,
+};
 
-Color _doctorColor(String image) {
-  switch (image) {
-    case 'cardio': return const Color(0xFFEF4444);
-    case 'ortho':  return const Color(0xFF3B82F6);
-    case 'derm':   return const Color(0xFFF59E0B);
-    case 'neuro':  return const Color(0xFF8B5CF6);
-    default:       return const Color(0xFF00BFA5);
-  }
-}
+IconData _iconFor(String image) => switch (image) {
+  'cardio' => Icons.favorite_rounded,
+  'ortho'  => Icons.accessibility_new,
+  'derm'   => Icons.face_retouching_natural,
+  'neuro'  => Icons.psychology,
+  _        => Icons.local_hospital,
+};
 
-IconData _doctorIcon(String image) {
-  switch (image) {
-    case 'cardio': return Icons.favorite_rounded;
-    case 'ortho':  return Icons.accessibility_new;
-    case 'derm':   return Icons.face_retouching_natural;
-    case 'neuro':  return Icons.psychology;
-    default:       return Icons.local_hospital;
-  }
-}
+Color _bgFor(String image) => switch (image) {
+  'cardio' => kRedLight,
+  'ortho'  => kInfoLight,
+  'derm'   => kAmberLight,
+  'neuro'  => kPurpleLight,
+  _        => kPrimaryLight,
+};
 
-Widget _doctorAvatar(String image, {double size = 48}) {
-  final color = _doctorColor(image);
-  final icon  = _doctorIcon(image);
+Widget _doctorAvatar(String image, {double size = 46}) {
+  final color  = _accentFor(image);
+  final bg     = _bgFor(image);
+  final icon   = _iconFor(image);
   return Container(
     width: size, height: size,
     decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [color.withOpacity(0.8), color],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
-      borderRadius: BorderRadius.circular(size * 0.3),
+      color: bg,
+      borderRadius: BorderRadius.circular(size * 0.27),
+      border: Border.all(color: color.withOpacity(0.2), width: 1.5),
     ),
-    child: Icon(icon, color: Colors.white, size: size * 0.48),
+    child: Icon(icon, color: color, size: size * 0.44),
   );
 }
 
-// ─── SHIMMER BOX ─────────────────────────────────────────────────────────────
-
-class _ShimmerBox extends StatefulWidget {
-  final double width;
-  final double height;
-  const _ShimmerBox({required this.width, required this.height});
-
+// ── Shimmer ───────────────────────────────────────────────────────────────────
+class _Shimmer extends StatefulWidget {
+  final double width, height;
+  const _Shimmer({required this.width, required this.height});
   @override
-  State<_ShimmerBox> createState() => _ShimmerBoxState();
+  State<_Shimmer> createState() => _ShimmerState();
 }
 
-class _ShimmerBoxState extends State<_ShimmerBox>
+class _ShimmerState extends State<_Shimmer>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double> _anim;
+  late Animation<double>   _anim;
 
   @override
   void initState() {
@@ -199,8 +156,8 @@ class _ShimmerBoxState extends State<_ShimmerBox>
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 900))
       ..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.2, end: 0.6).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    _anim = Tween<double>(begin: 0.15, end: 0.45)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -219,28 +176,31 @@ class _ShimmerBoxState extends State<_ShimmerBox>
       );
 }
 
-// ─── HOME SCREEN ─────────────────────────────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════
+//  HOME SCREEN
+// ════════════════════════════════════════════════════════════════════
 class HomeScreen extends ConsumerStatefulWidget {
-  final VoidCallback onToggleTheme;
-  final ThemeMode themeMode;
-  final Function(int) onTabChange;
+  final VoidCallback    onToggleTheme;
+  final ThemeMode       themeMode;
+  final Function(int)   onTabChange;
+
   const HomeScreen({
     super.key,
     required this.onToggleTheme,
     required this.themeMode,
     required this.onTabChange,
   });
+
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _animCtrl;
-  late List<Animation<double>> _itemAnims;
+  late AnimationController      _animCtrl;
+  late List<Animation<double>>  _anims;
 
-  String _location = '';
+  String _location       = '';
   bool   _locationLoaded = false;
   bool   _didFetch       = false;
   bool   _isFetching     = false;
@@ -249,11 +209,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 900));
-    _itemAnims = List.generate(6, (i) => Tween<double>(begin: 0, end: 1).animate(
+        vsync: this, duration: const Duration(milliseconds: 800));
+    _anims = List.generate(6, (i) => Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _animCtrl,
-        curve: Interval(i * 0.1, 0.6 + i * 0.07, curve: Curves.easeOut),
+        curve: Interval(i * 0.08, 0.55 + i * 0.07, curve: Curves.easeOut),
       ),
     ));
     _animCtrl.forward();
@@ -265,17 +225,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (_isFetching || _didFetch) return;
     _isFetching = true;
     try {
-      final loginNotifier = ref.read(patientLoginViewModelProvider.notifier);
-      var patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
-      if (patientId == 0) {
-        await loginNotifier.loadFromStoragePatient();
-        patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      final notifier = ref.read(patientLoginViewModelProvider.notifier);
+      var pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      if (pid == 0) {
+        await notifier.loadFromStoragePatient();
+        pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       }
-      if (patientId == 0) return;
+      if (pid == 0) return;
       _didFetch = true;
-      await ref
-          .read(appointmentViewModelProvider.notifier)
-          .getPatientAppointments(patientId);
+      await ref.read(appointmentViewModelProvider.notifier)
+          .getPatientAppointments(pid);
     } finally {
       _isFetching = false;
     }
@@ -285,12 +244,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void dispose() { _animCtrl.dispose(); super.dispose(); }
 
   Future<void> _ensureLocationPermission() async {
-    var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
     }
-    if (permission == LocationPermission.deniedForever) {
-      if (mounted) _showLocationSettingsSnack();
+    if (perm == LocationPermission.deniedForever) {
+      if (mounted) _showLocationSnack();
       await _loadLocation();
       return;
     }
@@ -315,9 +274,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (mounted) {
       setState(() { _location = current; _locationLoaded = true; });
       await LocationStorage.saveLocation(current, isManual: false);
-      if (_isPermissionIssue(current)) {
-        _showLocationSettingsSnack();
-      }
+      if (_isPermIssue(current)) _showLocationSnack();
     }
   }
 
@@ -326,197 +283,195 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _LocationPickerSheet(
-        isDark: Theme.of(context).brightness == Brightness.dark,
+      builder: (_) => _LocationSheet(
         currentLocation: _location,
-        onLocationSelected: (loc) async {
+        onSelected: (loc) async {
           setState(() { _location = loc; _locationLoaded = true; });
           await LocationStorage.saveLocation(loc, isManual: true);
-          if (_isPermissionIssue(loc)) {
-            _showLocationSettingsSnack();
-          }
+          if (_isPermIssue(loc)) _showLocationSnack();
         },
       ),
     );
   }
 
-  bool _isPermissionIssue(String value) {
-    final v = value.toLowerCase();
-    return v.contains('location disabled') ||
-        v.contains('permission denied') ||
-        v.contains('permission permanently denied') ||
-        v.contains('permission unavailable');
+  bool _isPermIssue(String v) {
+    final s = v.toLowerCase();
+    return s.contains('location disabled') || s.contains('permission');
   }
 
-  void _showLocationSettingsSnack() {
-    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-    final message = isWindows
-        ? 'Enable Windows location services to detect location'
-        : 'Enable phone location services to detect location';
+  bool _isGenericLocation(String v) {
+    final s = v.trim().toLowerCase();
+    if (s.contains('location ') || s.contains('permission') ||
+        s.contains('unknown')) return true;
+    return RegExp(r'^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$').hasMatch(s);
+  }
+
+  void _showLocationSnack() {
+    final isWindows =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(isWindows
+            ? 'Enable Windows location services'
+            : 'Enable phone location services'),
         action: SnackBarAction(
-          label: 'Open Settings',
-          onPressed: () {
-            Geolocator.openLocationSettings();
-          },
-        ),
+            label: 'Open Settings',
+            onPressed: () => Geolocator.openLocationSettings()),
       ),
     );
-  }
-
-  bool _isGenericLocation(String value) {
-    final v = value.trim().toLowerCase();
-    if (v.contains('location ') ||
-        v.contains('permission') ||
-        v.contains('unknown')) {
-      return true;
-    }
-    final coordRegex = RegExp(r'^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$');
-    return coordRegex.hasMatch(v);
   }
 
   bool _isToday(AppointmentList a) {
     final p = DateTime.tryParse(a.appointmentDate ?? '');
     if (p == null) return false;
-    final now = DateTime.now();
-    return p.year == now.year && p.month == now.month && p.day == now.day;
+    final n = DateTime.now();
+    return p.year == n.year && p.month == n.month && p.day == n.day;
   }
 
   bool _isUpcoming(AppointmentList a) {
     final p = DateTime.tryParse(a.appointmentDate ?? '');
     if (p == null) return false;
-    final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+    final today = DateTime(
+        DateTime.now().year, DateTime.now().month, DateTime.now().day);
     return DateTime(p.year, p.month, p.day).isAfter(today);
   }
 
-  Widget _buildAppointmentsSection() {
-    final asyncAppts = ref.watch(appointmentViewModelProvider).patientAppointmentsList;
-
-    return asyncAppts == null || asyncAppts is AsyncLoading
-        ? Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _SectionTitle('Today\'s Appointments',
-                  action: 'See All', onAction: () => widget.onTabChange(2)),
-              const SizedBox(height: 12),
-              const Center(child: CircularProgressIndicator()),
-            ],
-          )
-        : asyncAppts.when(
-            loading: () => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SectionTitle('Today\'s Appointments',
-                    action: 'See All', onAction: () => widget.onTabChange(2)),
-                const SizedBox(height: 12),
-                const Center(child: CircularProgressIndicator()),
-              ],
-            ),
-            error: (_, __) => const SizedBox.shrink(),
-            data: (list) {
-              final todayList    = list.where(_isToday).toList();
-              final upcomingList = list.where(_isUpcoming).toList();
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionTitle('Today\'s Appointments',
-                      action: 'See All', onAction: () => widget.onTabChange(2)),
-                  const SizedBox(height: 12),
-                  if (todayList.isEmpty)
-                    _EmptyAppointmentNote('No appointments today')
-                  else
-                    ...todayList.map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _ApiAppointmentCard(appointment: a),
-                        )),
-                  const SizedBox(height: 18),
-                  _SectionTitle('Upcoming Appointments',
-                      action: 'See All', onAction: () => widget.onTabChange(2)),
-                  const SizedBox(height: 12),
-                  if (upcomingList.isEmpty)
-                    _EmptyAppointmentNote('No upcoming appointments')
-                  else
-                    ...upcomingList.take(3).map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: _ApiAppointmentCard(appointment: a),
-                        )),
-                ],
-              );
-            },
-          );
-  }
-
-  Widget _anim(int idx, Widget child) => AnimatedBuilder(
-        animation: _itemAnims[idx],
+  Widget _fade(int i, Widget child) => AnimatedBuilder(
+        animation: _anims[i],
         builder: (_, w) => Opacity(
-          opacity: _itemAnims[idx].value,
+          opacity: _anims[i].value,
           child: Transform.translate(
-              offset: Offset(0, 16 * (1 - _itemAnims[idx].value)), child: w),
+              offset: Offset(0, 14 * (1 - _anims[i].value)), child: w),
         ),
         child: child,
       );
 
+  // ---------------------------------------------------------------------------
+  // Appointments section
+  // ---------------------------------------------------------------------------
+
+  Widget _buildAppointmentsSection() {
+    final async = ref.watch(appointmentViewModelProvider).patientAppointmentsList;
+
+    if (async == null || async is AsyncLoading) {
+      return _apptShell(loading: true);
+    }
+
+    return async.when(
+      loading: () => _apptShell(loading: true),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (list) {
+        final today    = list.where(_isToday).toList();
+        final upcoming = list.where(_isUpcoming).toList();
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _SectionTitle("Today's Appointments",
+              action: 'See All', onAction: () => widget.onTabChange(2)),
+          const SizedBox(height: 10),
+          if (today.isEmpty)
+            _EmptyNote("No appointments today")
+          else
+            ...today.map((a) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _ApptCard(appointment: a))),
+          const SizedBox(height: 16),
+          _SectionTitle('Upcoming',
+              action: 'See All', onAction: () => widget.onTabChange(2)),
+          const SizedBox(height: 10),
+          if (upcoming.isEmpty)
+            _EmptyNote("No upcoming appointments")
+          else
+            ...upcoming.take(3).map((a) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _ApptCard(appointment: a))),
+        ]);
+      },
+    );
+  }
+
+  Widget _apptShell({required bool loading}) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionTitle("Today's Appointments",
+              action: 'See All', onAction: () => widget.onTabChange(2)),
+          const SizedBox(height: 10),
+          if (loading)
+            const Center(
+              child: SizedBox(
+                width: 24, height: 24,
+                child: CircularProgressIndicator(
+                    color: kPrimary, strokeWidth: 2.5),
+              ),
+            ),
+        ],
+      );
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final loginState = ref.watch(patientLoginViewModelProvider);
+    final name = loginState.name ?? 'there';
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? 'Good Morning 👋'
+        : hour < 17
+            ? 'Good Afternoon 👋'
+            : 'Good Evening 👋';
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: CustomScrollView(
         slivers: [
-          // ── HEADER ────────────────────────────────────────────────────────
+          // ── HEADER ──────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  // ── Q UP teal gradient (was blue)
-                  colors: isDark
-                      ? [const Color(0xFF0D2B27), const Color(0xFF071A17)]
-                      : [const Color(0xFF00BFA5), const Color(0xFF008C7A)],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [kPrimary, kPrimaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft:  Radius.circular(28),
-                  bottomRight: Radius.circular(28),
+                borderRadius: BorderRadius.only(
+                  bottomLeft:  Radius.circular(24),
+                  bottomRight: Radius.circular(24),
                 ),
               ),
               child: SafeArea(
                 bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 22),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _anim(0, Row(
+                      _fade(0, Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Good Morning 👋',
+                                Text(greeting,
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.75),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    )),
-                                const SizedBox(height: 2),
-                                const Text('Arjun Mehta',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                    )),
-                                const SizedBox(height: 4),
+                                        color: Colors.white.withOpacity(0.78),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500)),
+                                const SizedBox(height: 1),
+                                Text(name,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 5),
                                 // Location pill
                                 GestureDetector(
                                   onTap: _openLocationPicker,
                                   child: Container(
-                                    constraints: const BoxConstraints(maxWidth: 140),
+                                    constraints:
+                                        const BoxConstraints(maxWidth: 140),
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 5),
+                                        horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withOpacity(0.18),
                                       borderRadius: BorderRadius.circular(20),
@@ -527,24 +482,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         const Icon(Icons.location_on_rounded,
-                                            color: Colors.white, size: 11),
+                                            color: Colors.white, size: 10),
                                         const SizedBox(width: 3),
                                         if (!_locationLoaded)
-                                          _ShimmerBox(width: 64, height: 9)
+                                          _Shimmer(width: 60, height: 8)
                                         else
                                           Flexible(
                                             child: Text(_location,
-                                                overflow: TextOverflow.ellipsis,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
                                                 maxLines: 1,
                                                 style: TextStyle(
-                                                  color: Colors.white.withOpacity(0.95),
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w600,
-                                                )),
+                                                    color: Colors.white
+                                                        .withOpacity(0.95),
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.w600)),
                                           ),
                                         const SizedBox(width: 2),
-                                        const Icon(Icons.keyboard_arrow_down,
-                                            color: Colors.white, size: 13),
+                                        const Icon(
+                                            Icons.keyboard_arrow_down,
+                                            color: Colors.white, size: 12),
                                       ],
                                     ),
                                   ),
@@ -552,7 +510,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               ],
                             ),
                           ),
-                          const SizedBox(width: 4),
                           _HeaderBtn(
                             icon: widget.themeMode == ThemeMode.dark
                                 ? Icons.light_mode_rounded
@@ -563,30 +520,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           _HeaderBtn(
                             icon: Icons.notifications_outlined,
                             badge: true,
-                            onTap: () => Navigator.push(context,
-                                MaterialPageRoute(
-                                    builder: (_) => const NotificationsScreen())),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const NotificationsScreen()),
+                            ),
                           ),
                         ],
                       )),
-
-                      const SizedBox(height: 16),
-
+                      const SizedBox(height: 14),
                       // Search bar
-                      _anim(1, GestureDetector(
+                      _fade(1, GestureDetector(
                         onTap: () => widget.onTabChange(1),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 11),
+                              horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: Colors.white.withOpacity(0.3), width: 1),
+                                color: Colors.white.withOpacity(0.3)),
                           ),
                           child: Row(children: [
                             Icon(Icons.search_rounded,
-                                color: Colors.white.withOpacity(0.8), size: 18),
+                                color: Colors.white.withOpacity(0.8),
+                                size: 17),
                             const SizedBox(width: 8),
                             Text('Search doctors or specialties…',
                                 style: TextStyle(
@@ -602,91 +560,101 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
 
-          // ── BODY ──────────────────────────────────────────────────────────
+          // ── BODY ────────────────────────────────────────────────────────
           SliverPadding(
-            padding: const EdgeInsets.all(16),
+         padding: const EdgeInsets.fromLTRB(14, 16, 14, 90),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
 
                 // Quick Actions
-                _anim(2, Column(
+                _fade(2, Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _SectionTitle('Quick Actions'),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Row(children: [
-                      // ── Q UP teal for the first two quick actions (was blue / teal)
-                      _QuickAction(icon: Icons.calendar_month_rounded, label: 'Book\nAppt.',  color: const Color(0xFF00BFA5), onTap: () => widget.onTabChange(1)),
-                      const SizedBox(width: 8),
-                      _QuickAction(icon: Icons.history_rounded,         label: 'My\nAppts.', color: const Color(0xFF00BFA5), onTap: () => widget.onTabChange(2)),
+                      _QuickAction(
+                          icon: Icons.calendar_month_rounded,
+                          label: 'Book\nAppt.',
+                          color: kPrimary,
+                          onTap: () => widget.onTabChange(1)),
                       const SizedBox(width: 8),
                       _QuickAction(
-                        icon: Icons.group_add_rounded,
-                        label: 'Add\nFamily',
-                        color: const Color(0xFF7C3AED),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const FamilyMembersScreen()),
-                        ),
-                      ),
+                          icon: Icons.history_rounded,
+                          label: 'My\nAppts.',
+                          color: kPrimary,
+                          onTap: () => widget.onTabChange(2)),
                       const SizedBox(width: 8),
                       _QuickAction(
-                        icon: Icons.medical_information_rounded,
-                        label: 'My\nRecords',
-                        color: const Color(0xFFF59E0B),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PatientPrescriptionListScreen()),
-                        ),
-                      ),
+                          icon: Icons.group_add_rounded,
+                          label: 'Family',
+                          color: kPurple,
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const FamilyMembersScreen()))),
+                      const SizedBox(width: 8),
+                      _QuickAction(
+                          icon: Icons.medical_information_rounded,
+                          label: 'Records',
+                          color: kWarning,
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PatientPrescriptionListScreen()))),
                     ]),
                   ],
                 )),
-                const SizedBox(height: 24),
+                const SizedBox(height: 22),
 
-                // Today & Upcoming Appointments
-                _anim(3, _buildAppointmentsSection()),
-                const SizedBox(height: 24),
+                // Appointments
+                _fade(3, _buildAppointmentsSection()),
+                const SizedBox(height: 22),
 
                 // Specialties
-                _anim(4, Column(
+                _fade(4, Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _SectionTitle('Most Searched Specialties'),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     SizedBox(
-                      height: 100,
+                      height: 96,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
                         itemCount: specialties.length,
-                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(width: 8),
                         itemBuilder: (_, i) {
                           final s = specialties[i];
                           return _SpecialtyChip(
-                            icon: s['icon'], label: s['name'],
-                            color: Color(s['color']), onTap: () {},
+                            icon: s['icon'],
+                            label: s['name'],
+                            color: s['color'] as Color,
+                            onTap: () {},
                           );
                         },
                       ),
                     ),
                   ],
                 )),
-                const SizedBox(height: 24),
+                const SizedBox(height: 22),
 
                 // Top Doctors
-                _anim(5, Column(
+                _fade(5, Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _SectionTitle('Top Rated Doctors',
-                        action: 'View All', onAction: () => widget.onTabChange(1)),
-                    const SizedBox(height: 12),
+                        action: 'View All',
+                        onAction: () => widget.onTabChange(1)),
+                    const SizedBox(height: 10),
                     ...sampleDoctors.take(2).map((d) => Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.only(bottom: 8),
                           child: _DoctorCard(doctor: d, onTap: () {}),
                         )),
                   ],
                 )),
-                const SizedBox(height: 20),
               ]),
             ),
           ),
@@ -696,46 +664,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
-// ─── LOCATION PICKER SHEET ───────────────────────────────────────────────────
-
-class _LocationPickerSheet extends StatefulWidget {
-  final bool isDark;
+// ════════════════════════════════════════════════════════════════════
+//  LOCATION SHEET
+// ════════════════════════════════════════════════════════════════════
+class _LocationSheet extends StatefulWidget {
   final String currentLocation;
-  final ValueChanged<String> onLocationSelected;
-
-  const _LocationPickerSheet({
-    required this.isDark,
-    required this.currentLocation,
-    required this.onLocationSelected,
-  });
+  final ValueChanged<String> onSelected;
+  const _LocationSheet(
+      {required this.currentLocation, required this.onSelected});
 
   @override
-  State<_LocationPickerSheet> createState() => _LocationPickerSheetState();
+  State<_LocationSheet> createState() => _LocationSheetState();
 }
 
-class _LocationPickerSheetState extends State<_LocationPickerSheet> {
-  final TextEditingController _searchCtrl = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
-
+class _LocationSheetState extends State<_LocationSheet> {
+  final _ctrl  = TextEditingController();
+  final _focus = FocusNode();
   List<String> _suggestions = _allCities;
   bool _isLoadingGPS = false;
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(_onType);
+    _ctrl.addListener(_onType);
   }
 
   @override
   void dispose() {
-    _searchCtrl.removeListener(_onType);
-    _searchCtrl.dispose();
-    _focusNode.dispose();
+    _ctrl.removeListener(_onType);
+    _ctrl.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
   void _onType() {
-    final q = _searchCtrl.text.trim().toLowerCase();
+    final q = _ctrl.text.trim().toLowerCase();
     setState(() {
       _suggestions = q.isEmpty
           ? _allCities
@@ -744,7 +707,7 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
   }
 
   void _pick(String loc) {
-    widget.onLocationSelected(loc);
+    widget.onSelected(loc);
     Navigator.pop(context);
   }
 
@@ -752,402 +715,368 @@ class _LocationPickerSheetState extends State<_LocationPickerSheet> {
     setState(() => _isLoadingGPS = true);
     try {
       final current = await LocationService.getCurrentAddress();
-      if (mounted) {
-        widget.onLocationSelected(current);
-        final lower = current.toLowerCase();
-        final permissionIssue = lower.contains('location disabled') ||
-            lower.contains('permission denied') ||
-            lower.contains('permission permanently denied') ||
-            lower.contains('permission unavailable');
-        if (!permissionIssue) {
-          await LocationStorage.saveLocation(current, isManual: false);
-          Navigator.pop(context);
-        } else {
-          setState(() => _isLoadingGPS = false);
-          _showLocationSettingsSnack();
-        }
+      if (!mounted) return;
+      final lower = current.toLowerCase();
+      final hasIssue = lower.contains('location disabled') ||
+          lower.contains('permission');
+      widget.onSelected(current);
+      if (!hasIssue) {
+        await LocationStorage.saveLocation(current, isManual: false);
+        Navigator.pop(context);
+      } else {
+        setState(() => _isLoadingGPS = false);
+        _snack();
       }
     } catch (_) {
       if (!mounted) return;
       setState(() => _isLoadingGPS = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to detect location')),
-      );
+          const SnackBar(content: Text('Unable to detect location')));
     }
   }
 
-  void _showLocationSettingsSnack() {
-    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-    final message = isWindows
-        ? 'Enable Windows location services to detect location'
-        : 'Enable phone location services to detect location';
+  void _snack() {
+    final isWindows =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(isWindows
+            ? 'Enable Windows location services'
+            : 'Enable phone location services'),
         action: SnackBarAction(
-          label: 'Open Settings',
-          onPressed: () => Geolocator.openLocationSettings(),
-        ),
+            label: 'Settings',
+            onPressed: () => Geolocator.openLocationSettings()),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark    = widget.isDark;
-    // ── Q UP teal-tinted surfaces (was slate/navy)
-    final bg        = isDark ? const Color(0xFF0A1F1C) : Colors.white;
-    final textColor = isDark ? Colors.white : const Color(0xFF1A2B4A);
-    final sub       = isDark ? Colors.white38 : Colors.grey.shade400;
-    final tileBg    = isDark ? const Color(0xFF142E29) : const Color(0xFFF0FAF8);
-    final divColor  = isDark ? Colors.white10 : const Color(0xFFE0F5F2);
-
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
+            maxHeight: MediaQuery.of(context).size.height * 0.85),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.15),
-              blurRadius: 24, offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 10),
+          Container(
+            width: 36, height: 4,
+            decoration: BoxDecoration(
+                color: kBorder, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 14),
 
-            const SizedBox(height: 10),
-            Container(
-              width: 32, height: 4,
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.location_on_rounded,
+                    color: kPrimary, size: 17),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Choose Location',
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary)),
+                    if (widget.currentLocation.isNotEmpty)
+                      Text('Current: ${widget.currentLocation}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 11, color: kTextMuted)),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 28, height: 28,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFF7F8FA),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: kBorder)),
+                  child: const Icon(Icons.close_rounded,
+                      size: 15, color: kTextMuted),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 10),
+
+          // Search
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
               decoration: BoxDecoration(
-                color: isDark ? Colors.white24 : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
+                color: const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBorder),
+              ),
+              child: TextField(
+                controller: _ctrl,
+                focusNode: _focus,
+                textInputAction: TextInputAction.done,
+                style: const TextStyle(
+                    color: kTextPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: 'Search city…',
+                  hintStyle: const TextStyle(
+                      color: kTextMuted, fontSize: 13),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      color: kTextMuted, size: 17),
+                  suffixIcon: _ctrl.text.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () { _ctrl.clear(); _focus.requestFocus(); },
+                          child: const Icon(Icons.clear_rounded,
+                              color: kTextMuted, size: 15))
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 11),
+                ),
+                onSubmitted: (val) {
+                  final v = val.trim();
+                  if (v.isEmpty) return;
+                  _pick(_suggestions.isNotEmpty ? _suggestions.first : v);
+                },
               ),
             ),
-            const SizedBox(height: 14),
+          ),
+          const SizedBox(height: 8),
 
-            // Title row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
+          // GPS button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GestureDetector(
+              onTap: _isLoadingGPS ? null : _useGPS,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: kPrimary.withOpacity(0.3)),
+                ),
+                child: Row(children: [
                   Container(
-                    width: 36, height: 36,
+                    width: 30, height: 30,
                     decoration: BoxDecoration(
-                      // ── Q UP teal gradient (was blue)
-                      gradient: const LinearGradient(
-                          colors: [Color(0xFF00BFA5), Color(0xFF008C7A)]),
-                      borderRadius: BorderRadius.circular(10),
+                      color: kPrimary,
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.location_on_rounded,
-                        color: Colors.white, size: 18),
+                    child: _isLoadingGPS
+                        ? const Padding(
+                            padding: EdgeInsets.all(7),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.my_location_rounded,
+                            color: Colors.white, size: 15),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Choose Location',
+                        Text(
+                          _isLoadingGPS
+                              ? 'Detecting…'
+                              : 'Use Current Location',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary),
+                        ),
+                        const Text('Auto-detect via GPS',
                             style: TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w700,
-                                color: textColor)),
-                        if (widget.currentLocation.isNotEmpty)
-                          Text('Current: ${widget.currentLocation}',
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  fontSize: 11, color: sub)),
+                                fontSize: 10, color: kTextMuted)),
                       ],
                     ),
                   ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 28, height: 28,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white12 : const Color(0xFFF0FAF8),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(Icons.close_rounded, size: 16, color: sub),
-                    ),
-                  ),
-                ],
+                  if (!_isLoadingGPS)
+                    const Icon(Icons.chevron_right_rounded,
+                        color: kPrimary, size: 17),
+                ]),
               ),
             ),
-            const SizedBox(height: 12),
+          ),
+          const SizedBox(height: 8),
 
-            // Search field
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+          // Clear saved
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GestureDetector(
+              onTap: () async {
+                await LocationStorage.clearLocation();
+                if (!mounted) return;
+                widget.onSelected('');
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Location cache cleared')));
+              },
               child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 9),
                 decoration: BoxDecoration(
-                  color: tileBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: isDark ? Colors.white12 : const Color(0xFFD0EDE9)),
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kBorder),
                 ),
-                child: TextField(
-                  controller: _searchCtrl,
-                  focusNode: _focusNode,
-                  textInputAction: TextInputAction.done,
-                  style: TextStyle(
-                      color: textColor,
-                      fontSize: 13, fontWeight: FontWeight.w600),
-                  decoration: InputDecoration(
-                    hintText: 'Search city…',
-                    hintStyle: TextStyle(
-                        color: sub,
-                        fontSize: 13, fontWeight: FontWeight.w400),
-                    prefixIcon: Icon(Icons.search_rounded, color: sub, size: 18),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? GestureDetector(
-                            onTap: () {
-                              _searchCtrl.clear();
-                              _focusNode.requestFocus();
-                            },
-                            child: Icon(Icons.clear_rounded, color: sub, size: 16),
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 11),
-                  ),
-                  onSubmitted: (val) {
-                    final v = val.trim();
-                    if (v.isEmpty) return;
-                    if (_suggestions.isNotEmpty) {
-                      _pick(_suggestions.first);
-                    } else {
-                      _pick(v);
-                    }
-                  },
-                ),
+                child: Row(children: [
+                  const Icon(Icons.delete_outline_rounded,
+                      size: 15, color: kTextMuted),
+                  const SizedBox(width: 8),
+                  const Text('Clear Saved Location',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary)),
+                ]),
               ),
             ),
-            const SizedBox(height: 10),
+          ),
+          const SizedBox(height: 8),
 
-            // GPS button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GestureDetector(
-                onTap: _isLoadingGPS ? null : _useGPS,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      // ── Q UP teal gradient (was blue/teal)
-                      colors: isDark
-                          ? [const Color(0xFF00BFA5).withOpacity(0.18),
-                             const Color(0xFF008C7A).withOpacity(0.18)]
-                          : [const Color(0xFF00BFA5).withOpacity(0.08),
-                             const Color(0xFF008C7A).withOpacity(0.08)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: const Color(0xFF00BFA5).withOpacity(0.3),
-                        width: 1.5),
-                  ),
-                  child: Row(children: [
-                    Container(
-                      width: 32, height: 32,
-                      decoration: BoxDecoration(
-                        // ── Q UP teal gradient (was blue/teal)
-                        gradient: const LinearGradient(
-                            colors: [Color(0xFF00BFA5), Color(0xFF008C7A)]),
-                        borderRadius: BorderRadius.circular(9),
-                      ),
-                      child: _isLoadingGPS
-                          ? const Padding(
-                              padding: EdgeInsets.all(7),
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white))
-                          : const Icon(Icons.my_location_rounded,
-                              color: Colors.white, size: 16),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _isLoadingGPS ? 'Detecting…' : 'Use Current Location',
-                            style: TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w700,
-                                color: textColor),
-                          ),
-                          Text('Auto-detect via GPS',
-                              style: TextStyle(
-                                  fontSize: 10, color: sub)),
-                        ],
-                      ),
-                    ),
-                    if (!_isLoadingGPS)
-                      const Icon(Icons.chevron_right_rounded,
-                          color: Color(0xFF00BFA5), size: 18), // Q UP teal
-                  ]),
+          // Divider label
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              const Expanded(child: Divider(color: kBorder, height: 1)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  _ctrl.text.isEmpty ? 'POPULAR CITIES' : 'RESULTS',
+                  style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.0,
+                      color: kTextMuted),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
+              const Expanded(child: Divider(color: kBorder, height: 1)),
+            ]),
+          ),
+          const SizedBox(height: 4),
 
-            // Clear saved location
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GestureDetector(
-                onTap: () async {
-                  await LocationStorage.clearLocation();
-                  if (!mounted) return;
-                  widget.onLocationSelected('');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Location cache cleared')),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white10 : const Color(0xFFF0FAF8),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: divColor),
-                  ),
-                  child: Row(children: [
-                    Icon(Icons.delete_outline_rounded, size: 16, color: sub),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Clear Saved Location',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: textColor),
-                      ),
-                    ),
-                  ]),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-
-            // Divider label
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(children: [
-                Expanded(child: Divider(color: divColor, thickness: 1)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    _searchCtrl.text.isEmpty ? 'POPULAR CITIES' : 'RESULTS',
-                    style: TextStyle(
-                        fontSize: 9, fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1, color: sub),
-                  ),
-                ),
-                Expanded(child: Divider(color: divColor, thickness: 1)),
-              ]),
-            ),
-            const SizedBox(height: 4),
-
-            // City list
-            Flexible(
-              child: _suggestions.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        Icon(Icons.search_off_rounded, size: 30, color: sub),
-                        const SizedBox(height: 6),
+          // City list
+          Flexible(
+            child: _suggestions.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.search_off_rounded,
+                            size: 28, color: kTextMuted),
+                        SizedBox(height: 6),
                         Text('No cities found',
                             style: TextStyle(
-                                color: sub, fontSize: 12)),
-                      ]),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
-                      itemCount: _suggestions.length,
-                      separatorBuilder: (_, __) =>
-                          Divider(color: divColor, height: 1),
-                      itemBuilder: (_, i) {
-                        final loc      = _suggestions[i];
-                        final isActive = loc == widget.currentLocation;
-                        return GestureDetector(
-                          onTap: () => _pick(loc),
-                          child: Container(
-                            color: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            child: Row(children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                width: 30, height: 30,
-                                decoration: BoxDecoration(
-                                  color: isActive
-                                      ? const Color(0xFF00BFA5) // Q UP teal
-                                      : tileBg,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Icon(
-                                  isActive
-                                      ? Icons.location_on_rounded
-                                      : Icons.location_city_rounded,
-                                  color: isActive ? Colors.white : sub,
-                                  size: 15,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(loc,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isActive
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color: isActive
-                                          ? const Color(0xFF00BFA5) // Q UP teal
-                                          : textColor,
-                                    )),
-                              ),
-                              if (isActive)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF00BFA5).withOpacity(0.12),
-                                    borderRadius: BorderRadius.circular(5),
-                                  ),
-                                  child: const Text('Active',
-                                      style: TextStyle(
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w700,
-                                          color: Color(0xFF00BFA5))), // Q UP teal
-                                )
-                              else
-                                Icon(Icons.chevron_right_rounded,
-                                    color: divColor, size: 16),
-                            ]),
-                          ),
-                        );
-                      },
+                                color: kTextMuted, fontSize: 12)),
+                      ],
                     ),
-            ),
-
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
-        ),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                    itemCount: _suggestions.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(color: kBorder, height: 1),
+                    itemBuilder: (_, i) {
+                      final loc      = _suggestions[i];
+                      final isActive = loc == widget.currentLocation;
+                      return GestureDetector(
+                        onTap: () => _pick(loc),
+                        child: Container(
+                          color: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          child: Row(children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 28, height: 28,
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? kPrimary
+                                    : const Color(0xFFF7F8FA),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                isActive
+                                    ? Icons.location_on_rounded
+                                    : Icons.location_city_rounded,
+                                color:
+                                    isActive ? Colors.white : kTextMuted,
+                                size: 14,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(loc,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: isActive
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: isActive
+                                        ? kPrimary
+                                        : kTextPrimary,
+                                  )),
+                            ),
+                            if (isActive)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: kPrimaryLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Text('Active',
+                                    style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: kPrimary)),
+                              )
+                            else
+                              const Icon(Icons.chevron_right_rounded,
+                                  color: kBorder, size: 15),
+                          ]),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ]),
       ),
     );
   }
 }
 
-// ─── HEADER BUTTON ───────────────────────────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════
+//  HEADER BUTTON
+// ════════════════════════════════════════════════════════════════════
 class _HeaderBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool badge;
-  const _HeaderBtn({required this.icon, required this.onTap, this.badge = false});
+  const _HeaderBtn(
+      {required this.icon, required this.onTap, this.badge = false});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -1159,7 +1088,7 @@ class _HeaderBtn extends StatelessWidget {
               color: Colors.white.withOpacity(0.18),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: Colors.white, size: 18),
+            child: Icon(icon, color: Colors.white, size: 17),
           ),
           if (badge)
             Positioned(
@@ -1167,15 +1096,16 @@ class _HeaderBtn extends StatelessWidget {
               child: Container(
                 width: 7, height: 7,
                 decoration: const BoxDecoration(
-                    color: Color(0xFFF59E0B), shape: BoxShape.circle),
+                    color: kWarning, shape: BoxShape.circle),
               ),
             ),
         ]),
       );
 }
 
-// ─── SECTION TITLE ───────────────────────────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════
+//  SECTION TITLE
+// ════════════════════════════════════════════════════════════════════
 class _SectionTitle extends StatelessWidget {
   final String title;
   final String? action;
@@ -1183,31 +1113,30 @@ class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.title, {this.action, this.onAction});
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(title,
-            style: TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700,
-              color: isDark ? Colors.white : AppTheme.textPrimary,
-            )),
-        if (action != null)
-          GestureDetector(
-            onTap: onAction,
-            child: Text(action!,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w600,
-                    color: Color(0xFF00BFA5))), // Q UP teal
-          ),
-      ],
-    );
-  }
+  Widget build(BuildContext context) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary)),
+          if (action != null)
+            GestureDetector(
+              onTap: onAction,
+              child: Text(action!,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kPrimary)),
+            ),
+        ],
+      );
 }
 
-// ─── QUICK ACTION ────────────────────────────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════
+//  QUICK ACTION
+// ════════════════════════════════════════════════════════════════════
 class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1218,168 +1147,160 @@ class _QuickAction extends StatelessWidget {
        required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                  color: color, borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, color: Colors.white, size: 18),
+  Widget build(BuildContext context) => Expanded(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: color.withOpacity(0.15)),
             ),
-            const SizedBox(height: 6),
-            Text(label,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 9, fontWeight: FontWeight.w700, height: 1.3,
-                  color: isDark ? Colors.white70 : AppTheme.textPrimary,
-                )),
-          ]),
+            child: Column(children: [
+              Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(9)),
+                child: Icon(icon, color: Colors.white, size: 17),
+              ),
+              const SizedBox(height: 5),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                      color: kTextPrimary)),
+            ]),
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
-// ─── EMPTY NOTE ──────────────────────────────────────────────────────────────
-
-class _EmptyAppointmentNote extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  EMPTY NOTE
+// ════════════════════════════════════════════════════════════════════
+class _EmptyNote extends StatelessWidget {
   final String message;
-  const _EmptyAppointmentNote(this.message);
+  const _EmptyNote(this.message);
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14),
-      decoration: BoxDecoration(
-        // ── Q UP teal-tinted empty state (was slate)
-        color: isDark ? const Color(0xFF142E29) : const Color(0xFFF0FAF8),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.calendar_today_rounded,
-              size: 14,
-              color: isDark ? Colors.white38 : Colors.grey.shade400),
-          const SizedBox(width: 6),
-          Text(message,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: isDark ? Colors.white38 : Colors.grey.shade500)),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+        decoration: BoxDecoration(
+          color: kPrimaryLight.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: kPrimary.withOpacity(0.15)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.calendar_today_rounded,
+                size: 13, color: kPrimary),
+            const SizedBox(width: 6),
+            Text(message,
+                style: const TextStyle(
+                    fontSize: 12, color: kTextSecondary)),
+          ],
+        ),
+      );
 }
 
-// ─── API APPOINTMENT CARD ────────────────────────────────────────────────────
-
-class _ApiAppointmentCard extends StatelessWidget {
+// ════════════════════════════════════════════════════════════════════
+//  APPOINTMENT CARD
+// ════════════════════════════════════════════════════════════════════
+class _ApptCard extends StatelessWidget {
   final AppointmentList appointment;
-  const _ApiAppointmentCard({required this.appointment});
+  const _ApptCard({required this.appointment});
 
-  String _formatDate(String? raw) {
+  String _fmtDate(String? raw) {
     if (raw == null) return '—';
     final dt = DateTime.tryParse(raw);
-    if (dt == null) return raw;
-    return DateFormat('d MMM yyyy').format(dt);
+    return dt == null ? raw : DateFormat('d MMM yyyy').format(dt);
   }
 
-  String _formatTime(String? raw) {
+  String _fmtTime(String? raw) {
     if (raw == null || raw.isEmpty) return '—';
     final parts = raw.split(':');
     if (parts.length < 2) return raw;
-    final h = int.tryParse(parts[0]) ?? 0;
-    final m = int.tryParse(parts[1]) ?? 0;
-    final dt = DateTime(2000, 1, 1, h, m);
+    final dt = DateTime(2000, 1, 1,
+        int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
     return DateFormat('h:mm a').format(dt);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final doctorName = appointment.doctorName ?? 'Doctor';
-    final specialty  = appointment.specialization ?? '';
-    final dateStr    = _formatDate(appointment.appointmentDate);
-    final timeStr    = _formatTime(appointment.startTime);
-    final isToday = () {
-      final p = DateTime.tryParse(appointment.appointmentDate ?? '');
-      if (p == null) return false;
-      final now = DateTime.now();
-      return p.year == now.year && p.month == now.month && p.day == now.day;
-    }();
+    final name     = appointment.doctorName ?? 'Doctor';
+    final spec     = appointment.specialization ?? '';
+    final dateStr  = _fmtDate(appointment.appointmentDate);
+    final timeStr  = _fmtTime(appointment.startTime);
+    final p        = DateTime.tryParse(appointment.appointmentDate ?? '');
+    final isToday  = p != null &&
+        p.year  == DateTime.now().year &&
+        p.month == DateTime.now().month &&
+        p.day   == DateTime.now().day;
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [
-          // ── Q UP teal gradient (was blue)
-          const Color(0xFF00BFA5).withOpacity(isDark ? 0.22 : 0.07),
-          const Color(0xFF008C7A).withOpacity(isDark ? 0.22 : 0.07),
-        ]),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: const Color(0xFF00BFA5).withOpacity(0.2), width: 1.2),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3)),
+        ],
       ),
       child: Row(children: [
-        _doctorAvatar('cardio', size: 44),
+        _doctorAvatar('cardio', size: 42),
         const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(doctorName,
-                  style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white : AppTheme.textPrimary,
-                  )),
+              Text(name,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
               const SizedBox(height: 2),
-              Text(specialty,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: isDark ? Colors.white54 : AppTheme.textSecondary)),
-              const SizedBox(height: 6),
+              Text(spec,
+                  style: const TextStyle(
+                      fontSize: 11, color: kTextSecondary)),
+              const SizedBox(height: 5),
               Row(children: [
                 const Icon(Icons.calendar_today_rounded,
-                    size: 11, color: Color(0xFF00BFA5)), // Q UP teal
+                    size: 10, color: kPrimary),
                 const SizedBox(width: 3),
-                Flexible(
-                  child: Text(dateStr,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w600,
-                          color: Color(0xFF00BFA5))), // Q UP teal
-                ),
+                Text(dateStr,
+                    style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: kPrimary)),
                 const SizedBox(width: 8),
                 const Icon(Icons.access_time_rounded,
-                    size: 11, color: Color(0xFF008C7A)), // Q UP teal dark
+                    size: 10, color: kPrimaryDark),
                 const SizedBox(width: 3),
                 Text(timeStr,
                     style: const TextStyle(
-                        fontSize: 10, fontWeight: FontWeight.w600,
-                        color: Color(0xFF008C7A))), // Q UP teal dark
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: kPrimaryDark)),
               ]),
             ],
           ),
         ),
-        const SizedBox(width: 6),
         if (isToday)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            padding: const EdgeInsets.symmetric(
+                horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-                color: const Color(0xFF00BFA5), // Q UP teal
-                borderRadius: BorderRadius.circular(8)),
+                color: kPrimary,
+                borderRadius: BorderRadius.circular(6)),
             child: const Text('Today',
                 style: TextStyle(
                     color: Colors.white,
@@ -1391,8 +1312,9 @@ class _ApiAppointmentCard extends StatelessWidget {
   }
 }
 
-// ─── SPECIALTY CHIP ──────────────────────────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════
+//  SPECIALTY CHIP
+// ════════════════════════════════════════════════════════════════════
 class _SpecialtyChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1403,44 +1325,44 @@ class _SpecialtyChip extends StatelessWidget {
        required this.color, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 80,
-        decoration: BoxDecoration(
-          color: isDark ? color.withOpacity(0.15) : color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 76,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.15)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 38, height: 38,
+                decoration: BoxDecoration(
+                    color: color.withOpacity(0.15),
+                    shape: BoxShape.circle),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary)),
+              ),
+            ],
+          ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                  color: color.withOpacity(0.2), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(height: 5),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 8, fontWeight: FontWeight.w700,
-                    color: isDark ? Colors.white70 : AppTheme.textPrimary,
-                  )),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+      );
 }
 
-// ─── DOCTOR CARD ─────────────────────────────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════
+//  DOCTOR CARD
+// ════════════════════════════════════════════════════════════════════
 class _DoctorCard extends StatelessWidget {
   final Doctor doctor;
   final VoidCallback onTap;
@@ -1448,134 +1370,143 @@ class _DoctorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          // ── Q UP teal-tinted dark card (was slate)
-          color: isDark ? const Color(0xFF142E29) : Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.18 : 0.05),
-              blurRadius: 10, offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _doctorAvatar(doctor.image, size: 54),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    Expanded(
-                      child: Text(doctor.name,
+    final ac = _accentFor(doctor.image);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3)),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _doctorAvatar(doctor.image, size: 50),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Expanded(
+                    child: Text(doctor.name,
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary)),
+                  ),
+                  Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.star_rounded,
+                        color: kWarning, size: 12),
+                    const SizedBox(width: 2),
+                    Text(doctor.rating.toString(),
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: kWarning)),
+                  ]),
+                ]),
+                const SizedBox(height: 2),
+                Text(doctor.specialty,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: ac,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 5),
+                Wrap(spacing: 4, runSpacing: 3, children: [
+                  _InfoTag(
+                      icon: Icons.work_history_rounded,
+                      label: '${doctor.experience}yr',
+                      color: kSuccess),
+                  _InfoTag(
+                      icon: Icons.people_rounded,
+                      label: '${doctor.patientsAhead} ahead',
+                      color: kWarning),
+                  _InfoTag(
+                      icon: Icons.timer_rounded,
+                      label: '~${doctor.waitMinutes}min',
+                      color: kPurple),
+                ]),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: onTap,
+                      style: OutlinedButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 6),
+                        side: const BorderSide(color: kPrimary),
+                        foregroundColor: kPrimary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text('Profile',
                           style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : AppTheme.textPrimary,
-                          )),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600)),
                     ),
-                    Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.star_rounded,
-                          color: Color(0xFFF59E0B), size: 13),
-                      const SizedBox(width: 2),
-                      Text(doctor.rating.toString(),
-                          style: const TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.w700,
-                              color: Color(0xFFF59E0B))),
-                    ]),
-                  ]),
-                  const SizedBox(height: 2),
-                  Text(doctor.specialty,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF00BFA5), // Q UP teal
-                          fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 5),
-                  Wrap(spacing: 4, runSpacing: 3, children: [
-                    _InfoTag(icon: Icons.work_history_rounded,
-                        label: '${doctor.experience}yr',
-                        color: const Color(0xFF10B981)),
-                    _InfoTag(icon: Icons.people_rounded,
-                        label: '${doctor.patientsAhead} ahead',
-                        color: const Color(0xFFF59E0B)),
-                    _InfoTag(icon: Icons.timer_rounded,
-                        label: '~${doctor.waitMinutes}min',
-                        color: const Color(0xFF6366F1)),
-                  ]),
-                  const SizedBox(height: 8),
-                  Row(children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: onTap,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          side: const BorderSide(color: Color(0xFF00BFA5)), // Q UP teal
-                          foregroundColor: const Color(0xFF00BFA5),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9)),
-                        ),
-                        child: const Text('View Profile',
-                            style: TextStyle(fontSize: 11)),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 6),
+                        backgroundColor: kPrimary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
                       ),
+                      child: const Text('Book Now',
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600)),
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          backgroundColor: const Color(0xFF00BFA5), // Q UP teal
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9)),
-                        ),
-                        child: const Text('Book Now',
-                            style: TextStyle(fontSize: 11)),
-                      ),
-                    ),
-                  ]),
-                ],
-              ),
+                  ),
+                ]),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ─── INFO TAG ────────────────────────────────────────────────────────────────
-
+// ════════════════════════════════════════════════════════════════════
+//  INFO TAG
+// ════════════════════════════════════════════════════════════════════
 class _InfoTag extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color color;
-  const _InfoTag({required this.icon, required this.label, required this.color});
+  const _InfoTag(
+      {required this.icon, required this.label, required this.color});
 
   @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(isDark ? 0.2 : 0.1),
-        borderRadius: BorderRadius.circular(5),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 10, color: color),
-        const SizedBox(width: 2),
-        Text(label,
-            style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700, color: color)),
-      ]),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 10, color: color),
+          const SizedBox(width: 3),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: color)),
+        ]),
+      );
 }
