@@ -93,8 +93,9 @@ class DoctorDetails {
 
   @JsonKey(name: 'booking_start_time')
   final String? bookingStartTime;
-  @JsonKey(name: 'is_recently_visited')
-  final String? isRecentlyVisited;
+
+  @JsonKey(name: 'is_recently_visited', fromJson: _intFromJson)
+  final int? isRecentlyVisited;
 
   DoctorDetails({
     this.doctorId,

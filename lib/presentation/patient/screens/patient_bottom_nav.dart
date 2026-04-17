@@ -2,7 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
-import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
+import 'package:qless/presentation/patient/screens/doctor_explore.dart';
 import 'package:qless/presentation/patient/screens/patient_home_screen.dart';
 import 'package:qless/presentation/patient/screens/profile.dart';
 
@@ -108,7 +108,7 @@ static const _activePill  = Color(0x1A6366F1); // match doctor 10% indigo tint
         onTabChange: _setTab,
       ),
       
-      const DoctorSearchScreen(),
+      const DoctorExploreScreen(),
       AppointmentScreen(key: _appointmentsKey, onTabChange: _setTab),
       const PatientProfilePage(),
     ];

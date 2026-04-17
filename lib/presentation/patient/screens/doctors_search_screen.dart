@@ -144,7 +144,9 @@ class _QueueStatus {
 //  MAIN SCREEN
 // ════════════════════════════════════════════════════════════════════
 class DoctorSearchScreen extends ConsumerStatefulWidget {
-  const DoctorSearchScreen({super.key});
+  final String? initialSpecialty;
+  const DoctorSearchScreen({super.key, this.initialSpecialty});
+ 
   @override
   ConsumerState<DoctorSearchScreen> createState() => _DoctorSearchScreenState();
 }
@@ -168,10 +170,15 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen>
     Future.delayed(const Duration(milliseconds: 80), () => _fadeCtrl.forward());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+
       ref.read(doctorsViewModelProvider.notifier).fetchDoctors(ref.read(patientLoginViewModelProvider).patientId ?? 0);
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {
         ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
+      }
+
+            if (widget.initialSpecialty != null) {
+        setState(() => _specialty = widget.initialSpecialty);
       }
     });
   }
