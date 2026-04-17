@@ -1,9 +1,12 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
@@ -56,6 +59,17 @@ Color _bgFor(String? s)     => _specialtyBg[s?.toLowerCase()]     ?? kPrimaryLig
 
 String _cap(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
+
+/// Haversine distance in kilometres between two lat/lng points.
+double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
+  const r = 6371.0;
+  final dLat = (lat2 - lat1) * pi / 180;
+  final dLon = (lon2 - lon1) * pi / 180;
+  final a = sin(dLat / 2) * sin(dLat / 2) +
+      cos(lat1 * pi / 180) * cos(lat2 * pi / 180) *
+          sin(dLon / 2) * sin(dLon / 2);
+  return r * 2 * atan2(sqrt(a), sqrt(1 - a));
+}
 
 // ── Queue State ───────────────────────────────────────────────────────────
 enum _QueueState { noQueue, unavailable, opensSoon, full, open, hasQueue }
