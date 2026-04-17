@@ -14,6 +14,6 @@ abstract class DoctorLoginRepository {
 
   Future<dynamic> updateLeadTime(DoctorDetails doctor);
 
-   
+  Future<List<DoctorDetails>> mobileExistDoctor(String mobile);
 
 }

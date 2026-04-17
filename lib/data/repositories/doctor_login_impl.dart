@@ -50,4 +50,9 @@ class DoctorLoginImpl implements DoctorLoginRepository {
   Future<dynamic> updateLeadTime(DoctorDetails doctor ) {
     return apiService.updateLeadTime(doctor);
   }
+
+  @override
+  Future<List<DoctorDetails>> mobileExistDoctor(String mobile) {
+    return apiService.mobileExistDoctor(mobile);
+  }
 }
