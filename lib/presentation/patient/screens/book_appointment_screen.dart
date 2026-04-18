@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -707,7 +708,7 @@ class _BookAppointmentScreenState
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  APP BAR
+//  APP BAR WITH GOOGLE MAPS INTEGRATION
 // ════════════════════════════════════════════════════════════════════
 class _AppBar extends StatelessWidget {
   final DoctorDetails       doctor;
@@ -721,6 +722,55 @@ class _AppBar extends StatelessWidget {
     required this.onBack,    required this.onFavToggle,
     this.isReschedule = false,
   });
+
+  // ─── Google Maps Helper ──────────────────────────────────────────────────
+  Future<void> _openGoogleMaps(BuildContext context) async {
+    final lat = doctor.latitude;
+    final lng = doctor.longitude;
+    
+    if (lat == null || lng == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location coordinates not available'),
+          backgroundColor: kError,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // Create Google Maps URL with coordinates
+    final googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+    
+    try {
+      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
+        await launchUrl(
+          Uri.parse(googleMapsUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open Google Maps'),
+              backgroundColor: kError,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening map: $e'),
+            backgroundColor: kError,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -771,102 +821,164 @@ class _AppBar extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
           alignment: Alignment.bottomLeft,
           child: Row(
+  children: [
+    // Avatar
+    Stack(
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: ac.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: ac.withOpacity(0.2),
+              width: 1.5,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            initial,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: ac,
+            ),
+          ),
+        ),
+        if (isFavorite)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: Container(
+              width: 16,
+              height: 16,
+              decoration: BoxDecoration(
+                color: kFavActive,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(
+                Icons.favorite_rounded,
+                size: 8,
+                color: Colors.white,
+              ),
+            ),
+          ),
+      ],
+    ),
+
+    const SizedBox(width: 12),
+
+    // Name + details
+    Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Dr. ${doctor.name ?? 'Unknown'}',
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+
+          Row(
             children: [
-              // Avatar
-              Stack(
-                children: [
-                  Container(
-                    width: 52, height: 52,
-                    decoration: BoxDecoration(
-                      color: ac.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(
-                          color: ac.withOpacity(0.2), width: 1.5),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(initial,
-                        style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: ac)),
+              if (doctor.specialization != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: specBg,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  if (isFavorite)
-                    Positioned(
-                      right: 0, bottom: 0,
-                      child: Container(
-                        width: 16, height: 16,
-                        decoration: BoxDecoration(
-                          color: kFavActive,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: Colors.white, width: 2),
-                        ),
-                        child: const Icon(Icons.favorite_rounded,
-                            size: 8, color: Colors.white),
-                      ),
+                  child: Text(
+                    _cap(doctor.specialization!),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: ac,
                     ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              // Name + spec
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Dr. ${doctor.name ?? 'Unknown'}',
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary)),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        if (doctor.specialization != null) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 7, vertical: 2),
-                            decoration: BoxDecoration(
-                                color: specBg,
-                                borderRadius: BorderRadius.circular(6)),
-                            child: Text(_cap(doctor.specialization!),
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: ac)),
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                        if (doctor.clinicName != null)
-                          Flexible(
-                            child: Text(doctor.clinicName!,
-                                style: const TextStyle(
-                                    fontSize: 11, color: kTextMuted),
-                                overflow: TextOverflow.ellipsis),
-                          ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-              // Fee
-              if (doctor.consultationFee != null)
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text('₹${doctor.consultationFee!.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: kSuccess)),
-                    const Text('consult fee',
-                        style: TextStyle(
-                            fontSize: 10, color: kTextMuted)),
-                  ],
+                const SizedBox(width: 6),
+              ],
+              if (doctor.clinicName != null)
+                Flexible(
+                  child: Text(
+                    doctor.clinicName!,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: kTextMuted,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
             ],
           ),
+
+          // Address (no icon here now)
+          if (doctor.clinicAddress != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              doctor.clinicAddress!,
+              style: const TextStyle(
+                fontSize: 10,
+                color: kTextMuted,
+              ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
+          ],
+        ],
+      ),
+    ),
+
+    // 🗺️ Map Icon (RIGHT SIDE)
+    if (doctor.clinicAddress != null)
+      GestureDetector(
+        onTap: () => _openGoogleMaps(context),
+        child: Container(
+          margin: const EdgeInsets.only(right: 10),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: kPrimary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.map_rounded,
+            size: 18,
+            color: kPrimary,
+          ),
+        ),
+      ),
+
+    // Fee
+    if (doctor.consultationFee != null)
+      Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            '₹${doctor.consultationFee!.toStringAsFixed(0)}',
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: kSuccess,
+            ),
+          ),
+          const Text(
+            'consult fee',
+            style: TextStyle(fontSize: 10, color: kTextMuted),
+          ),
+        ],
+      ),
+  ],
+),
         ),
       ),
     );
