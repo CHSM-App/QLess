@@ -363,26 +363,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       data: (list) {
         final today    = list.where(_isToday).toList();
         final upcoming = list.where(_isUpcoming).toList();
+        // Merge: today first, then upcoming; cap at 3
+        final combined = [...today, ...upcoming];
+        final shown    = combined.take(3).toList();
+        final hasMore  = combined.length > 3;
+
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _SectionTitle("Today's Appointments",
-              action: 'See All', onAction: () => widget.onTabChange(2)),
+          _SectionTitle('Upcoming Appointments',
+              action: hasMore ? 'See All' : null,
+              onAction: () => widget.onTabChange(2)),
           const SizedBox(height: 10),
-          if (today.isEmpty)
-            _EmptyNote("No appointments today")
-          else
-            ...today.map((a) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: _ApptCard(appointment: a))),
-          const SizedBox(height: 16),
-          _SectionTitle('Upcoming',
-              action: 'See All', onAction: () => widget.onTabChange(2)),
-          const SizedBox(height: 10),
-          if (upcoming.isEmpty)
+          if (shown.isEmpty)
             _EmptyNote("No upcoming appointments")
           else
-            ...upcoming.take(3).map((a) => Padding(
+            ...shown.map((a) => Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: _ApptCard(appointment: a))),
+                child: _ApptCard(appointment: a, isToday: _isToday(a)))),
         ]);
       },
     );
@@ -391,7 +387,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _apptShell({required bool loading}) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionTitle("Today's Appointments",
+          _SectionTitle('Upcoming Appointments',
               action: 'See All', onAction: () => widget.onTabChange(2)),
           const SizedBox(height: 10),
           if (loading)
@@ -427,17 +423,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           // ── HEADER ──────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Container(
+              // decoration: const BoxDecoration(
+              //   gradient: LinearGradient(
+              //     colors: [kPrimary, kPrimaryDark],
+              //     begin: Alignment.topLeft,
+              //     end: Alignment.bottomRight,
+              //   ),
+              //   borderRadius: BorderRadius.only(
+              //     bottomLeft:  Radius.circular(24),
+              //     bottomRight: Radius.circular(24),
+              //   ),
+              // ),
               decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [kPrimary, kPrimaryDark],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.only(
-                  bottomLeft:  Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                ),
-              ),
+  color: Colors.white,
+  border: Border(
+    bottom: BorderSide(color: Color(0xFFEDF2F7), width: 1),
+  ),
+),
               child: SafeArea(
                 bottom: false,
                 child: Padding(
@@ -454,15 +456,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               children: [
                                 Text(greeting,
                                     style: TextStyle(
-                                        color: Colors.white.withOpacity(0.78),
+                                    color: kTextSecondary,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500)),
                                 const SizedBox(height: 1),
                                 Text(name,
                                     style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700)),
+                                       color: kTextPrimary,
+fontSize: 16,
+fontWeight: FontWeight.w700)),
                                 const SizedBox(height: 5),
                                 // Location pill
                                 GestureDetector(
@@ -473,16 +475,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 8, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.18),
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                          color: Colors.white.withOpacity(0.3)),
+                                     color: kPrimaryLight,
+borderRadius: BorderRadius.circular(20),
+border: Border.all(color: kPrimary.withOpacity(0.2)),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Icon(Icons.location_on_rounded,
-                                            color: Colors.white, size: 10),
+                                     const Icon(Icons.location_on_rounded, color: kPrimary, size: 10),
                                         const SizedBox(width: 3),
                                         if (!_locationLoaded)
                                           _Shimmer(width: 60, height: 8)
@@ -493,16 +493,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                                     TextOverflow.ellipsis,
                                                 maxLines: 1,
                                                 style: TextStyle(
-                                                    color: Colors.white
-                                                        .withOpacity(0.95),
-                                                    fontSize: 10,
-                                                    fontWeight:
-                                                        FontWeight.w600)),
+                                                 color: kPrimary, fontSize: 10, fontWeight: FontWeight.w600)),
                                           ),
                                         const SizedBox(width: 2),
                                         const Icon(
                                             Icons.keyboard_arrow_down,
-                                            color: Colors.white, size: 12),
+                                            color: kPrimary, size: 12),
                                       ],
                                     ),
                                   ),
@@ -536,19 +532,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                                color: Colors.white.withOpacity(0.3)),
+                           color: const Color(0xFFF7F8FA),
+borderRadius: BorderRadius.circular(12),
+border: Border.all(color: kBorder),
                           ),
                           child: Row(children: [
-                            Icon(Icons.search_rounded,
-                                color: Colors.white.withOpacity(0.8),
-                                size: 17),
+                           Icon(Icons.search_rounded, color: kTextMuted, size: 17),
                             const SizedBox(width: 8),
                             Text('Search doctors or specialties…',
                                 style: TextStyle(
-                                    color: Colors.white.withOpacity(0.7),
+                                    color: kTextMuted,
                                     fontSize: 13)),
                           ]),
                         ),
@@ -575,13 +568,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     Row(children: [
                       _QuickAction(
                           icon: Icons.calendar_month_rounded,
-                          label: 'Book\nAppt.',
+                          label: 'Book Appt.',
                           color: kPrimary,
                           onTap: () => widget.onTabChange(1)),
                       const SizedBox(width: 8),
                       _QuickAction(
                           icon: Icons.history_rounded,
-                          label: 'My\nAppts.',
+                          label: 'My Appts.',
                           color: kPrimary,
                           onTap: () => widget.onTabChange(2)),
                       const SizedBox(width: 8),
@@ -838,7 +831,8 @@ class _LocationSheetState extends State<_LocationSheet> {
                 decoration: InputDecoration(
                   hintText: 'Search city…',
                   hintStyle: const TextStyle(
-                      color: kTextMuted, fontSize: 13),
+                     // hint text:
+color: kTextMuted, fontSize: 13),
                   prefixIcon: const Icon(Icons.search_rounded,
                       color: kTextMuted, size: 17),
                   suffixIcon: _ctrl.text.isNotEmpty
@@ -1068,9 +1062,40 @@ class _LocationSheetState extends State<_LocationSheet> {
   }
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  HEADER BUTTON
-// ════════════════════════════════════════════════════════════════════
+// // ════════════════════════════════════════════════════════════════════
+// //  HEADER BUTTON
+// // ════════════════════════════════════════════════════════════════════
+// class _HeaderBtn extends StatelessWidget {
+//   final IconData icon;
+//   final VoidCallback onTap;
+//   final bool badge;
+//   const _HeaderBtn(
+//       {required this.icon, required this.onTap, this.badge = false});
+
+//   @override
+//   Widget build(BuildContext context) => GestureDetector(
+//         onTap: onTap,
+//         child: Stack(children: [
+//           Container(
+//             width: 36, height: 36,
+//             decoration: BoxDecoration(
+//               color: Colors.white.withOpacity(0.18),
+//               borderRadius: BorderRadius.circular(10),
+//             ),
+//             child: Icon(icon, color: Colors.white, size: 17),
+//           ),
+//           if (badge)
+//             Positioned(
+//               right: 7, top: 7,
+//               child: Container(
+//                 width: 7, height: 7,
+//                 decoration: const BoxDecoration(
+//                     color: kWarning, shape: BoxShape.circle),
+//               ),
+//             ),
+//         ]),
+//       );
+// }
 class _HeaderBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -1085,10 +1110,11 @@ class _HeaderBtn extends StatelessWidget {
           Container(
             width: 36, height: 36,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: const Color(0xFFF7F8FA),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder),
             ),
-            child: Icon(icon, color: Colors.white, size: 17),
+            child: Icon(icon, color: kTextPrimary, size: 17),
           ),
           if (badge)
             Positioned(
@@ -1102,7 +1128,6 @@ class _HeaderBtn extends StatelessWidget {
         ]),
       );
 }
-
 // ════════════════════════════════════════════════════════════════════
 //  SECTION TITLE
 // ════════════════════════════════════════════════════════════════════
@@ -1213,7 +1238,8 @@ class _EmptyNote extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════════
 class _ApptCard extends StatelessWidget {
   final AppointmentList appointment;
-  const _ApptCard({required this.appointment});
+  final bool isToday;
+  const _ApptCard({required this.appointment, this.isToday = false});
 
   String _fmtDate(String? raw) {
     if (raw == null) return '—';
@@ -1236,11 +1262,6 @@ class _ApptCard extends StatelessWidget {
     final spec     = appointment.specialization ?? '';
     final dateStr  = _fmtDate(appointment.appointmentDate);
     final timeStr  = _fmtTime(appointment.startTime);
-    final p        = DateTime.tryParse(appointment.appointmentDate ?? '');
-    final isToday  = p != null &&
-        p.year  == DateTime.now().year &&
-        p.month == DateTime.now().month &&
-        p.day   == DateTime.now().day;
 
     return Container(
       padding: const EdgeInsets.all(12),
