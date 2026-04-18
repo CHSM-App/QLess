@@ -486,12 +486,12 @@ border: Border.all(color: kPrimary.withOpacity(0.2)),
                               ],
                             ),
                           ),
-                          _HeaderBtn(
-                            icon: widget.themeMode == ThemeMode.dark
-                                ? Icons.light_mode_rounded
-                                : Icons.dark_mode_rounded,
-                            onTap: widget.onToggleTheme,
-                          ),
+                          // _HeaderBtn(
+                          //   icon: widget.themeMode == ThemeMode.dark
+                          //       ? Icons.light_mode_rounded
+                          //       : Icons.dark_mode_rounded,
+                          //   onTap: widget.onToggleTheme,
+                          // ),
                           const SizedBox(width: 8),
                           _HeaderBtn(
                             icon: Icons.notifications_outlined,

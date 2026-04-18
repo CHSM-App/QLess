@@ -166,7 +166,7 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
         MediaQuery.of(context).size.width >= DoctorNavTheme.wideBreakpoint;
 
     // Profile page hides the shared app bar (manages its own header)
-final showAppBar = true;
+final showAppBar = false;
 
     if (isWide) {
       return _buildWideLayout(showAppBar);
@@ -180,7 +180,7 @@ final showAppBar = true;
   Widget _buildWideLayout(bool showAppBar) {
     return Scaffold(
       backgroundColor: DoctorNavTheme.scaffoldBg,
-      appBar: showAppBar ? _buildAppBar() : null,
+ appBar: null,
       body: Row(
         children: [
           _buildSideRail(),
@@ -202,7 +202,7 @@ final showAppBar = true;
       backgroundColor: const Color(0xFFEEF2FF),
       extendBody: true,
       extendBodyBehindAppBar: true,
-      appBar: showAppBar ? _buildAppBar() : null,
+appBar: null,
       body: Stack(
         children: [
           Positioned.fill(

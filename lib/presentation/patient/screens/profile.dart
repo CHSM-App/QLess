@@ -123,6 +123,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                   color: kTextPrimary,
                   letterSpacing: -0.2),
             ),
+            
           ],
         ),
     
