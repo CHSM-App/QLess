@@ -340,7 +340,7 @@ class _BookAppointmentScreenState
     setState(() { _isEstimateLoading = true; _estimatedWaitTime = null; });
 
     await ref.read(appointmentViewModelProvider.notifier)
-        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did));
+        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did,soltId: _selectedSlotId));
     if (!mounted) return;
 
     final qd = ref.read(appointmentViewModelProvider).queuePreviewEstimateResponse;

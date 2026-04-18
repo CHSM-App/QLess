@@ -170,7 +170,7 @@ Widget build(BuildContext context) {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
               child: Container(
-                height: 64,
+          height: MediaQuery.of(context).size.width < 360 ? 56 : 64,
                 decoration: BoxDecoration(
                   color: const Color(0x12FFFFFF), // slightly stronger wash
                   borderRadius: BorderRadius.circular(30),
@@ -269,10 +269,10 @@ Widget build(BuildContext context) {
                                   child: AnimatedBuilder(
                                     animation: _iconScales[i],
                                     builder: (context, _) => Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 5,
-                                        vertical: 8,
-                                      ),
+                                    margin: const EdgeInsets.symmetric(
+  horizontal: 3, // was 5
+  vertical: 6,   // was 8
+),
                                       child: Column(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
@@ -283,7 +283,7 @@ Widget build(BuildContext context) {
                                               selected
                                                   ? _navItems[i].activeIcon
                                                   : _navItems[i].icon,
-                                              size: 22,
+                                          size: MediaQuery.of(context).size.width < 360 ? 20 : 22,
                                               color: selected
                                                   ? _accent
                                                   : _inactiveClr,
@@ -294,7 +294,7 @@ Widget build(BuildContext context) {
                                             duration: const Duration(
                                                 milliseconds: 200),
                                             style: TextStyle(
-                                              fontSize: 10,
+                                            fontSize: MediaQuery.of(context).size.width < 360 ? 9 : 10,
                                               fontWeight: selected
                                                   ? FontWeight.w700
                                                   : FontWeight.w500,
@@ -303,7 +303,10 @@ Widget build(BuildContext context) {
                                                   : _inactiveClr,
                                               letterSpacing: 0.1,
                                             ),
-                                            child: Text(_navItems[i].label),
+                                         child: Text(
+  _navItems[i].label,
+  overflow: TextOverflow.ellipsis,
+),
                                           ),
                                         ],
                                       ),

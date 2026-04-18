@@ -52,26 +52,6 @@ class Doctor {
   });
 }
 
-final List<Doctor> sampleDoctors = [
-  Doctor(
-    id: '1', name: 'Dr. Anika Sharma', specialty: 'Cardiologist',
-    image: 'cardio', rating: 4.9, experience: 12, patientsAhead: 3,
-    waitMinutes: 25, reviewCount: 248,
-    about: 'Dr. Anika Sharma is a leading Cardiologist with 12 years of experience.',
-    clinic: 'Apollo Heart Center', address: '14 MG Road, Bangalore',
-    isAvailable: true,
-    availableSlots: ['9:00 AM', '9:30 AM', '10:00 AM', '11:30 AM'],
-  ),
-  Doctor(
-    id: '2', name: 'Dr. Rajesh Kumar', specialty: 'Orthopedist',
-    image: 'ortho', rating: 4.7, experience: 8, patientsAhead: 1,
-    waitMinutes: 10, reviewCount: 183,
-    about: 'Dr. Rajesh Kumar specializes in joint replacement and sports injuries.',
-    clinic: 'Fortis Bone & Joint Clinic', address: '22 Nehru Place, New Delhi',
-    isAvailable: true,
-    availableSlots: ['10:00 AM', '10:30 AM', '4:00 PM'],
-  ),
-];
 
 final List<Map<String, dynamic>> specialties = [
   {'name': 'Cardiology',    'icon': Icons.favorite_rounded,        'color': kError},
@@ -642,10 +622,10 @@ border: Border.all(color: kBorder),
                         action: 'View All',
                         onAction: () => widget.onTabChange(1)),
                     const SizedBox(height: 10),
-                    ...sampleDoctors.take(2).map((d) => Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _DoctorCard(doctor: d, onTap: () {}),
-                        )),
+                    // ...sampleDoctors.take(2).map((d) => Padding(
+                    //       padding: const EdgeInsets.only(bottom: 8),
+                    //       child: _DoctorCard(doctor: d, onTap: () {}),
+                    //     )),
                   ],
                 )),
               ]),
