@@ -63,6 +63,9 @@ class DoctorDetails {
   @JsonKey(name: 'gender_id')
   final int? genderId;
 
+  @JsonKey(name: 'doc_is_verified')
+  final int? isverified;
+
   // Queue config
   @JsonKey(name: 'q_start_before', fromJson: _intFromJson)
   final int? leadTime;
@@ -120,6 +123,7 @@ class DoctorDetails {
     this.clinicContact,
     this.imageUrl,
     this.genderId,
+    this.isverified,
     this.leadTime,
     this.qStartSection,
     this.queueLength,
