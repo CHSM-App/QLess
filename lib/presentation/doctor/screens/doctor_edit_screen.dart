@@ -18,6 +18,7 @@ const kDivider = Color(0xFFE5E7EB);
 
 const kError    = Color(0xFFFC8181);
 const kSuccess  = Color(0xFF68D391);
+const kWarning  = Color(0xFFED8936);
 
 // ── Card decoration ───────────────────────────────────────────────────────────
 BoxDecoration _cardDec() => BoxDecoration(
@@ -52,6 +53,16 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   bool _didPrefill      = false;
   bool _isSubmitting    = false;
 
+  // ── Mobile verification state ─────────────────────────────────
+  String _originalMobile = '';
+  bool _isMobileChanged  = false;
+  bool _isOtpSent        = false;
+  bool _isVerifyingOtp   = false;
+  String _otpError       = '';
+  
+  // ── Dummy OTP for testing (remove in production) ───────────
+  String _dummyOtp       = '';  // Generated when OTP is sent
+
   // ── Personal ──────────────────────────────────────────────────
   final _nameCtrl    = TextEditingController();
   final _emailCtrl   = TextEditingController();
@@ -60,6 +71,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   final _licenseCtrl = TextEditingController();
   final _expCtrl     = TextEditingController();
   final _feeCtrl     = TextEditingController();
+  final _otpCtrl     = TextEditingController();
   String _selectedGender = 'Male';
   String _selectedSpec   = 'Cardiology';
 
@@ -105,7 +117,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     for (final c in [
       _nameCtrl, _emailCtrl, _contactCtrl, _qualCtrl, _licenseCtrl,
       _expCtrl, _feeCtrl, _clinicNameCtrl, _clinicAddrCtrl,
-      _clinicContactCtrl, _clinicEmailCtrl, _websiteCtrl,
+      _clinicContactCtrl, _clinicEmailCtrl, _websiteCtrl, _otpCtrl,
     ]) { c.dispose(); }
     super.dispose();
   }
@@ -142,6 +154,9 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     _set(_clinicEmailCtrl,   details.clinicEmail);
     _set(_websiteCtrl,       details.websiteName);
 
+    // Store original mobile for comparison
+    _originalMobile = (details.mobile ?? state.mobile ?? '').trim();
+
     _applyGender(details);
     _applySpec(details);
     if (mounted) setState(() {});
@@ -167,10 +182,148 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   }
 
   // ---------------------------------------------------------------------------
+  // Mobile Number Change Verification
+  // ---------------------------------------------------------------------------
+
+  void _onMobileChanged(String value) {
+    final newMobile = value.trim();
+    final hasChanged = newMobile != _originalMobile;
+    
+    setState(() {
+      _isMobileChanged = hasChanged;
+      if (!hasChanged) {
+        _isOtpSent = false;
+        _otpCtrl.clear();
+        _otpError = '';
+      }
+    });
+  }
+
+  Future<void> _sendOtp() async {
+    final newMobile = _contactCtrl.text.trim();
+    
+    // Validation
+    if (newMobile.isEmpty) {
+      _snack('Please enter a mobile number', isError: true);
+      return;
+    }
+    if (newMobile.length < 10) {
+      _snack('Mobile number must be at least 10 digits', isError: true);
+      return;
+    }
+
+    setState(() => _isVerifyingOtp = true);
+
+    try {
+      // ───────────────────────────────────────────────────────────
+      // DUMMY OTP GENERATION FOR TESTING/DEVELOPMENT
+      // In production, replace with actual backend call:
+      // await ref.read(doctorLoginViewModelProvider.notifier).sendOtpToMobile(newMobile);
+      // ───────────────────────────────────────────────────────────
+      _dummyOtp = _generateDummyOtp();
+      
+      // Log dummy OTP to console for easy testing
+      debugPrint('╔════════════════════════════════════════╗');
+      debugPrint('║ 🔐 DEVELOPMENT MODE - DUMMY OTP      ║');
+      debugPrint('╠════════════════════════════════════════╣');
+      debugPrint('║ Mobile: $newMobile');
+      debugPrint('║ OTP: $_dummyOtp');
+      debugPrint('╚════════════════════════════════════════╝');
+      
+      // Simulate network delay (2 seconds)
+      await Future.delayed(const Duration(seconds: 2));
+
+      setState(() {
+        _isOtpSent = true;
+        _otpError = '';
+      });
+
+      _snack('OTP sent to $newMobile\n💡 Test OTP: $_dummyOtp');
+    } catch (e) {
+      _snack('Failed to send OTP: ${e.toString()}', isError: true);
+    } finally {
+      setState(() => _isVerifyingOtp = false);
+    }
+  }
+
+  /// Generates a random 6-digit OTP for testing
+  /// Remove this method in production
+  String _generateDummyOtp() {
+    final random = DateTime.now().millisecond % 1000;
+    return '${(random + 111111) % 1000000}'.padLeft(6, '0');
+  }
+
+  Future<void> _verifyOtp() async {
+    final otp = _otpCtrl.text.trim();
+    final newMobile = _contactCtrl.text.trim();
+
+    if (otp.isEmpty) {
+      setState(() => _otpError = 'Please enter OTP');
+      return;
+    }
+    if (otp.length < 4) {
+      setState(() => _otpError = 'OTP must be at least 4 digits');
+      return;
+    }
+
+    setState(() => _isVerifyingOtp = true);
+
+    try {
+      // ───────────────────────────────────────────────────────────
+      // DUMMY OTP VERIFICATION FOR TESTING/DEVELOPMENT
+      // In production, replace with actual backend call:
+      // final isVerified = await ref.read(doctorLoginViewModelProvider.notifier)
+      //     .verifyOtpForMobile(newMobile, otp);
+      // ───────────────────────────────────────────────────────────
+      
+      // Simulate network delay (1.5 seconds)
+      await Future.delayed(const Duration(milliseconds: 1500));
+      
+      // Check if entered OTP matches dummy OTP
+      final isVerified = (otp == _dummyOtp);
+      
+      debugPrint('🔍 OTP Verification: Entered=$otp, Expected=$_dummyOtp, Result=${isVerified ? '✓' : '✗'}');
+
+      if (isVerified) {
+        // Update the original mobile to mark it as verified
+        setState(() {
+          _originalMobile = newMobile;
+          _isMobileChanged = false;
+          _isOtpSent = false;
+          _otpError = '';
+        });
+        _snack('Mobile number verified successfully');
+      } else {
+        setState(() => _otpError = 'Invalid OTP. Please try again.');
+      }
+    } catch (e) {
+      setState(() => _otpError = 'Verification failed: ${e.toString()}');
+    } finally {
+      setState(() => _isVerifyingOtp = false);
+    }
+  }
+
+  void _cancelMobileChange() {
+    setState(() {
+      _contactCtrl.text = _originalMobile;
+      _isMobileChanged = false;
+      _isOtpSent = false;
+      _otpCtrl.clear();
+      _otpError = '';
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // Save
   // ---------------------------------------------------------------------------
 
   Future<void> _save() async {
+    // Prevent saving if mobile was changed but not verified
+    if (_isMobileChanged && _isOtpSent && _originalMobile != _contactCtrl.text.trim()) {
+      _snack('Please verify your new mobile number before saving', isError: true);
+      return;
+    }
+
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
 
@@ -325,7 +478,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
           _buildCard([
             _field('Full Name',    _nameCtrl),
             _field('Email',        _emailCtrl,   keyboard: TextInputType.emailAddress),
-            _field('Contact No',   _contactCtrl, keyboard: TextInputType.phone),
+            _fieldWithMobileVerification(),
             _genderTile(),
           ]),
           const SizedBox(height: 14),
@@ -376,6 +529,206 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   // ---------------------------------------------------------------------------
   // Shared sub-widgets
   // ---------------------------------------------------------------------------
+
+  Widget _fieldWithMobileVerification() => Column(children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(
+              children: [
+                const Text('Contact No',
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w600,
+                        color: kTextSecondary, letterSpacing: 0.2)),
+                if (_isMobileChanged)
+                  Container(
+                    margin: const EdgeInsets.only(left: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: kWarning.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text('Verification Required',
+                        style: TextStyle(
+                            fontSize: 9, fontWeight: FontWeight.w600,
+                            color: kWarning, letterSpacing: 0.3)),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 5),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: _isMobileChanged ? kWarning : kBorder,
+                    width: _isMobileChanged ? 1.5 : 1),
+              ),
+              child: TextField(
+                controller: _contactCtrl,
+                keyboardType: TextInputType.phone,
+                enabled: !_isOtpSent, // Disable editing after OTP is sent
+                onChanged: _onMobileChanged,
+                style: const TextStyle(fontSize: 13, color: kTextPrimary),
+                decoration: const InputDecoration(
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                ),
+              ),
+            ),
+          ]),
+        ),
+        // OTP verification section
+        if (_isMobileChanged)
+          Column(
+            children: [
+              const Divider(height: 1, thickness: 1, color: kBorder,
+                  indent: 12, endIndent: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Verification',
+                        style: TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w600,
+                            color: kTextSecondary, letterSpacing: 0.2)),
+                    const SizedBox(height: 8),
+                    if (!_isOtpSent)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 38,
+                        child: ElevatedButton.icon(
+                          onPressed: _isVerifyingOtp ? null : _sendOtp,
+                          icon: _isVerifyingOtp
+                              ? SizedBox(
+                                  width: 16, height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white.withOpacity(0.8))))
+                              : const Icon(Icons.mail_outline_rounded, size: 16),
+                          label: Text(
+                              _isVerifyingOtp ? 'Sending OTP...' : 'Send OTP'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      )
+                    else
+                      Column(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F8FA),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                  color: _otpError.isNotEmpty ? kError : kBorder),
+                            ),
+                            child: TextField(
+                              controller: _otpCtrl,
+                              keyboardType: TextInputType.number,
+                              maxLength: 6,
+                              enabled: !_isVerifyingOtp,
+                              style: const TextStyle(
+                                  fontSize: 13, color: kTextPrimary,
+                                  letterSpacing: 2),
+                              textAlign: TextAlign.center,
+                              decoration: const InputDecoration(
+                                hintText: '000000',
+                                hintStyle: TextStyle(
+                                    color: kTextMuted, letterSpacing: 2),
+                                border: InputBorder.none,
+                                contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                counterText: '',
+                              ),
+                            ),
+                          ),
+                          if (_otpError.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.error_outline_rounded,
+                                      size: 12, color: kError),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(_otpError,
+                                        style: const TextStyle(
+                                            fontSize: 11, color: kError)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 36,
+                                child: OutlinedButton(
+                                  onPressed: _cancelMobileChange,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: kTextSecondary,
+                                    side: const BorderSide(color: kBorder),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10)),
+                                  ),
+                                  child: const Text('Cancel',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600)),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: SizedBox(
+                                height: 36,
+                                child: ElevatedButton.icon(
+                                  onPressed:
+                                      _isVerifyingOtp ? null : _verifyOtp,
+                                  icon: _isVerifyingOtp
+                                      ? SizedBox(
+                                          width: 14, height: 14,
+                                          child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                      Colors.white
+                                                          .withOpacity(0.8))))
+                                      : const Icon(Icons.check_rounded, size: 16),
+                                  label: Text(
+                                      _isVerifyingOtp ? 'Verifying...' : 'Verify'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kSuccess,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ]),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          )
+        else
+          const Divider(height: 1, thickness: 1, color: kBorder,
+              indent: 12, endIndent: 12),
+      ]);
 
   Widget _photoCard({required bool isDoctor}) => Container(
         width: double.infinity,
@@ -573,7 +926,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   Widget _saveButton() => SizedBox(
         width: double.infinity, height: 46,
         child: ElevatedButton(
-          onPressed: _isSubmitting ? null : _save,
+          onPressed: _isSubmitting || _isMobileChanged ? null : _save,
           style: ElevatedButton.styleFrom(
             backgroundColor: kPrimary,
             disabledBackgroundColor: kPrimaryLight,
@@ -586,9 +939,19 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
               ? const SizedBox(width: 20, height: 20,
                   child: CircularProgressIndicator(
                       color: Colors.white, strokeWidth: 2.5))
-              : const Text('Save Changes',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700)),
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Save Changes',
+                        style: TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700)),
+                    if (_isMobileChanged)
+                      const Text('(Verify mobile first)',
+                          style: TextStyle(
+                              fontSize: 9, fontWeight: FontWeight.w500,
+                              color: Colors.white70)),
+                  ],
+                ),
         ),
       );
 

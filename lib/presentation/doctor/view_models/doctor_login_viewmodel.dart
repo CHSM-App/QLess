@@ -118,15 +118,32 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
   }
 
+  // Future<void> addDoctorDetails(DoctorDetails doctorLogin) async {
+  //   state = state.copyWith(isLoading: true, error: null);
+  //   try {
+  //     await usecase.addDoctorDetails(doctorLogin);
+  //     state = state.copyWith(isLoading: false);
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: e.toString());
+  //   }
+  // }
+
   Future<void> addDoctorDetails(DoctorDetails doctorLogin) async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      await usecase.addDoctorDetails(doctorLogin);
-      state = state.copyWith(isLoading: false);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
+  state = state.copyWith(isLoading: true, error: null);
+  try {
+    final result = await usecase.addDoctorDetails(doctorLogin);
+    // API returns: { "success": true, "doctor_id": 42, "clinic_id": "CL001" }
+    final doctorId = result['doctor_id'] as int?;
+    final clinicId = result['clinic_id'] as String?;
+    state = state.copyWith(
+      isLoading: false,
+      doctorId: doctorId,   // stored on state for the screen to read
+      clinicId: clinicId,
+    );
+  } catch (e) {
+    state = state.copyWith(isLoading: false, error: e.toString());
   }
+}
 
   Future<void> checkPhoneDoctor(String mobile) async {
     state = state.copyWith(
@@ -210,6 +227,8 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     await TokenStorage.clear();
     state = const DoctorLoginState();
   }
+
+
 
   Future<List<DoctorDetails>> mobileExistDoctor(String mobile) async {
     try {
