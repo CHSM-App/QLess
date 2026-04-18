@@ -4,28 +4,61 @@ import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 
-// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
-const kPrimary      = Color(0xFF26C6B0);
-const kPrimaryDark  = Color(0xFF2BB5A0);
-const kPrimaryLight = Color(0xFFD9F5F1);
+// ── Colour Palette (matches QueueHomePage exactly) ───────────────────────────
+const kPrimary       = Color(0xFF26C6B0);
+const kPrimaryDark   = Color(0xFF2BB5A0);
+const kPrimaryLight  = Color(0xFFD9F5F1);
+const kPrimaryLighter= Color(0xFFF2FCFA);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
 const kTextMuted     = Color(0xFFA0AEC0);
 
-const kBorder  = Color(0xFFEDF2F7);
-const kDivider = Color(0xFFE5E7EB);
+const kBorder        = Color(0xFFEDF2F7);
 
-const kError      = Color(0xFFFC8181);
-const kRedLight   = Color(0xFFFEE2E2);
-const kSuccess    = Color(0xFF68D391);
-const kGreenLight = Color(0xFFDCFCE7);
-const kWarning    = Color(0xFFF6AD55);
-const kAmberLight = Color(0xFFFEF3C7);
-const kPurple     = Color(0xFF9F7AEA);
-const kPurpleLight= Color(0xFFEDE9FE);
-const kInfo       = Color(0xFF3B82F6);
-const kInfoLight  = Color(0xFFDBEAFE);
+const kError         = Color(0xFFFC8181);
+const kRedLight      = Color(0xFFFEE2E2);
+const kRedDark       = Color(0xFFC53030);
+
+const kSuccess       = Color(0xFF68D391);
+const kGreenLight    = Color(0xFFDCFCE7);
+const kGreenDark     = Color(0xFF276749);
+
+const kWarning       = Color(0xFFF6AD55);
+const kAmberLight    = Color(0xFFFEF3C7);
+const kAmberDark     = Color(0xFF975A16);
+
+const kPurple        = Color(0xFF9F7AEA);
+const kPurpleLight   = Color(0xFFEDE9FE);
+const kPurpleDark    = Color(0xFF6B46C1);
+
+const kInfo          = Color(0xFF3B82F6);
+const kInfoLight     = Color(0xFFDBEAFE);
+const kInfoDark      = Color(0xFF1E40AF);
+
+// ════════════════════════════════════════════════════════════════════
+//  MEDICINE TYPE STYLES
+// ════════════════════════════════════════════════════════════════════
+class _TypeStyle {
+  final Color bg, fg;
+  final IconData icon;
+  const _TypeStyle({required this.bg, required this.fg, required this.icon});
+}
+
+const _typeStyles = <String, _TypeStyle>{
+  'Tablet':    _TypeStyle(bg: kPrimaryLight, fg: kPrimary,   icon: Icons.medication_rounded),
+  'Lotion':    _TypeStyle(bg: kPurpleLight,  fg: kPurple,    icon: Icons.science_outlined),
+  'Syrup':     _TypeStyle(bg: kGreenLight,   fg: kSuccess,   icon: Icons.local_drink_outlined),
+  'Injection': _TypeStyle(bg: kAmberLight,   fg: kWarning,   icon: Icons.colorize_outlined),
+  'Drops':     _TypeStyle(bg: kInfoLight,    fg: kInfo,      icon: Icons.water_drop_outlined),
+  'Spray':     _TypeStyle(bg: kGreenLight,   fg: kSuccess,   icon: Icons.air_outlined),
+};
+
+const _defaultStyle = _TypeStyle(
+  bg: Color(0xFFF7F8FA),
+  fg: kTextMuted,
+  icon: Icons.medication_outlined,
+);
 
 // ════════════════════════════════════════════════════════════════════
 //  DOCTOR MEDICINE PAGE
@@ -43,14 +76,17 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   bool _hasFetched   = false;
 
   static const _types = [
-    'All', 'Tablet', 'Lotion', 'Syrup', 'Injection', 'Drops', 'Spray'
+    'All', 'Tablet', 'Lotion', 'Syrup', 'Injection', 'Drops', 'Spray',
   ];
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _refresh(force: false));
+      (_) => _refresh(force: false),
+    );
   }
 
   @override
@@ -59,13 +95,19 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
     super.dispose();
   }
 
+  // ── Data ──────────────────────────────────────────────────────────────────
+
   void _refresh({required bool force}) {
     if (_hasFetched && !force) return;
     final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
     if (doctorId == 0) return;
     _hasFetched = true;
-    ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
+    ref
+        .read(doctorLoginViewModelProvider.notifier)
+        .fetchAllMedicines(doctorId);
   }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
 
   Future<void> _goToAdd() async {
     final result = await Navigator.push<bool>(
@@ -75,80 +117,114 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
     if (result == true) _refresh(force: true);
   }
 
+  // ── Filter ────────────────────────────────────────────────────────────────
+
+  List<Medicine> _filtered(List<Medicine> list) {
+    final q = _searchCtrl.text.toLowerCase().trim();
+    return list.where((m) {
+      final typeMatch =
+          _selectedType == 0 || m.medTypeName == _types[_selectedType];
+      final searchMatch = q.isEmpty ||
+          (m.medicineName?.toLowerCase().contains(q) ?? false) ||
+          (m.medTypeName?.toLowerCase().contains(q) ?? false);
+      return typeMatch && searchMatch;
+    }).toList();
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+
   void _confirmDelete(Medicine medicine) {
     showDialog(
       context: context,
       builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: 48, height: 48,
-              decoration: const BoxDecoration(
-                  color: kRedLight, shape: BoxShape.circle),
-              child: const Icon(Icons.delete_outline_rounded,
-                  size: 22, color: kError),
-            ),
-            const SizedBox(height: 12),
-            const Text('Remove Medicine?',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                width: 48,
+                height: 48,
+                decoration: const BoxDecoration(
+                    color: kRedLight, shape: BoxShape.circle),
+                child: const Icon(Icons.delete_outline_rounded,
+                    size: 22, color: kError),
+              ),
+              const SizedBox(height: 12),
+
+              // Title
+              const Text(
+                'Remove Medicine?',
                 style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700,
-                    color: kTextPrimary)),
-            const SizedBox(height: 6),
-            Text(
-              'Remove "${medicine.medicineName ?? 'this medicine'}" permanently?',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 13, color: kTextSecondary, height: 1.5),
-            ),
-            const SizedBox(height: 20),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: kBorder),
-                    foregroundColor: kTextSecondary,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                  ),
-                  child: const Text('Cancel',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
-                ),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    Navigator.pop(context);
-                    await ref
-                        .read(prescriptionViewModelProvider.notifier)
-                        .deleteMedicine(medicine.medicineId ?? 0);
-                    _refresh(force: true);
-                    _snack('Medicine removed');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kError,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 11),
-                  ),
-                  child: const Text('Remove',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
-                ),
+              const SizedBox(height: 6),
+
+              // Subtitle
+              Text(
+                'Remove "${medicine.medicineName ?? 'this medicine'}" permanently?',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13, color: kTextSecondary, height: 1.5),
               ),
-            ]),
-          ]),
+              const SizedBox(height: 20),
+
+              // Buttons
+              Row(children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: kBorder),
+                      foregroundColor: kTextSecondary,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                    ),
+                    child: const Text('Cancel',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await ref
+                          .read(prescriptionViewModelProvider.notifier)
+                          .deleteMedicine(medicine.medicineId ?? 0);
+                      _refresh(force: true);
+                      _snack('Medicine removed');
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kError,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                    ),
+                    child: const Text('Remove',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ]),
+            ],
+          ),
         ),
       ),
     );
   }
+
+  // ── Snack ─────────────────────────────────────────────────────────────────
 
   void _snack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -158,31 +234,26 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
             isError
                 ? Icons.error_outline_rounded
                 : Icons.check_circle_outline_rounded,
-            color: Colors.white, size: 15,
+            color: Colors.white,
+            size: 15,
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(msg,
-              style: const TextStyle(fontSize: 13, color: Colors.white))),
+          Expanded(
+            child: Text(msg,
+                style:
+                    const TextStyle(fontSize: 13, color: Colors.white)),
+          ),
         ]),
         backgroundColor: isError ? kError : kPrimary,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
       ),
     );
   }
 
-  List<Medicine> _filtered(List<Medicine> list) {
-    final q = _searchCtrl.text.toLowerCase().trim();
-    return list.where((m) {
-      final typeMatch = _selectedType == 0 ||
-          m.medTypeName == _types[_selectedType];
-      final searchMatch = q.isEmpty ||
-          (m.medicineName?.toLowerCase().contains(q) ?? false) ||
-          (m.medTypeName?.toLowerCase().contains(q) ?? false);
-      return typeMatch && searchMatch;
-    }).toList();
-  }
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -190,61 +261,63 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
     final medicinesAsync = state.medicines ?? const AsyncValue.loading();
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(children: [
-        _TopBar(
-          searchCtrl:       _searchCtrl,
-          selectedType:     _selectedType,
-          types:            _types,
-          onSearchChanged:  () => setState(() {}),
-          onTypeSelected:   (i) => setState(() => _selectedType = i),
-        ),
+      backgroundColor: const Color(0xFFF7F8FA),
+      body: Column(
+        children: [
+          // ── Header (matches QueueHomePage header style exactly) ──────────
+          _buildHeader(),
 
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-          child: medicinesAsync.when(
+          // ── Count row ───────────────────────────────────────────────────
+          medicinesAsync.when(
             data: (list) => _CountRow(
                 count: _filtered(list).length, total: list.length),
-            loading: () => const Text('Loading medicines…',
-                style: TextStyle(fontSize: 12, color: kTextMuted)),
-            error: (_, __) => const SizedBox(),
-          ),
-        ),
-
-        Expanded(
-          child: medicinesAsync.when(
-            loading: () => const Center(
-              child: SizedBox(
-                width: 28, height: 28,
-                child: CircularProgressIndicator(
-                    color: kPrimary, strokeWidth: 2.5),
-              ),
+            loading: () => const Padding(
+              padding: EdgeInsets.fromLTRB(14, 8, 14, 4),
+              child: Text('Loading medicines…',
+                  style: TextStyle(fontSize: 12, color: kTextMuted)),
             ),
-            error: (_, __) => _ErrorState(
-                onRetry: () => _refresh(force: true)),
-            data: (medicines) {
-              final filtered = _filtered(medicines);
-              if (filtered.isEmpty) {
-                return _EmptyState(
-                  hasFilters: _selectedType != 0 ||
-                      _searchCtrl.text.isNotEmpty,
-                );
-              }
-              return LayoutBuilder(builder: (_, constraints) {
-                final isWide = constraints.maxWidth > 900;
-                return RefreshIndicator(
-                  color: kPrimary,
-                  strokeWidth: 2,
-                  onRefresh: () async => _refresh(force: true),
-                  child: isWide
-                      ? _buildGrid(filtered)
-                      : _buildList(filtered),
-                );
-              });
-            },
+            error: (_, __) => const SizedBox.shrink(),
           ),
-        ),
-      ]),
+
+          // ── Main content ────────────────────────────────────────────────
+          Expanded(
+            child: medicinesAsync.when(
+              loading: () => const Center(
+                child: SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: CircularProgressIndicator(
+                      color: kPrimary, strokeWidth: 2.5),
+                ),
+              ),
+              error: (_, __) =>
+                  _ErrorState(onRetry: () => _refresh(force: true)),
+              data: (medicines) {
+                final filtered = _filtered(medicines);
+                if (filtered.isEmpty) {
+                  return _EmptyState(
+                    hasFilters: _selectedType != 0 ||
+                        _searchCtrl.text.isNotEmpty,
+                  );
+                }
+                return LayoutBuilder(builder: (_, constraints) {
+                  final isWide = constraints.maxWidth > 700;
+                  return RefreshIndicator(
+                    color: kPrimary,
+                    strokeWidth: 2,
+                    onRefresh: () async => _refresh(force: true),
+                    child: isWide
+                        ? _buildGrid(filtered)
+                        : _buildList(filtered),
+                  );
+                });
+              },
+            ),
+          ),
+        ],
+      ),
+
+      // ── FAB ─────────────────────────────────────────────────────────────
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 80),
         child: FloatingActionButton.extended(
@@ -252,18 +325,191 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
           backgroundColor: kPrimary,
           elevation: 3,
           icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-          label: const Text('Add Medicine',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white)),
+          label: const Text(
+            'Add Medicine',
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Colors.white),
+          ),
         ),
       ),
     );
   }
 
+  // ── Header — matches QueueHomePage _buildHeader style exactly ─────────────
+  Widget _buildHeader() {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+            bottom: BorderSide(color: Color(0xFFEDF2F7), width: 1)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+
+              // ── Title row ───────────────────────────────────────────────
+              Row(
+                children: [
+                  // Icon badge — same size/radius as home page
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: kPrimary.withOpacity(0.2)),
+                    ),
+                    child: const Icon(Icons.medication_rounded,
+                        color: kPrimary, size: 17),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Title + subtitle — same font sizes as home page
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Medicines',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 1),
+                        Text(
+                          'Manage your medicines list',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: kTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 12),
+
+              // ── Search bar ──────────────────────────────────────────────
+              Container(
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kBorder),
+                ),
+                child: Row(
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 11),
+                      child: Icon(Icons.search_rounded,
+                          size: 17, color: kTextMuted),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        onChanged: (_) => setState(() {}),
+                        style: const TextStyle(
+                            fontSize: 13, color: kTextPrimary),
+                        decoration: const InputDecoration(
+                          hintText: 'Search medicines…',
+                          hintStyle: TextStyle(
+                              fontSize: 13, color: kTextMuted),
+                          border: InputBorder.none,
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                    if (_searchCtrl.text.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          _searchCtrl.clear();
+                          setState(() {});
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(right: 10),
+                          width: 18,
+                          height: 18,
+                          decoration: const BoxDecoration(
+                              color: kTextMuted,
+                              shape: BoxShape.circle),
+                          child: const Icon(Icons.close_rounded,
+                              size: 11, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              // ── Filter chips ────────────────────────────────────────────
+              SizedBox(
+                height: 32,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _types.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(width: 6),
+                  itemBuilder: (_, i) {
+                    final sel = _selectedType == i;
+                    return GestureDetector(
+                      onTap: () =>
+                          setState(() => _selectedType = i),
+                      child: AnimatedContainer(
+                        duration:
+                            const Duration(milliseconds: 160),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: sel
+                              ? kPrimary
+                              : Colors.white,
+                          border: Border.all(
+                              color: sel
+                                  ? kPrimary
+                                  : kBorder),
+                          borderRadius:
+                              BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          _types[i],
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: sel
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                            color: sel
+                                ? Colors.white
+                                : kTextSecondary,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── List (mobile) ─────────────────────────────────────────────────────────
   Widget _buildList(List<Medicine> medicines) => ListView.separated(
-        padding: const EdgeInsets.fromLTRB(14, 6, 14, 140),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 140),
         itemCount: medicines.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (_, i) => _MedicineCard(
@@ -272,11 +518,12 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
         ),
       );
 
+  // ── Grid (tablet / desktop) ───────────────────────────────────────────────
   Widget _buildGrid(List<Medicine> medicines) => GridView.builder(
-        padding: const EdgeInsets.fromLTRB(14, 6, 14, 100),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 120),
         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-          maxCrossAxisExtent: 320,
-          childAspectRatio: 3.2,
+          maxCrossAxisExtent: 340,
+          childAspectRatio: 3.4,
           crossAxisSpacing: 10,
           mainAxisSpacing: 10,
         ),
@@ -291,21 +538,6 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE CARD
 // ════════════════════════════════════════════════════════════════════
-class _TypeStyle {
-  final Color bg, fg;
-  final IconData icon;
-  const _TypeStyle({required this.bg, required this.fg, required this.icon});
-}
-
-const _typeStyles = <String, _TypeStyle>{
-  'Tablet':    _TypeStyle(bg: kPrimaryLight, fg: kPrimary,   icon: Icons.medication_rounded),
-  'Lotion':    _TypeStyle(bg: kPurpleLight,  fg: kPurple,    icon: Icons.science_outlined),
-  'Syrup':     _TypeStyle(bg: kGreenLight,   fg: kSuccess,   icon: Icons.local_drink_outlined),
-  'Injection': _TypeStyle(bg: kAmberLight,   fg: kWarning,   icon: Icons.colorize_outlined),
-  'Drops':     _TypeStyle(bg: kInfoLight,    fg: kInfo,      icon: Icons.water_drop_outlined),
-  'Spray':     _TypeStyle(bg: kGreenLight,   fg: kSuccess,   icon: Icons.air_outlined),
-};
-
 class _MedicineCard extends StatelessWidget {
   final Medicine medicine;
   final VoidCallback onDelete;
@@ -313,10 +545,8 @@ class _MedicineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _typeStyles[medicine.medTypeName] ??
-        const _TypeStyle(
-            bg: Color(0xFFF7F8FA), fg: kTextMuted,
-            icon: Icons.medication_outlined);
+    final style =
+        _typeStyles[medicine.medTypeName] ?? _defaultStyle;
 
     return Container(
       decoration: BoxDecoration(
@@ -325,170 +555,77 @@ class _MedicineCard extends StatelessWidget {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2)),
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      child: Row(children: [
-        // Icon badge
-        Container(
-          width: 40, height: 40,
-          decoration: BoxDecoration(
-              color: style.bg,
-              borderRadius: BorderRadius.circular(10)),
-          child: Icon(style.icon, color: style.fg, size: 19),
-        ),
-        const SizedBox(width: 10),
+      padding:
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          // ── Icon badge ────────────────────────────────────────────
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+                color: style.bg,
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(style.icon, color: style.fg, size: 19),
+          ),
+          const SizedBox(width: 10),
 
-        // Info
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(medicine.medicineName ?? '—',
+          // ── Name + type badge ─────────────────────────────────────
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  medicine.medicineName ?? '—',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: kTextPrimary)),
-              const SizedBox(height: 3),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                    color: style.bg,
-                    borderRadius: BorderRadius.circular(6)),
-                child: Text(medicine.medTypeName ?? '—',
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: style.fg)),
-              ),
-            ],
-          ),
-        ),
-
-        // Delete
-        GestureDetector(
-          onTap: onDelete,
-          child: Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-                color: kRedLight,
-                borderRadius: BorderRadius.circular(9)),
-            child: const Icon(Icons.delete_outline_rounded,
-                color: kError, size: 16),
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  TOP BAR
-// ════════════════════════════════════════════════════════════════════
-class _TopBar extends StatelessWidget {
-  final TextEditingController searchCtrl;
-  final int selectedType;
-  final List<String> types;
-  final VoidCallback onSearchChanged;
-  final ValueChanged<int> onTypeSelected;
-
-  const _TopBar({
-    required this.searchCtrl,
-    required this.selectedType,
-    required this.types,
-    required this.onSearchChanged,
-    required this.onTypeSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-      child: Column(children: [
-        // Search bar
-        Container(
-          height: 40,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kBorder),
-          ),
-          child: Row(children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 11),
-              child: Icon(Icons.search_rounded, size: 17, color: kTextMuted),
-            ),
-            Expanded(
-              child: TextField(
-                controller: searchCtrl,
-                onChanged: (_) => onSearchChanged(),
-                style: const TextStyle(fontSize: 13, color: kTextPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Search medicines…',
-                  hintStyle: TextStyle(fontSize: 13, color: kTextMuted),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-            if (searchCtrl.text.isNotEmpty)
-              GestureDetector(
-                onTap: () { searchCtrl.clear(); onSearchChanged(); },
-                child: Container(
-                  margin: const EdgeInsets.only(right: 10),
-                  width: 18, height: 18,
-                  decoration: const BoxDecoration(
-                      color: kTextMuted, shape: BoxShape.circle),
-                  child: const Icon(Icons.close_rounded,
-                      size: 11, color: Colors.white),
-                ),
-              ),
-          ]),
-        ),
-        const SizedBox(height: 8),
-
-        // Filter chips — pill style
-        SizedBox(
-          height: 32,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: types.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
-            itemBuilder: (_, i) {
-              final sel = selectedType == i;
-              return GestureDetector(
-                onTap: () => onTypeSelected(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: sel ? kPrimary : Colors.white,
-                    border: Border.all(
-                        color: sel ? kPrimary : kBorder),
-                    borderRadius: BorderRadius.circular(20),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary,
                   ),
-                  child: Text(types[i],
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: sel
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          color: sel ? Colors.white : kTextSecondary)),
                 ),
-              );
-            },
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: style.bg,
+                      borderRadius: BorderRadius.circular(6)),
+                  child: Text(
+                    medicine.medTypeName ?? '—',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: style.fg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ]),
+
+          // ── Delete button ─────────────────────────────────────────
+          GestureDetector(
+            onTap: onDelete,
+            child: Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                  color: kRedLight,
+                  borderRadius: BorderRadius.circular(9)),
+              child: const Icon(Icons.delete_outline_rounded,
+                  color: kError, size: 16),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -501,23 +638,34 @@ class _CountRow extends StatelessWidget {
   const _CountRow({required this.count, required this.total});
 
   @override
-  Widget build(BuildContext context) => Row(children: [
-        Text('$count medicine${count != 1 ? 's' : ''}',
-            style: const TextStyle(
-                fontSize: 12, color: kTextMuted)),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-          decoration: BoxDecoration(
-              color: kPrimaryLight,
-              borderRadius: BorderRadius.circular(20)),
-          child: Text('$total total',
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+        child: Row(
+          children: [
+            Text(
+              '$count medicine${count != 1 ? 's' : ''}',
               style: const TextStyle(
+                  fontSize: 12, color: kTextMuted),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 9, vertical: 3),
+              decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(20)),
+              child: Text(
+                '$total total',
+                style: const TextStyle(
                   fontSize: 11,
                   color: kPrimary,
-                  fontWeight: FontWeight.w600)),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
-      ]);
+      );
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -529,29 +677,38 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 60, height: 60,
-            decoration: const BoxDecoration(
-                color: kPrimaryLight, shape: BoxShape.circle),
-            child: const Icon(Icons.medication_outlined,
-                size: 28, color: kPrimary),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            hasFilters ? 'No matching medicines' : 'No medicines added yet',
-            style: const TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w600,
-                color: kTextPrimary),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            hasFilters
-                ? 'Try a different filter or search'
-                : 'Tap + to add a new medicine',
-            style: const TextStyle(fontSize: 12, color: kTextMuted),
-          ),
-        ]),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: const BoxDecoration(
+                  color: kPrimaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.medication_outlined,
+                  size: 28, color: kPrimary),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              hasFilters
+                  ? 'No matching medicines'
+                  : 'No medicines added yet',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: kTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              hasFilters
+                  ? 'Try a different filter or search'
+                  : 'Tap + to add a new medicine',
+              style: const TextStyle(
+                  fontSize: 12, color: kTextMuted),
+            ),
+          ],
+        ),
       );
 }
 
@@ -564,40 +721,53 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 60, height: 60,
-            decoration: const BoxDecoration(
-                color: kRedLight, shape: BoxShape.circle),
-            child: const Icon(Icons.wifi_off_rounded,
-                size: 26, color: kError),
-          ),
-          const SizedBox(height: 12),
-          const Text('Failed to load',
-              style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600,
-                  color: kTextPrimary)),
-          const SizedBox(height: 4),
-          const Text('Please check your connection',
-              style: TextStyle(fontSize: 12, color: kTextMuted)),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 38,
-            child: ElevatedButton(
-              onPressed: onRetry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('Retry',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: const BoxDecoration(
+                  color: kRedLight, shape: BoxShape.circle),
+              child: const Icon(Icons.wifi_off_rounded,
+                  size: 26, color: kError),
             ),
-          ),
-        ]),
+            const SizedBox(height: 12),
+            const Text(
+              'Failed to load',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: kTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Please check your connection',
+              style: TextStyle(fontSize: 12, color: kTextMuted),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 38,
+              child: ElevatedButton(
+                onPressed: onRetry,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text(
+                  'Retry',
+                  style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 }

@@ -340,7 +340,7 @@ class _BookAppointmentScreenState
     setState(() { _isEstimateLoading = true; _estimatedWaitTime = null; });
 
     await ref.read(appointmentViewModelProvider.notifier)
-        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did,soltId: _selectedSlotId));
+        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did,slotId: _selectedSlotId));
     if (!mounted) return;
 
     final qd = ref.read(appointmentViewModelProvider).queuePreviewEstimateResponse;
@@ -687,7 +687,7 @@ class _BookAppointmentScreenState
           doctorId:        widget.doctor.doctorId,
           appointmentDate: _fmtDateApi(_selectedDate!),
           startTime:       start,
-          soltId:          _selectedSlotId,
+          slotId:          _selectedSlotId,
         ),
       );
     } else {
@@ -700,7 +700,7 @@ class _BookAppointmentScreenState
           appointmentDate: _fmtDateApi(_selectedDate!),
           startTime:       start,
           userType:        isForMember ? 2 : 1,
-          soltId:          _selectedSlotId,
+          slotId:          _selectedSlotId,
         ),
       );
     }

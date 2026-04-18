@@ -16,7 +16,7 @@ AppointmentRequestModel _$AppointmentRequestModelFromJson(
   appointmentDate: json['appointment_date'] as String?,
   startTime: json['start_time'] as String?,
   userType: (json['user_type'] as num?)?.toInt(),
-  soltId: (json['solt_id'] as num?)?.toInt(),
+  slotId: (json['slot_id'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$AppointmentRequestModelToJson(
@@ -29,5 +29,5 @@ Map<String, dynamic> _$AppointmentRequestModelToJson(
   'appointment_date': instance.appointmentDate,
   'start_time': instance.startTime,
   'user_type': instance.userType,
-  'solt_id': instance.soltId,
+  'slot_id': instance.slotId,
 };
