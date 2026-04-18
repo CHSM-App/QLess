@@ -15,6 +15,8 @@ import 'package:qless/presentation/doctor/screens/profile_screen.dart';
 class DoctorNavTheme {
   DoctorNavTheme._();
 
+  
+
   // Brand palette
   static const teal        = Color(0xFF26C6B0);
   static const tealDark    = Color(0xFF2BB5A0);

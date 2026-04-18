@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
 
@@ -23,57 +24,60 @@ const _kError      = Color(0xFFFC8181);
 const _kRedLight   = Color(0xFFFEE2E2);
 const _kSuccess    = Color(0xFF68D391);
 const _kGreenLight = Color(0xFFDCFCE7);
-const _kWarning    = Color(0xFFF6AD55);
-const _kAmberLight = Color(0xFFFEF3C7);
-const _kPurple     = Color(0xFF9F7AEA);
-const _kPurpleLight= Color(0xFFEDE9FE);
-const _kInfo       = Color(0xFF3B82F6);
-const _kInfoLight  = Color(0xFFDBEAFE);
 
-// ── Specialty → colour helpers ────────────────────────────────────────────────
-const _specialtyAccent = <String, Color>{
-  'cardiology'   : _kError,
-  'dermatology'  : _kWarning,
-  'pediatrics'   : _kSuccess,
-  'orthopedics'  : _kPurple,
-  'neurology'    : _kInfo,
-  'general'      : _kPrimary,
-  'gynecology'   : _kPurple,
-  'ophthalmology': _kInfo,
-  'dentistry'    : _kWarning,
-  'ent'          : _kPrimary,
-};
-const _specialtyBg = <String, Color>{
-  'cardiology'   : _kRedLight,
-  'dermatology'  : _kAmberLight,
-  'pediatrics'   : _kGreenLight,
-  'orthopedics'  : _kPurpleLight,
-  'neurology'    : _kInfoLight,
-  'general'      : _kPrimaryLight,
-  'gynecology'   : _kPurpleLight,
-  'ophthalmology': _kInfoLight,
-  'dentistry'    : _kAmberLight,
-  'ent'          : _kPrimaryLight,
-};
-const _specialtyIcon = <String, IconData>{
-  'cardiology'   : Icons.favorite_rounded,
-  'dermatology'  : Icons.face_retouching_natural,
-  'pediatrics'   : Icons.child_care_rounded,
-  'orthopedics'  : Icons.accessibility_new_rounded,
-  'neurology'    : Icons.psychology_rounded,
-  'general'      : Icons.local_hospital_rounded,
-  'gynecology'   : Icons.pregnant_woman_rounded,
-  'ophthalmology': Icons.visibility_rounded,
-  'dentistry'    : Icons.medical_services_rounded,
-  'ent'          : Icons.hearing_rounded,
-};
+// ── Specialty → colour helpers (hash-based, works for any string) ─────────────
+const _kAccentPalette = [
+  Color(0xFFFC8181), // red
+  Color(0xFFF6AD55), // amber
+  Color(0xFF68D391), // green
+  Color(0xFF9F7AEA), // purple
+  Color(0xFF3B82F6), // blue
+  Color(0xFF26C6B0), // teal
+  Color(0xFFF687B3), // pink
+  Color(0xFF4FD1C5), // cyan
+  Color(0xFFED8936), // orange
+  Color(0xFF667EEA), // indigo
+];
+const _kBgPalette = [
+  Color(0xFFFEE2E2), // red light
+  Color(0xFFFEF3C7), // amber light
+  Color(0xFFDCFCE7), // green light
+  Color(0xFFEDE9FE), // purple light
+  Color(0xFFDBEAFE), // blue light
+  Color(0xFFD9F5F1), // teal light
+  Color(0xFFFED7E2), // pink light
+  Color(0xFFE6FFFA), // cyan light
+  Color(0xFFFEEBC8), // orange light
+  Color(0xFFEBF4FF), // indigo light
+];
+const _kIconPalette = <IconData>[
+  Icons.favorite_rounded,
+  Icons.face_retouching_natural,
+  Icons.child_care_rounded,
+  Icons.accessibility_new_rounded,
+  Icons.psychology_rounded,
+  Icons.local_hospital_rounded,
+  Icons.pregnant_woman_rounded,
+  Icons.visibility_rounded,
+  Icons.medical_services_rounded,
+  Icons.hearing_rounded,
+];
+
+int _hashIndex(String? s, int length) {
+  if (s == null || s.isEmpty) return 0;
+  var h = 0;
+  for (final c in s.toLowerCase().codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return h % length;
+}
 
 Color _accentFor(String? s) =>
-    _specialtyAccent[s?.toLowerCase()] ?? _kPrimary;
+    _kAccentPalette[_hashIndex(s, _kAccentPalette.length)];
 Color _bgFor(String? s) =>
-    _specialtyBg[s?.toLowerCase()] ?? _kPrimaryLight;
+    _kBgPalette[_hashIndex(s, _kBgPalette.length)];
 IconData _iconFor(String? s) =>
-    _specialtyIcon[s?.toLowerCase()] ?? Icons.medical_services_rounded;
+    _kIconPalette[_hashIndex(s, _kIconPalette.length)];
 
 String _initials(String? name) {
   if (name == null || name.isEmpty) return '?';
@@ -461,7 +465,12 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen> {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, i) => _RecentDoctorCard(
           doctor: doctors[i],
-          onTap: () => _goToSearch(context),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BookAppointmentScreen(doctor: doctors[i]),
+            ),
+          ),
         ),
       ),
     );
@@ -490,7 +499,12 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen> {
           return _NearbyDoctorCard(
             doctor: d,
             distanceKm: distKm,
-            onTap: () => _goToSearch(context),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BookAppointmentScreen(doctor: d),
+              ),
+            ),
           );
         },
       ),

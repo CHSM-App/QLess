@@ -40,11 +40,7 @@ DoctorDetails _$DoctorDetailsFromJson(Map<String, dynamic> json) =>
       maxQueueLength: _intFromJson(json['max_queue_length']),
       isQueueFull: _intFromJson(json['is_queue_full']),
       bookingStartTime: json['booking_start_time'] as String?,
-<<<<<<< HEAD
       isRecentlyVisited: _intFromJson(json['is_recently_visited']),
-=======
-      isRecentlyVisited: json['is_recently_visited'] as String?,
->>>>>>> f83b4af0476d6bc9e571c5ef16cfab0b3efced8c
     );
 
 Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
