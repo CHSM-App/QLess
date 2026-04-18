@@ -208,7 +208,10 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: CustomScrollView(
+      body: RefreshIndicator(
+        color: _kPrimary,
+        onRefresh: _loadData,
+        child: CustomScrollView(
         slivers: [
 
           // ── HEADER ─────────────────────────────────────────────────
@@ -293,6 +296,7 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
             ),
           ),
         ],
+      ),
       ),
     );
   }
