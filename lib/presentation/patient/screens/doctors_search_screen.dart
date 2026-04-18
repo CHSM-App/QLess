@@ -1,12 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
-import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
@@ -36,9 +34,9 @@ const kInfoLight  = Color(0xFFDBEAFE);
 const _specialtyAccent = <String, Color>{
   'cardiology'   : kError,
   'dermatology'  : kWarning,
-  'pediatrics'   : kSuccess,
-  'orthopedics'  : kPurple,
-  'neurology'    : kInfo,
+  'dermatologiest'   : kSuccess,
+  'psychiatrist'  : kPurple,
+  'orthoadician'    : kInfo,
   'general'      : kPrimary,
   'gynecology'   : kPurple,
   'ophthalmology': kInfo,
@@ -46,9 +44,9 @@ const _specialtyAccent = <String, Color>{
 const _specialtyBg = <String, Color>{
   'cardiology'   : kRedLight,
   'dermatology'  : kAmberLight,
-  'pediatrics'   : kGreenLight,
-  'orthopedics'  : kPurpleLight,
-  'neurology'    : kInfoLight,
+  'Dermatologiest'   : kGreenLight,
+  'Psychiatrist'  : kPurpleLight,
+  'Orthoadician'    : kInfoLight,
   'general'      : kPrimaryLight,
   'gynecology'   : kPurpleLight,
   'ophthalmology': kInfoLight,
@@ -144,7 +142,9 @@ class _QueueStatus {
 //  MAIN SCREEN
 // ════════════════════════════════════════════════════════════════════
 class DoctorSearchScreen extends ConsumerStatefulWidget {
-  const DoctorSearchScreen({super.key});
+  final String? initialSpecialty;
+  const DoctorSearchScreen({super.key, this.initialSpecialty});
+ 
   @override
   ConsumerState<DoctorSearchScreen> createState() => _DoctorSearchScreenState();
 }
@@ -168,10 +168,15 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen>
     Future.delayed(const Duration(milliseconds: 80), () => _fadeCtrl.forward());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+
       ref.read(doctorsViewModelProvider.notifier).fetchDoctors(ref.read(patientLoginViewModelProvider).patientId ?? 0);
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {
         ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
+      }
+
+            if (widget.initialSpecialty != null) {
+        setState(() => _specialty = widget.initialSpecialty);
       }
     });
   }
@@ -190,17 +195,22 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen>
           (d.name?.toLowerCase().contains(q) ?? false) ||
           (d.specialization?.toLowerCase().contains(q) ?? false) ||
           (d.clinicName?.toLowerCase().contains(q) ?? false);
-      final matchS = _specialty == null || d.specialization == _specialty;
+      final matchS = _specialty == null ||
+          (d.specialization?.toLowerCase() == _specialty?.toLowerCase());
       return matchQ && matchS;
     }).toList();
   }
 
   List<String> _specialties(List<DoctorDetails> all) {
     final seen = <String>{};
-    return all
-        .map((d) => d.specialization ?? '')
-        .where((s) => s.isNotEmpty && seen.add(s))
-        .toList();
+    final result = <String>[];
+    for (final d in all) {
+      final s = d.specialization?.trim() ?? '';
+      if (s.isNotEmpty && seen.add(s.toLowerCase())) {
+        result.add(_cap(s));
+      }
+    }
+    return result;
   }
 
   Future<void> _refresh() async =>
