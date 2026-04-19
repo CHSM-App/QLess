@@ -14,6 +14,7 @@ import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/models/review_model.dart';
+import 'package:qless/domain/models/today_queue_model.dart';
 import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:retrofit/retrofit.dart';
@@ -66,6 +67,12 @@ abstract class ApiService {
   Future<List<AppointmentList>> fetchPatientAppointments(
     @Path("doctor_id") int doctorId,
   );
+
+   @GET("doctor/users/appointment/getTodayQueue/{doctor_id}")
+  Future<List<TodayQueueModel>> getTodayQueue(
+    @Path("doctor_id") int doctorId,
+  );
+
 
 
   //  POST API

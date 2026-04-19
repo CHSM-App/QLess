@@ -3,7 +3,7 @@ import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
 import 'package:qless/domain/models/queue_preview_model.dart';
-
+import 'package:qless/domain/models/today_queue_model.dart';
 
 abstract class AppointmentRepository {
   Future<AppointmentResponseModel> getAppointmentAvailability(
@@ -66,4 +66,7 @@ abstract class AppointmentRepository {
   Future<QueuePreviewResponseModel> queuePreviewEstimate(
     AppointmentRequestModel appointmentRequest,
   );
+
+  Future<List<TodayQueueModel>> getTodayQueue(int doctorId);
+  
 }

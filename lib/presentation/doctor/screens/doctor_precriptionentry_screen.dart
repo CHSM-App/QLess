@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+﻿
+
+
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
@@ -8,17 +11,49 @@ import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 
 // ════════════════════════════════════════════════════════════════════
-//  DESIGN TOKENS
+//  DESIGN TOKENS — aligned with PatientListScreen
 // ════════════════════════════════════════════════════════════════════
-const kPrimary = Color(0xFF1A73E8);
-const kPrimaryBg = Color(0xFFE8F0FE);
-const kBg = Color(0xFFF8F9FA);
-const kCardBg = Colors.white;
-const kTextDark = Color(0xFF1F2937);
-const kTextMid = Color(0xFF6B7280);
-const kBorder = Color(0xFFE5E7EB);
-const kRed = Color(0xFFEA4335);
-const kGreen = Color(0xFF34A853);
+const kPrimary        = Color(0xFF26C6B0);
+const kPrimaryDark    = Color(0xFF2BB5A0);
+const kPrimaryLight   = Color(0xFFD9F5F1);
+const kPrimaryLighter = Color(0xFFF2FCFA);
+const _kGradFrom      = Color(0xFF4DD9C8);
+const _kGradTo        = Color(0xFF2BB5A0);
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder  = Color(0xFFEDF2F7);
+const kDivider = Color(0xFFE5E7EB);
+const kBg      = Color(0xFFF7F8FA);
+const kCardBg  = Colors.white;
+
+const kSuccess     = Color(0xFF68D391);
+const kGreenLight  = Color(0xFFDCFCE7);
+const kGreenDark   = Color(0xFF276749);
+
+const kError    = Color(0xFFFC8181);
+const kRedLight = Color(0xFFFEE2E2);
+const kRedDark  = Color(0xFFC53030);
+
+const kAmberLight = Color(0xFFFEF3C7);
+const kAmberDark  = Color(0xFF975A16);
+const kWarning    = Color(0xFFF6AD55);
+
+const kPurple      = Color(0xFF9F7AEA);
+const kPurpleLight = Color(0xFFEDE9FE);
+const kPurpleDark  = Color(0xFF6B46C1);
+
+const kInfo      = Color(0xFF3B82F6);
+const kInfoLight = Color(0xFFDBEAFE);
+const kInfoDark  = Color(0xFF1E40AF);
+
+// ════════════════════════════════════════════════════════════════════
+//  BREAKPOINTS
+// ════════════════════════════════════════════════════════════════════
+const _kTabletBreak  = 650.0;
+const _kDesktopBreak = 1050.0;
 
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE TYPE
@@ -27,30 +62,48 @@ enum MedicineType { tablet, syrup, injection, drops, lotion, spray }
 
 extension MedTypeX on MedicineType {
   String get label => const {
-    MedicineType.tablet: 'Tablet',
-    MedicineType.syrup: 'Syrup',
+    MedicineType.tablet:    'Tablet',
+    MedicineType.syrup:     'Syrup',
     MedicineType.injection: 'Injection',
-    MedicineType.drops: 'Drops',
-    MedicineType.lotion: 'Lotion',
-    MedicineType.spray: 'Spray',
+    MedicineType.drops:     'Drops',
+    MedicineType.lotion:    'Lotion',
+    MedicineType.spray:     'Spray',
   }[this]!;
 
   IconData get icon => const {
-    MedicineType.tablet: Icons.medication_rounded,
-    MedicineType.syrup: Icons.local_drink_rounded,
+    MedicineType.tablet:    Icons.medication_rounded,
+    MedicineType.syrup:     Icons.local_drink_rounded,
     MedicineType.injection: Icons.vaccines_rounded,
-    MedicineType.drops: Icons.water_drop_rounded,
-    MedicineType.lotion: Icons.soap_rounded,
-    MedicineType.spray: Icons.air_rounded,
+    MedicineType.drops:     Icons.water_drop_rounded,
+    MedicineType.lotion:    Icons.soap_rounded,
+    MedicineType.spray:     Icons.air_rounded,
   }[this]!;
 
   Color get color => const {
-    MedicineType.tablet: Color(0xFF2B7FFF),
-    MedicineType.syrup: Color(0xFF8B5CF6),
-    MedicineType.injection: Color(0xFFEF4444),
-    MedicineType.drops: Color(0xFF06B6D4),
-    MedicineType.lotion: Color(0xFF10B981),
-    MedicineType.spray: Color(0xFFF59E0B),
+    MedicineType.tablet:    Color(0xFF26C6B0),
+    MedicineType.syrup:     Color(0xFF9F7AEA),
+    MedicineType.injection: Color(0xFFFC8181),
+    MedicineType.drops:     Color(0xFF3B82F6),
+    MedicineType.lotion:    Color(0xFF68D391),
+    MedicineType.spray:     Color(0xFFF6AD55),
+  }[this]!;
+
+  Color get colorLight => const {
+    MedicineType.tablet:    Color(0xFFD9F5F1),
+    MedicineType.syrup:     Color(0xFFEDE9FE),
+    MedicineType.injection: Color(0xFFFEE2E2),
+    MedicineType.drops:     Color(0xFFDBEAFE),
+    MedicineType.lotion:    Color(0xFFDCFCE7),
+    MedicineType.spray:     Color(0xFFFEF3C7),
+  }[this]!;
+
+  Color get colorDark => const {
+    MedicineType.tablet:    Color(0xFF2BB5A0),
+    MedicineType.syrup:     Color(0xFF6B46C1),
+    MedicineType.injection: Color(0xFFC53030),
+    MedicineType.drops:     Color(0xFF1E40AF),
+    MedicineType.lotion:    Color(0xFF276749),
+    MedicineType.spray:     Color(0xFF975A16),
   }[this]!;
 
   int get typeId => index + 1;
@@ -58,8 +111,6 @@ extension MedTypeX on MedicineType {
 
 // ════════════════════════════════════════════════════════════════════
 //  PICKER OPTIONS
-//  _kDosageOpts  — per-type dose amounts  (goes to dosage API field)
-//  _kFreqOpts    — times per slot         (goes to frequency API field)
 // ════════════════════════════════════════════════════════════════════
 const _kDosageOpts = {
   'tablet':    ['0', '¼', '½', '¾', '1', '1½', '2', '3'],
@@ -71,14 +122,63 @@ const _kDosageOpts = {
 };
 
 // ════════════════════════════════════════════════════════════════════
-//  SlotPickerField  — reusable inline drum picker
-//  Used for both dosage and frequency
+//  MedicineEntry
+// ════════════════════════════════════════════════════════════════════
+class MedicineEntry {
+  MedicineType type;
+  int?    medicineId;
+  String? selectedName;
+  String  searchText;
+  String  dosage;
+  String  frequency;
+  String  duration;
+  String  timing;
+  String  injRoute;
+  String  dropsApplication;
+  String  lotionApplyArea;
+  String  sprayUsage;
+
+  MedicineEntry()
+      : type             = MedicineType.tablet,
+        medicineId       = null,
+        selectedName     = null,
+        searchText       = '',
+        dosage           = '1-0-1',
+        frequency        = '1-0-1',
+        duration         = '',
+        timing           = 'After Food',
+        injRoute         = 'IV',
+        dropsApplication = 'Eyes',
+        lotionApplyArea  = '',
+        sprayUsage       = 'Nasal';
+
+  PrescriptionMedicineModel toApiModel() => PrescriptionMedicineModel(
+    medicineId:       medicineId,
+    medicineTypeId:   type.typeId,
+    frequency:        frequency.isEmpty ? null : frequency,
+    duration:         duration.isEmpty  ? null : duration,
+    timing:           timing.isEmpty    ? null : timing,
+    tabletDosage:     type == MedicineType.tablet    ? (dosage.isEmpty ? null : dosage) : null,
+    syrupDosageMl:    type == MedicineType.syrup     ? (dosage.isEmpty ? null : dosage) : null,
+    injDosage:        type == MedicineType.injection ? (dosage.isEmpty ? null : dosage) : null,
+    injRoute:         type == MedicineType.injection ? (injRoute.isEmpty ? null : injRoute) : null,
+    dropsCount:       type == MedicineType.drops     ? (dosage.isEmpty ? null : dosage) : null,
+    dropsApplication: type == MedicineType.drops     ? (dropsApplication.isEmpty ? null : dropsApplication) : null,
+    lotionApplyArea:  type == MedicineType.lotion    ? (lotionApplyArea.isEmpty ? null : lotionApplyArea) : null,
+    sprayPuffs:       type == MedicineType.spray     ? (dosage.isEmpty ? null : dosage) : null,
+    sprayUsage:       type == MedicineType.spray     ? (sprayUsage.isEmpty ? null : sprayUsage) : null,
+    lotionUsage:      type == MedicineType.lotion    ? (dosage.isEmpty ? null : dosage) : null,
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SlotPickerField
 // ════════════════════════════════════════════════════════════════════
 class SlotPickerField extends StatefulWidget {
   final String label;
   final String subLabel;
   final String typeKey;
-  final Color accentColor;
+  final Color  accentColor;
   final String initialValue;
   final Map<String, List<String>> optsMap;
   final ValueChanged<String> onChanged;
@@ -102,32 +202,23 @@ class _SlotPickerFieldState extends State<SlotPickerField> {
   bool _open = false;
   late List<String> _committed;
 
-  List<String> get _opts =>
-      widget.optsMap[widget.typeKey] ?? widget.optsMap['tablet']!;
+  List<String> get _opts => widget.optsMap[widget.typeKey] ?? widget.optsMap['tablet']!;
 
   @override
-  void initState() {
-    super.initState();
-    _committed = _parse(widget.initialValue);
-  }
+  void initState() { super.initState(); _committed = _parse(widget.initialValue); }
 
   @override
   void didUpdateWidget(SlotPickerField old) {
     super.didUpdateWidget(old);
-    if (old.typeKey != widget.typeKey) {
-      _committed = _parse(widget.initialValue);
-      setState(() {});
-    }
-    if (old.initialValue != widget.initialValue) {
-      _committed = _parse(widget.initialValue);
-      setState(() {});
+    if (old.typeKey != widget.typeKey || old.initialValue != widget.initialValue) {
+      setState(() => _committed = _parse(widget.initialValue));
     }
   }
 
   List<String> _parse(String v) {
     final parts = v.split('-');
     if (parts.length >= 3) return [parts[0], parts[1], parts[2]];
-    final o = _opts;
+    final o   = _opts;
     final def = o.length > 1 ? o[1] : o[0];
     return [def, '0', def];
   }
@@ -135,80 +226,49 @@ class _SlotPickerFieldState extends State<SlotPickerField> {
   String get _display => _committed.join(' – ');
 
   void _onSet(List<String> vals) {
-    setState(() {
-      _committed = List.from(vals);
-      _open = false;
-    });
+    setState(() { _committed = List.from(vals); _open = false; });
     widget.onChanged(vals.join('-'));
   }
 
   @override
   Widget build(BuildContext context) {
     final ac = widget.accentColor;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // label row
-        Row(children: [
-          Text(widget.label, style: const TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w600,
-            color: kTextMid, letterSpacing: 0.1,
-          )),
-          const SizedBox(width: 4),
-          Text('(${widget.subLabel})', style: const TextStyle(
-            fontSize: 11, color: Color(0xFFB0B8C8),
-          )),
-        ]),
-        const SizedBox(height: 6),
-
-        // display box
-        GestureDetector(
-          onTap: () => setState(() => _open = !_open),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: kBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: _open ? ac : kBorder,
-                width: _open ? 1.8 : 1.0,
-              ),
-            ),
-            child: Row(children: [
-              Expanded(child: Text(
-                _display,
-                style: TextStyle(
-                  fontSize: 19, fontWeight: FontWeight.w700, color: ac,
-                ),
-              )),
-              Icon(
-                _open
-                    ? Icons.keyboard_arrow_up_rounded
-                    : Icons.keyboard_arrow_down_rounded,
-                color: kTextMid, size: 20,
-              ),
-            ]),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [
+        Text(widget.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.1)),
+        const SizedBox(width: 4),
+        Text('(${widget.subLabel})', style: const TextStyle(fontSize: 10, color: kTextMuted)),
+      ]),
+      const SizedBox(height: 5),
+      GestureDetector(
+        onTap: () => setState(() => _open = !_open),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: kBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _open ? ac : kBorder, width: _open ? 1.5 : 1.0),
           ),
+          child: Row(children: [
+            Expanded(child: Text(_display, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: ac))),
+            Icon(_open ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: kTextMuted, size: 18),
+          ]),
         ),
-
-        // inline drum panel
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 200),
-          child: _open
-              ? _InlineDrumPanel(
-                  key: ValueKey('${widget.typeKey}_${widget.label}'),
-                  opts: _opts,
-                  draft: List.from(_committed),
-                  accentColor: ac,
-                  onSet: _onSet,
-                  onDismiss: () => setState(() => _open = false),
-                )
-              : const SizedBox.shrink(),
-        ),
-      ],
-    );
+      ),
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        child: _open
+            ? _InlineDrumPanel(
+                key: ValueKey('${widget.typeKey}_${widget.label}'),
+                opts: _opts, draft: List.from(_committed),
+                accentColor: ac, onSet: _onSet,
+                onDismiss: () => setState(() => _open = false),
+              )
+            : const SizedBox.shrink(),
+      ),
+    ]);
   }
 }
 
@@ -224,11 +284,8 @@ class _InlineDrumPanel extends StatefulWidget {
 
   const _InlineDrumPanel({
     super.key,
-    required this.opts,
-    required this.draft,
-    required this.accentColor,
-    required this.onSet,
-    required this.onDismiss,
+    required this.opts, required this.draft,
+    required this.accentColor, required this.onSet, required this.onDismiss,
   });
 
   @override
@@ -239,101 +296,69 @@ class _InlineDrumPanelState extends State<_InlineDrumPanel> {
   late List<String> _sel;
 
   @override
-  void initState() {
-    super.initState();
-    _sel = List.from(widget.draft);
-  }
+  void initState() { super.initState(); _sel = List.from(widget.draft); }
 
   @override
   Widget build(BuildContext context) {
     final ac = widget.accentColor;
     return Container(
-      margin: const EdgeInsets.only(top: 6),
+      margin: const EdgeInsets.only(top: 5),
       decoration: BoxDecoration(
         color: kCardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ac.withOpacity(0.25)),
-        boxShadow: [BoxShadow(
-          color: ac.withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 4),
-        )],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ac.withOpacity(0.22)),
+        boxShadow: [BoxShadow(color: ac.withOpacity(0.07), blurRadius: 14, offset: const Offset(0, 4))],
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        // header
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: ac.withOpacity(0.07),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
           ),
           child: Row(children: [
-            Icon(Icons.tune_rounded, color: ac, size: 14),
-            const SizedBox(width: 6),
-            Text('Select per slot', style: TextStyle(
-              fontSize: 12, fontWeight: FontWeight.w600, color: ac,
-            )),
+            Icon(Icons.tune_rounded, color: ac, size: 13),
+            const SizedBox(width: 5),
+            Text('Select per slot', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ac)),
             const Spacer(),
-            GestureDetector(
-              onTap: widget.onDismiss,
-              child: const Icon(Icons.close_rounded, color: kTextMid, size: 16),
-            ),
+            GestureDetector(onTap: widget.onDismiss,
+                child: const Icon(Icons.close_rounded, color: kTextMuted, size: 15)),
           ]),
         ),
-
-        // slot labels
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
           child: Row(children: [
-            _slotLbl('Morning'),
-            const SizedBox(width: 16),
-            _slotLbl('Afternoon'),
-            const SizedBox(width: 16),
+            _slotLbl('Morning'), const SizedBox(width: 16),
+            _slotLbl('Afternoon'), const SizedBox(width: 16),
             _slotLbl('Night'),
           ]),
         ),
-
-        // drums
         Padding(
-          padding: const EdgeInsets.fromLTRB(10, 4, 10, 0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: _DrumPicker(
-                opts: widget.opts, selected: _sel[0], accentColor: ac,
-                onChanged: (v) => setState(() => _sel[0] = v),
-              )),
-              Text('–', style: TextStyle(fontSize: 20, color: kTextMid)),
-              Expanded(child: _DrumPicker(
-                opts: widget.opts, selected: _sel[1], accentColor: ac,
-                onChanged: (v) => setState(() => _sel[1] = v),
-              )),
-              Text('–', style: TextStyle(fontSize: 20, color: kTextMid)),
-              Expanded(child: _DrumPicker(
-                opts: widget.opts, selected: _sel[2], accentColor: ac,
-                onChanged: (v) => setState(() => _sel[2] = v),
-              )),
-            ],
-          ),
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+            Expanded(child: _DrumPicker(opts: widget.opts, selected: _sel[0], accentColor: ac,
+                onChanged: (v) => setState(() => _sel[0] = v))),
+            Text('–', style: TextStyle(fontSize: 18, color: kTextMuted)),
+            Expanded(child: _DrumPicker(opts: widget.opts, selected: _sel[1], accentColor: ac,
+                onChanged: (v) => setState(() => _sel[1] = v))),
+            Text('–', style: TextStyle(fontSize: 18, color: kTextMuted)),
+            Expanded(child: _DrumPicker(opts: widget.opts, selected: _sel[2], accentColor: ac,
+                onChanged: (v) => setState(() => _sel[2] = v))),
+          ]),
         ),
-
         const Divider(height: 1, color: kBorder),
-
-        // Set button
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
           child: SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () => widget.onSet(_sel),
               style: ElevatedButton.styleFrom(
-                backgroundColor: ac,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                backgroundColor: ac, foregroundColor: Colors.white, elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Set', style: TextStyle(
-                fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.4,
-              )),
+              child: const Text('Set', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
             ),
           ),
         ),
@@ -341,14 +366,12 @@ class _InlineDrumPanelState extends State<_InlineDrumPanel> {
     );
   }
 
-  Widget _slotLbl(String t) => Expanded(child: Text(
-    t, textAlign: TextAlign.center,
-    style: const TextStyle(fontSize: 11, color: kTextMid, fontWeight: FontWeight.w500),
-  ));
+  Widget _slotLbl(String t) => Expanded(child: Text(t, textAlign: TextAlign.center,
+      style: const TextStyle(fontSize: 10, color: kTextMuted, fontWeight: FontWeight.w500)));
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  _DrumPicker  — single scroll column
+//  _DrumPicker
 // ════════════════════════════════════════════════════════════════════
 class _DrumPicker extends StatefulWidget {
   final List<String> opts;
@@ -356,12 +379,8 @@ class _DrumPicker extends StatefulWidget {
   final Color accentColor;
   final ValueChanged<String> onChanged;
 
-  const _DrumPicker({
-    required this.opts,
-    required this.selected,
-    required this.accentColor,
-    required this.onChanged,
-  });
+  const _DrumPicker({required this.opts, required this.selected,
+      required this.accentColor, required this.onChanged});
 
   @override
   State<_DrumPicker> createState() => _DrumPickerState();
@@ -382,10 +401,8 @@ class _DrumPickerState extends State<_DrumPicker> {
     super.didUpdateWidget(old);
     if (old.selected != widget.selected) {
       final idx = widget.opts.indexOf(widget.selected);
-      if (idx >= 0) {
-        _ctrl.animateToItem(idx,
-            duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
-      }
+      if (idx >= 0) _ctrl.animateToItem(idx,
+          duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
     }
   }
 
@@ -396,50 +413,35 @@ class _DrumPickerState extends State<_DrumPicker> {
   Widget build(BuildContext context) {
     final ac = widget.accentColor;
     return SizedBox(
-      height: 120,
+      height: 110,
       child: Stack(alignment: Alignment.center, children: [
-        Container(
-          height: 40,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            color: ac.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-        Positioned(top: 0, left: 0, right: 0, height: 40,
+        Container(height: 36, margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(color: ac.withOpacity(0.10), borderRadius: BorderRadius.circular(7))),
+        Positioned(top: 0, left: 0, right: 0, height: 37,
           child: IgnorePointer(child: Container(decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter, end: Alignment.bottomCenter,
-              colors: [kCardBg, kCardBg.withOpacity(0)],
-            ),
+            gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                colors: [kCardBg, kCardBg.withOpacity(0)]),
           ))),
         ),
-        Positioned(bottom: 0, left: 0, right: 0, height: 40,
+        Positioned(bottom: 0, left: 0, right: 0, height: 37,
           child: IgnorePointer(child: Container(decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter, end: Alignment.topCenter,
-              colors: [kCardBg, kCardBg.withOpacity(0)],
-            ),
+            gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                colors: [kCardBg, kCardBg.withOpacity(0)]),
           ))),
         ),
         ListWheelScrollView.useDelegate(
-          controller: _ctrl,
-          itemExtent: 40,
-          diameterRatio: 1.8,
+          controller: _ctrl, itemExtent: 37, diameterRatio: 1.8,
           physics: const FixedExtentScrollPhysics(),
           onSelectedItemChanged: (i) => widget.onChanged(widget.opts[i]),
           childDelegate: ListWheelChildBuilderDelegate(
             childCount: widget.opts.length,
             builder: (_, i) {
               final isSel = widget.opts[i] == widget.selected;
-              return Center(child: Text(
-                widget.opts[i],
-                style: TextStyle(
-                  fontSize: isSel ? 20 : 14,
-                  fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
-                  color: isSel ? ac : kTextMid,
-                ),
-              ));
+              return Center(child: Text(widget.opts[i], style: TextStyle(
+                fontSize: isSel ? 18 : 13,
+                fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
+                color: isSel ? ac : kTextMuted,
+              )));
             },
           ),
         ),
@@ -449,18 +451,11 @@ class _DrumPickerState extends State<_DrumPicker> {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  MedicineEntry
-//  dosage  → per-slot dose    e.g. "½-0-1"   → API: tabletDosage etc.
-//  frequency → per-slot times e.g. "1-0-1"   → API: frequency
+//  _CompleteDropdown — split action button
 // ════════════════════════════════════════════════════════════════════
-// ── Complete Split Button ─────────────────────────────────────────────────────
-// Selecting from dropdown CHANGES the main button's action.
-// Main button always reflects the currently selected action.
-
 class _CompleteDropdown extends StatefulWidget {
   final VoidCallback onNext;
   final VoidCallback onBack;
-
   const _CompleteDropdown({required this.onNext, required this.onBack});
 
   @override
@@ -468,7 +463,6 @@ class _CompleteDropdown extends StatefulWidget {
 }
 
 class _CompleteDropdownState extends State<_CompleteDropdown> {
-  // 0 = Complete & Next (default), 1 = Complete & Back
   int _selected = 0;
 
   static const _options = [
@@ -481,62 +475,48 @@ class _CompleteDropdownState extends State<_CompleteDropdown> {
   @override
   Widget build(BuildContext context) {
     final opt = _options[_selected];
-    return Row(
-      children: [
-        // Main button — runs the currently selected action
-        Expanded(
-          child: ElevatedButton(
-            onPressed: _action,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                ),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-            ),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Text(opt.label,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-              const SizedBox(width: 4),
-              Icon(opt.icon, size: 15),
-            ]),
+    return Row(children: [
+      Expanded(
+        child: ElevatedButton(
+          onPressed: _action,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kPrimary, foregroundColor: Colors.white, elevation: 0,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(10), bottomLeft: Radius.circular(10),
+            )),
+            padding: const EdgeInsets.symmetric(vertical: 13),
           ),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(opt.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            const SizedBox(width: 4),
+            Icon(opt.icon, size: 14),
+          ]),
         ),
-        // Divider
-        Container(width: 1, height: 48,
-            color: Colors.white.withValues(alpha: 0.3)),
-        // Dropdown — switches which action the main button will run
-        PopupMenuButton<int>(
-          onSelected: (v) => setState(() => _selected = v),
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          color: Colors.white,
-          offset: const Offset(0, -110),
-          itemBuilder: (_) => [
-            _menuItem(0, Icons.arrow_forward_rounded, 'Complete & Next'),
-            _menuItem(1, Icons.arrow_back_rounded,    'Complete & Back'),
-          ],
-          child: Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: const BoxDecoration(
-              color: kPrimary,
-              borderRadius: BorderRadius.only(
-                topRight: Radius.circular(12),
-                bottomRight: Radius.circular(12),
-              ),
+      ),
+      Container(width: 1, height: 46, color: Colors.white.withOpacity(0.3)),
+      PopupMenuButton<int>(
+        onSelected: (v) => setState(() => _selected = v),
+        padding: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        color: Colors.white,
+        offset: const Offset(0, -110),
+        itemBuilder: (_) => [
+          _menuItem(0, Icons.arrow_forward_rounded, 'Complete & Next'),
+          _menuItem(1, Icons.arrow_back_rounded,    'Complete & Back'),
+        ],
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: const BoxDecoration(
+            color: kPrimary,
+            borderRadius: BorderRadius.only(
+              topRight: Radius.circular(10), bottomRight: Radius.circular(10),
             ),
-            child: const Icon(Icons.keyboard_arrow_up_rounded,
-                color: Colors.white, size: 20),
           ),
+          child: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white, size: 18),
         ),
-      ],
-    );
+      ),
+    ]);
   }
 
   PopupMenuItem<int> _menuItem(int value, IconData icon, String label) {
@@ -544,69 +524,17 @@ class _CompleteDropdownState extends State<_CompleteDropdown> {
     return PopupMenuItem<int>(
       value: value,
       child: Row(children: [
-        Icon(icon, size: 16, color: isActive ? kPrimary : Colors.grey),
+        Icon(icon, size: 15, color: isActive ? kPrimary : kTextMuted),
         const SizedBox(width: 8),
         Text(label, style: TextStyle(
-          fontSize: 13,
-          fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-          color: isActive ? kPrimary : kTextDark,
+          fontSize: 13, fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+          color: isActive ? kPrimary : kTextPrimary,
         )),
         if (isActive) ...[
           const Spacer(),
-          const Icon(Icons.check_rounded, size: 14, color: kPrimary),
+          const Icon(Icons.check_rounded, size: 13, color: kPrimary),
         ],
       ]),
-    );
-  }
-}
-
-class MedicineEntry {
-  MedicineType type;
-  int? medicineId;
-  String? selectedName;
-  String searchText;
-  String dosage;
-  String frequency;
-  String duration;
-  String timing;
-  String injRoute;
-  String dropsApplication;
-  String lotionApplyArea;
-  String sprayUsage;
-  
-
-  MedicineEntry()
-      : type = MedicineType.tablet,
-        medicineId = null,
-        selectedName = null,
-        searchText = '',
-        dosage = '1-0-1',
-        frequency = '1-0-1',
-        duration = '',
-        timing = 'After Food',
-        injRoute = 'IV',
-        dropsApplication = 'Eyes',
-        lotionApplyArea = '',
-        sprayUsage = 'Nasal';
-
-  PrescriptionMedicineModel toApiModel() {
-    return PrescriptionMedicineModel(
-      medicineId:       medicineId,
-      medicineTypeId:   type.typeId,
-      frequency:        frequency.isEmpty ? null : frequency,
-      duration:         duration.isEmpty  ? null : duration,
-      timing:           timing.isEmpty    ? null : timing,
-      // dosage goes to correct type-specific field
-      tabletDosage:     type == MedicineType.tablet    ? (dosage.isEmpty ? null : dosage) : null,
-      syrupDosageMl:    type == MedicineType.syrup     ? (dosage.isEmpty ? null : dosage) : null,
-      injDosage:        type == MedicineType.injection ? (dosage.isEmpty ? null : dosage) : null,
-      injRoute:         type == MedicineType.injection ? (injRoute.isEmpty ? null : injRoute) : null,
-      dropsCount:       type == MedicineType.drops     ? (dosage.isEmpty ? null : dosage) : null,
-      dropsApplication: type == MedicineType.drops     ? (dropsApplication.isEmpty ? null : dropsApplication) : null,
-      lotionApplyArea:  type == MedicineType.lotion    ? (lotionApplyArea.isEmpty ? null : lotionApplyArea) : null,
-      sprayPuffs:       type == MedicineType.spray     ? (dosage.isEmpty ? null : dosage) : null,
-      sprayUsage:       type == MedicineType.spray     ? (sprayUsage.isEmpty ? null : sprayUsage) : null,
-      lotionUsage:    type == MedicineType.lotion    ? (dosage.isEmpty ? null : dosage) : null,
     );
   }
 }
@@ -615,16 +543,15 @@ class MedicineEntry {
 //  PrescriptionScreen
 // ════════════════════════════════════════════════════════════════════
 class PrescriptionScreen extends ConsumerStatefulWidget {
-  final int patientId;
-  final int doctorId;
-  final int userTypeId;
-  final int appointmentId;
-  final String patientName;
+  final int     patientId;
+  final int     doctorId;
+  final int     userTypeId;
+  final int     appointmentId;
+  final String  patientName;
   final String? patientAge;
   final String? patientGender;
-  final int? queueNumber;
-  /// 'booked' → QUEUE_NEXT after prescription  |  'skipped' → QUEUE_RECALL
-  final String patientStatus;
+  final int?    queueNumber;
+  final String  patientStatus;
 
   const PrescriptionScreen({
     super.key,
@@ -658,13 +585,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     super.initState();
     _doctorIdSub = ref.listenManual<int?>(
       doctorLoginViewModelProvider.select((s) => s.doctorId),
-      (prev, next) {
-        _maybeFetchMedicines(next ?? 0);
-      },
+      (_, next) => _maybeFetchMedicines(next ?? 0),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      _maybeFetchMedicines(widget.doctorId);
+      if (mounted) _maybeFetchMedicines(widget.doctorId);
     });
   }
 
@@ -681,7 +605,6 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   void _maybeFetchMedicines(int doctorId) {
     if (doctorId == 0 || doctorId == _lastDoctorId) return;
-    debugPrint('PrescriptionScreen: fetching medicines for doctorId=$doctorId');
     _lastDoctorId = doctorId;
     ref.read(doctorLoginViewModelProvider.notifier).fetchAllMedicines(doctorId);
   }
@@ -722,52 +645,50 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     if (dt == null) return null;
     final now = DateTime.now();
     int age = now.year - dt.year;
-    if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) {
-      age--;
-    }
+    if (now.month < dt.month || (now.month == dt.month && now.day < dt.day)) age--;
     return '$age y';
   }
 
-  /// Calls QUEUE_RECALL for skipped patients, QUEUE_NEXT for booked patients.
+  String? _followUpStr() {
+    if (_followDate == null) return null;
+    return '${_followDate!.year}-${_followDate!.month.toString().padLeft(2, '0')}-${_followDate!.day.toString().padLeft(2, '0')}';
+  }
+
+  PrescriptionModel _buildPrescription() => PrescriptionModel(
+    patientId:     widget.patientId,
+    doctorId:      widget.doctorId,
+    symptoms:      _sympCtrl.text.trim(),
+    diagnosis:     _diagCtrl.text.trim(),
+    clinicalNotes: _clinCtrl.text.trim().isEmpty ? null : _clinCtrl.text.trim(),
+    userType:      widget.userTypeId,
+    appointmentId: widget.appointmentId,
+    followUpDate:  _followUpStr(),
+    advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
+    medicines:     _meds.map((e) => e.toApiModel()).toList(),
+  );
+
   Future<AppointmentResponseModel?> _completeQueueAction() async {
     try {
-      final isSkipped =
-          widget.patientStatus.toLowerCase().trim() == 'skipped';
-
+      final isSkipped = widget.patientStatus.toLowerCase().trim() == 'skipped';
       final AppointmentResponseModel result;
-
       if (isSkipped) {
-        // Skipped patient → recall (mark as completed directly)
-        final req = AppointmentRequestModel(
-          appointmentId: widget.appointmentId,
-          doctorId: widget.doctorId,
-        );
-        debugPrint('QueueRecall request: ${req.toJson()}');
-        result = await ref
-            .read(appointmentViewModelProvider.notifier)
-            .queueRecall(req);
-        debugPrint('QueueRecall response: ${result.toJson()}');
+        result = await ref.read(appointmentViewModelProvider.notifier)
+            .queueRecall(AppointmentRequestModel(
+              appointmentId: widget.appointmentId, doctorId: widget.doctorId));
       } else {
-        // Booked patient → advance queue
-        final req = AppointmentRequestModel(
-          operation: 'QUEUE_NEXT',
-          doctorId: widget.doctorId,
-          appointmentId: widget.appointmentId,
-          patientId: widget.patientId,
-          appointmentDate: _todayApi(),
-        );
-        debugPrint('QueueNext request: ${req.toJson()}');
-        result = await ref
-            .read(appointmentViewModelProvider.notifier)
-            .queueNext(req);
-        debugPrint('QueueNext response: ${result.toJson()}');
+        result = await ref.read(appointmentViewModelProvider.notifier)
+            .queueNext(AppointmentRequestModel(
+              operation:       'QUEUE_NEXT',
+              doctorId:        widget.doctorId,
+              appointmentId:   widget.appointmentId,
+              patientId:       widget.patientId,
+              appointmentDate: _todayApi(),
+            ));
       }
-
       if (result.success == true) return result;
       _showSnack(result.message ?? 'Queue action failed', isError: true);
       return null;
     } catch (e) {
-      debugPrint('Queue action error: $e');
       _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
       return null;
     }
@@ -777,7 +698,6 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     final result = await _completeQueueAction();
     if (!mounted || result == null) return;
 
-    // Recalled skipped patient → just go back to patient list
     if (widget.patientStatus.toLowerCase().trim() == 'skipped') {
       _showSnack(result.message ?? 'Patient attended', isError: false);
       await Future.delayed(const Duration(milliseconds: 300));
@@ -785,239 +705,152 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       return;
     }
 
-    final nextToken = result.data?.isNotEmpty == true
-        ? result.data!.first.nextToken
-        : null;
+    final nextToken = result.data?.isNotEmpty == true ? result.data!.first.nextToken : null;
 
-    // refresh list so patient_list shows latest when user goes back
-    await ref
-        .read(appointmentViewModelProvider.notifier)
+    await ref.read(appointmentViewModelProvider.notifier)
         .fetchPatientAppointments(widget.doctorId);
     if (!mounted) return;
 
-    final allAppointments =
-        ref.read(appointmentViewModelProvider).patientAppointmentsList.maybeWhen(
-              data: (list) => list,
-              orElse: () => const <AppointmentList>[],
-            );
-    var candidatesSource = allAppointments;
-    if (candidatesSource.isEmpty) {
-      await ref
-          .read(appointmentViewModelProvider.notifier)
-          .fetchPatientAppointments(widget.doctorId);
-      if (!mounted) return;
-      candidatesSource = ref
-          .read(appointmentViewModelProvider)
-          .patientAppointmentsList
-          .maybeWhen(
-            data: (list) => list,
-            orElse: () => const <AppointmentList>[],
-          );
-    }
+    final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
+        .maybeWhen(data: (l) => l, orElse: () => const <AppointmentList>[]);
 
-    final next =
-        _pickNextAppointment(candidatesSource, preferredQueue: nextToken);
+    final next = _pickNextAppointment(all, preferredQueue: nextToken);
     if (next == null) {
       _showSnack('No next patient found', isError: true);
       Navigator.pop(context);
       return;
     }
 
-    final patientId = next.patientId ?? 0;
-    final appointmentId = next.appointmentId ?? 0;
-    if (patientId == 0 || appointmentId == 0) {
-      _showSnack('Next patient info missing', isError: true);
-      Navigator.pop(context);
-      return;
-    }
-
-    _showSnack(
-      'Prescription completed. Opening next patient...',
-      isError: false,
-    );
-
+    _showSnack('Prescription saved. Opening next patient…', isError: false);
     await Future.delayed(const Duration(milliseconds: 300));
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PrescriptionScreen(
-          patientId: patientId,
-          doctorId: next.doctorId ?? widget.doctorId,
-          userTypeId: next.userType ?? widget.userTypeId,
-          appointmentId: appointmentId,
-          patientName: next.patientName ?? 'Patient',
-          patientAge: _ageString(next.dob),
-          patientGender: next.gender,
-          queueNumber: next.queueNumber,
-        ),
-      ),
-    );
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PrescriptionScreen(
+      patientId:     next.patientId     ?? 0,
+      doctorId:      next.doctorId      ?? widget.doctorId,
+      userTypeId:    next.userType      ?? widget.userTypeId,
+      appointmentId: next.appointmentId ?? 0,
+      patientName:   next.patientName   ?? 'Patient',
+      patientAge:    _ageString(next.dob),
+      patientGender: next.gender,
+      queueNumber:   next.queueNumber,
+    )));
   }
 
-  AppointmentList? _pickNextAppointment(
-    List<AppointmentList> list, {
-    int? preferredQueue,
-  }) {
-    // First: if backend auto-started next patient (in_progress), prefer them
-    final inProgressNext = list.where((a) {
-      final status = a.status?.toLowerCase().trim() ?? '';
-      if (status != 'in_progress') return false;
-      if (a.appointmentId == widget.appointmentId) return false;
-      final d = _parseAppointmentDate(a.appointmentDate);
-      return _isToday(d);
+  AppointmentList? _pickNextAppointment(List<AppointmentList> list, {int? preferredQueue}) {
+    final inProgress = list.where((a) {
+      final s = a.status?.toLowerCase().trim() ?? '';
+      return s == 'in_progress' && a.appointmentId != widget.appointmentId
+          && _isToday(_parseDate(a.appointmentDate));
     }).toList();
-
-    if (inProgressNext.isNotEmpty) {
-      inProgressNext.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
-      return inProgressNext.first;
+    if (inProgress.isNotEmpty) {
+      inProgress.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
+      return inProgress.first;
     }
-
-    // Fallback: pick next booked patient
     final candidates = list.where((a) {
-      final status = a.status?.toLowerCase().trim() ?? '';
-      if (status != 'booked') return false;
-      final d = _parseAppointmentDate(a.appointmentDate);
-      if (!_isToday(d)) return false;
-      if (a.appointmentId == widget.appointmentId) return false;
-      return true;
+      final s = a.status?.toLowerCase().trim() ?? '';
+      return s == 'booked' && _isToday(_parseDate(a.appointmentDate))
+          && a.appointmentId != widget.appointmentId;
     }).toList();
-
     if (preferredQueue != null) {
-      final match = candidates
-          .where((a) => a.queueNumber != null && a.queueNumber == preferredQueue)
-          .toList();
+      final match = candidates.where((a) => a.queueNumber == preferredQueue).toList();
       if (match.isNotEmpty) return match.first;
     }
-
     candidates.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
     return candidates.isEmpty ? null : candidates.first;
   }
 
   int _sortKey(AppointmentList a) {
     if (a.queueNumber != null) return a.queueNumber!;
-    final t = _timeMinutes(a.startTime);
-    if (t != null) return 100000 + t;
+    final dt = a.startTime == null ? null : DateTime.tryParse(a.startTime!);
+    if (dt != null) return 100000 + dt.hour * 60 + dt.minute;
     return 200000;
   }
 
-  int? _timeMinutes(String? iso) {
-    if (iso == null || iso.trim().isEmpty) return null;
-    final dt = DateTime.tryParse(iso);
-    if (dt == null) return null;
-    return dt.hour * 60 + dt.minute;
-  }
-
-  DateTime? _parseAppointmentDate(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return null;
-    return DateTime.tryParse(raw.trim());
-  }
+  DateTime? _parseDate(String? s) => s == null ? null : DateTime.tryParse(s.trim());
 
   bool _isToday(DateTime? d) {
     if (d == null) return false;
-    final now = DateTime.now();
-    return d.year == now.year && d.month == now.month && d.day == now.day;
-  }
-Future<void> _completeAndBack() async {
-  final error = _validate();
-  if (error != null) { _showSnack(error, isError: true); return; }
-
-  String? followUpStr;
-  if (_followDate != null) {
-    followUpStr =
-        '${_followDate!.year}-${_followDate!.month.toString().padLeft(2, '0')}-${_followDate!.day.toString().padLeft(2, '0')}';
+    final n = DateTime.now();
+    return d.year == n.year && d.month == n.month && d.day == n.day;
   }
 
-  final prescription = PrescriptionModel(
-    patientId:     widget.patientId,
-    doctorId:      widget.doctorId,
-    symptoms:      _sympCtrl.text.trim(),
-    diagnosis:     _diagCtrl.text.trim(),
-    clinicalNotes: _clinCtrl.text.trim().isEmpty ? null : _clinCtrl.text.trim(),
-    userType:      widget.userTypeId,
-    appointmentId: widget.appointmentId,
-    followUpDate:  followUpStr,
-    advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
-    medicines:     _meds.isEmpty ? [] : _meds.map((e) => e.toApiModel()).toList(),
-  );
-
-  await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription);
-  if (!mounted) return;
-
-  final state = ref.read(prescriptionViewModelProvider);
-  if (state.error != null) {
-    _showSnack(state.error ?? 'Something went wrong', isError: true);
-    return;
+  Future<void> _completePrescription() async {
+    final error = _validate();
+    if (error != null) { _showSnack(error, isError: true); return; }
+    await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
+    if (!mounted) return;
+    final state = ref.read(prescriptionViewModelProvider);
+    if (state.error != null) { _showSnack(state.error!, isError: true); return; }
+    await _handleNextPatient();
   }
 
-  // Call endSession API
-  try {
-    await ref.read(appointmentViewModelProvider.notifier).endSession(
-      AppointmentRequestModel(doctorId: widget.doctorId,
-          appointmentId: widget.appointmentId,
-          patientId: widget.patientId),
-    );
-  } catch (_) {
-    // Non-blocking
+  Future<void> _completeAndBack() async {
+    final error = _validate();
+    if (error != null) { _showSnack(error, isError: true); return; }
+    await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
+    if (!mounted) return;
+    final state = ref.read(prescriptionViewModelProvider);
+    if (state.error != null) { _showSnack(state.error!, isError: true); return; }
+    try {
+      await ref.read(appointmentViewModelProvider.notifier).endSession(
+        AppointmentRequestModel(doctorId: widget.doctorId,
+            appointmentId: widget.appointmentId, patientId: widget.patientId));
+    } catch (_) {}
+    if (!mounted) return;
+    _showSnack('Prescription saved', isError: false);
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) Navigator.pop(context);
   }
 
-  if (!mounted) return;
-  _showSnack('Prescription saved', isError: false);
-  await Future.delayed(const Duration(milliseconds: 300));
-  if (!mounted) return;
-  // Pop back to patient list
-  Navigator.pop(context);
-}
-
-Future<void> _completePrescription() async {
-  final error = _validate();
-  if (error != null) { _showSnack(error, isError: true); return; }
-
-  String? followUpStr;
-  if (_followDate != null) {
-    followUpStr =
-        '${_followDate!.year}-${_followDate!.month.toString().padLeft(2, '0')}-${_followDate!.day.toString().padLeft(2, '0')}';
+  Future<void> _onSkip() async {
+    try {
+      await ref.read(appointmentViewModelProvider.notifier).queueSkip(
+        AppointmentRequestModel(doctorId: widget.doctorId,
+            appointmentId: widget.appointmentId, patientId: widget.patientId));
+      if (!mounted) return;
+      await ref.read(appointmentViewModelProvider.notifier)
+          .fetchPatientAppointments(widget.doctorId);
+      if (!mounted) return;
+      final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
+          .maybeWhen(data: (l) => l, orElse: () => <AppointmentList>[]);
+      final next = _pickNextAppointment(all);
+      if (next == null) { _showSnack('No next patient', isError: false); Navigator.pop(context); return; }
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PrescriptionScreen(
+        patientId:     next.patientId     ?? 0,
+        doctorId:      next.doctorId      ?? widget.doctorId,
+        userTypeId:    next.userType      ?? widget.userTypeId,
+        appointmentId: next.appointmentId ?? 0,
+        patientName:   next.patientName   ?? 'Patient',
+        patientAge:    _ageString(next.dob),
+        patientGender: next.gender,
+        queueNumber:   next.queueNumber,
+        patientStatus: next.status ?? 'booked',
+      )));
+    } catch (e) { _showSnack('Skip failed: $e', isError: true); }
   }
-
-  final prescription2 = PrescriptionModel(
-    patientId:     widget.patientId,
-    doctorId:      widget.doctorId,
-    symptoms:      _sympCtrl.text.trim(),
-    diagnosis:     _diagCtrl.text.trim(),
-    clinicalNotes: _clinCtrl.text.trim().isEmpty ? null : _clinCtrl.text.trim(),
-    userType:      widget.userTypeId,
-    appointmentId: widget.appointmentId,
-    followUpDate:  followUpStr,
-    advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
-    medicines:     _meds.isEmpty ? [] : _meds.map((e) => e.toApiModel()).toList(),
-  );
-
-  await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(prescription2);
-  if (!mounted) return;
-
-  final state2 = ref.read(prescriptionViewModelProvider);
-  if (state2.error != null) {
-    _showSnack(state2.error ?? 'Something went wrong', isError: true);
-    return;
-  }
-
-  // No dialog: directly queue next and return to list
-  await _handleNextPatient();
-}
-
 
   void _showSnack(String msg, {bool isError = false}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg),
-      backgroundColor: isError ? kRed : kGreen,
+      content: Row(children: [
+        Icon(
+          isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+          color: Colors.white, size: 14,
+        ),
+        const SizedBox(width: 7),
+        Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, color: Colors.white))),
+      ]),
+      backgroundColor: isError ? kError : kPrimary,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      duration: const Duration(seconds: 2),
     ));
   }
 
-  bool get _isDesktop => MediaQuery.of(context).size.width >= 1100;
-  bool get _isTablet  => MediaQuery.of(context).size.width >= 650;
+  double get _width => MediaQuery.of(context).size.width;
+  bool get _isDesktop => _width >= _kDesktopBreak;
+  bool get _isTablet  => _width >= _kTabletBreak;
 
   @override
   Widget build(BuildContext context) {
@@ -1028,112 +861,223 @@ Future<void> _completePrescription() async {
     return Stack(children: [
       Scaffold(
         backgroundColor: kBg,
-        appBar: _appBar(),
-        body: _isDesktop ? _desktopBody(medicines) : _mobileBody(medicines),
+        body: Column(children: [
+          _buildHeader(),
+          Expanded(
+            child: _isDesktop
+                ? _desktopBody(medicines)
+                : _mobileBody(medicines),
+          ),
+        ]),
       ),
       if (state.isLoading)
         Container(
-          color: Colors.black.withOpacity(0.35),
-          child: const Center(child: CircularProgressIndicator(color: kPrimary)),
+          color: Colors.black.withOpacity(0.28),
+          child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
         ),
     ]);
   }
 
-  PreferredSizeWidget _appBar() => AppBar(
-    backgroundColor: kCardBg, elevation: 0, surfaceTintColor: Colors.transparent,
-    leading: IconButton(
-      icon: const Icon(Icons.arrow_back_ios_new_rounded, color: kTextDark, size: 20),
-      onPressed: () => Navigator.pop(context),
+  // ── Header — matches PatientListScreen header exactly ────────────
+  Widget _buildHeader() => Container(
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(bottom: BorderSide(color: kBorder, width: 1)),
     ),
-    title: const Text('New Prescription', style: TextStyle(
-      color: kTextDark, fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: -0.3,
-    )),
-    centerTitle: true,
-    actions: [
-      IconButton(icon: const Icon(Icons.help_outline_rounded, color: kTextMid), onPressed: () {}),
-      IconButton(icon: const Icon(Icons.more_vert_rounded, color: kTextDark), onPressed: () {}),
-    ],
-    bottom: PreferredSize(
-      preferredSize: const Size.fromHeight(1),
-      child: Container(height: 1, color: kBorder),
+    child: SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(children: [
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(
+                color: kBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBorder),
+              ),
+              child: const Icon(Icons.arrow_back_ios_new_rounded, color: kTextPrimary, size: 15),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // Icon badge — same 34×34 style as PatientListScreen
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kPrimary.withOpacity(0.2)),
+            ),
+            child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('New Prescription', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+              SizedBox(height: 1),
+              Text('Fill in consultation details', style: TextStyle(fontSize: 11, color: kTextSecondary)),
+            ]),
+          ),
+          IconButton(icon: const Icon(Icons.help_outline_rounded, color: kTextMuted, size: 18), onPressed: () {}),
+        ]),
+      ),
     ),
   );
 
+  // ── Desktop — 3-column ───────────────────────────────────────────
   Widget _desktopBody(List<Medicine> medicines) => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      Expanded(flex: 4, child: ListView(
-        padding: const EdgeInsets.fromLTRB(28, 20, 14, 100),
-        children: [
-          _patientCard(), _vg(14),
-          _textSection('Symptoms', _sympCtrl, 'Enter patient symptoms...'), _vg(12),
-          _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis...'), _vg(12),
-          _textSection('Clinical Notes', _clinCtrl, 'Add clinical notes...'), _vg(12),
-          _followUpCard(),
-        ],
-      )),
-      Expanded(flex: 6, child: Stack(children: [
-        ListView(
-          padding: const EdgeInsets.fromLTRB(14, 20, 28, 100),
-          children: [
-            _medicinesHeader(), _vg(10),
-            ..._buildMedCards(medicines),
-            if (_meds.isEmpty) _emptyMeds(),
-          ],
+      // Left: Patient info + text fields
+      SizedBox(
+        width: 300,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(right: BorderSide(color: kBorder)),
+          ),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+            children: [
+              _patientCard(), _gap(12),
+              _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+              _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(10),
+              _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
+            ],
+          ),
         ),
-        _bottomBar(),
-      ])),
+      ),
+      // Center: Medicines
+      Expanded(
+        child: Stack(children: [
+          ListView(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+            children: [
+              _medicinesHeader(), _gap(10),
+              ..._buildMedCards(medicines),
+              if (_meds.isEmpty) _emptyMeds(),
+            ],
+          ),
+          _bottomBar(),
+        ]),
+      ),
+      // Right: Follow-up & advice
+      SizedBox(
+        width: 260,
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(left: BorderSide(color: kBorder)),
+          ),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+            children: [_followUpCard()],
+          ),
+        ),
+      ),
     ],
   );
 
+  // ── Tablet — 2-column ────────────────────────────────────────────
   Widget _mobileBody(List<Medicine> medicines) {
-    final hp = _isTablet ? 20.0 : 16.0;
+    if (_isTablet) {
+      return Stack(children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            flex: 4,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 14, 10, 110),
+              children: [
+                _patientCard(), _gap(12),
+                _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+                _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(10),
+                _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
+                _followUpCard(),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 5,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(10, 14, 16, 110),
+              children: [
+                _medicinesHeader(), _gap(10),
+                ..._buildMedCards(medicines),
+                if (_meds.isEmpty) _emptyMeds(),
+              ],
+            ),
+          ),
+        ]),
+        _bottomBar(),
+      ]);
+    }
+    // Mobile — single column
     return Stack(children: [
       ListView(
-        padding: EdgeInsets.fromLTRB(hp, 16, hp, 110),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
         children: [
-          _patientCard(), _vg(16),
-          _textSection('Symptoms', _sympCtrl, 'Enter patient symptoms...'), _vg(12),
-          _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis...'), _vg(12),
-          _textSection('Clinical Notes', _clinCtrl, 'Add clinical notes...'), _vg(16),
-          _medicinesHeader(), _vg(10),
+          _patientCard(), _gap(12),
+          _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+          _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(10),
+          _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
+          _medicinesHeader(), _gap(10),
           ..._buildMedCards(medicines),
           if (_meds.isEmpty) _emptyMeds(),
-          _vg(16),
+          _gap(12),
           _followUpCard(),
         ],
       ),
       _bottomBar(),
     ]);
   }
-Widget _patientCard() => _card(child: Row(children: [
-  Container(
-    width: 52, height: 52,
-    decoration: BoxDecoration(color: kPrimaryBg, borderRadius: BorderRadius.circular(14)),
-    child: const Icon(Icons.person_rounded, color: kPrimary, size: 28),
-  ),
-  const SizedBox(width: 14),
-  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(widget.patientName, style: const TextStyle(   // ← real name
-      fontSize: 16, fontWeight: FontWeight.w700, color: kTextDark,
-    )),
-    const SizedBox(height: 5),
-    Wrap(spacing: 6, runSpacing: 4, children: [
-      if (widget.patientAge != null) _chip(widget.patientAge!),
-      if (widget.patientGender != null) _chip(widget.patientGender!),
-      if (widget.queueNumber != null)
-        _chip('Queue #${widget.queueNumber}', blue: true),
-    ]),
-  ])),
-  _statusBadge('Active', kGreen),
-]));
+
+  // ── Patient Card — matches PatientListScreen card style ──────────
+  Widget _patientCard() {
+    final inits = widget.patientName.trim().split(' ').take(2)
+        .map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
+    return _card(child: Row(children: [
+      Container(
+        width: 44, height: 44,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(colors: [_kGradFrom, _kGradTo],
+              begin: Alignment.topLeft, end: Alignment.bottomRight),
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Text(inits, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
+      ),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(widget.patientName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+            overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 4),
+        Wrap(spacing: 5, runSpacing: 4, children: [
+          if (widget.patientAge != null)    _chip(widget.patientAge!, bg: kInfoLight, fg: kInfoDark),
+          if (widget.patientGender != null) _chip(widget.patientGender!, bg: kPrimaryLighter, fg: kPrimaryDark),
+          if (widget.queueNumber != null)   _chip('Queue #${widget.queueNumber}', bg: kPrimaryLight, fg: kPrimaryDark),
+        ]),
+      ])),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(color: kGreenLight, borderRadius: BorderRadius.circular(8)),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 6, height: 6, decoration: const BoxDecoration(color: kSuccess, shape: BoxShape.circle)),
+          const SizedBox(width: 4),
+          const Text('Active', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreenDark)),
+        ]),
+      ),
+    ]));
+  }
 
   Widget _textSection(String label, TextEditingController ctrl, String hint) =>
       _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _secLabel(label), _vg(12),
+        _secLabel(label), _gap(8),
         TextField(
           controller: ctrl, maxLines: 3,
-          style: const TextStyle(fontSize: 14, color: kTextDark),
+          style: const TextStyle(fontSize: 13, color: kTextPrimary),
           decoration: _ideco(hint),
         ),
       ]));
@@ -1145,24 +1089,25 @@ Widget _patientCard() => _card(child: Row(children: [
       GestureDetector(
         onTap: _addMed,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(10)),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(colors: [_kGradFrom, _kGradTo],
+                begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(10),
+          ),
           child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.add_rounded, color: Colors.white, size: 16),
+            Icon(Icons.add_rounded, color: Colors.white, size: 15),
             SizedBox(width: 5),
-            Text('Add Medicine', style: TextStyle(
-              color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600,
-            )),
+            Text('Add Medicine', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
           ]),
         ),
       ),
     ],
   );
 
-  List<Widget> _buildMedCards(List<Medicine> medicines) => List.generate(
-    _meds.length,
-    (i) => Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+  List<Widget> _buildMedCards(List<Medicine> medicines) => List.generate(_meds.length, (i) =>
+    Padding(
+      padding: const EdgeInsets.only(bottom: 12),
       child: _MedCard(
         index: i, entry: _meds[i], medicines: medicines,
         onDelete: () => _delMed(i),
@@ -1172,208 +1117,139 @@ Widget _patientCard() => _card(child: Row(children: [
   );
 
   Widget _emptyMeds() => _card(child: Center(child: Padding(
-    padding: const EdgeInsets.symmetric(vertical: 28),
+    padding: const EdgeInsets.symmetric(vertical: 22),
     child: Column(children: [
-      Icon(Icons.medication_outlined, color: kPrimary.withOpacity(0.28), size: 44),
-      const SizedBox(height: 10),
-      const Text('No medicines added yet', style: TextStyle(color: kTextMid, fontSize: 14)),
-      const SizedBox(height: 4),
-      const Text('Tap "+ Add Medicine" above',
-          style: TextStyle(color: Color(0xFFB0B8C8), fontSize: 12)),
+      Container(
+        width: 48, height: 48,
+        decoration: BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle),
+        child: const Icon(Icons.medication_outlined, color: kPrimary, size: 22),
+      ),
+      const SizedBox(height: 8),
+      const Text('No medicines added yet', style: TextStyle(color: kTextSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+      const SizedBox(height: 3),
+      const Text('Tap "+ Add Medicine" above', style: TextStyle(color: kTextMuted, fontSize: 11)),
     ]),
   )));
 
-  Widget _followUpCard() => _card(child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      _secLabel('Follow-up & Advice'), _vg(14),
-      GestureDetector(
-        onTap: _pickDate,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-          decoration: BoxDecoration(
-            color: kBg, borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kBorder),
+  Widget _followUpCard() => _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    _secLabel('Follow-up & Advice'), _gap(12),
+    GestureDetector(
+      onTap: _pickDate,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(color: kBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: kBorder)),
+        child: Row(children: [
+          Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(7)),
+            child: const Icon(Icons.event_rounded, color: kPrimary, size: 15),
           ),
-          child: Row(children: [
-            const Icon(Icons.event_rounded, color: kPrimary, size: 18),
-            const SizedBox(width: 10),
-            Text(
-              _followDate == null
-                  ? 'Select follow-up date'
-                  : '${_followDate!.day.toString().padLeft(2, '0')}/'
-                      '${_followDate!.month.toString().padLeft(2, '0')}/'
-                      '${_followDate!.year}',
-              style: TextStyle(
-                fontSize: 14,
-                color: _followDate == null ? const Color(0xFFB0B8C8) : kTextDark,
-                fontWeight: _followDate == null ? FontWeight.w400 : FontWeight.w600,
-              ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(
+            _followDate == null
+                ? 'Select follow-up date'
+                : '${_followDate!.day.toString().padLeft(2, '0')}/${_followDate!.month.toString().padLeft(2, '0')}/${_followDate!.year}',
+            style: TextStyle(
+              fontSize: 13,
+              color: _followDate == null ? kTextMuted : kTextPrimary,
+              fontWeight: _followDate == null ? FontWeight.w400 : FontWeight.w600,
             ),
-            const Spacer(),
-            const Icon(Icons.arrow_drop_down_rounded, color: kTextMid),
-          ]),
-        ),
+          )),
+          const Icon(Icons.arrow_drop_down_rounded, color: kTextMuted, size: 20),
+        ]),
       ),
-      _vg(12),
-      TextField(
-        controller: _advCtrl, maxLines: 3,
-        style: const TextStyle(fontSize: 14, color: kTextDark),
-        decoration: _ideco('Advice / instructions for patient...'),
-      ),
-    ],
-  ));
+    ),
+    _gap(10),
+    TextField(
+      controller: _advCtrl, maxLines: 3,
+      style: const TextStyle(fontSize: 13, color: kTextPrimary),
+      decoration: _ideco('Advice / instructions for patient…'),
+    ),
+  ]));
 
+  // ── Bottom Action Bar ────────────────────────────────────────────
   Widget _bottomBar() {
     final isLoading = ref.watch(prescriptionViewModelProvider).isLoading;
     return Positioned(
       bottom: 0, left: 0, right: 0,
       child: Container(
-        padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+        padding: EdgeInsets.fromLTRB(14, 10, 14, MediaQuery.of(context).padding.bottom + 10),
         decoration: const BoxDecoration(
-          color: kCardBg,
-          boxShadow: [BoxShadow(color: Color(0x1A000000), blurRadius: 20, offset: Offset(0, -4))],
+          color: Colors.white,
+          border: Border(top: BorderSide(color: kBorder)),
+          boxShadow: [BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, -3))],
         ),
         child: Row(children: [
-          // ── Skip button ───────────────────────────────────────────────
           Expanded(
             child: OutlinedButton.icon(
               onPressed: isLoading ? null : _onSkip,
-              icon: const Icon(Icons.skip_next_rounded, size: 16, color: Color(0xFFF57F17)),
-              label: const Text('Skip & Next', style: TextStyle(
-                color: Color(0xFFF57F17), fontWeight: FontWeight.w600, fontSize: 13,
-              )),
+              icon: const Icon(Icons.skip_next_rounded, size: 15, color: kAmberDark),
+              label: const Text('Skip & Next', style: TextStyle(color: kAmberDark, fontWeight: FontWeight.w700, fontSize: 12)),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFFFCC80), width: 1.5),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: kAmberLight, width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                backgroundColor: kAmberLight,
               ),
             ),
           ),
           const SizedBox(width: 10),
-          // ── Complete dropdown (Complete & Next | Complete & Back) ──────
           Expanded(
             flex: 3,
             child: isLoading
-                ? ElevatedButton(
-                    onPressed: null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                ? Container(
+                    height: 46,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(colors: [_kGradFrom, _kGradTo],
+                          begin: Alignment.topLeft, end: Alignment.bottomRight),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const SizedBox(height: 20, width: 20,
-                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)),
+                    alignment: Alignment.center,
+                    child: const SizedBox(height: 18, width: 18,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)),
                   )
-                : _CompleteDropdown(
-                    onNext: _completePrescription,
-                    onBack: _completeAndBack,
-                  ),
+                : _CompleteDropdown(onNext: _completePrescription, onBack: _completeAndBack),
           ),
         ]),
       ),
     );
   }
 
-  Future<void> _onSkip() async {
-    try {
-      await ref.read(appointmentViewModelProvider.notifier).queueSkip(
-        AppointmentRequestModel(doctorId: widget.doctorId
-            , appointmentId: widget.appointmentId, patientId: widget.patientId),
-      );
-      if (!mounted) return;
-
-      // Refresh list and navigate to next patient
-      await ref
-          .read(appointmentViewModelProvider.notifier)
-          .fetchPatientAppointments(widget.doctorId);
-      if (!mounted) return;
-
-      final allList = ref
-          .read(appointmentViewModelProvider)
-          .patientAppointmentsList
-          .maybeWhen(data: (l) => l, orElse: () => <AppointmentList>[]);
-
-      final next = _pickNextAppointment(allList);
-      if (next == null) {
-        _showSnack('No next patient', isError: false);
-        Navigator.pop(context);
-        return;
-      }
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PrescriptionScreen(
-            patientId: next.patientId ?? 0,
-            doctorId: next.doctorId ?? widget.doctorId,
-            userTypeId: next.userType ?? widget.userTypeId,
-            appointmentId: next.appointmentId ?? 0,
-            patientName: next.patientName ?? 'Patient',
-            patientAge: _ageString(next.dob),
-            patientGender: next.gender,
-            queueNumber: next.queueNumber,
-            patientStatus: next.status ?? 'booked',
-          ),
-        ),
-      );
-    } catch (e) {
-      _showSnack('Skip failed: $e', isError: true);
-    }
-  }
-
+  // ── Shared helpers ───────────────────────────────────────────────
   Widget _card({required Widget child}) => Container(
-    width: double.infinity, padding: const EdgeInsets.all(16),
+    width: double.infinity,
+    padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: kCardBg, borderRadius: BorderRadius.circular(16),
-      boxShadow: const [BoxShadow(
-        color: Color(0x0B000000), blurRadius: 12, offset: Offset(0, 2),
-      )],
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: kBorder),
+      boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
     ),
     child: child,
   );
 
-  Widget _vg(double h) => SizedBox(height: h);
+  Widget _gap(double h) => SizedBox(height: h);
 
   Widget _secLabel(String t, {bool bare = false}) => Row(children: [
-    Container(width: 3, height: 16,
-        decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(2))),
-    const SizedBox(width: 8),
-    Text(t, style: const TextStyle(
-      fontSize: 15, fontWeight: FontWeight.w700, color: kTextDark, letterSpacing: -0.2,
-    )),
+    Container(width: 3, height: 14, decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(2))),
+    const SizedBox(width: 7),
+    Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary, letterSpacing: -0.2)),
   ]);
 
-  Widget _chip(String t, {bool blue = false}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: blue ? kPrimaryBg : kBg, borderRadius: BorderRadius.circular(6),
-    ),
-    child: Text(t, style: TextStyle(
-      fontSize: 12, fontWeight: FontWeight.w500,
-      color: blue ? kPrimary : kTextMid,
-    )),
-  );
-
-  Widget _statusBadge(String t, Color c) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    decoration: BoxDecoration(
-      color: c.withOpacity(0.12), borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(t, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: c)),
+  Widget _chip(String t, {required Color bg, required Color fg}) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+    child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
   );
 
   InputDecoration _ideco(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFB0B8C8)),
+    hintStyle: const TextStyle(fontSize: 12, color: kTextMuted),
     filled: true, fillColor: kBg,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
   );
 }
 
@@ -1398,7 +1274,6 @@ class _MedCard extends StatefulWidget {
 
 class _MedCardState extends State<_MedCard> {
   MedicineEntry get e => widget.entry;
-
   late TextEditingController _durCtrl;
   late TextEditingController _areaCtrl;
 
@@ -1410,15 +1285,12 @@ class _MedCardState extends State<_MedCard> {
     _areaCtrl = TextEditingController(text: e.lotionApplyArea);
   }
 
+  void _disposeControllers() { _durCtrl.dispose(); _areaCtrl.dispose(); }
+
   String _freqFromDosage(String dosage) {
     final parts = dosage.split('-');
     if (parts.length < 3) return e.frequency;
     return parts.map((p) => p == '0' ? '0' : '1').join('-');
-  }
-
-  void _disposeControllers() {
-    _durCtrl.dispose();
-    _areaCtrl.dispose();
   }
 
   void _onTypeChange(MedicineType t) {
@@ -1434,9 +1306,7 @@ class _MedCardState extends State<_MedCard> {
   @override
   void dispose() { _disposeControllers(); super.dispose(); }
 
-  static const _timingOpts = [
-    'After Food', 'Before Food', 'With Food', 'Empty Stomach', 'At Bedtime', 'As Directed',
-  ];
+  static const _timingOpts = ['After Food', 'Before Food', 'With Food', 'Empty Stomach', 'At Bedtime', 'As Directed'];
   static const _routeOpts  = ['IV', 'IM', 'SC', 'Intradermal'];
   static const _appOpts    = ['Eyes', 'Ears', 'Nose', 'Both Eyes', 'Both Ears'];
   static const _sprayUsage = ['Nasal', 'Oral (Inhaler)', 'Throat'];
@@ -1445,47 +1315,44 @@ class _MedCardState extends State<_MedCard> {
   Widget build(BuildContext context) {
     final tc = e.type.color;
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
+      duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: kCardBg, borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: tc.withOpacity(0.28), width: 1.2),
-        boxShadow: [BoxShadow(
-            color: tc.withOpacity(0.07), blurRadius: 14, offset: const Offset(0, 3))],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: tc.withOpacity(0.30), width: 1.2),
+        boxShadow: [BoxShadow(color: tc.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _header(tc),
-        Padding(padding: const EdgeInsets.all(14), child: _body()),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 14), child: _body()),
       ]),
     );
   }
 
   Widget _header(Color tc) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
       color: tc.withOpacity(0.07),
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
     ),
     child: Row(children: [
       Container(
-        width: 30, height: 30,
-        decoration: BoxDecoration(
-            color: tc.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
-        child: Icon(e.type.icon, color: tc, size: 16),
+        width: 28, height: 28,
+        decoration: BoxDecoration(color: tc.withOpacity(0.15), borderRadius: BorderRadius.circular(7)),
+        child: Icon(e.type.icon, color: tc, size: 14),
       ),
-      const SizedBox(width: 10),
-      Text('Medicine ${widget.index + 1}', style: const TextStyle(
-        fontSize: 14, fontWeight: FontWeight.w700, color: kTextDark,
-      )),
-      const SizedBox(width: 8),
+      const SizedBox(width: 9),
+      Text('Medicine ${widget.index + 1}',
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+      const SizedBox(width: 7),
       _TypePill(value: e.type, onChanged: _onTypeChange),
       const Spacer(),
       GestureDetector(
         onTap: widget.onDelete,
         child: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-              color: kRed.withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
-          child: const Icon(Icons.delete_outline_rounded, color: kRed, size: 18),
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(color: kRedLight, borderRadius: BorderRadius.circular(7)),
+          child: const Icon(Icons.delete_outline_rounded, color: kError, size: 16),
         ),
       ),
     ]),
@@ -1502,7 +1369,6 @@ class _MedCardState extends State<_MedCard> {
     }
   }
 
-  // ── dosage picker helper ─────────────────────────────────────────
   Widget _dosagePicker({String? label}) => SlotPickerField(
     key: ValueKey('dosage_${e.type.name}'),
     label: label ?? 'Dosage per slot',
@@ -1513,123 +1379,97 @@ class _MedCardState extends State<_MedCard> {
     optsMap: _kDosageOpts,
     onChanged: (val) => setState(() {
       e.dosage = val;
-      // Derive frequency from dosage: any non-zero dose counts as 1 time.
       e.frequency = _freqFromDosage(val);
     }),
   );
 
   Widget _commonBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _nameSearch(), _vg(12),
-    _dosagePicker(), _vg(12),
+    _nameSearch(), _gap(10),
+    _dosagePicker(), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 5 days, 2 weeks', _durCtrl,
-          onChanged: (v) => e.duration = v),
-      _dropField('Timing', e.timing, _timingOpts,
-          (v) => setState(() => e.timing = v!)),
+      _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
 
   Widget _injBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _nameSearch(), _vg(12),
-    _dropField('Route', e.injRoute, _routeOpts,
-        (v) => setState(() => e.injRoute = v!)),
-    _vg(12),
-    _dosagePicker(), _vg(12),
+    _nameSearch(), _gap(10),
+    _dropField('Route', e.injRoute, _routeOpts, (v) => setState(() => e.injRoute = v!)),
+    _gap(10), _dosagePicker(), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 3 days, 5 days', _durCtrl,
-          onChanged: (v) => e.duration = v),
-      _dropField('Timing', e.timing, _timingOpts,
-          (v) => setState(() => e.timing = v!)),
+      _txtField('Duration', 'e.g. 3 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
 
   Widget _dropsBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _nameSearch(), _vg(12),
-    _dropField('Application', e.dropsApplication, _appOpts,
-        (v) => setState(() => e.dropsApplication = v!)),
-    _vg(12),
-    _dosagePicker(label: 'Drops per slot'), _vg(12),
+    _nameSearch(), _gap(10),
+    _dropField('Application', e.dropsApplication, _appOpts, (v) => setState(() => e.dropsApplication = v!)),
+    _gap(10), _dosagePicker(label: 'Drops per slot'), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 5 days, 1 week', _durCtrl,
-          onChanged: (v) => e.duration = v),
-      _dropField('Timing', e.timing, _timingOpts,
-          (v) => setState(() => e.timing = v!)),
+      _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
 
   Widget _lotionBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _nameSearch(), _vg(12),
-    _txtField('Apply Area / Body Part', 'e.g. Scalp, Face, Both arms', _areaCtrl,
-        onChanged: (v) => e.lotionApplyArea = v),
-    _vg(12),
-    _dosagePicker(label: 'Application per slot'), _vg(12),
+    _nameSearch(), _gap(10),
+    _txtField('Apply Area / Body Part', 'e.g. Scalp, Face', _areaCtrl, onChanged: (v) => e.lotionApplyArea = v),
+    _gap(10), _dosagePicker(label: 'Application per slot'), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 7 days, 2 weeks', _durCtrl,
-          onChanged: (v) => e.duration = v),
-      _dropField('Timing', e.timing,
-          ['Morning', 'Evening', 'Night', 'Morning & Night', 'As Directed'],
+      _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _dropField('Timing', e.timing, ['Morning', 'Evening', 'Night', 'Morning & Night', 'As Directed'],
           (v) => setState(() => e.timing = v!)),
     ]),
   ]);
 
   Widget _sprayBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _nameSearch(), _vg(12),
-    _dropField('Usage', e.sprayUsage, _sprayUsage,
-        (v) => setState(() => e.sprayUsage = v!)),
-    _vg(12),
-    _dosagePicker(label: 'Puffs per slot'), _vg(12),
+    _nameSearch(), _gap(10),
+    _dropField('Usage', e.sprayUsage, _sprayUsage, (v) => setState(() => e.sprayUsage = v!)),
+    _gap(10), _dosagePicker(label: 'Puffs per slot'), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 7 days, 1 month', _durCtrl,
-          onChanged: (v) => e.duration = v),
-      _dropField('Timing', e.timing, _timingOpts,
-          (v) => setState(() => e.timing = v!)),
+      _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
 
-  // ── name search ──────────────────────────────────────────────────
   Widget _nameSearch() {
-    final all = widget.medicines
-        .where((m) => (m.medTypeId ?? 0) == e.type.typeId)
-        .toList();
+    final all = widget.medicines.where((m) => (m.medTypeId ?? 0) == e.type.typeId).toList();
     final filtered = e.searchText.isEmpty
         ? all
-        : all.where((m) => (m.medicineName ?? '')
-            .toLowerCase()
-            .contains(e.searchText.toLowerCase()))
-            .toList();
+        : all.where((m) => (m.medicineName ?? '').toLowerCase().contains(e.searchText.toLowerCase())).toList();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _lbl('Medicine Name  ·  ${e.type.label}'),
-      _vg(6),
+      _lbl('Medicine Name  ·  ${e.type.label}'), _gap(5),
       if (all.isEmpty)
-        Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(children: const [
-          Icon(Icons.info_outline_rounded, size: 13, color: kTextMid),
-          SizedBox(width: 6),
-          Text('No medicines found for this type. Add medicines first.',
-              style: TextStyle(fontSize: 12, color: kTextMid)),
-        ])),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(color: kAmberLight, borderRadius: BorderRadius.circular(8), border: Border.all(color: kAmberDark.withOpacity(0.3))),
+          child: const Row(children: [
+            Icon(Icons.info_outline_rounded, size: 13, color: kAmberDark),
+            SizedBox(width: 6),
+            Expanded(child: Text('No medicines found for this type.', style: TextStyle(fontSize: 11, color: kAmberDark))),
+          ]),
+        ),
       if (e.selectedName != null)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
-            color: e.type.color.withOpacity(0.08),
+            color: e.type.colorLight,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: e.type.color.withOpacity(0.30)),
+            border: Border.all(color: e.type.color.withOpacity(0.3)),
           ),
           child: Row(children: [
-            Icon(e.type.icon, color: e.type.color, size: 16),
+            Icon(e.type.icon, color: e.type.color, size: 15),
             const SizedBox(width: 8),
-            Expanded(child: Text(e.selectedName!, style: const TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark,
-            ), overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text(e.selectedName!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
+                overflow: TextOverflow.ellipsis)),
             GestureDetector(
-              onTap: () => setState(() {
-                e.selectedName = null; e.medicineId = null; e.searchText = '';
-              }),
+              onTap: () => setState(() { e.selectedName = null; e.medicineId = null; e.searchText = ''; }),
               child: Container(
                 padding: const EdgeInsets.all(3),
                 decoration: const BoxDecoration(color: kBorder, shape: BoxShape.circle),
-                child: const Icon(Icons.close_rounded, size: 12, color: kTextMid),
+                child: const Icon(Icons.close_rounded, size: 11, color: kTextSecondary),
               ),
             ),
           ]),
@@ -1637,59 +1477,54 @@ class _MedCardState extends State<_MedCard> {
       else ...[
         TextField(
           onChanged: (v) => setState(() => e.searchText = v),
-          style: const TextStyle(fontSize: 14, color: kTextDark),
-          decoration: _ideco('Search or type ${e.type.label} name...').copyWith(
-            prefixIcon: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Icon(Icons.search_rounded, color: e.type.color, size: 18),
-            ),
-            prefixIconConstraints: const BoxConstraints(minWidth: 44),
+          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          decoration: _ideco('Search ${e.type.label} name…').copyWith(
+            prefixIcon: Padding(padding: const EdgeInsets.symmetric(horizontal: 11),
+                child: Icon(Icons.search_rounded, color: e.type.color, size: 16)),
+            prefixIconConstraints: const BoxConstraints(minWidth: 40),
           ),
         ),
         if (e.searchText.isNotEmpty) ...[
-          _vg(4),
+          _gap(4),
           if (filtered.isNotEmpty)
             Container(
-              constraints: const BoxConstraints(maxHeight: 190),
+              constraints: const BoxConstraints(maxHeight: 180),
               decoration: BoxDecoration(
-                color: kCardBg, borderRadius: BorderRadius.circular(10),
+                color: Colors.white, borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: kBorder),
-                boxShadow: const [BoxShadow(
-                  color: Color(0x12000000), blurRadius: 8, offset: Offset(0, 4),
-                )],
+                boxShadow: const [BoxShadow(color: Color(0x10000000), blurRadius: 8, offset: Offset(0, 3))],
               ),
               child: ListView.separated(
                 shrinkWrap: true, padding: EdgeInsets.zero,
                 itemCount: filtered.length,
-                separatorBuilder: (_, __) =>
-                    const Divider(height: 1, color: kBorder, indent: 14, endIndent: 14),
+                separatorBuilder: (_, __) => const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
                 itemBuilder: (_, i) => InkWell(
                   onTap: () => setState(() {
                     e.selectedName = filtered[i].medicineName ?? '';
-                    e.medicineId = filtered[i].medicineId;
-                    e.searchText = '';
+                    e.medicineId   = filtered[i].medicineId;
+                    e.searchText   = '';
                   }),
                   borderRadius: BorderRadius.circular(10),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     child: Row(children: [
-                      Icon(e.type.icon, color: e.type.color, size: 14),
-                      const SizedBox(width: 10),
+                      Icon(e.type.icon, color: e.type.color, size: 13),
+                      const SizedBox(width: 9),
                       Expanded(child: Text(filtered[i].medicineName ?? '',
-                          style: const TextStyle(fontSize: 13, color: kTextDark),
+                          style: const TextStyle(fontSize: 12, color: kTextPrimary),
                           overflow: TextOverflow.ellipsis)),
-                      Icon(Icons.add_circle_outline_rounded, color: e.type.color, size: 16),
+                      Icon(Icons.add_circle_outline_rounded, color: e.type.color, size: 15),
                     ]),
                   ),
                 ),
               ),
             )
           else
-            Padding(padding: const EdgeInsets.only(top: 6), child: Row(children: [
-              const Icon(Icons.info_outline_rounded, size: 13, color: kTextMid),
-              const SizedBox(width: 6),
-              Text('No ${e.type.label} found for "${e.searchText}"',
-                  style: const TextStyle(fontSize: 12, color: kTextMid)),
+            Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
+              const Icon(Icons.info_outline_rounded, size: 12, color: kTextMuted),
+              const SizedBox(width: 5),
+              Expanded(child: Text('No ${e.type.label} found for "${e.searchText}"',
+                  style: const TextStyle(fontSize: 11, color: kTextMuted))),
             ])),
         ],
       ],
@@ -1699,58 +1534,44 @@ class _MedCardState extends State<_MedCard> {
   Widget _txtField(String label, String hint, TextEditingController ctrl,
       {required ValueChanged<String> onChanged}) =>
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _lbl(label), _vg(6),
-        TextField(
-          controller: ctrl, onChanged: onChanged,
-          style: const TextStyle(fontSize: 14, color: kTextDark),
-          decoration: _ideco(hint),
-        ),
+        _lbl(label), _gap(5),
+        TextField(controller: ctrl, onChanged: onChanged,
+          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          decoration: _ideco(hint)),
       ]);
 
-  Widget _dropField(String label, String value, List<String> opts,
-      ValueChanged<String?> cb) {
+  Widget _dropField(String label, String value, List<String> opts, ValueChanged<String?> cb) {
     final safe = opts.contains(value) ? value : opts.first;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _lbl(label), _vg(6),
+      _lbl(label), _gap(5),
       DropdownButtonFormField<String>(
         value: safe, isExpanded: true,
-        items: opts.map((o) => DropdownMenuItem(
-            value: o,
-            child: Text(o,
-                style: const TextStyle(fontSize: 13),
-                overflow: TextOverflow.ellipsis))).toList(),
+        items: opts.map((o) => DropdownMenuItem(value: o,
+            child: Text(o, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
         onChanged: cb,
-        decoration: _ideco('').copyWith(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        ),
-        dropdownColor: kCardBg,
-        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: kTextMid, size: 18),
+        decoration: _ideco('').copyWith(contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10)),
+        dropdownColor: Colors.white,
+        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: kTextMuted, size: 17),
       ),
     ]);
   }
 
-  Widget _r2(List<Widget> ch) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [Expanded(child: ch[0]), const SizedBox(width: 10), Expanded(child: ch[1])],
-  );
+  Widget _r2(List<Widget> ch) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Expanded(child: ch[0]), const SizedBox(width: 8), Expanded(child: ch[1]),
+  ]);
 
-  Widget _lbl(String t) => Text(t, style: const TextStyle(
-    fontSize: 12, fontWeight: FontWeight.w600, color: kTextMid, letterSpacing: 0.1,
-  ));
+  Widget _lbl(String t) => Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.1));
 
-  Widget _vg(double h) => SizedBox(height: h);
+  Widget _gap(double h) => SizedBox(height: h);
 
   InputDecoration _ideco(String hint) => InputDecoration(
     hintText: hint,
-    hintStyle: const TextStyle(fontSize: 13, color: Color(0xFFB0B8C8)),
+    hintStyle: const TextStyle(fontSize: 12, color: kTextMuted),
     filled: true, fillColor: kBg,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kBorder)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
   );
 }
 
@@ -1763,216 +1584,29 @@ class _TypePill extends StatelessWidget {
   const _TypePill({required this.value, required this.onChanged});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: kCardBg, borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: value.color.withOpacity(0.4)),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+    decoration: BoxDecoration(
+      color: value.colorLight,
+      borderRadius: BorderRadius.circular(7),
+      border: Border.all(color: value.color.withOpacity(0.35)),
+    ),
+    child: DropdownButtonHideUnderline(
+      child: DropdownButton<MedicineType>(
+        value: value, isDense: true,
+        icon: Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: value.colorDark),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: value.colorDark),
+        dropdownColor: Colors.white,
+        items: MedicineType.values.map((t) => DropdownMenuItem(
+          value: t,
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(t.icon, size: 13, color: t.color),
+            const SizedBox(width: 5),
+            Text(t.label, style: TextStyle(color: t.colorDark, fontSize: 12, fontWeight: FontWeight.w600)),
+          ]),
+        )).toList(),
+        onChanged: (v) { if (v != null) onChanged(v); },
       ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<MedicineType>(
-          value: value, isDense: true,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, size: 15, color: value.color),
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: value.color),
-          dropdownColor: kCardBg,
-          items: MedicineType.values.map((t) => DropdownMenuItem(
-            value: t,
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(t.icon, size: 14, color: t.color),
-              const SizedBox(width: 5),
-              Text(t.label, style: TextStyle(
-                color: t.color, fontSize: 12, fontWeight: FontWeight.w600,
-              )),
-            ]),
-          )).toList(),
-          onChanged: (v) { if (v != null) onChanged(v); },
-        ),
-      ),
-    );
-  }
-}
-
-class _SuccessDialog extends StatelessWidget {
-  final String patientName;
-  final int medicineCount;
-  final String? followUpDate;
-  final VoidCallback onBackToList;
-
-  const _SuccessDialog({
-    required this.patientName,
-    required this.medicineCount,
-    required this.followUpDate,
-    required this.onBackToList,
-  });
-
-  String _formatDate(String? d) {
-    if (d == null) return 'Not scheduled';
-    final parts = d.split('-');
-    if (parts.length < 3) return d;
-    const months = ['Jan','Feb','Mar','Apr','May','Jun',
-                    'Jul','Aug','Sep','Oct','Nov','Dec'];
-    final month = int.tryParse(parts[1]);
-    final mLabel = (month != null && month >= 1 && month <= 12)
-        ? months[month - 1] : parts[1];
-    return '${parts[2]} $mLabel ${parts[0]}';
-  }
-
-  String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length == 1) return parts[0][0].toUpperCase();
-    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      backgroundColor: kCardBg,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-
-          // ✅ Success icon
-          Container(
-            width: 68, height: 68,
-            decoration: BoxDecoration(
-              color: kGreen.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.check_circle_rounded, color: kGreen, size: 40),
-          ),
-          const SizedBox(height: 16),
-
-          const Text('Prescription Saved!',
-              style: TextStyle(
-                fontSize: 19, fontWeight: FontWeight.w700, color: kTextDark)),
-          const SizedBox(height: 6),
-
-          // Patient name
-          RichText(text: TextSpan(
-            style: const TextStyle(fontSize: 13, color: kTextMid),
-            children: [
-              TextSpan(
-                text: patientName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600, color: kTextDark),
-              ),
-              const TextSpan(text: "'s prescription has been completed successfully."),
-            ],
-          )),
-
-          const SizedBox(height: 20),
-
-          // Patient avatar + summary card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: kBg,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: kBorder),
-            ),
-            child: Column(children: [
-
-              // Patient avatar row
-              Row(children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: kPrimaryBg,
-                  child: Text(_initials(patientName),
-                      style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w700, color: kPrimary)),
-                ),
-                const SizedBox(width: 12),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(patientName,
-                      style: const TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w600, color: kTextDark)),
-                  const SizedBox(height: 2),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: kGreen.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('Prescription Complete',
-                        style: TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w600, color: kGreen)),
-                  ),
-                ]),
-              ]),
-
-              const SizedBox(height: 12),
-              const Divider(height: 1, color: kBorder),
-              const SizedBox(height: 12),
-
-              // Medicines count
-              _summaryRow(
-                Icons.medication_rounded,
-                'Medicines',
-                '$medicineCount medicine${medicineCount > 1 ? 's' : ''} prescribed',
-                const Color(0xFF2B7FFF),
-              ),
-              const SizedBox(height: 10),
-
-              // Follow-up date
-              _summaryRow(
-                Icons.event_rounded,
-                'Follow-up',
-                _formatDate(followUpDate),
-                kPrimary,
-              ),
-            ]),
-          ),
-
-          const SizedBox(height: 20),
-
-          // Back to Patient List button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onBackToList,
-              icon: const Icon(Icons.people_rounded, size: 16, color: Colors.white),
-              label: const Text('Next Patient',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: Colors.white,
-                  )),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kPrimary,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-          ),
-        ]),
-      ),
-    );
-    
-  }
-
-  Widget _summaryRow(IconData icon, String label, String value, Color iconColor) =>
-      Row(children: [
-        Container(
-          width: 32, height: 32,
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 16, color: iconColor),
-        ),
-        const SizedBox(width: 10),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: const TextStyle(fontSize: 11, color: kTextMid)),
-          Text(value,
-              style: const TextStyle(
-                fontSize: 13, fontWeight: FontWeight.w600, color: kTextDark)),
-        ]),
-      ]);
+    ),
+  );
 }
