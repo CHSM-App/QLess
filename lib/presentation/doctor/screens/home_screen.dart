@@ -123,6 +123,18 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }).toList();
   }
 
+  List<AppointmentList> _skippedToday(List<AppointmentList> all) {
+    final today = DateTime.now();
+    return all.where((a) {
+      if ((a.status?.toLowerCase() ?? '') != 'skipped') return false;
+      final d = DateTime.tryParse(a.appointmentDate ?? '');
+      if (d == null) return false;
+      return d.year == today.year &&
+          d.month == today.month &&
+          d.day == today.day;
+    }).toList();
+  }
+
   // ── Snack ─────────────────────────────────────────────────────────────────
 
   void _snack(String msg) {
@@ -139,33 +151,33 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   // ── Queue actions ─────────────────────────────────────────────────────────
 
-  Future<void> _onQueueStart() async {
+  Future<void> _onQueueStart(int? queueId) async {
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queueStart(AppointmentRequestModel(doctorId: _doctorId));
+          .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue started');
     } catch (_) {
       _snack('Failed to start queue');
     }
   }
 
-  Future<void> _onQueuePause() async {
+  Future<void> _onQueuePause(int? queueId) async {
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queuePause(AppointmentRequestModel(doctorId: _doctorId));
+          .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue paused');
     } catch (_) {
       _snack('Failed to pause queue');
     }
   }
 
-  Future<void> _onQueueStop() async {
+  Future<void> _onQueueStop(int? queueId) async {
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queueStop(AppointmentRequestModel(doctorId: _doctorId));
+          .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue closed');
     } catch (_) {
       _snack('Failed to close queue');
@@ -216,6 +228,33 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       .join()
       .toUpperCase();
 
+  QueueState _sessionQueueState(int? status) {
+    switch (status) {
+      case 1: return QueueState.running;
+      case 2: return QueueState.paused;
+      case 3: return QueueState.stopped;
+      default: return QueueState.idle;
+    }
+  }
+
+  AppointmentList? _findCurrentPatient(List<AppointmentList> all, int? appointmentId) {
+    if (appointmentId == null || appointmentId == 0) return null;
+    try {
+      return all.firstWhere((a) => a.appointmentId == appointmentId);
+    } catch (_) {
+      return null;
+    }
+  }
+String _fmtTime(String? raw) {
+  if (raw == null) return '';
+  try {
+    final dt = DateTime.parse(raw).toUtc(); // keep as UTC, don't convert to local
+    return DateFormat('h:mm a').format(dt);
+  } catch (_) {
+    return raw;
+  }
+}
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -228,7 +267,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             : 'Good Evening 👋';
 
     final vmState           = ref.watch(appointmentViewModelProvider);
-    final queueState        = vmState.queueState;
     final appointmentsAsync = vmState.patientAppointmentsList;
 
     // Read doctor name reactively
@@ -246,7 +284,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           final current    = todayQueue.isNotEmpty ? todayQueue.first : null;
           final waiting    = _waitingList(todayQueue);
           final completed  = _completedToday(list);
-          final nextNo     = waiting.isNotEmpty ? waiting.first.queueNumber : null;
+          final skipped    = _skippedToday(list);
+
+          // Today's queue sessions from getTodayQueue API
+          final todayQueues = vmState.todayQueueResult?.value ?? [];
 
           // Limit waiting list to 3 unless "Show All" is toggled
           final visibleWaiting = _showAllWaiting
@@ -268,22 +309,45 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                     total:   todayQueue.length,
                     waiting: waiting.length,
                     done:    completed.length,
+                    skipped: skipped.length,
                   ),
                 ),
               ),
-              // ── LIVE QUEUE CARD ──────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
+              // ── LIVE QUEUE CARDS (one per session) ───────────────────
+              if (todayQueues.isNotEmpty)
+                SliverPadding(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                  child: _buildQueueCard(
-                    current:     current,
-                    nextQueueNo: nextNo,
-                    total:       todayQueue.length,
-                    done:        completed.length,
-                    queueState:  queueState,
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) {
+                        final session   = todayQueues[i];
+                        final qs        = _sessionQueueState(session.queueStatus);
+                        final currentPt = _findCurrentPatient(list, session.currentServing);
+                        final nextQNo   = session.currentQueueNo != null &&
+                                session.currentQueueNo! < (session.totalQueue ?? 0)
+                            ? session.currentQueueNo! + 1
+                            : null;
+                        final slotLbl = (session.startTime != null)
+                            ? '${_fmtTime(session.startTime)} – ${_fmtTime(session.endTime)}'
+                            : null;
+                        return Padding(
+                          padding: EdgeInsets.only(
+                              bottom: i < todayQueues.length - 1 ? 12 : 0),
+                          child: _buildQueueCard(
+                            current:     currentPt,
+                            nextQueueNo: nextQNo,
+                            total:       session.totalQueue ?? 0,
+                            done:        session.completedCount ?? 0,
+                            queueState:  qs,
+                            queueId:     session.queueId,
+                            slotLabel:   slotLbl,
+                          ),
+                        );
+                      },
+                      childCount: todayQueues.length,
+                    ),
                   ),
                 ),
-              ),
               // ── QUICK ACTIONS ────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
@@ -605,10 +669,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     required int total,
     required int waiting,
     required int done,
+    required int skipped,
   }) {
     return Row(children: [
       _statCard(
-          label: 'Total Today',
+          label: 'Total',
           value: total.toString().padLeft(2, '0'),
           valueColor: kTextPrimary,
           accent: kPrimary),
@@ -624,6 +689,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           value: done.toString().padLeft(2, '0'),
           valueColor: kGreenDark,
           accent: kGreen),
+      const SizedBox(width: 8),
+      _statCard(
+          label: 'Skipped',
+          value: skipped.toString().padLeft(2, '0'),
+          valueColor: kAmberDark,
+          accent: kAmber),
     ]);
   }
 
@@ -679,6 +750,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     required int total,
     required int done,
     required QueueState queueState,
+    int? queueId,
+    String? slotLabel,
   }) {
     final isRunning = queueState == QueueState.running;
     final isStopped = queueState == QueueState.stopped;
@@ -703,6 +776,23 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                     letterSpacing: 1.1,
                     color: kPrimary)),
           ),
+          if (slotLabel != null) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                slotLabel,
+                style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: kPrimaryDark),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
           _queueStateBadge(queueState),
         ]),
         const SizedBox(height: 12),
@@ -737,8 +827,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         Row(children: [
           Expanded(
             child: _actionBtn(
-              label: isRunning ? '⏸  Pause' : '▶  Resume',
-              onTap: isRunning ? _onQueuePause : _onQueueStart,
+              label: isRunning ? '⏸  Pause' : '▶  Start',
+              onTap: isRunning
+                  ? () => _onQueuePause(queueId)
+                  : () => _onQueueStart(queueId),
               isPrimary: isRunning,
             ),
           ),
@@ -747,7 +839,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             child: Opacity(
               opacity: isStopped ? 0.4 : 1.0,
               child: GestureDetector(
-                onTap: isStopped ? null : _onQueueStop,
+                onTap: isStopped ? null : () => _onQueueStop(queueId),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   decoration: BoxDecoration(

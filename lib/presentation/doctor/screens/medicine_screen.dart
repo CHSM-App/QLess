@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -286,25 +288,14 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
           medicinesAsync.when(
             data: (list) => _CountRow(
                 count: _filtered(list).length, total: list.length),
-            loading: () => const Padding(
-              padding: EdgeInsets.fromLTRB(14, 8, 14, 4),
-              child: Text('Loading medicines…',
-                  style: TextStyle(fontSize: 12, color: kTextMuted)),
-            ),
+            loading: () => const _SkeletonCountRow(),
             error: (_, __) => const SizedBox.shrink(),
           ),
 
           // ── Main content ────────────────────────────────────────────────
           Expanded(
             child: medicinesAsync.when(
-              loading: () => const Center(
-                child: SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                      color: kPrimary, strokeWidth: 2.5),
-                ),
-              ),
+              loading: () => const _SkeletonList(),
               error: (_, __) =>
                   _ErrorState(onRetry: () => _refresh(force: true)),
               data: (medicines) {
@@ -319,8 +310,14 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                   final isWide = constraints.maxWidth > 700;
                   return RefreshIndicator(
                     color: kPrimary,
-                    strokeWidth: 2,
-                    onRefresh: () async => _refresh(force: true),
+                    strokeWidth: 2.5,
+                    displacement: 40,
+                    onRefresh: () async {
+                      _refresh(force: true);
+                      // wait a bit so indicator is visible
+                      await Future.delayed(
+                          const Duration(milliseconds: 600));
+                    },
                     child: isWide
                         ? _buildGrid(filtered)
                         : _buildList(filtered, _scrollCtrl),
@@ -735,6 +732,134 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  ERROR STATE
+// ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+//  SHIMMER HELPERS
+// ════════════════════════════════════════════════════════════════════
+class _Shimmer extends StatefulWidget {
+  final double width, height, radius;
+  const _Shimmer(
+      {required this.width, required this.height, this.radius = 6});
+
+  @override
+  State<_Shimmer> createState() => _ShimmerState();
+}
+
+class _ShimmerState extends State<_Shimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1100))
+      ..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _anim,
+        child: Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE2E8F0),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON COUNT ROW
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonCountRow extends StatelessWidget {
+  const _SkeletonCountRow();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+        child: Row(
+          children: [
+            const _Shimmer(width: 90, height: 12, radius: 6),
+            const Spacer(),
+            const _Shimmer(width: 56, height: 22, radius: 20),
+          ],
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON MEDICINE CARD
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonCard extends StatelessWidget {
+  const _SkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            const _Shimmer(width: 40, height: 40, radius: 10),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  _Shimmer(width: 130, height: 13),
+                  SizedBox(height: 6),
+                  _Shimmer(width: 60, height: 20, radius: 6),
+                ],
+              ),
+            ),
+            const _Shimmer(width: 30, height: 30, radius: 9),
+          ],
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON LIST
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonList extends StatelessWidget {
+  const _SkeletonList();
+
+  @override
+  Widget build(BuildContext context) => ListView.separated(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 140),
+        itemCount: 7,
+        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        itemBuilder: (_, __) => const _SkeletonCard(),
       );
 }
 

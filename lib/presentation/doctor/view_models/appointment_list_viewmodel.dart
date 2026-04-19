@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
+import 'package:qless/domain/models/today_queue_model.dart';
 import 'package:qless/domain/usecase/appointment_usecase.dart';
 
 enum QueueState { idle, running, paused, stopped }
@@ -14,6 +15,7 @@ class AppointmentListState {
   final bool isLoading;
   final String? error;
   final AsyncValue<List<AppointmentList>> patientAppointmentsList;
+  final AsyncValue<List<TodayQueueModel>>? todayQueueResult;
   final QueueState queueState;
 
   const AppointmentListState({
@@ -21,12 +23,14 @@ class AppointmentListState {
     this.error,
     this.patientAppointmentsList = const AsyncValue.data([]),
     this.queueState = QueueState.idle,
+    this.todayQueueResult = const AsyncValue.data([]),
   });
 
   AppointmentListState copyWith({
     bool? isLoading,
     String? error,
     AsyncValue<List<AppointmentList>>? patientAppointmentsList,
+    AsyncValue<List<TodayQueueModel>>? todayQueueResult,
     QueueState? queueState,
   }) {
     return AppointmentListState(
@@ -34,6 +38,7 @@ class AppointmentListState {
       error: error ?? this.error,
       patientAppointmentsList: patientAppointmentsList ?? this.patientAppointmentsList,
       queueState: queueState ?? this.queueState,
+      todayQueueResult: todayQueueResult ?? this.todayQueueResult,
     );
   }
 }
@@ -57,9 +62,16 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       // Derive queue state from backend data so it survives app restarts
       final derivedQueueState = _deriveQueueState(result.isNotEmpty ? result.first.queueStatus : null);
 
+      // Also fetch today's queue sessions to get queue_id per session
+      List<TodayQueueModel> todayQueues = [];
+      try {
+        todayQueues = await usecase.getTodayQueue(doctorId);
+      } catch (_) {}
+
       state = state.copyWith(
         patientAppointmentsList: AsyncValue.data(result),
         queueState: derivedQueueState,
+        todayQueueResult: AsyncValue.data(todayQueues),
       );
     } catch (e, st) {
       state = state.copyWith(patientAppointmentsList: AsyncValue.error(e, st));
@@ -207,5 +219,22 @@ Future<AppointmentResponseModel> startSession(
       rethrow;
     }
     }
+
+    Future<List<TodayQueueModel>> getTodayQueue(int doctorId) async {
+    state = state.copyWith(
+      todayQueueResult: const AsyncValue.loading(),
+      error: null,
+    );
+    try {
+      final result = await usecase.getTodayQueue(doctorId);
+      state = state.copyWith(
+        todayQueueResult: AsyncValue.data(result),
+      );
+      return result;
+    } catch (e, st) {
+      state = state.copyWith(todayQueueResult: AsyncValue.error(e, st));
+      rethrow;
+    }
+  }
 
 }

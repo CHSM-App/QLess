@@ -605,71 +605,93 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   // ---------------------------------------------------------------------------
   // Tab content
   // ---------------------------------------------------------------------------
+Widget _buildTabContent(List<AppointmentList> appointments) {
+  return TabBarView(
+    controller: _tabCtrl,
+    children: _filters.map((f) {
+      final list = applyFilter(appointments, f.key, _search);
 
-  Widget _buildTabContent(List<AppointmentList> appointments) {
-    return TabBarView(
-      controller: _tabCtrl,
-      children: _filters.map((f) {
-        final list = applyFilter(appointments, f.key, _search);
-        if (list.isEmpty && !vmState.isLoading) return _emptyState(f);
+      Future<void> onRefresh() async {
+        final id = ref.read(patientLoginViewModelProvider).patientId;
+        if (id != null && id != 0) {
+          await ref
+              .read(appointmentViewModelProvider.notifier)
+              .getPatientAppointments(id);
+        }
+      }
+
+      if (list.isEmpty && !vmState.isLoading) {
+        // Empty state — still pull-to-refresh
         return RefreshIndicator(
           color: kPrimary,
           strokeWidth: 2,
-          onRefresh: () async {
-            final id = ref.read(patientLoginViewModelProvider).patientId;
-            if (id != null && id != 0) {
-              await ref.read(appointmentViewModelProvider.notifier)
-                  .getPatientAppointments(id);
-            }
-          },
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
-            itemCount: list.length,
-            itemBuilder: (_, i) {
-              final a    = list[i];
-              final live = _isLive(a);
-              return _AppointmentCard(
-                appointment: a,
-                onViewDetails: () => _openDetail(a),
-                onReview:     _canReview(a) ? () => _handleReview(context, a) : null,
-                onCancel:     _canCancel(a) ? () => _handleCancel(a) : null,
-                onReschedule: _canReschedule(a) ? () => _handleReschedule(a) : null,
-                queueNumber:         live ? (a.myQueueNumber ?? a.queueNumber) : null,
-                isLiveQueue:         live,
-                queueStarted:        live ? (a.queueStarted ?? false) : false,
-                isMyTurn:            live ? (a.isMyTurn ?? false) : false,
-                patientsAhead:       live ? a.patientsAhead : null,
-                estimatedArrivalTime:live ? a.estimatedArrivalTime : null,
-              );
-            },
+          onRefresh: onRefresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              SliverFillRemaining(
+                child: _emptyState(f),
+              ),
+            ],
           ),
         );
-      }).toList(),
-    );
-  }
+      }
+
+      return RefreshIndicator(
+        color: kPrimary,
+        strokeWidth: 2,
+        onRefresh: onRefresh,
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
+          itemCount: list.length,
+          itemBuilder: (_, i) {
+            final a    = list[i];
+            final live = _isLive(a);
+            return _AppointmentCard(
+              appointment:          a,
+              onViewDetails:        () => _openDetail(a),
+              onReview:             _canReview(a) ? () => _handleReview(context, a) : null,
+              onCancel:             _canCancel(a) ? () => _handleCancel(a) : null,
+              onReschedule:         _canReschedule(a) ? () => _handleReschedule(a) : null,
+              queueNumber:          live ? (a.myQueueNumber ?? a.queueNumber) : null,
+              isLiveQueue:          live,
+              queueStarted:         live ? (a.queueStarted ?? false) : false,
+              isMyTurn:             live ? (a.isMyTurn ?? false) : false,
+              patientsAhead:        live ? a.patientsAhead : null,
+              estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
+            );
+          },
+        ),
+      );
+    }).toList(),
+  );
+}
 
   AppointmentState get vmState => ref.read(appointmentViewModelProvider);
 
   // ---------------------------------------------------------------------------
   // States
   // ---------------------------------------------------------------------------
-
-  Widget _buildLoading(String msg) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(
-              width: 36, height: 36,
-              child: CircularProgressIndicator(
-                  color: kPrimary, strokeWidth: 2.5),
-            ),
-            const SizedBox(height: 12),
-            Text(msg,
-                style: const TextStyle(fontSize: 13, color: kTextMuted)),
-          ],
+Widget _buildLoading(String msg) {
+  // Show skeleton only for the appointments fetch, spinner for account loading
+  if (msg.contains('Fetching')) {
+    return _buildSkeletonList();
+  }
+  return Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(
+          width: 36, height: 36,
+          child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5),
         ),
-      );
-
+        const SizedBox(height: 12),
+        Text(msg, style: const TextStyle(fontSize: 13, color: kTextMuted)),
+      ],
+    ),
+  );
+}
   Widget _emptyState(_FilterTab f) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1958,5 +1980,171 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
         );
       },
     ),
+  );
+}
+
+
+// ════════════════════════════════════════════════════════════════════
+//  SHIMMER SKELETON
+// ════════════════════════════════════════════════════════════════════
+class _Shimmer extends StatefulWidget {
+  final double width, height, radius;
+  const _Shimmer({this.width = double.infinity, this.height = 16, this.radius = 8});
+
+  @override
+  State<_Shimmer> createState() => _ShimmerState();
+}
+
+class _ShimmerState extends State<_Shimmer> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat();
+    _anim = Tween<double>(begin: -2, end: 2)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _anim,
+      builder: (_, __) => Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(widget.radius),
+          gradient: LinearGradient(
+            begin: Alignment(_anim.value - 1, 0),
+            end: Alignment(_anim.value + 1, 0),
+            colors: const [
+              Color(0xFFEDF2F7),
+              Color(0xFFE2E8F0),
+              Color(0xFFCBD5E0),
+              Color(0xFFE2E8F0),
+              Color(0xFFEDF2F7),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonCard extends StatelessWidget {
+  const _SkeletonCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Row 1: Avatar + name + status badge
+          Row(
+            children: [
+              _Shimmer(width: 44, height: 44, radius: 12),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Shimmer(width: 140, height: 13),
+                    const SizedBox(height: 6),
+                    _Shimmer(width: 100, height: 10),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _Shimmer(width: 70, height: 22, radius: 6),
+            ],
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 10),
+            child: Divider(height: 1, color: kBorder),
+          ),
+          // Row 2: Date + Time tiles
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    _Shimmer(width: 26, height: 26, radius: 6),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _Shimmer(height: 12, width: 80),
+                          const SizedBox(height: 4),
+                          _Shimmer(height: 10, width: 60),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    _Shimmer(width: 26, height: 26, radius: 6),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _Shimmer(height: 12, width: 60),
+                          const SizedBox(height: 4),
+                          _Shimmer(height: 10, width: 50),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Action buttons row
+          Row(
+            children: [
+              Expanded(child: _Shimmer(height: 36, radius: 10)),
+              const SizedBox(width: 6),
+              _Shimmer(width: 36, height: 36, radius: 10),
+              const SizedBox(width: 6),
+              _Shimmer(width: 36, height: 36, radius: 10),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+Widget _buildSkeletonList() {
+  return ListView.builder(
+    padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
+    itemCount: 4,
+    itemBuilder: (_, __) => const _SkeletonCard(),
   );
 }

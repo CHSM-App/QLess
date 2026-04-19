@@ -36,7 +36,7 @@ const kRedLight      = Color(0xFFFEE2E2);
 // ── Shadow helper ─────────────────────────────────────────────────────────────
 BoxDecoration _cardDecoration({
   Color color = kCardBg,
-  double radius = 14,
+  double radius = 10,
   bool elevated = true,
 }) =>
     BoxDecoration(
@@ -46,14 +46,13 @@ BoxDecoration _cardDecoration({
       boxShadow: elevated
           ? [
               BoxShadow(
-                color: const Color(0xFF000000).withOpacity(0.05),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: const Color(0xFF000000).withOpacity(0.03),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
               ),
             ]
           : null,
     );
-
 // =============================================================================
 // Screen
 // =============================================================================
@@ -434,12 +433,12 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       strokeWidth: 2,
       onRefresh: _refresh,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+    padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
         itemCount: filtered.length,
         itemBuilder: (context, index) {
           final member = filtered[index];
           return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.only(bottom: 7),
             child: _FamilyMemberCard(
               member:   member,
               age:      member.dob != null ? _ageFrom(member.dob!) : null,
@@ -458,273 +457,250 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
   // ---------------------------------------------------------------------------
   // UI sub-widgets
   // ---------------------------------------------------------------------------
+Widget _buildHeader() {
+  final name     = ref.read(patientLoginViewModelProvider).name ?? 'Patient';
+  final initials = name.trim().isNotEmpty
+      ? name.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
+      : '?';
 
-  Widget _buildHeader() {
-    final name     = ref.read(patientLoginViewModelProvider).name ?? 'Patient';
-    final initials = name.trim().isNotEmpty
-        ? name.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
-        : '?';
-
-    return Container(
-      color: kBg,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Row(
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  size: 15, color: kPrimary),
+  return Container(
+    color: kBg,
+    padding: EdgeInsets.fromLTRB(14, MediaQuery.of(context).padding.top + 8, 14, 8),
+    child: Row(
+      children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(9),
             ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                size: 13, color: kPrimary),
           ),
-          const SizedBox(width: 12),
-
-          // Title block
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  'Family Members',
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('Family Members',
                   style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: kTextPrimary,
-                      letterSpacing: -0.2),
+                      letterSpacing: -0.2)),
+              Text('Manage your health profiles',
+                  style: TextStyle(fontSize: 11, color: kTextMuted)),
+            ],
+          ),
+        ),
+        Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [kPrimary, kPrimaryDark],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          alignment: Alignment.center,
+          child: Text(initials,
+              style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white)),
+        ),
+      ],
+    ),
+  );
+}
+Widget _buildSearchBar() {
+  return Container(
+    color: kBg,
+    padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+    child: Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kBorder),
+      ),
+      child: Row(
+        children: [
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10),
+            child: Icon(Icons.search_rounded, size: 15, color: kTextMuted),
+          ),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(fontSize: 13, color: kTextPrimary),
+              decoration: const InputDecoration(
+                hintText: 'Search members…',
+                hintStyle: TextStyle(fontSize: 13, color: kTextMuted),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            GestureDetector(
+              onTap: () => _searchController.clear(),
+              child: Container(
+                margin: const EdgeInsets.only(right: 8),
+                width: 16, height: 16,
+                decoration: const BoxDecoration(
+                    color: kTextMuted, shape: BoxShape.circle),
+                child: const Icon(Icons.close_rounded,
+                    size: 10, color: Colors.white),
+              ),
+            ),
+        ],
+      ),
+    ),
+  );
+}
+Widget _buildAddButton() {
+  return Container(
+    color: kBg,
+    padding: const EdgeInsets.fromLTRB(14, 6, 14, 12),
+    child: SizedBox(
+      width: double.infinity,
+      height: 42,
+      child: ElevatedButton(
+        onPressed: _onAddMember,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: kPrimary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add_rounded, size: 17),
+            SizedBox(width: 5),
+            Text('Add New Member',
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+Widget _buildLoading() {
+  return _FamilySkeletonList();
+}
+Widget _buildError(String message) {
+  return RefreshIndicator(
+    color: kPrimary,
+    strokeWidth: 2,
+    onRefresh: _refresh,
+    child: CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 56, height: 56,
+                    decoration: const BoxDecoration(
+                        color: kRedLight, shape: BoxShape.circle),
+                    child: const Icon(Icons.wifi_off_rounded,
+                        size: 26, color: kError),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Failed to load',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: kTextPrimary)),
+                  const SizedBox(height: 4),
+                  Text(message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 12, color: kTextSecondary, height: 1.5)),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    height: 38,
+                    child: ElevatedButton(
+                      onPressed: _refresh,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kPrimary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                      ),
+                      child: const Text('Retry',
+                          style: TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _buildEmptyState({
+  required IconData icon,
+  required String message,
+  required Color iconColor,
+  required Color bgColor,
+}) {
+  return RefreshIndicator(
+    color: kPrimary,
+    strokeWidth: 2,
+    onRefresh: _refresh,
+    child: CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64, height: 64,
+                  decoration: BoxDecoration(
+                      color: bgColor, shape: BoxShape.circle),
+                  child: Icon(icon, size: 28, color: iconColor),
                 ),
-                SizedBox(height: 1),
+                const SizedBox(height: 12),
                 Text(
-                  'Manage your health profiles',
-                  style: TextStyle(fontSize: 12, color: kTextMuted),
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 13, color: kTextSecondary, height: 1.6),
                 ),
               ],
             ),
           ),
-
-          // Avatar
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [kPrimary, kPrimaryDark],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initials,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      color: kBg,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-      child: Container(
-        height: 42,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FA),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kBorder),
         ),
-        child: Row(
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Icon(Icons.search_rounded, size: 17, color: kTextMuted),
-            ),
-            Expanded(
-              child: TextField(
-                controller: _searchController,
-                style: const TextStyle(
-                    fontSize: 14, color: kTextPrimary),
-                decoration: const InputDecoration(
-                  hintText: 'Search members…',
-                  hintStyle: TextStyle(fontSize: 14, color: kTextMuted),
-                  border: InputBorder.none,
-                  isDense: true,
-                ),
-              ),
-            ),
-            if (_searchQuery.isNotEmpty)
-              GestureDetector(
-                onTap: () => _searchController.clear(),
-                child: Container(
-                  margin: const EdgeInsets.only(right: 10),
-                  width: 20,
-                  height: 20,
-                  decoration: const BoxDecoration(
-                    color: kTextMuted,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close_rounded,
-                      size: 12, color: Colors.white),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddButton() {
-    return Container(
-      color: kBg,
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-      child: SizedBox(
-        width: double.infinity,
-        height: 48,
-        child: ElevatedButton(
-          onPressed: _onAddMember,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.add_rounded, size: 19),
-              SizedBox(width: 6),
-              Text('Add New Member',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoading() {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 36,
-            height: 36,
-            child: CircularProgressIndicator(
-              color: kPrimary,
-              strokeWidth: 2.5,
-              backgroundColor: kPrimaryLight,
-            ),
-          ),
-          const SizedBox(height: 12),
-          const Text('Loading members…',
-              style: TextStyle(fontSize: 13, color: kTextMuted)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildError(String message) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                  color: kRedLight, shape: BoxShape.circle),
-              child: const Icon(Icons.wifi_off_rounded,
-                  size: 26, color: kError),
-            ),
-            const SizedBox(height: 12),
-            const Text('Failed to load',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary)),
-            const SizedBox(height: 4),
-            Text(message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 12, color: kTextSecondary, height: 1.5)),
-            const SizedBox(height: 18),
-            SizedBox(
-              height: 38,
-              child: ElevatedButton(
-                onPressed: _refresh,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kPrimary,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                ),
-                child: const Text('Retry',
-                    style: TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState({
-    required IconData icon,
-    required String message,
-    required Color iconColor,
-    required Color bgColor,
-  }) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: bgColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 28, color: iconColor),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-                fontSize: 13, color: kTextSecondary, height: 1.6),
-          ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
-
+}
 // =============================================================================
 // Member Card
 // =============================================================================
-
 class _FamilyMemberCard extends StatelessWidget {
   final FamilyMember  member;
   final int?          age;
@@ -754,122 +730,100 @@ class _FamilyMemberCard extends StatelessWidget {
     return Container(
       decoration: _cardDecoration(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: [
-            // ── Avatar ──────────────────────────────────────────────
+            // ── Avatar ────────────────────────────────────────
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 38, height: 38,
                   decoration: BoxDecoration(
                     color: avatarBg,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   alignment: Alignment.center,
-                  child: Text(
-                    letter,
-                    style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: avatarFg),
-                  ),
+                  child: Text(letter,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: avatarFg)),
                 ),
                 if (isSelf)
                   Positioned(
-                    bottom: -3,
-                    right: -3,
+                    bottom: -2, right: -2,
                     child: Container(
-                      width: 16,
-                      height: 16,
+                      width: 13, height: 13,
                       decoration: BoxDecoration(
                         color: kPrimary,
                         shape: BoxShape.circle,
-                        border:
-                            Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: Colors.white, width: 1.5),
                       ),
                       child: const Icon(Icons.check_rounded,
-                          size: 9, color: Colors.white),
+                          size: 7, color: Colors.white),
                     ),
                   ),
               ],
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
 
-            // ── Info ─────────────────────────────────────────────────
+            // ── Info ──────────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          member.memberName ?? '',
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: kTextPrimary),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  Row(children: [
+                    Expanded(
+                      child: Text(
+                        member.memberName ?? '',
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      if (isSelf)
-                        _Badge(
-                          'You',
-                          bg: kPrimaryLight,
-                          fg: kPrimary,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
+                    ),
+                    if (isSelf)
+                      _Badge('You', bg: kPrimaryLight, fg: kPrimary),
+                  ]),
+                  const SizedBox(height: 3),
                   Wrap(
-                    spacing: 5,
-                    runSpacing: 4,
+                    spacing: 4,
+                    runSpacing: 3,
                     children: [
-                      if (relation.isNotEmpty && relation.toLowerCase() != 'self')
+                      if (relation.isNotEmpty &&
+                          relation.toLowerCase() != 'self')
                         _Badge(relation, bg: kPrimaryLight, fg: kPrimary),
                       if (gender.isNotEmpty)
-                        _Badge(
-                          gender,
-                          bg: const Color(0xFFF0F4FF),
-                          fg: kIndigo,
-                        ),
+                        _Badge(gender,
+                            bg: const Color(0xFFF0F4FF), fg: kIndigo),
                       if (ageText.isNotEmpty)
-                        _Badge(
-                          ageText,
-                          bg: kGreenLight,
-                          fg: const Color(0xFF38A169),
-                        ),
+                        _Badge(ageText,
+                            bg: kGreenLight,
+                            fg: const Color(0xFF38A169)),
                     ],
                   ),
                 ],
               ),
             ),
 
-            // ── Actions ───────────────────────────────────────────────
+            // ── Actions ───────────────────────────────────────
             if (!isSelf) ...[
-              const SizedBox(width: 8),
-              Column(
-                children: [
-                  _IconBtn(
-                    icon:    Icons.edit_rounded,
-                    bg:      kPrimaryLight,
-                    fg:      kPrimary,
-                    onTap:   onEdit,
-                    tooltip: 'Edit',
-                  ),
-                  const SizedBox(height: 6),
-                  _IconBtn(
-                    icon:    Icons.delete_outline_rounded,
-                    bg:      kRedLight,
-                    fg:      kError,
-                    onTap:   onDelete,
-                    tooltip: 'Remove',
-                  ),
-                ],
-              ),
+              const SizedBox(width: 6),
+              Row(children: [
+                _IconBtn(
+                  icon: Icons.edit_rounded,
+                  bg: kPrimaryLight, fg: kPrimary,
+                  onTap: onEdit, tooltip: 'Edit',
+                ),
+                const SizedBox(width: 5),
+                _IconBtn(
+                  icon: Icons.delete_outline_rounded,
+                  bg: kRedLight, fg: kError,
+                  onTap: onDelete, tooltip: 'Remove',
+                ),
+              ]),
             ],
           ],
         ),
@@ -877,7 +831,6 @@ class _FamilyMemberCard extends StatelessWidget {
     );
   }
 }
-
 // =============================================================================
 // Tiny reusable widgets
 // =============================================================================
@@ -939,4 +892,132 @@ class _IconBtn extends StatelessWidget {
       ),
     );
   }
+}
+
+
+// =============================================================================
+//  SKELETON SHIMMER
+// =============================================================================
+class _FamilySkeletonList extends StatefulWidget {
+  const _FamilySkeletonList();
+  @override
+  State<_FamilySkeletonList> createState() => _FamilySkeletonListState();
+}
+
+class _FamilySkeletonListState extends State<_FamilySkeletonList>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1300))
+      ..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) => ListView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          itemCount: 5,
+          itemBuilder: (_, __) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _FamilySkeletonCard(phase: _anim.value),
+          ),
+        ),
+      );
+}
+
+class _FamilySkeletonCard extends StatelessWidget {
+  final double phase;
+  const _FamilySkeletonCard({required this.phase});
+
+  Widget _bar({double? width, required double height, double radius = 6}) =>
+      Container(
+        width: width,
+        height: height,
+        margin: const EdgeInsets.only(bottom: 5),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          gradient: LinearGradient(
+            begin: Alignment(phase - 1, 0),
+            end: Alignment(phase + 1, 0),
+            colors: const [
+              Color(0xFFEDF2F7),
+              Color(0xFFE2E8F0),
+              Color(0xFFCBD5E0),
+              Color(0xFFE2E8F0),
+              Color(0xFFEDF2F7),
+            ],
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: _cardDecoration(),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              // Avatar skeleton
+              Container(
+                width: 46, height: 46,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    begin: Alignment(phase - 1, 0),
+                    end: Alignment(phase + 1, 0),
+                    colors: const [
+                      Color(0xFFEDF2F7),
+                      Color(0xFFCBD5E0),
+                      Color(0xFFEDF2F7),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+
+              // Info skeleton
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Name row
+                    Row(children: [
+                      _bar(width: 120, height: 14),
+                      const Spacer(),
+                      _bar(width: 34, height: 20, radius: 8), // "You" badge
+                    ]),
+                    // Badges row
+                    Row(children: [
+                      _bar(width: 55, height: 20, radius: 8),
+                      const SizedBox(width: 5),
+                      _bar(width: 44, height: 20, radius: 8),
+                      const SizedBox(width: 5),
+                      _bar(width: 48, height: 20, radius: 8),
+                    ]),
+                  ],
+                ),
+              ),
+
+              // Action buttons skeleton
+              const SizedBox(width: 8),
+              Column(children: [
+                _bar(width: 32, height: 32, radius: 10),
+                const SizedBox(height: 6),
+                _bar(width: 32, height: 32, radius: 10),
+              ]),
+            ],
+          ),
+        ),
+      );
 }

@@ -4,10 +4,13 @@ import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 
-// ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
-const kPrimary      = Color(0xFF26C6B0);
-const kPrimaryDark  = Color(0xFF2BB5A0);
-const kPrimaryLight = Color(0xFFD9F5F1);
+// ════════════════════════════════════════════════════════════════════
+//  DESIGN TOKENS — exact match with PatientListScreen
+// ════════════════════════════════════════════════════════════════════
+const kPrimary        = Color(0xFF26C6B0);
+const kPrimaryDark    = Color(0xFF2BB5A0);
+const kPrimaryLight   = Color(0xFFD9F5F1);
+const kPrimaryLighter = Color(0xFFF2FCFA);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -15,23 +18,25 @@ const kTextMuted     = Color(0xFFA0AEC0);
 
 const kBorder  = Color(0xFFEDF2F7);
 const kDivider = Color(0xFFE5E7EB);
+const kBg      = Color(0xFFF7F8FA);
+
+const kSuccess    = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+const kGreenDark  = Color(0xFF276749);
 
 const kError    = Color(0xFFFC8181);
-const kSuccess  = Color(0xFF68D391);
-const kWarning  = Color(0xFFED8936);
+const kRedLight = Color(0xFFFEE2E2);
+const kRedDark  = Color(0xFFC53030);
 
-// ── Card decoration ───────────────────────────────────────────────────────────
-BoxDecoration _cardDec() => BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: kBorder),
-      boxShadow: [
-        BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4)),
-      ],
-    );
+const kWarning    = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+const kAmberDark  = Color(0xFF975A16);
+
+// ════════════════════════════════════════════════════════════════════
+//  BREAKPOINTS
+// ════════════════════════════════════════════════════════════════════
+const _kTabletBreak  = 650.0;
+const _kDesktopBreak = 1050.0;
 
 // ════════════════════════════════════════════════════════════════════
 //  DOCTOR EDIT PROFILE PAGE
@@ -53,17 +58,15 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   bool _didPrefill      = false;
   bool _isSubmitting    = false;
 
-  // ── Mobile verification state ─────────────────────────────────
+  // ── Mobile verification ──────────────────────────────────────────
   String _originalMobile = '';
-  bool _isMobileChanged  = false;
-  bool _isOtpSent        = false;
-  bool _isVerifyingOtp   = false;
-  String _otpError       = '';
-  
-  // ── Dummy OTP for testing (remove in production) ───────────
-  String _dummyOtp       = '';  // Generated when OTP is sent
+  bool   _isMobileChanged  = false;
+  bool   _isOtpSent        = false;
+  bool   _isVerifyingOtp   = false;
+  String _otpError         = '';
+  String _dummyOtp         = '';
 
-  // ── Personal ──────────────────────────────────────────────────
+  // ── Personal ────────────────────────────────────────────────────
   final _nameCtrl    = TextEditingController();
   final _emailCtrl   = TextEditingController();
   final _contactCtrl = TextEditingController();
@@ -75,7 +78,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   String _selectedGender = 'Male';
   String _selectedSpec   = 'Cardiology';
 
-  // ── Clinic ────────────────────────────────────────────────────
+  // ── Clinic ──────────────────────────────────────────────────────
   final _clinicNameCtrl    = TextEditingController();
   final _clinicAddrCtrl    = TextEditingController();
   final _clinicContactCtrl = TextEditingController();
@@ -88,20 +91,14 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   ];
   final _genders = const ['Male', 'Female', 'Other'];
 
-  // ---------------------------------------------------------------------------
-  // Lifecycle
-  // ---------------------------------------------------------------------------
-
+  // ── Lifecycle ────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
     _sub = ref.listenManual<DoctorLoginState>(
       doctorLoginViewModelProvider,
-      (prev, next) {
-        _maybeFetchProfile(next);
-        _prefillFromState(next);
-      },
+      (_, next) { _maybeFetchProfile(next); _prefillFromState(next); },
     );
     Future.microtask(() {
       final state = ref.read(doctorLoginViewModelProvider);
@@ -147,16 +144,13 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     _set(_licenseCtrl, details.licenseNo);
     _set(_expCtrl,     details.experience?.toString());
     _set(_feeCtrl,     details.consultationFee?.toStringAsFixed(0));
-
     _set(_clinicNameCtrl,    details.clinicName ?? state.clinic_name);
     _set(_clinicAddrCtrl,    details.clinicAddress);
     _set(_clinicContactCtrl, details.clinicContact);
     _set(_clinicEmailCtrl,   details.clinicEmail);
     _set(_websiteCtrl,       details.websiteName);
 
-    // Store original mobile for comparison
     _originalMobile = (details.mobile ?? state.mobile ?? '').trim();
-
     _applyGender(details);
     _applySpec(details);
     if (mounted) setState(() {});
@@ -176,154 +170,78 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
   void _applySpec(DoctorDetails d) {
     final s = d.specialization?.trim();
-    if (s != null && s.isNotEmpty && _specs.contains(s)) {
-      _selectedSpec = s;
-    }
+    if (s != null && s.isNotEmpty && _specs.contains(s)) _selectedSpec = s;
   }
 
-  // ---------------------------------------------------------------------------
-  // Mobile Number Change Verification
-  // ---------------------------------------------------------------------------
-
+  // ── Mobile verification ──────────────────────────────────────────
   void _onMobileChanged(String value) {
-    final newMobile = value.trim();
-    final hasChanged = newMobile != _originalMobile;
-    
+    final hasChanged = value.trim() != _originalMobile;
     setState(() {
       _isMobileChanged = hasChanged;
-      if (!hasChanged) {
-        _isOtpSent = false;
-        _otpCtrl.clear();
-        _otpError = '';
-      }
+      if (!hasChanged) { _isOtpSent = false; _otpCtrl.clear(); _otpError = ''; }
     });
   }
 
   Future<void> _sendOtp() async {
-    final newMobile = _contactCtrl.text.trim();
-    
-    // Validation
-    if (newMobile.isEmpty) {
-      _snack('Please enter a mobile number', isError: true);
+    final m = _contactCtrl.text.trim();
+    if (m.isEmpty || m.length < 10) {
+      _showSnack('Enter a valid 10-digit mobile number', isError: true);
       return;
     }
-    if (newMobile.length < 10) {
-      _snack('Mobile number must be at least 10 digits', isError: true);
-      return;
-    }
-
     setState(() => _isVerifyingOtp = true);
-
     try {
-      // ───────────────────────────────────────────────────────────
-      // DUMMY OTP GENERATION FOR TESTING/DEVELOPMENT
-      // In production, replace with actual backend call:
-      // await ref.read(doctorLoginViewModelProvider.notifier).sendOtpToMobile(newMobile);
-      // ───────────────────────────────────────────────────────────
-      _dummyOtp = _generateDummyOtp();
-      
-      // Log dummy OTP to console for easy testing
-      debugPrint('╔════════════════════════════════════════╗');
-      debugPrint('║ 🔐 DEVELOPMENT MODE - DUMMY OTP      ║');
-      debugPrint('╠════════════════════════════════════════╣');
-      debugPrint('║ Mobile: $newMobile');
-      debugPrint('║ OTP: $_dummyOtp');
-      debugPrint('╚════════════════════════════════════════╝');
-      
-      // Simulate network delay (2 seconds)
+      _dummyOtp = ((DateTime.now().millisecond % 1000) + 111111).toString().substring(0, 6);
+      debugPrint('DEV OTP for $m → $_dummyOtp');
       await Future.delayed(const Duration(seconds: 2));
-
-      setState(() {
-        _isOtpSent = true;
-        _otpError = '';
-      });
-
-      _snack('OTP sent to $newMobile\n💡 Test OTP: $_dummyOtp');
+      setState(() { _isOtpSent = true; _otpError = ''; });
+      _showSnack('OTP sent to $m  •  Test OTP: $_dummyOtp');
     } catch (e) {
-      _snack('Failed to send OTP: ${e.toString()}', isError: true);
+      _showSnack('Failed to send OTP: $e', isError: true);
     } finally {
       setState(() => _isVerifyingOtp = false);
     }
-  }
-
-  /// Generates a random 6-digit OTP for testing
-  /// Remove this method in production
-  String _generateDummyOtp() {
-    final random = DateTime.now().millisecond % 1000;
-    return '${(random + 111111) % 1000000}'.padLeft(6, '0');
   }
 
   Future<void> _verifyOtp() async {
     final otp = _otpCtrl.text.trim();
-    final newMobile = _contactCtrl.text.trim();
-
-    if (otp.isEmpty) {
-      setState(() => _otpError = 'Please enter OTP');
-      return;
-    }
-    if (otp.length < 4) {
-      setState(() => _otpError = 'OTP must be at least 4 digits');
-      return;
-    }
-
+    if (otp.isEmpty) { setState(() => _otpError = 'Please enter OTP'); return; }
+    if (otp.length < 4) { setState(() => _otpError = 'OTP must be at least 4 digits'); return; }
     setState(() => _isVerifyingOtp = true);
-
     try {
-      // ───────────────────────────────────────────────────────────
-      // DUMMY OTP VERIFICATION FOR TESTING/DEVELOPMENT
-      // In production, replace with actual backend call:
-      // final isVerified = await ref.read(doctorLoginViewModelProvider.notifier)
-      //     .verifyOtpForMobile(newMobile, otp);
-      // ───────────────────────────────────────────────────────────
-      
-      // Simulate network delay (1.5 seconds)
       await Future.delayed(const Duration(milliseconds: 1500));
-      
-      // Check if entered OTP matches dummy OTP
-      final isVerified = (otp == _dummyOtp);
-      
-      debugPrint('🔍 OTP Verification: Entered=$otp, Expected=$_dummyOtp, Result=${isVerified ? '✓' : '✗'}');
-
-      if (isVerified) {
-        // Update the original mobile to mark it as verified
+      if (otp == _dummyOtp) {
         setState(() {
-          _originalMobile = newMobile;
+          _originalMobile  = _contactCtrl.text.trim();
           _isMobileChanged = false;
-          _isOtpSent = false;
-          _otpError = '';
+          _isOtpSent       = false;
+          _otpError        = '';
         });
-        _snack('Mobile number verified successfully');
+        _otpCtrl.clear();
+        _showSnack('Mobile number verified successfully');
       } else {
         setState(() => _otpError = 'Invalid OTP. Please try again.');
       }
     } catch (e) {
-      setState(() => _otpError = 'Verification failed: ${e.toString()}');
+      setState(() => _otpError = 'Verification failed: $e');
     } finally {
       setState(() => _isVerifyingOtp = false);
     }
   }
 
-  void _cancelMobileChange() {
-    setState(() {
-      _contactCtrl.text = _originalMobile;
-      _isMobileChanged = false;
-      _isOtpSent = false;
-      _otpCtrl.clear();
-      _otpError = '';
-    });
-  }
+  void _cancelMobileChange() => setState(() {
+    _contactCtrl.text = _originalMobile;
+    _isMobileChanged  = false;
+    _isOtpSent        = false;
+    _otpError         = '';
+    _otpCtrl.clear();
+  });
 
-  // ---------------------------------------------------------------------------
-  // Save
-  // ---------------------------------------------------------------------------
-
+  // ── Save ─────────────────────────────────────────────────────────
   Future<void> _save() async {
-    // Prevent saving if mobile was changed but not verified
-    if (_isMobileChanged && _isOtpSent && _originalMobile != _contactCtrl.text.trim()) {
-      _snack('Please verify your new mobile number before saving', isError: true);
+    if (_isMobileChanged) {
+      _showSnack('Please verify your new mobile number before saving', isError: true);
       return;
     }
-
     if (_isSubmitting) return;
     setState(() => _isSubmitting = true);
 
@@ -334,24 +252,24 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     );
 
     final doctor = DoctorDetails(
-      doctorId:       details?.doctorId ?? state.doctorId,
-      name:           _nameCtrl.text.trim(),
-      email:          _emailCtrl.text.trim(),
-      mobile:         _contactCtrl.text.trim(),
-      qualification:  _qualCtrl.text.trim(),
-      licenseNo:      _licenseCtrl.text.trim(),
-      experience:     _parseInt(_expCtrl.text),
-      specialization: _selectedSpec,
-      roleId:         details?.roleId ?? _parseInt(state.roleId),
-      clinicId:       details?.clinicId ?? state.clinic_id,
-      clinicName:     _clinicNameCtrl.text.trim(),
-      clinicAddress:  _clinicAddrCtrl.text.trim(),
-      consultationFee:_parseDouble(_feeCtrl.text),
-      websiteName:    _websiteCtrl.text.trim(),
-      clinicEmail:    _clinicEmailCtrl.text.trim(),
-      clinicContact:  _clinicContactCtrl.text.trim(),
-      genderId:       _genderIdFor(_selectedGender),
-      Token:          state.token,
+      doctorId:        details?.doctorId ?? state.doctorId,
+      name:            _nameCtrl.text.trim(),
+      email:           _emailCtrl.text.trim(),
+      mobile:          _contactCtrl.text.trim(),
+      qualification:   _qualCtrl.text.trim(),
+      licenseNo:       _licenseCtrl.text.trim(),
+      experience:      _parseInt(_expCtrl.text),
+      specialization:  _selectedSpec,
+      roleId:          details?.roleId ?? _parseInt(state.roleId),
+      clinicId:        details?.clinicId ?? state.clinic_id,
+      clinicName:      _clinicNameCtrl.text.trim(),
+      clinicAddress:   _clinicAddrCtrl.text.trim(),
+      consultationFee: _parseDouble(_feeCtrl.text),
+      websiteName:     _websiteCtrl.text.trim(),
+      clinicEmail:     _clinicEmailCtrl.text.trim(),
+      clinicContact:   _clinicContactCtrl.text.trim(),
+      genderId:        _genderId(_selectedGender),
+      Token:           state.token,
     );
 
     await ref.read(doctorLoginViewModelProvider.notifier).addDoctorDetails(doctor);
@@ -360,433 +278,281 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
     final after = ref.read(doctorLoginViewModelProvider);
     if (after.error != null && after.error!.isNotEmpty) {
-      _snack(after.error!, isError: true);
+      _showSnack(after.error!, isError: true);
       return;
     }
-
-    _snack('Doctor details updated successfully');
-    final mobile = after.mobile;
-    if (mobile != null && mobile.trim().isNotEmpty) {
-      ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(mobile);
+    _showSnack('Profile updated successfully');
+    final m = after.mobile;
+    if (m != null && m.trim().isNotEmpty) {
+      ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(m);
     }
     Navigator.pop(context, true);
   }
 
-  int?    _parseInt(String? v)  => v == null ? null : int.tryParse(v.trim());
+  int?    _parseInt(String? v)    => v == null ? null : int.tryParse(v.trim());
   double? _parseDouble(String? v) => v == null ? null : double.tryParse(v.trim());
-  int?    _genderIdFor(String g) =>
+  int?    _genderId(String g)     =>
       g.toLowerCase() == 'female' ? 2 : g.toLowerCase() == 'other' ? 3 : 1;
 
-  void _snack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: [
-          Icon(isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-              color: Colors.white, size: 15),
-          const SizedBox(width: 8),
-          Expanded(child: Text(msg,
-              style: const TextStyle(fontSize: 13, color: Colors.white))),
-        ]),
-        backgroundColor: isError ? kError : kPrimary,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-      ),
-    );
+  void _showSnack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Row(children: [
+        Icon(
+          isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+          color: Colors.white, size: 14,
+        ),
+        const SizedBox(width: 7),
+        Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, color: Colors.white))),
+      ]),
+      backgroundColor: isError ? kError : kPrimary,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      duration: const Duration(seconds: 3),
+    ));
   }
 
-  // ---------------------------------------------------------------------------
-  // Build
-  // ---------------------------------------------------------------------------
+  double get _width => MediaQuery.of(context).size.width;
+  bool get _isDesktop => _width >= _kDesktopBreak;
+  bool get _isTablet  => _width >= _kTabletBreak;
 
+  // ── Build ────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 15, color: kPrimary),
-          ),
+      backgroundColor: kBg,
+      body: Column(children: [
+        _buildHeader(),
+        _buildTabBar(),
+        Expanded(
+          child: _isDesktop
+              ? _buildDesktopBody()
+              : TabBarView(
+                  controller: _tabCtrl,
+                  children: [_personalTab(), _clinicTab()],
+                ),
         ),
-        title: const Text('Edit Profile',
-            style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: kTextPrimary,
-                letterSpacing: -0.2)),
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: kBorder),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(children: [
-          // Tab bar
-          Container(
-            color: Colors.white,
-            child: TabBar(
-              controller: _tabCtrl,
-              labelColor: kPrimary,
-              unselectedLabelColor: kTextMuted,
-              labelStyle: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w700),
-              unselectedLabelStyle: const TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w500),
-              indicatorColor: kPrimary,
-              indicatorWeight: 2,
-              tabs: const [
-                Tab(text: 'Personal Info'),
-                Tab(text: 'Clinic Info'),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: kBorder),
-          Expanded(
-            child: TabBarView(
-              controller: _tabCtrl,
-              children: [
-                _buildPersonalTab(),
-                _buildClinicTab(),
-              ],
-            ),
-          ),
-        ]),
-      ),
+      ]),
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Tab 1: Personal
-  // ---------------------------------------------------------------------------
-
-  Widget _buildPersonalTab() => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _photoCard(isDoctor: true),
-          const SizedBox(height: 14),
-          _sectionLabel('Personal Details'),
-          const SizedBox(height: 8),
-          _buildCard([
-            _field('Full Name',    _nameCtrl),
-            _field('Email',        _emailCtrl,   keyboard: TextInputType.emailAddress),
-            _fieldWithMobileVerification(),
-            _genderTile(),
-          ]),
-          const SizedBox(height: 14),
-          _sectionLabel('Professional Details'),
-          const SizedBox(height: 8),
-          _buildCard([
-            _specTile(),
-            _field('Qualification',        _qualCtrl),
-            _field('License Number',       _licenseCtrl),
-            _field('Experience (Years)',   _expCtrl,  keyboard: TextInputType.number),
-            _field('Consultation Fee (₹)', _feeCtrl,  keyboard: TextInputType.number,
-                showDivider: false),
-          ]),
-          const SizedBox(height: 18),
-          _saveButton(),
-          const SizedBox(height: 32),
-        ]),
-      );
-
-  // ---------------------------------------------------------------------------
-  // Tab 2: Clinic
-  // ---------------------------------------------------------------------------
-
-  Widget _buildClinicTab() => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _photoCard(isDoctor: false),
-          const SizedBox(height: 14),
-          _sectionLabel('Clinic Details'),
-          const SizedBox(height: 8),
-          _buildCard([
-            _field('Clinic Name',    _clinicNameCtrl),
-            _field('Clinic Address', _clinicAddrCtrl,    maxLines: 3),
-            _field('Clinic Contact', _clinicContactCtrl, keyboard: TextInputType.phone),
-            _field('Clinic Email',   _clinicEmailCtrl,   keyboard: TextInputType.emailAddress),
-            _field('Website',        _websiteCtrl,       showDivider: false),
-          ]),
-          const SizedBox(height: 14),
-          _sectionLabel('Location'),
-          const SizedBox(height: 8),
-          _buildCard([_locationTile()]),
-          const SizedBox(height: 18),
-          _saveButton(),
-          const SizedBox(height: 32),
-        ]),
-      );
-
-  // ---------------------------------------------------------------------------
-  // Shared sub-widgets
-  // ---------------------------------------------------------------------------
-
-  Widget _fieldWithMobileVerification() => Column(children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(
-              children: [
-                const Text('Contact No',
-                    style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w600,
-                        color: kTextSecondary, letterSpacing: 0.2)),
-                if (_isMobileChanged)
-                  Container(
-                    margin: const EdgeInsets.only(left: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: kWarning.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text('Verification Required',
-                        style: TextStyle(
-                            fontSize: 9, fontWeight: FontWeight.w600,
-                            color: kWarning, letterSpacing: 0.3)),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 5),
-            Container(
+  // ── Header — exact PatientListScreen style ────────────────────────
+  Widget _buildHeader() => Container(
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+    ),
+    child: SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Row(children: [
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 34, height: 34,
               decoration: BoxDecoration(
-                color: const Color(0xFFF7F8FA),
+                color: kBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                    color: _isMobileChanged ? kWarning : kBorder,
-                    width: _isMobileChanged ? 1.5 : 1),
+                border: Border.all(color: kBorder),
               ),
-              child: TextField(
-                controller: _contactCtrl,
-                keyboardType: TextInputType.phone,
-                enabled: !_isOtpSent, // Disable editing after OTP is sent
-                onChanged: _onMobileChanged,
-                style: const TextStyle(fontSize: 13, color: kTextPrimary),
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                ),
-              ),
+              child: const Icon(Icons.arrow_back_ios_new_rounded,
+                  color: kTextPrimary, size: 15),
             ),
-          ]),
-        ),
-        // OTP verification section
-        if (_isMobileChanged)
-          Column(
-            children: [
-              const Divider(height: 1, thickness: 1, color: kBorder,
-                  indent: 12, endIndent: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Verification',
-                        style: TextStyle(
-                            fontSize: 11, fontWeight: FontWeight.w600,
-                            color: kTextSecondary, letterSpacing: 0.2)),
-                    const SizedBox(height: 8),
-                    if (!_isOtpSent)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 38,
-                        child: ElevatedButton.icon(
-                          onPressed: _isVerifyingOtp ? null : _sendOtp,
-                          icon: _isVerifyingOtp
-                              ? SizedBox(
-                                  width: 16, height: 16,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          Colors.white.withOpacity(0.8))))
-                              : const Icon(Icons.mail_outline_rounded, size: 16),
-                          label: Text(
-                              _isVerifyingOtp ? 'Sending OTP...' : 'Send OTP'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                        ),
-                      )
-                    else
-                      Column(
-                        children: [
-                          Container(
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF7F8FA),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                  color: _otpError.isNotEmpty ? kError : kBorder),
-                            ),
-                            child: TextField(
-                              controller: _otpCtrl,
-                              keyboardType: TextInputType.number,
-                              maxLength: 6,
-                              enabled: !_isVerifyingOtp,
-                              style: const TextStyle(
-                                  fontSize: 13, color: kTextPrimary,
-                                  letterSpacing: 2),
-                              textAlign: TextAlign.center,
-                              decoration: const InputDecoration(
-                                hintText: '000000',
-                                hintStyle: TextStyle(
-                                    color: kTextMuted, letterSpacing: 2),
-                                border: InputBorder.none,
-                                contentPadding: EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
-                                counterText: '',
-                              ),
-                            ),
-                          ),
-                          if (_otpError.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.error_outline_rounded,
-                                      size: 12, color: kError),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(_otpError,
-                                        style: const TextStyle(
-                                            fontSize: 11, color: kError)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          const SizedBox(height: 8),
-                          Row(children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 36,
-                                child: OutlinedButton(
-                                  onPressed: _cancelMobileChange,
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: kTextSecondary,
-                                    side: const BorderSide(color: kBorder),
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10)),
-                                  ),
-                                  child: const Text('Cancel',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: SizedBox(
-                                height: 36,
-                                child: ElevatedButton.icon(
-                                  onPressed:
-                                      _isVerifyingOtp ? null : _verifyOtp,
-                                  icon: _isVerifyingOtp
-                                      ? SizedBox(
-                                          width: 14, height: 14,
-                                          child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              valueColor:
-                                                  AlwaysStoppedAnimation<Color>(
-                                                      Colors.white
-                                                          .withOpacity(0.8))))
-                                      : const Icon(Icons.check_rounded, size: 16),
-                                  label: Text(
-                                      _isVerifyingOtp ? 'Verifying...' : 'Verify'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: kSuccess,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(10)),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ]),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          )
-        else
-          const Divider(height: 1, thickness: 1, color: kBorder,
-              indent: 12, endIndent: 12),
-      ]);
-
-  Widget _photoCard({required bool isDoctor}) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: _cardDec(),
-        child: Column(children: [
-          Stack(children: [
-            Container(
-              width: 70, height: 70,
-              decoration: BoxDecoration(
-                color: kPrimaryLight,
-                shape: isDoctor ? BoxShape.circle : BoxShape.rectangle,
-                borderRadius: isDoctor ? null : BorderRadius.circular(14),
-                border: Border.all(color: kPrimary, width: 2),
-              ),
-              child: Icon(
-                isDoctor ? Icons.person : Icons.local_hospital_outlined,
-                size: 32, color: kPrimary,
-              ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kPrimary.withOpacity(0.2)),
             ),
-            Positioned(
-              bottom: 0, right: 0,
-              child: Container(
-                width: 22, height: 22,
-                decoration: BoxDecoration(
-                    color: kSuccess, shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2)),
-                child: const Icon(Icons.edit_rounded, size: 11, color: Colors.white),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 6),
-          Text(
-            isDoctor ? 'Tap to change photo' : 'Tap to change clinic photo',
-            style: const TextStyle(fontSize: 11, color: kTextMuted),
+            child: const Icon(Icons.person_outline_rounded,
+                color: kPrimary, size: 17),
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Edit Profile',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+              SizedBox(height: 1),
+              Text('Update your personal & clinic info',
+                  style: TextStyle(fontSize: 11, color: kTextSecondary)),
+            ]),
           ),
         ]),
-      );
+      ),
+    ),
+  );
+
+  // ── Tab bar ───────────────────────────────────────────────────────
+  Widget _buildTabBar() => Container(
+    color: Colors.white,
+    child: Column(children: [
+      Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F5F3),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: TabBar(
+            controller: _tabCtrl,
+            labelColor: kPrimaryDark,
+            unselectedLabelColor: kTextSecondary,
+            indicator: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07),
+                  blurRadius: 6, offset: const Offset(0, 1))],
+            ),
+            indicatorPadding: const EdgeInsets.all(3),
+            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            dividerColor: Colors.transparent,
+            tabs: const [
+              Tab(text: 'Personal Info'),
+              Tab(text: 'Clinic Info'),
+            ],
+          ),
+        ),
+      ),
+      const Divider(height: 1, color: kBorder),
+    ]),
+  );
+
+  // ── Desktop: side-by-side ─────────────────────────────────────────
+  Widget _buildDesktopBody() => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(child: _personalTab()),
+      Container(width: 1, color: kBorder),
+      Expanded(child: _clinicTab()),
+    ],
+  );
+
+  // ── Personal tab ─────────────────────────────────────────────────
+  Widget _personalTab() => SingleChildScrollView(
+    padding: EdgeInsets.fromLTRB(
+        _isTablet ? 20 : 14, 14, _isTablet ? 20 : 14, 24),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _avatarCard(isDoctor: true),
+      _gap(12),
+      _sectionLabel('Personal Details'),
+      _gap(6),
+      _card([
+        _field('Full Name',   _nameCtrl),
+        _field('Email',       _emailCtrl, keyboard: TextInputType.emailAddress),
+        _mobileVerificationField(),
+        _genderRow(),
+      ]),
+      _gap(12),
+      _sectionLabel('Professional Details'),
+      _gap(6),
+      _card([
+        _specDropdown(),
+        _field('Qualification',         _qualCtrl),
+        _field('License Number',        _licenseCtrl),
+        _field('Experience (Years)',     _expCtrl,  keyboard: TextInputType.number),
+        _field('Consultation Fee (₹)',  _feeCtrl,  keyboard: TextInputType.number,
+            showDivider: false),
+      ]),
+      _gap(14),
+      _saveBtn(),
+    ]),
+  );
+
+  // ── Clinic tab ────────────────────────────────────────────────────
+  Widget _clinicTab() => SingleChildScrollView(
+    padding: EdgeInsets.fromLTRB(
+        _isTablet ? 20 : 14, 14, _isTablet ? 20 : 14, 24),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _avatarCard(isDoctor: false),
+      _gap(12),
+      _sectionLabel('Clinic Details'),
+      _gap(6),
+      _card([
+        _field('Clinic Name',    _clinicNameCtrl),
+        _field('Clinic Address', _clinicAddrCtrl, maxLines: 2),
+        _field('Contact Number', _clinicContactCtrl, keyboard: TextInputType.phone),
+        _field('Clinic Email',   _clinicEmailCtrl, keyboard: TextInputType.emailAddress),
+        _field('Website URL',    _websiteCtrl, showDivider: false),
+      ]),
+      _gap(12),
+      _sectionLabel('Location'),
+      _gap(6),
+      _card([_locationTile()]),
+      _gap(14),
+      _saveBtn(),
+    ]),
+  );
+
+  // ── Widgets ───────────────────────────────────────────────────────
+
+  Widget _avatarCard({required bool isDoctor}) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 14),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: kBorder),
+      boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
+    ),
+    child: Column(children: [
+      Stack(children: [
+        Container(
+          width: 62, height: 62,
+          decoration: BoxDecoration(
+            color: kPrimaryLight,
+            shape: isDoctor ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: isDoctor ? null : BorderRadius.circular(14),
+            border: Border.all(color: kPrimary, width: 1.8),
+          ),
+          child: Icon(
+            isDoctor ? Icons.person_rounded : Icons.local_hospital_outlined,
+            size: 28, color: kPrimary,
+          ),
+        ),
+        Positioned(
+          bottom: 0, right: 0,
+          child: Container(
+            width: 20, height: 20,
+            decoration: BoxDecoration(
+              color: kPrimary, shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 2),
+            ),
+            child: const Icon(Icons.edit_rounded, size: 10, color: Colors.white),
+          ),
+        ),
+      ]),
+      const SizedBox(height: 5),
+      Text(
+        isDoctor ? 'Tap to change photo' : 'Tap to change clinic photo',
+        style: const TextStyle(fontSize: 11, color: kTextMuted),
+      ),
+    ]),
+  );
 
   Widget _field(
     String label,
     TextEditingController ctrl, {
     TextInputType keyboard = TextInputType.text,
-    int maxLines = 1,
+    int maxLines  = 1,
     bool showDivider = true,
   }) {
     return Column(children: [
       Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w600,
-                  color: kTextSecondary, letterSpacing: 0.2)),
+          Text(label, style: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600,
+              color: kTextSecondary, letterSpacing: 0.2)),
           const SizedBox(height: 5),
           Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFF7F8FA),
+              color: kBg,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: kBorder),
             ),
@@ -797,196 +563,341 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
               style: const TextStyle(fontSize: 13, color: kTextPrimary),
               decoration: const InputDecoration(
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 10),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               ),
             ),
           ),
         ]),
       ),
-      if (showDivider)
-        const Divider(height: 1, thickness: 1, color: kBorder,
-            indent: 12, endIndent: 12),
+      if (showDivider) const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
     ]);
   }
 
-  Widget _genderTile() => Column(children: [
-        const Divider(height: 1, thickness: 1, color: kBorder,
-            indent: 12, endIndent: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Gender',
-                style: TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w600,
-                    color: kTextSecondary, letterSpacing: 0.2)),
-            const SizedBox(height: 7),
-            Row(
-              children: _genders.map((g) {
-                final sel = _selectedGender == g;
-                final isLast = g == _genders.last;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedGender = g),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      margin: EdgeInsets.only(right: isLast ? 0 : 8),
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: sel ? kPrimary : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: sel ? kPrimary : kBorder,
-                            width: sel ? 1.5 : 1),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(g,
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: sel ? Colors.white : kTextSecondary)),
+  // ── Mobile + OTP verification field ─────────────────────────────
+  Widget _mobileVerificationField() => Column(children: [
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('Contact No', style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600,
+              color: kTextSecondary, letterSpacing: 0.2)),
+          if (_isMobileChanged) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: kAmberLight,
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: kWarning.withOpacity(0.4)),
+              ),
+              child: const Text('Verification required',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
+                      color: kAmberDark)),
+            ),
+          ],
+        ]),
+        const SizedBox(height: 5),
+        Container(
+          decoration: BoxDecoration(
+            color: kBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: _isMobileChanged ? kWarning : kBorder,
+                width: _isMobileChanged ? 1.5 : 1),
+          ),
+          child: TextField(
+            controller: _contactCtrl,
+            keyboardType: TextInputType.phone,
+            enabled: !_isOtpSent,
+            onChanged: _onMobileChanged,
+            style: const TextStyle(fontSize: 13, color: kTextPrimary),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            ),
+          ),
+        ),
+      ]),
+    ),
+    if (_isMobileChanged) ...[
+      const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // label row
+          Row(children: [
+            Container(
+              width: 18, height: 18,
+              decoration: BoxDecoration(color: kAmberLight, shape: BoxShape.circle),
+              child: const Icon(Icons.lock_outline_rounded, size: 10, color: kAmberDark),
+            ),
+            const SizedBox(width: 6),
+            const Text('OTP Verification', style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w600,
+                color: kTextSecondary, letterSpacing: 0.2)),
+          ]),
+          const SizedBox(height: 8),
+          if (!_isOtpSent)
+            SizedBox(
+              width: double.infinity, height: 38,
+              child: ElevatedButton.icon(
+                onPressed: _isVerifyingOtp ? null : _sendOtp,
+                icon: _isVerifyingOtp
+                    ? const SizedBox(width: 14, height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.send_rounded, size: 14),
+                label: Text(_isVerifyingOtp ? 'Sending…' : 'Send OTP',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary, foregroundColor: Colors.white, elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            )
+          else ...[
+            Container(
+              decoration: BoxDecoration(
+                color: kBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _otpError.isNotEmpty ? kError : kBorder),
+              ),
+              child: TextField(
+                controller: _otpCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                enabled: !_isVerifyingOtp,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 15, color: kTextPrimary,
+                    fontWeight: FontWeight.w700, letterSpacing: 6),
+                decoration: const InputDecoration(
+                  hintText: '• • • • • •',
+                  hintStyle: TextStyle(color: kTextMuted, letterSpacing: 4, fontSize: 13),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  counterText: '',
+                ),
+              ),
+            ),
+            if (_otpError.isNotEmpty) ...[
+              const SizedBox(height: 5),
+              Row(children: [
+                const Icon(Icons.error_outline_rounded, size: 12, color: kError),
+                const SizedBox(width: 4),
+                Expanded(child: Text(_otpError,
+                    style: const TextStyle(fontSize: 11, color: kError))),
+              ]),
+            ],
+            const SizedBox(height: 8),
+            Row(children: [
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: OutlinedButton(
+                    onPressed: _cancelMobileChange,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: kTextSecondary,
+                      side: const BorderSide(color: kBorder),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    child: const Text('Cancel',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: ElevatedButton.icon(
+                    onPressed: _isVerifyingOtp ? null : _verifyOtp,
+                    icon: _isVerifyingOtp
+                        ? const SizedBox(width: 13, height: 13,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.check_rounded, size: 14),
+                    label: Text(_isVerifyingOtp ? 'Verifying…' : 'Verify',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kSuccess, foregroundColor: Colors.white, elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
-                );
-              }).toList(),
-            ),
-          ]),
-        ),
-      ]);
-
-  Widget _specTile() => Column(children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('Specialization',
-                style: TextStyle(
-                    fontSize: 11, fontWeight: FontWeight.w600,
-                    color: kTextSecondary, letterSpacing: 0.2)),
-            const SizedBox(height: 5),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F8FA),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBorder),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedSpec,
-                  isExpanded: true,
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                      color: kTextMuted, size: 18),
-                  style: const TextStyle(fontSize: 13, color: kTextPrimary),
-                  dropdownColor: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  items: _specs.map((s) => DropdownMenuItem(
-                      value: s, child: Text(s))).toList(),
-                  onChanged: (v) =>
-                      setState(() => _selectedSpec = v ?? _selectedSpec),
                 ),
               ),
-            ),
-          ]),
-        ),
-        const Divider(height: 1, thickness: 1, color: kBorder,
-            indent: 12, endIndent: 12),
-      ]);
-
-  Widget _locationTile() => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Coordinates',
-              style: TextStyle(
-                  fontSize: 11, fontWeight: FontWeight.w600,
-                  color: kTextSecondary, letterSpacing: 0.2)),
-          const SizedBox(height: 7),
-          Row(children: [
-            Expanded(
-              child: Container(
-                height: 40,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7F8FA),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kBorder),
-                ),
-                child: const Text('18.5204, 73.8567',
-                    style: TextStyle(fontSize: 13, color: kTextPrimary)),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _LocBtn(icon: Icons.my_location_rounded, onTap: () {}, isCircle: true),
-            const SizedBox(width: 8),
-            _LocBtn(icon: Icons.map_rounded, onTap: () {}, isCircle: false),
-          ]),
+            ]),
+          ],
         ]),
-      );
+      ),
+    ] else
+      const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
+  ]);
 
-  Widget _saveButton() => SizedBox(
-        width: double.infinity, height: 46,
-        child: ElevatedButton(
-          onPressed: _isSubmitting || _isMobileChanged ? null : _save,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimary,
-            disabledBackgroundColor: kPrimaryLight,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12)),
-          ),
-          child: _isSubmitting
-              ? const SizedBox(width: 20, height: 20,
-                  child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2.5))
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text('Save Changes',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w700)),
-                    if (_isMobileChanged)
-                      const Text('(Verify mobile first)',
-                          style: TextStyle(
-                              fontSize: 9, fontWeight: FontWeight.w500,
-                              color: Colors.white70)),
-                  ],
+  // ── Gender row ────────────────────────────────────────────────────
+  Widget _genderRow() => Padding(
+    padding: const EdgeInsets.fromLTRB(12, 9, 12, 12),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Gender', style: TextStyle(
+          fontSize: 11, fontWeight: FontWeight.w600,
+          color: kTextSecondary, letterSpacing: 0.2)),
+      const SizedBox(height: 7),
+      Row(
+        children: _genders.map((g) {
+          final sel    = _selectedGender == g;
+          final isLast = g == _genders.last;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedGender = g),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 160),
+                margin: EdgeInsets.only(right: isLast ? 0 : 8),
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: sel
+                      ? const LinearGradient(
+                          colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
+                          begin: Alignment.topLeft, end: Alignment.bottomRight)
+                      : null,
+                  color: sel ? null : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: sel ? kPrimary : kBorder),
                 ),
+                alignment: Alignment.center,
+                child: Text(g, style: TextStyle(
+                    fontSize: 12, fontWeight: FontWeight.w700,
+                    color: sel ? Colors.white : kTextSecondary)),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    ]),
+  );
+
+  // ── Specialization dropdown ───────────────────────────────────────
+  Widget _specDropdown() => Column(children: [
+    Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Specialization', style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600,
+            color: kTextSecondary, letterSpacing: 0.2)),
+        const SizedBox(height: 5),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: kBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kBorder),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: _selectedSpec,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: kTextMuted, size: 17),
+              style: const TextStyle(fontSize: 13, color: kTextPrimary),
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              items: _specs.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+              onChanged: (v) => setState(() => _selectedSpec = v ?? _selectedSpec),
+            ),
+          ),
         ),
-      );
+      ]),
+    ),
+    const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
+  ]);
 
-  Widget _buildCard(List<Widget> children) => Container(
-        decoration: _cardDec(),
-        child: Column(children: children),
-      );
+  // ── Location tile ─────────────────────────────────────────────────
+  Widget _locationTile() => Padding(
+    padding: const EdgeInsets.all(12),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Coordinates', style: TextStyle(
+          fontSize: 11, fontWeight: FontWeight.w600,
+          color: kTextSecondary, letterSpacing: 0.2)),
+      const SizedBox(height: 7),
+      Row(children: [
+        Expanded(
+          child: Container(
+            height: 38,
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: kBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder),
+            ),
+            child: const Text('18.5204, 73.8567',
+                style: TextStyle(fontSize: 13, color: kTextPrimary)),
+          ),
+        ),
+        const SizedBox(width: 8),
+        _locBtn(Icons.my_location_rounded, () {}, circle: true),
+        const SizedBox(width: 8),
+        _locBtn(Icons.map_rounded, () {}, circle: false),
+      ]),
+    ]),
+  );
 
-  Widget _sectionLabel(String title) => Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: 0),
-        child: Text(title.toUpperCase(),
-            style: const TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700,
-                color: kTextMuted, letterSpacing: 1.0)),
-      );
-}
-
-// ─── Location button ──────────────────────────────────────────────────────────
-class _LocBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool isCircle;
-  const _LocBtn({required this.icon, required this.onTap, required this.isCircle});
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget _locBtn(IconData icon, VoidCallback onTap, {required bool circle}) =>
+      GestureDetector(
         onTap: onTap,
         child: Container(
-          width: 40, height: 40,
+          width: 38, height: 38,
           decoration: BoxDecoration(
             color: kPrimary,
-            shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-            borderRadius: isCircle ? null : BorderRadius.circular(10),
+            shape: circle ? BoxShape.circle : BoxShape.rectangle,
+            borderRadius: circle ? null : BorderRadius.circular(10),
           ),
-          child: Icon(icon, color: Colors.white, size: 18),
+          child: Icon(icon, color: Colors.white, size: 17),
         ),
       );
+
+  // ── Save button ───────────────────────────────────────────────────
+  Widget _saveBtn() => SizedBox(
+    width: double.infinity, height: 44,
+    child: ElevatedButton(
+      onPressed: (_isSubmitting || _isMobileChanged) ? null : _save,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: kPrimary,
+        disabledBackgroundColor: kPrimaryLight,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: _isSubmitting
+          ? const SizedBox(width: 18, height: 18,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+          : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Text('Save Changes',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              if (_isMobileChanged)
+                const Text('Verify mobile number first',
+                    style: TextStyle(fontSize: 9, color: Colors.white70,
+                        fontWeight: FontWeight.w500)),
+            ]),
+    ),
+  );
+
+  // ── Section label — matches PatientListScreen _SectionHeader style ─
+  Widget _sectionLabel(String title) => Row(children: [
+    Container(width: 3, height: 14,
+        decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(2))),
+    const SizedBox(width: 7),
+    Text(title.toUpperCase(),
+        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+            color: kTextMuted, letterSpacing: 1.0)),
+  ]);
+
+  // ── Card wrapper ──────────────────────────────────────────────────
+  Widget _card(List<Widget> children) => Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: kBorder),
+      boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
+    ),
+    child: Column(children: children),
+  );
+
+  Widget _gap(double h) => SizedBox(height: h);
 }

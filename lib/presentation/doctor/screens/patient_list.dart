@@ -334,8 +334,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         // ── Body ──────────────────────────────────────────────────────────
         Expanded(
           child: async.when(
-            loading: () => const Center(
-                child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
+            loading: () => const _SkeletonPatientList(),
             error: (e, _) => _ErrorView(onRetry: () => _refresh(force: true)),
             data: (all) {
               final today     = _todayList(all);
@@ -833,11 +832,15 @@ class _PatientListBody extends ConsumerWidget {
 
     return RefreshIndicator(
       color: kPrimary,
-      strokeWidth: 2,
-      onRefresh: () async => ref
-          .read(appointmentViewModelProvider.notifier)
-          .fetchPatientAppointments(
-              ref.read(doctorLoginViewModelProvider).doctorId ?? 0),
+      strokeWidth: 2.5,
+      displacement: 40,
+      onRefresh: () async {
+        ref
+            .read(appointmentViewModelProvider.notifier)
+            .fetchPatientAppointments(
+                ref.read(doctorLoginViewModelProvider).doctorId ?? 0);
+        await Future.delayed(const Duration(milliseconds: 600));
+      },
       child: ListView.builder(
         padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + extraBottom),
         itemCount: patients.length + hdrCount,
@@ -1837,4 +1840,248 @@ class _ErrorView extends StatelessWidget {
       ),
     ]),
   );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SHIMMER HELPER
+// ════════════════════════════════════════════════════════════════════
+class _Shimmer extends StatefulWidget {
+  final double width, height, radius;
+  const _Shimmer(
+      {required this.width, required this.height, this.radius = 6});
+
+  @override
+  State<_Shimmer> createState() => _ShimmerState();
+}
+
+class _ShimmerState extends State<_Shimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1100))
+      ..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _anim,
+        child: Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE2E8F0),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — LIVE QUEUE CARD
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonLiveQueueCard extends StatelessWidget {
+  const _SkeletonLiveQueueCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: kPrimaryLight),
+        ),
+        padding: const EdgeInsets.all(14),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // top row: pulse label + badge + buttons
+          Row(children: const [
+            _Shimmer(width: 80, height: 10),
+            Spacer(),
+            _Shimmer(width: 60, height: 22, radius: 20),
+            SizedBox(width: 8),
+            _Shimmer(width: 28, height: 28, radius: 8),
+            SizedBox(width: 4),
+            _Shimmer(width: 28, height: 28, radius: 8),
+          ]),
+          const SizedBox(height: 12),
+          // token boxes
+          Row(children: const [
+            Expanded(child: _Shimmer(width: double.infinity, height: 60, radius: 12)),
+            SizedBox(width: 8),
+            Expanded(child: _Shimmer(width: double.infinity, height: 60, radius: 12)),
+            SizedBox(width: 8),
+            Expanded(child: _Shimmer(width: double.infinity, height: 60, radius: 12)),
+          ]),
+          const SizedBox(height: 12),
+          // current patient band
+          const _Shimmer(width: double.infinity, height: 70, radius: 12),
+          const SizedBox(height: 12),
+          // progress bar
+          const _Shimmer(width: double.infinity, height: 6, radius: 20),
+          const SizedBox(height: 12),
+          // action buttons
+          Row(children: const [
+            Expanded(child: _Shimmer(width: double.infinity, height: 38, radius: 10)),
+            SizedBox(width: 10),
+            Expanded(flex: 2, child: _Shimmer(width: double.infinity, height: 38, radius: 10)),
+          ]),
+        ]),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — PATIENT CARD
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonPatientCard extends StatelessWidget {
+  const _SkeletonPatientCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(children: [
+          // top row: avatar + info + token
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: const [
+            _Shimmer(width: 42, height: 42, radius: 12),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Shimmer(width: 120, height: 13),
+                  SizedBox(height: 5),
+                  _Shimmer(width: 80, height: 10),
+                  SizedBox(height: 8),
+                  Row(children: [
+                    _Shimmer(width: 56, height: 20, radius: 6),
+                    SizedBox(width: 5),
+                    _Shimmer(width: 64, height: 20, radius: 6),
+                    SizedBox(width: 5),
+                    _Shimmer(width: 44, height: 20, radius: 6),
+                  ]),
+                ],
+              ),
+            ),
+            SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                _Shimmer(width: 32, height: 26),
+                SizedBox(height: 4),
+                _Shimmer(width: 28, height: 10),
+              ],
+            ),
+          ]),
+          const SizedBox(height: 10),
+          // action buttons
+          Row(children: const [
+            Expanded(child: _Shimmer(width: double.infinity, height: 36, radius: 10)),
+            SizedBox(width: 8),
+            Expanded(flex: 2, child: _Shimmer(width: double.infinity, height: 36, radius: 10)),
+          ]),
+        ]),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — SEARCH BAR + TABS
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonSearchAndTabs extends StatelessWidget {
+  const _SkeletonSearchAndTabs();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        color: Colors.white,
+        child: Column(children: [
+          // search bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+            child: Container(
+              height: 40,
+              decoration: BoxDecoration(
+                color: kBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBorder),
+              ),
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 11),
+              child: const _Shimmer(width: 140, height: 13),
+            ),
+          ),
+          // tab bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F5F3),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              padding: const EdgeInsets.all(4),
+              child: Row(children: const [
+                Expanded(child: _Shimmer(width: double.infinity, height: double.infinity, radius: 20)),
+                SizedBox(width: 4),
+                Expanded(child: _Shimmer(width: double.infinity, height: double.infinity, radius: 20)),
+                SizedBox(width: 4),
+                Expanded(child: _Shimmer(width: double.infinity, height: double.infinity, radius: 20)),
+              ]),
+            ),
+          ),
+        ]),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — FULL PATIENT LIST
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonPatientList extends StatelessWidget {
+  const _SkeletonPatientList();
+
+  @override
+  Widget build(BuildContext context) => Column(
+        children: [
+          const _SkeletonSearchAndTabs(),
+          Expanded(
+            child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
+              children: const [
+                _SkeletonLiveQueueCard(),
+                // section header
+                Padding(
+                  padding: EdgeInsets.only(bottom: 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _Shimmer(width: 70, height: 13),
+                      _Shimmer(width: 60, height: 22, radius: 20),
+                    ],
+                  ),
+                ),
+                _SkeletonPatientCard(),
+                _SkeletonPatientCard(),
+                _SkeletonPatientCard(),
+                _SkeletonPatientCard(),
+              ],
+            ),
+          ),
+        ],
+      );
 }

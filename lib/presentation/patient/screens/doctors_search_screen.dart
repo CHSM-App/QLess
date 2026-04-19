@@ -533,63 +533,73 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       ]),
     );
   }
-
-  // ── Doctor List ────────────────────────────────────────────────────
-  Widget _buildDoctorList(List<DoctorDetails> docs) {
-    if (docs.isEmpty) {
-      return Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 56, height: 56,
-            decoration: const BoxDecoration(
-                color: kPrimaryLight, shape: BoxShape.circle),
-            child: Icon(
-              _favOnly
-                  ? Icons.favorite_border_rounded
-                  : Icons.search_off_rounded,
-              size: 24, color: kPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _favOnly ? 'No favorites yet' : 'No results found',
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: kTextPrimary),
-          ),
-          const SizedBox(height: 4),
-          const Text('Try a different search',
-              style: TextStyle(fontSize: 12, color: kTextMuted)),
-        ]),
-      );
-    }
-
+Widget _buildDoctorList(List<DoctorDetails> docs) {
+  if (docs.isEmpty) {
     return RefreshIndicator(
       onRefresh: _refresh,
       color: kPrimary,
       strokeWidth: 2,
-      child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
-        itemCount: docs.length,
-        itemBuilder: (_, i) => _DoctorCard(
-          doctor: docs[i],
-          selectedMemberId: _selectedMemberId,
-          onBook: (d) => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => BookAppointmentScreen(
-                doctor: d,
-                bookingForMemberId: _selectedMemberId,
-              ),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            child: Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 56, height: 56,
+                  decoration: const BoxDecoration(
+                      color: kPrimaryLight, shape: BoxShape.circle),
+                  child: Icon(
+                    _favOnly
+                        ? Icons.favorite_border_rounded
+                        : Icons.search_off_rounded,
+                    size: 24, color: kPrimary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _favOnly ? 'No favorites yet' : 'No results found',
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary),
+                ),
+                const SizedBox(height: 4),
+                const Text('Pull down to refresh',
+                    style: TextStyle(fontSize: 12, color: kTextMuted)),
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  return RefreshIndicator(
+    onRefresh: _refresh,
+    color: kPrimary,
+    strokeWidth: 2,
+    child: ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+      itemCount: docs.length,
+      itemBuilder: (_, i) => _DoctorCard(
+        doctor: docs[i],
+        selectedMemberId: _selectedMemberId,
+        onBook: (d) => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookAppointmentScreen(
+              doctor: d,
+              bookingForMemberId: _selectedMemberId,
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
-
+}
 // ════════════════════════════════════════════════════════════════════
 //  BOOKING ROW HELPERS
 // ════════════════════════════════════════════════════════════════════
@@ -1017,15 +1027,16 @@ class _LoadingShimmer extends StatefulWidget {
 class _LoadingShimmerState extends State<_LoadingShimmer>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double>   _anim;
+  late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
+        vsync: this, duration: const Duration(milliseconds: 1300))
       ..repeat();
-    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut);
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -1036,7 +1047,7 @@ class _LoadingShimmerState extends State<_LoadingShimmer>
         animation: _anim,
         builder: (_, __) => ListView.builder(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
-          itemCount: 5,
+          itemCount: 6,
           itemBuilder: (_, __) => _ShimmerCard(phase: _anim.value),
         ),
       );
@@ -1046,19 +1057,23 @@ class _ShimmerCard extends StatelessWidget {
   final double phase;
   const _ShimmerCard({required this.phase});
 
-  Color get _s1 =>
-      Color.lerp(const Color(0xFFE2E8F0), const Color(0xFFF7F9FC), phase)!;
-  Color get _s2 =>
-      Color.lerp(const Color(0xFFF1F5F9), const Color(0xFFE2E8F0), phase)!;
-
-  Widget _bar(double w, double h) => Container(
-        width: w, height: h,
+  Widget _bar({double? width, required double height}) => Container(
+        width: width,
+        height: height,
         margin: const EdgeInsets.only(bottom: 6),
         decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(5),
           gradient: LinearGradient(
-              colors: [_s1, _s2, _s1],
-              stops: [0, 0.5 + phase * 0.3, 1]),
-          borderRadius: BorderRadius.circular(4),
+            begin: Alignment(phase - 1, 0),
+            end: Alignment(phase + 1, 0),
+            colors: const [
+              Color(0xFFEDF2F7),
+              Color(0xFFE2E8F0),
+              Color(0xFFCBD5E0),
+              Color(0xFFE2E8F0),
+              Color(0xFFEDF2F7),
+            ],
+          ),
         ),
       );
 
@@ -1070,27 +1085,67 @@ class _ShimmerCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 10,
+                offset: const Offset(0, 3)),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Avatar skeleton
             Container(
               width: 46, height: 46,
               decoration: BoxDecoration(
-                  color: _s1, borderRadius: BorderRadius.circular(12)),
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment(phase - 1, 0),
+                  end: Alignment(phase + 1, 0),
+                  colors: const [
+                    Color(0xFFEDF2F7),
+                    Color(0xFFCBD5E0),
+                    Color(0xFFEDF2F7),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(width: 10),
+            // Text lines skeleton
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [_bar(140, 13), _bar(90, 11), _bar(110, 11)],
+                children: [
+                  _bar(width: 150, height: 13),  // name
+                  _bar(width: 100, height: 11),  // specialty + exp
+                  _bar(width: 120, height: 10),  // clinic
+                  _bar(width: 80,  height: 20),  // queue pill
+                ],
               ),
             ),
             const SizedBox(width: 8),
-            Container(
-              width: 62, height: 34,
-              decoration: BoxDecoration(
-                  color: _s1, borderRadius: BorderRadius.circular(9)),
+            // Book button skeleton
+            Column(
+              children: [
+                Container(
+                  width: 62, height: 34,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(9),
+                    gradient: LinearGradient(
+                      begin: Alignment(phase - 1, 0),
+                      end: Alignment(phase + 1, 0),
+                      colors: const [
+                        Color(0xFFEDF2F7),
+                        Color(0xFFCBD5E0),
+                        Color(0xFFEDF2F7),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 5),
+                _bar(width: 40, height: 9),  // ~15 min label
+              ],
             ),
           ],
         ),

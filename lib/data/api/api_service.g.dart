@@ -352,6 +352,37 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<List<TodayQueueModel>> getTodayQueue(int doctorId) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<TodayQueueModel>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'doctor/users/appointment/getTodayQueue/${doctorId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<TodayQueueModel> _value;
+    try {
+      _value = _result.data!
+          .map(
+            (dynamic i) => TodayQueueModel.fromJson(i as Map<String, dynamic>),
+          )
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<dynamic> addDoctorDetails(DoctorDetails doctorLogin) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};

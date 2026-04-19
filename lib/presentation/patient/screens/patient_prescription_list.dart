@@ -509,64 +509,79 @@ class _PatientPrescriptionListScreenState
 
   // ── List body ───────────────────────────────────────────────────────
   Widget _buildList(List<PatientPrescription> items,
-      {required bool waitAuth, required PrescriptionState state,
-       required int pid}) {
-    if (waitAuth) {
-      return const Center(
-          child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5));
-    }
-    if (state.error != null && items.isEmpty) return _errorState(state.error!, pid);
-    if (items.isEmpty && !state.isLoading) return _emptyState();
-    return RefreshIndicator(
+    {required bool waitAuth, required PrescriptionState state,
+     required int pid}) {
+  if (waitAuth || (state.isLoading && items.isEmpty)) {
+    return const _PrescriptionSkeletonList();
+  }
+  if (state.error != null && items.isEmpty) return _errorState(state.error!, pid);
+  if (items.isEmpty) return _emptyState(pid);
+
+  return RefreshIndicator(
+    color: kPrimary,
+    strokeWidth: 2,
+    onRefresh: () => ref
+        .read(prescriptionViewModelProvider.notifier)
+        .patientPrescriptionList(pid),
+    child: ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
+      itemCount: items.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) => _PrescriptionCard(
+        prescription: items[i],
+        fmtDate: _fmtDate,
+        onTap: () => _openDetail(items[i]),
+      ),
+    ),
+  );
+}
+Widget _emptyState(int pid) => RefreshIndicator(
       color: kPrimary,
       strokeWidth: 2,
       onRefresh: () => ref
           .read(prescriptionViewModelProvider.notifier)
           .patientPrescriptionList(pid),
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (_, i) => _PrescriptionCard(
-          prescription: items[i],
-          fmtDate: _fmtDate,
-          onTap: () => _openDetail(items[i]),
-        ),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverFillRemaining(
+            child: Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 56, height: 56,
+                  decoration: const BoxDecoration(
+                      color: kPrimaryLight, shape: BoxShape.circle),
+                  child: const Icon(Icons.receipt_long_outlined,
+                      size: 24, color: kPrimary),
+                ),
+                const SizedBox(height: 12),
+                const Text('No prescriptions found',
+                    style: TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.w700,
+                        color: kTextPrimary)),
+                const SizedBox(height: 4),
+                const Text('Pull down to refresh or try a different filter',
+                    style: TextStyle(fontSize: 12, color: kTextMuted)),
+                if (_hasFilter) ...[
+                  const SizedBox(height: 14),
+                  TextButton.icon(
+                    onPressed: () => setState(() {
+                      _dateFilter = _DateFilter.all; _sortNewest = true;
+                    }),
+                    icon: const Icon(Icons.clear_all_rounded, size: 15),
+                    label: const Text('Clear Filters',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    style: TextButton.styleFrom(foregroundColor: kPrimary),
+                  ),
+                ],
+              ]),
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  Widget _emptyState() => Center(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 56, height: 56,
-            decoration: const BoxDecoration(
-                color: kPrimaryLight, shape: BoxShape.circle),
-            child: const Icon(Icons.receipt_long_outlined,
-                size: 24, color: kPrimary),
-          ),
-          const SizedBox(height: 12),
-          const Text('No prescriptions found',
-              style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
-          const SizedBox(height: 4),
-          const Text('Try a different filter or search',
-              style: TextStyle(fontSize: 12, color: kTextMuted)),
-          if (_hasFilter) ...[
-            const SizedBox(height: 14),
-            TextButton.icon(
-              onPressed: () => setState(() {
-                _dateFilter = _DateFilter.all; _sortNewest = true;
-              }),
-              icon: const Icon(Icons.clear_all_rounded, size: 15),
-              label: const Text('Clear Filters',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-              style: TextButton.styleFrom(foregroundColor: kPrimary),
-            ),
-          ],
-        ]),
-      );
-
   Widget _errorState(String msg, int pid) => Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -641,226 +656,223 @@ class _PrescriptionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: prescription.status == 'active'
-                ? kSuccess.withOpacity(0.3)
-                : kBorder),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(children: [
-        // ── Top strip ─────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: prescription.status == 'active'
-                ? kGreenLight.withOpacity(0.4)
-                : const Color(0xFFF7F8FA),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
-          ),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                  color: kPrimaryLight, borderRadius: BorderRadius.circular(6)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                const Icon(Icons.receipt_rounded, color: kPrimary, size: 10),
-                const SizedBox(width: 4),
-                Text('Rx #${prescription.prescriptionId}',
-                    style: const TextStyle(
-                        color: kPrimary, fontSize: 11,
-                        fontWeight: FontWeight.w700)),
-              ]),
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.calendar_today_rounded,
-                color: kTextMuted, size: 10),
-            const SizedBox(width: 3),
-            Text(fmtDate(prescription.prescriptionDate),
-                style: const TextStyle(fontSize: 11, color: kTextMuted)),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                  color: _sbg, borderRadius: BorderRadius.circular(6)),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                Icon(_sic, color: _sfg, size: 10),
-                const SizedBox(width: 3),
-                Text(_slbl,
-                    style: TextStyle(
-                        color: _sfg, fontSize: 10,
-                        fontWeight: FontWeight.w700)),
-              ]),
-            ),
-          ]),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: prescription.status == 'active'
+                  ? kSuccess.withOpacity(0.3)
+                  : kBorder),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.03),
+                blurRadius: 8,
+                offset: const Offset(0, 3)),
+          ],
         ),
-
-        // ── Body ──────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Doctor row
-            Row(children: [
+        child: Column(children: [
+          // ── Top strip ──────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: prescription.status == 'active'
+                  ? kGreenLight.withOpacity(0.35)
+                  : const Color(0xFFF7F8FA),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(children: [
               Container(
-                width: 30, height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                      colors: [kPrimaryDark, kPrimary],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.person_rounded,
-                    color: Colors.white, size: 15),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(prescription.doctorName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary)),
-                    Text(prescription.specialization,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 10, color: kTextMuted)),
-                  ],
-                ),
-              ),
-            ]),
-            const SizedBox(height: 8),
-
-            // Patient row
-            Row(children: [
-              Container(
-                width: 22, height: 22,
-                decoration: const BoxDecoration(
-                    color: kPrimary, shape: BoxShape.circle),
-                alignment: Alignment.center,
-                child: Text(
-                  prescription.patientName
-                      .split(' ')
-                      .where((w) => w.isNotEmpty)
-                      .take(1)
-                      .map((w) => w[0].toUpperCase())
-                      .join(),
-                  style: const TextStyle(
-                      color: Colors.white, fontSize: 9,
-                      fontWeight: FontWeight.w700),
-                ),
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(5)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  const Icon(Icons.receipt_rounded, color: kPrimary, size: 9),
+                  const SizedBox(width: 3),
+                  Text('Rx #${prescription.prescriptionId}',
+                      style: const TextStyle(
+                          color: kPrimary, fontSize: 10,
+                          fontWeight: FontWeight.w700)),
+                ]),
               ),
               const SizedBox(width: 6),
-              Flexible(
-                child: Text(prescription.patientName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: kTextPrimary)),
+              const Icon(Icons.calendar_today_rounded,
+                  color: kTextMuted, size: 9),
+              const SizedBox(width: 2),
+              Text(fmtDate(prescription.prescriptionDate),
+                  style: const TextStyle(fontSize: 10, color: kTextMuted)),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                    color: _sbg, borderRadius: BorderRadius.circular(5)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(_sic, color: _sfg, size: 9),
+                  const SizedBox(width: 2),
+                  Text(_slbl,
+                      style: TextStyle(
+                          color: _sfg, fontSize: 9,
+                          fontWeight: FontWeight.w700)),
+                ]),
               ),
-              if (prescription.patientAge != null &&
-                  prescription.patientAge! > 0) ...[
-                const SizedBox(width: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 5, vertical: 2),
-                  decoration: BoxDecoration(
-                      color: kPrimaryLight,
-                      borderRadius: BorderRadius.circular(4)),
-                  child: Text('${prescription.patientAge} yrs',
-                      style: const TextStyle(
-                          fontSize: 9,
-                          color: kPrimary,
-                          fontWeight: FontWeight.w600)),
-                ),
-              ],
             ]),
-          ]),
-        ),
+          ),
 
-        // ── Bottom strip ───────────────────────────────────────
-        Container(
-          decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: kBorder))),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Left: chips wrapped so they never push the button
-              Expanded(
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
+          // ── Body ───────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Doctor avatar
+                Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                        colors: [kPrimaryDark, kPrimary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: const Icon(Icons.person_rounded,
+                      color: Colors.white, size: 16),
+                ),
+                const SizedBox(width: 8),
+                // Doctor info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(prescription.doctorName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary)),
+                      Text(prescription.specialization,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 10, color: kTextMuted)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Patient badge
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    _miniChip(Icons.medication_rounded,
-                        '${prescription.medicines.length} Med',
-                        kPurple, kPurpleLight),
-                    if (prescription.followUpDate != null)
-                      _miniChip(
-                        Icons.event_rounded,
-                        fmtDate(prescription.followUpDate!),
-                        kWarning, kAmberLight,
+                    Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(
+                        width: 18, height: 18,
+                        decoration: const BoxDecoration(
+                            color: kPrimary, shape: BoxShape.circle),
+                        alignment: Alignment.center,
+                        child: Text(
+                          prescription.patientName
+                              .split(' ')
+                              .where((w) => w.isNotEmpty)
+                              .take(1)
+                              .map((w) => w[0].toUpperCase())
+                              .join(),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 8,
+                              fontWeight: FontWeight.w700),
+                        ),
                       ),
+                      const SizedBox(width: 4),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 80),
+                        child: Text(prescription.patientName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: kTextPrimary)),
+                      ),
+                    ]),
+                    if (prescription.patientAge != null &&
+                        prescription.patientAge! > 0) ...[
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                            color: kPrimaryLight,
+                            borderRadius: BorderRadius.circular(4)),
+                        child: Text('${prescription.patientAge} yrs',
+                            style: const TextStyle(
+                                fontSize: 9, color: kPrimary,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
                   ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              // Right: fixed-width View button — never displaced
-              GestureDetector(
-                onTap: onTap,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                      color: kPrimary,
-                      borderRadius: BorderRadius.circular(8)),
-                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                    Icon(Icons.visibility_rounded,
-                        color: Colors.white, size: 12),
-                    SizedBox(width: 4),
-                    Text('View',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700)),
-                  ]),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ]),
+
+          // ── Bottom strip ───────────────────────────────────
+          Container(
+            decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: kBorder))),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(children: [
+              Expanded(
+                child: Wrap(spacing: 5, runSpacing: 3, children: [
+                  _miniChip(Icons.medication_rounded,
+                      '${prescription.medicines.length} Med',
+                      kPurple, kPurpleLight),
+                  if (prescription.followUpDate != null)
+                    _miniChip(Icons.event_rounded,
+                        fmtDate(prescription.followUpDate!),
+                        kWarning, kAmberLight),
+                ]),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                    color: kPrimary,
+                    borderRadius: BorderRadius.circular(7)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.visibility_rounded,
+                      color: Colors.white, size: 11),
+                  SizedBox(width: 3),
+                  Text('View',
+                      style: TextStyle(
+                          color: Colors.white, fontSize: 11,
+                          fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ]),
+          ),
+        ]),
+      ),
     );
   }
 
   Widget _miniChip(IconData ic, String lbl, Color fg, Color bg) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+            color: bg, borderRadius: BorderRadius.circular(5)),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(ic, color: fg, size: 10),
-          const SizedBox(width: 4),
+          Icon(ic, color: fg, size: 9),
+          const SizedBox(width: 3),
           Text(lbl,
               style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
+                  fontSize: 9, fontWeight: FontWeight.w600, color: fg)),
         ]),
       );
 }
-
 // ════════════════════════════════════════════════════════════════════
 //  MEMBER DROPDOWN
 // ════════════════════════════════════════════════════════════════════
@@ -2149,5 +2161,129 @@ class PrescriptionMedicineItem {
         dropsCount: model.dropsCount, dropsApplication: model.dropsApplication,
         lotionApplyArea: model.lotionApplyArea, sprayPuffs: model.sprayPuffs,
         sprayUsage: model.sprayUsage, lotionUsage: model.lotionUsage,
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  PRESCRIPTION SKELETON
+// ════════════════════════════════════════════════════════════════════
+class _PrescriptionSkeletonList extends StatefulWidget {
+  const _PrescriptionSkeletonList();
+  @override
+  State<_PrescriptionSkeletonList> createState() =>
+      _PrescriptionSkeletonListState();
+}
+
+class _PrescriptionSkeletonListState extends State<_PrescriptionSkeletonList>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1300))
+      ..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) => ListView.separated(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
+          itemCount: 5,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (_, __) => _PrescriptionSkeletonCard(phase: _anim.value),
+        ),
+      );
+}
+
+class _PrescriptionSkeletonCard extends StatelessWidget {
+  final double phase;
+  const _PrescriptionSkeletonCard({required this.phase});
+
+  Widget _bar({double? width, required double height, double radius = 5}) =>
+      Container(
+        width: width, height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(radius),
+          gradient: LinearGradient(
+            begin: Alignment(phase - 1, 0),
+            end: Alignment(phase + 1, 0),
+            colors: const [
+              Color(0xFFEDF2F7), Color(0xFFE2E8F0),
+              Color(0xFFCBD5E0), Color(0xFFE2E8F0), Color(0xFFEDF2F7),
+            ],
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.03),
+                blurRadius: 8, offset: const Offset(0, 3))
+          ],
+        ),
+        child: Column(children: [
+          // Top strip skeleton
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
+            ),
+            child: Row(children: [
+              _bar(width: 70, height: 18, radius: 5),
+              const SizedBox(width: 8),
+              _bar(width: 80, height: 10),
+              const Spacer(),
+              _bar(width: 60, height: 18, radius: 5),
+            ]),
+          ),
+          // Body skeleton
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 6),
+            child: Row(children: [
+              _bar(width: 34, height: 34, radius: 9), // avatar
+              const SizedBox(width: 8),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _bar(width: 130, height: 12),
+                  _bar(width: 80, height: 10),
+                ],
+              )),
+              const SizedBox(width: 8),
+              Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                _bar(width: 90, height: 12),
+                _bar(width: 44, height: 16, radius: 4),
+              ]),
+            ]),
+          ),
+          // Bottom strip skeleton
+          Container(
+            decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: kBorder))),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(children: [
+              _bar(width: 55, height: 18, radius: 5),
+              const SizedBox(width: 6),
+              _bar(width: 80, height: 18, radius: 5),
+              const Spacer(),
+              _bar(width: 52, height: 28, radius: 7),
+            ]),
+          ),
+        ]),
       );
 }

@@ -84,79 +84,84 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   // ---------------------------------------------------------------------------
   //  BUILD
   // ---------------------------------------------------------------------------
-  @override
-  Widget build(BuildContext context) {
-    final state   = ref.watch(patientLoginViewModelProvider);
-    final details = state.patientPhoneCheck.maybeWhen(
-      data: (list) => list.isNotEmpty ? list.first : null,
-      orElse: () => null,
-    );
+@override
+Widget build(BuildContext context) {
+  final state   = ref.watch(patientLoginViewModelProvider);
+  final details = state.patientPhoneCheck.maybeWhen(
+    data: (list) => list.isNotEmpty ? list.first : null,
+    orElse: () => null,
+  );
 
-    return Scaffold(
+  // Show skeleton while waiting for profile data
+  final isLoading = state.patientPhoneCheck.maybeWhen(
+    loading: () => true,
+    orElse: () => false,
+  );
+
+  return Scaffold(
+    backgroundColor: Colors.white,
+    appBar: AppBar(
       backgroundColor: Colors.white,
-      // ── AppBar — icon + title side-by-side, same as DoctorExploreScreen ──
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        centerTitle: false,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Side icon badge — mirrors explore screen's explore_rounded badge
-            Container(
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: kPrimary.withOpacity(0.2)),
+      elevation: 0,
+      automaticallyImplyLeading: false,
+      centerTitle: false,
+      title: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: kPrimary.withOpacity(0.2)),
+            ),
+            child: const Icon(Icons.person_rounded, color: kPrimary, size: 16),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            'My Profile',
+            style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+                letterSpacing: -0.2),
+          ),
+        ],
+      ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(color: kBorder, height: 1),
+      ),
+    ),
+    body: RefreshIndicator(
+      color: kPrimary,
+      strokeWidth: 2,
+      onRefresh: () async {
+        _didFetchProfile = false;
+        _maybeFetchProfile(ref.read(patientLoginViewModelProvider));
+      },
+      child: isLoading
+          ? const _ProfileSkeleton()
+          : SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildProfileCard(state, details),
+                  const SizedBox(height: 10),
+                  _buildStatsRow(details),
+                  const SizedBox(height: 20),
+                  _buildSectionLabel('ACCOUNT', 'Settings & information'),
+                  const SizedBox(height: 10),
+                  _buildAccountCard(context, ref, state, details),
+                  const SizedBox(height: 24),
+                ],
               ),
-              child: const Icon(Icons.person_rounded,
-                  color: kPrimary, size: 16),
             ),
-            const SizedBox(width: 8),
-            const Text(
-              'My Profile',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: kTextPrimary,
-                  letterSpacing: -0.2),
-            ),
-            
-          ],
-        ),
-    
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: kBorder, height: 1),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 100),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Profile card ──────────────────────────────────────
-            _buildProfileCard(state, details),
-            const SizedBox(height: 10),
-
-            // ── Stats row ─────────────────────────────────────────
-            _buildStatsRow(details),
-            const SizedBox(height: 20),
-
-            // ── Account section label — mirrors explore's _SectionLabel ──
-            _buildSectionLabel('ACCOUNT', 'Settings & information'),
-            const SizedBox(height: 10),
-
-            // ── Menu rows card ────────────────────────────────────
-            _buildAccountCard(context, ref, state, details),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
 
   // ---------------------------------------------------------------------------
   //  PROFILE CARD
@@ -898,4 +903,197 @@ class _StatItem {
   final IconData icon;
   final Color color, bgColor;
   const _StatItem(this.value, this.label, this.icon, this.color, this.bgColor);
+}
+
+
+// =============================================================================
+//  PROFILE SKELETON
+// =============================================================================
+class _ProfileSkeleton extends StatefulWidget {
+  const _ProfileSkeleton();
+  @override
+  State<_ProfileSkeleton> createState() => _ProfileSkeletonState();
+}
+
+class _ProfileSkeletonState extends State<_ProfileSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1300))
+      ..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  Widget _bar({double? width, required double height, double radius = 6}) =>
+      AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) => Container(
+          width: width,
+          height: height,
+          margin: const EdgeInsets.only(bottom: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            gradient: LinearGradient(
+              begin: Alignment(_anim.value - 1, 0),
+              end: Alignment(_anim.value + 1, 0),
+              colors: const [
+                Color(0xFFEDF2F7),
+                Color(0xFFE2E8F0),
+                Color(0xFFCBD5E0),
+                Color(0xFFE2E8F0),
+                Color(0xFFEDF2F7),
+              ],
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: 100),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Profile card skeleton ─────────────────────────
+          Container(
+            margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kBorder),
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 12, offset: const Offset(0, 4))],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                  // Avatar
+                  AnimatedBuilder(
+                    animation: _anim,
+                    builder: (_, __) => Container(
+                      width: 54, height: 54,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(14),
+                        gradient: LinearGradient(
+                          begin: Alignment(_anim.value - 1, 0),
+                          end: Alignment(_anim.value + 1, 0),
+                          colors: const [Color(0xFFEDF2F7), Color(0xFFCBD5E0), Color(0xFFEDF2F7)],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _bar(width: 140, height: 14),
+                        _bar(width: 100, height: 10),
+                        const SizedBox(height: 4),
+                        Row(children: [
+                          _bar(width: 55, height: 22, radius: 8),
+                          const SizedBox(width: 5),
+                          _bar(width: 44, height: 22, radius: 8),
+                        ]),
+                      ],
+                    ),
+                  ),
+                ]),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(height: 1, color: kBorder),
+                ),
+                // Info tiles row
+                Row(children: [
+                  Expanded(child: _bar(height: 60, radius: 10)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _bar(height: 60, radius: 10)),
+                  const SizedBox(width: 8),
+                  Expanded(child: _bar(height: 60, radius: 10)),
+                ]),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Stats row skeleton ────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(children: List.generate(3, (i) => Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: i < 2 ? 8 : 0),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kBorder),
+                ),
+                child: Column(children: [
+                  _bar(width: 34, height: 34, radius: 9),
+                  const SizedBox(height: 6),
+                  _bar(width: 28, height: 16),
+                  _bar(width: 44, height: 10),
+                ]),
+              ),
+            ))),
+          ),
+          const SizedBox(height: 20),
+
+          // ── Section label skeleton ────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _bar(width: 70, height: 10),
+              _bar(width: 120, height: 10),
+            ]),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Menu rows skeleton ────────────────────────────
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kBorder),
+            ),
+            child: Column(
+              children: List.generate(5, (i) => Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                    child: Row(children: [
+                      _bar(width: 34, height: 34, radius: 10),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _bar(width: 130, height: 13),
+                          _bar(width: 90, height: 10),
+                        ],
+                      )),
+                      _bar(width: 16, height: 16, radius: 4),
+                    ]),
+                  ),
+                  if (i < 4) const Divider(height: 1, color: kBorder, indent: 14, endIndent: 14),
+                ],
+              )),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
