@@ -226,32 +226,33 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
               delegate: SliverChildListDelegate([
 
                 // Recent Doctors
-                if (isLoading || recent.isNotEmpty) ...[
-                  _fade(1, _SectionTitle(
-                    'Recent Doctors',
-                    subtitle: 'Your last visits',
-                  )),
-                  const SizedBox(height: 10),
-                  _fade(1, isLoading
-                      ? _HorizontalShimmer(height: 170, itemWidth: 130)
-                      : _buildRecentDoctors(context, recent)),
-                  const SizedBox(height: 22),
-                ],
+             // Recent Doctors
+if (isLoading || recent.isNotEmpty) ...[
+  _fade(1, _SectionTitle(
+    'Recent Doctors',
+    subtitle: 'Your last visits',
+  )),
+  const SizedBox(height: 10),
+  _fade(1, isLoading
+      ? const _HorizontalShimmer(height: 170, isRecent: true)
+      : _buildRecentDoctors(context, recent)),
+  const SizedBox(height: 22),
+],
 
-                // Nearby Doctors
-                if (_position != null && (isLoading || nearby.isNotEmpty)) ...[
-                  _fade(2, _SectionTitle(
-                    'Nearby Doctors',
-                    subtitle: 'Doctors close to you',
-                    action: 'See All',
-                    onAction: () => _goToSearch(context),
-                  )),
-                  const SizedBox(height: 10),
-                  _fade(2, isLoading
-                      ? _HorizontalShimmer(height: 148, itemWidth: 210)
-                      : _buildNearbyDoctors(context, nearby)),
-                  const SizedBox(height: 22),
-                ],
+// Nearby Doctors
+if (_position != null && (isLoading || nearby.isNotEmpty)) ...[
+  _fade(2, _SectionTitle(
+    'Nearby Doctors',
+    subtitle: 'Doctors close to you',
+    action: 'See All',
+    onAction: () => _goToSearch(context),
+  )),
+  const SizedBox(height: 10),
+  _fade(2, isLoading
+      ? const _HorizontalShimmer(height: 148, isRecent: false)
+      : _buildNearbyDoctors(context, nearby)),
+  const SizedBox(height: 22),
+],
 
                 // Browse by Specialty
                 if (isLoading || specialties.isNotEmpty) ...[
@@ -480,8 +481,7 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
       ),
     );
   }
-
-  Widget _buildSpecialtyShimmerGrid() {
+Widget _buildSpecialtyShimmerGrid() {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -494,10 +494,13 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
       itemCount: 6,
       itemBuilder: (_, __) => _ShimmerBox(
         borderRadius: BorderRadius.circular(12),
+        height: null,
       ),
     );
   }
-}
+} // ← closes _DoctorExploreScreenState
+
+
 
 // ════════════════════════════════════════════════════════════════════
 //  HEADER BUTTON  — identical to HomeScreen
@@ -882,14 +885,11 @@ class _SpecialtyTile extends StatelessWidget {
     );
   }
 }
-
-// ════════════════════════════════════════════════════════════════════
-//  SHIMMER HELPERS
-// ════════════════════════════════════════════════════════════════════
 class _ShimmerBox extends StatefulWidget {
   final double? width;
+  final double? height;
   final BorderRadius borderRadius;
-  const _ShimmerBox({this.width, required this.borderRadius});
+  const _ShimmerBox({this.width, this.height, required this.borderRadius});
 
   @override
   State<_ShimmerBox> createState() => _ShimmerBoxState();
@@ -898,15 +898,16 @@ class _ShimmerBox extends StatefulWidget {
 class _ShimmerBoxState extends State<_ShimmerBox>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double>   _anim;
+  late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.3, end: 0.7).animate(_ctrl);
+        vsync: this, duration: const Duration(milliseconds: 1300))
+      ..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -917,36 +918,122 @@ class _ShimmerBoxState extends State<_ShimmerBox>
         animation: _anim,
         builder: (_, __) => Container(
           width: widget.width,
+          height: widget.height,
           decoration: BoxDecoration(
-            color: Color.lerp(
-                const Color(0xFFEDF2F7),
-                const Color(0xFFC8D6E5),
-                _anim.value),
             borderRadius: widget.borderRadius,
+            gradient: LinearGradient(
+              begin: Alignment(_anim.value - 1, 0),
+              end: Alignment(_anim.value + 1, 0),
+              colors: const [
+                Color(0xFFEDF2F7),
+                Color(0xFFE2E8F0),
+                Color(0xFFCBD5E0),
+                Color(0xFFE2E8F0),
+                Color(0xFFEDF2F7),
+              ],
+            ),
           ),
         ),
       );
 }
 
+// Skeleton for Recent Doctor card (130×170)
+class _RecentDoctorSkeleton extends StatelessWidget {
+  const _RecentDoctorSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 130,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Avatar circle
+          _ShimmerBox(width: 52, height: 52, borderRadius: BorderRadius.circular(26)),
+          const SizedBox(height: 10),
+          // Name line
+          _ShimmerBox(width: 90, height: 11, borderRadius: BorderRadius.circular(6)),
+          const SizedBox(height: 6),
+          // Specialty line
+          _ShimmerBox(width: 65, height: 9, borderRadius: BorderRadius.circular(6)),
+          const SizedBox(height: 10),
+          // Experience row
+          _ShimmerBox(width: 70, height: 9, borderRadius: BorderRadius.circular(6)),
+        ],
+      ),
+    );
+  }
+}
+
+// Skeleton for Nearby Doctor card (210×148)
+class _NearbyDoctorSkeleton extends StatelessWidget {
+  const _NearbyDoctorSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 210,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Icon + badge row
+          Row(children: [
+            _ShimmerBox(width: 36, height: 36, borderRadius: BorderRadius.circular(10)),
+            const Spacer(),
+            _ShimmerBox(width: 55, height: 22, borderRadius: BorderRadius.circular(6)),
+          ]),
+          const SizedBox(height: 10),
+          // Doctor name
+          _ShimmerBox(height: 13, borderRadius: BorderRadius.circular(6)),
+          const SizedBox(height: 6),
+          // Address
+          _ShimmerBox(width: 140, height: 10, borderRadius: BorderRadius.circular(6)),
+          const SizedBox(height: 10),
+          // Distance + specialty tags
+          Row(children: [
+            _ShimmerBox(width: 60, height: 22, borderRadius: BorderRadius.circular(6)),
+            const SizedBox(width: 8),
+            _ShimmerBox(width: 80, height: 10, borderRadius: BorderRadius.circular(6)),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
 class _HorizontalShimmer extends StatelessWidget {
   final double height;
-  final double itemWidth;
-  const _HorizontalShimmer(
-      {required this.height, required this.itemWidth});
+  final bool isRecent;
+  const _HorizontalShimmer({
+    required this.height,
+    this.isRecent = false,
+  });
 
   @override
   Widget build(BuildContext context) => SizedBox(
         height: height,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.only(right: 4),
           itemCount: 4,
           separatorBuilder: (_, __) => const SizedBox(width: 10),
-          itemBuilder: (_, __) => _ShimmerBox(
-            width: itemWidth,
-            borderRadius: BorderRadius.circular(14),
-          ),
+          itemBuilder: (_, __) =>
+              isRecent ? const _RecentDoctorSkeleton() : const _NearbyDoctorSkeleton(),
         ),
       );
 }
-
-

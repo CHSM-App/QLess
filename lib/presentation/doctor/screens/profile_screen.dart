@@ -161,6 +161,18 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         _leadTimeEdited = false;
       });
 
+  // ── Refresh ───────────────────────────────────────────────────────────────
+
+  Future<void> _refreshProfile() async {
+    final mobile = ref.read(doctorLoginViewModelProvider).mobile;
+    if (mobile != null && mobile.trim().isNotEmpty) {
+      ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .checkPhoneDoctor(mobile);
+      await Future.delayed(const Duration(milliseconds: 600));
+    }
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   String _initials(String? name) {
@@ -233,6 +245,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       _lastAppliedLeadTimeMinutes = stateLeadTime;
     }
 
+    final isLoading     = doctorState.phoneCheckResult.isLoading;
     final w             = MediaQuery.of(context).size.width;
     final isTablet      = w >= 600;
     final isLargeTablet = w >= 900;
@@ -246,28 +259,42 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
           // ── Body ─────────────────────────────────────────────────────────
           Expanded(
-            child: isLargeTablet
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
+            child: isLoading
+                ? const _SkeletonSettingsBody()
+                : isLargeTablet
+                    ? Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: RefreshIndicator(
+                              color: kPrimary,
+                              strokeWidth: 2.5,
+                              displacement: 40,
+                              onRefresh: _refreshProfile,
+                              child: _buildScroll(
+                                isTablet: true,
+                                s: doctorState,
+                                d: doctorDetails,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 300,
+                            child: _buildRightPanel(),
+                          ),
+                        ],
+                      )
+                    : RefreshIndicator(
+                        color: kPrimary,
+                        strokeWidth: 2.5,
+                        displacement: 40,
+                        onRefresh: _refreshProfile,
                         child: _buildScroll(
-                          isTablet: true,
+                          isTablet: isTablet,
                           s: doctorState,
                           d: doctorDetails,
                         ),
                       ),
-                      SizedBox(
-                        width: 300,
-                        child: _buildRightPanel(),
-                      ),
-                    ],
-                  )
-                : _buildScroll(
-                    isTablet: isTablet,
-                    s: doctorState,
-                    d: doctorDetails,
-                  ),
           ),
         ],
       ),
@@ -1643,5 +1670,213 @@ class _WheelPickerState extends State<_WheelPicker> {
             ),
           ),
         ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SHIMMER HELPER
+// ════════════════════════════════════════════════════════════════════
+class _Shimmer extends StatefulWidget {
+  final double width, height, radius;
+  const _Shimmer(
+      {required this.width, required this.height, this.radius = 6});
+
+  @override
+  State<_Shimmer> createState() => _ShimmerState();
+}
+
+class _ShimmerState extends State<_Shimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1100))
+      ..repeat(reverse: true);
+    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(
+        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+        opacity: _anim,
+        child: Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            color: const Color(0xFFE2E8F0),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — PROFILE CARD
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonProfileCard extends StatelessWidget {
+  const _SkeletonProfileCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(children: [
+          // gradient strip placeholder
+          Container(height: 60, color: const Color(0xFFE2E8F0)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            child: Column(children: [
+              Transform.translate(
+                offset: const Offset(0, -30),
+                child: Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFE2E8F0),
+                    border: Border.all(color: Colors.white, width: 3),
+                  ),
+                ),
+              ),
+              Transform.translate(
+                offset: const Offset(0, -20),
+                child: Column(children: const [
+                  _Shimmer(width: 140, height: 14),
+                  SizedBox(height: 8),
+                  _Shimmer(width: 100, height: 11),
+                  SizedBox(height: 4),
+                  _Shimmer(width: 80, height: 10),
+                  SizedBox(height: 14),
+                  // stats row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _Shimmer(width: 50, height: 30),
+                      _Shimmer(width: 50, height: 30),
+                      _Shimmer(width: 50, height: 30),
+                    ],
+                  ),
+                  SizedBox(height: 14),
+                  _Shimmer(
+                      width: double.infinity, height: 36, radius: 10),
+                ]),
+              ),
+            ]),
+          ),
+        ]),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — SECTION LABEL
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonSectionLabel extends StatelessWidget {
+  const _SkeletonSectionLabel();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.only(left: 2, bottom: 8),
+        child: _Shimmer(width: 70, height: 10),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — TILE CARD
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonTileCard extends StatelessWidget {
+  final int rows;
+  const _SkeletonTileCard({required this.rows});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Column(
+          children: List.generate(rows, (i) {
+            return Column(children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 13),
+                child: Row(children: const [
+                  _Shimmer(width: 34, height: 34, radius: 10),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _Shimmer(width: 120, height: 12),
+                        SizedBox(height: 5),
+                        _Shimmer(width: 80, height: 10),
+                      ],
+                    ),
+                  ),
+                  _Shimmer(width: 16, height: 16, radius: 4),
+                ]),
+              ),
+              if (i < rows - 1)
+                const Divider(height: 1, indent: 56, color: kBorder),
+            ]);
+          }),
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SKELETON — FULL SETTINGS BODY
+// ════════════════════════════════════════════════════════════════════
+class _SkeletonSettingsBody extends StatelessWidget {
+  const _SkeletonSettingsBody();
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
+        children: const [
+          _SkeletonProfileCard(),
+          SizedBox(height: 14),
+          _SkeletonSectionLabel(),
+          _SkeletonTileCard(rows: 4),
+          SizedBox(height: 14),
+          _SkeletonSectionLabel(),
+          _SkeletonTileCard(rows: 2),
+          SizedBox(height: 14),
+          _SkeletonSectionLabel(),
+          _SkeletonTileCard(rows: 3),
+          SizedBox(height: 14),
+          _SkeletonSectionLabel(),
+          _SkeletonTileCard(rows: 3),
+          SizedBox(height: 14),
+          _SkeletonSectionLabel(),
+          _SkeletonTileCard(rows: 5),
+        ],
       );
 }
