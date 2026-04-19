@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -71,9 +72,11 @@ class DoctorMedicinePage extends ConsumerStatefulWidget {
 }
 
 class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
-  final _searchCtrl = TextEditingController();
+  final _searchCtrl  = TextEditingController();
+  final _scrollCtrl  = ScrollController();
   int  _selectedType = 0;
   bool _hasFetched   = false;
+  bool _fabVisible   = true;
 
   static const _types = [
     'All', 'Tablet', 'Lotion', 'Syrup', 'Injection', 'Drops', 'Spray',
@@ -84,14 +87,26 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   @override
   void initState() {
     super.initState();
+    _scrollCtrl.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => _refresh(force: false),
     );
   }
 
+  void _onScroll() {
+    if (_scrollCtrl.position.userScrollDirection ==
+        ScrollDirection.reverse && _fabVisible) {
+      setState(() => _fabVisible = false);
+    } else if (_scrollCtrl.position.userScrollDirection ==
+        ScrollDirection.forward && !_fabVisible) {
+      setState(() => _fabVisible = true);
+    }
+  }
+
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _scrollCtrl.dispose();
     super.dispose();
   }
 
@@ -308,7 +323,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                     onRefresh: () async => _refresh(force: true),
                     child: isWide
                         ? _buildGrid(filtered)
-                        : _buildList(filtered),
+                        : _buildList(filtered, _scrollCtrl),
                   );
                 });
               },
@@ -318,19 +333,28 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
       ),
 
       // ── FAB ─────────────────────────────────────────────────────────────
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 80),
-        child: FloatingActionButton.extended(
-          onPressed: _goToAdd,
-          backgroundColor: kPrimary,
-          elevation: 3,
-          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-          label: const Text(
-            'Add Medicine',
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: Colors.white),
+      floatingActionButton: AnimatedSlide(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        offset: _fabVisible ? Offset.zero : const Offset(0, 0.6),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 300),
+          opacity: _fabVisible ? 1.0 : 0.0,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 80),
+            child: FloatingActionButton.extended(
+              onPressed: _fabVisible ? _goToAdd : null,
+              backgroundColor: kPrimary,
+              elevation: 3,
+              icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
+              label: const Text(
+                'Add Medicine',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white),
+              ),
+            ),
           ),
         ),
       ),
@@ -508,7 +532,9 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   }
 
   // ── List (mobile) ─────────────────────────────────────────────────────────
-  Widget _buildList(List<Medicine> medicines) => ListView.separated(
+  Widget _buildList(List<Medicine> medicines, [ScrollController? controller]) =>
+      ListView.separated(
+        controller: controller,
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 140),
         itemCount: medicines.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
