@@ -444,23 +444,23 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                           fontWeight: FontWeight.w600,
                           color: kTextSecondary),
                     ),
-                    if (d.consultationFee != null) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                            color: kPrimaryLight,
-                            borderRadius: BorderRadius.circular(6)),
-                        child: Text(
-                          '₹${d.consultationFee!.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: kPrimary),
-                        ),
-                      ),
-                    ],
+                    // if (d.consultationFee != null) ...[
+                    //   const SizedBox(width: 8),
+                    //   Container(
+                    //     padding: const EdgeInsets.symmetric(
+                    //         horizontal: 7, vertical: 2),
+                    //     decoration: BoxDecoration(
+                    //         color: kPrimaryLight,
+                    //         borderRadius: BorderRadius.circular(6)),
+                    //     child: Text(
+                    //       '₹${d.consultationFee!.toStringAsFixed(0)}',
+                    //       style: const TextStyle(
+                    //           fontSize: 11,
+                    //           fontWeight: FontWeight.w700,
+                    //           color: kPrimary),
+                    //     ),
+                    //   ),
+                    // ],
                   ]),
                 ],
               ),
@@ -660,17 +660,17 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             const SizedBox(height: 10),
           ],
           _buildWorkingHours(avail),
-          if (d.consultationFee != null) ...[
-            const SizedBox(height: 10),
-            _InfoRow(
-              icon: Icons.currency_rupee_rounded,
-              iconColor: const Color(0xFFD97706),
-              iconBg: kAmberLight,
-              title: 'Consultation Fee',
-              subtitle:
-                  '₹${d.consultationFee!.toStringAsFixed(0)} per visit',
-            ),
-          ],
+          // if (d.consultationFee != null) ...[
+          //   const SizedBox(height: 10),
+          //   _InfoRow(
+          //     icon: Icons.currency_rupee_rounded,
+          //     iconColor: const Color(0xFFD97706),
+          //     iconBg: kAmberLight,
+          //     title: 'Consultation Fee',
+          //     subtitle:
+          //         '₹${d.consultationFee!.toStringAsFixed(0)} per visit',
+          //   ),
+          // ],
         ],
       ),
     );

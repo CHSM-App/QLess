@@ -581,7 +581,7 @@ class _BookAppointmentScreenState
               selectedDate:   _selectedDate,
               selectedSlot:   _selectedTime,
               queueStartTime: isQueue ? _fmtTime(selAvail!.startTime) : null,
-              fee:            widget.doctor.consultationFee,
+              // fee:            widget.doctor.consultationFee,
               isLoading:      _isBooking,
               onConfirm:      _onConfirm,
             )
@@ -958,25 +958,25 @@ class _AppBar extends StatelessWidget {
       ),
 
     // Fee
-    if (doctor.consultationFee != null)
-      Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            '₹${doctor.consultationFee!.toStringAsFixed(0)}',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: kSuccess,
-            ),
-          ),
-          const Text(
-            'consult fee',
-            style: TextStyle(fontSize: 10, color: kTextMuted),
-          ),
-        ],
-      ),
+    // if (doctor.consultationFee != null)
+    //   Column(
+    //     mainAxisSize: MainAxisSize.min,
+    //     crossAxisAlignment: CrossAxisAlignment.end,
+    //     children: [
+    //       Text(
+    //         '₹${doctor.consultationFee!.toStringAsFixed(0)}',
+    //         style: const TextStyle(
+    //           fontSize: 16,
+    //           fontWeight: FontWeight.w700,
+    //           color: kSuccess,
+    //         ),
+    //       ),
+    //       const Text(
+    //         'consult fee',
+    //         style: TextStyle(fontSize: 10, color: kTextMuted),
+    //       ),
+    //     ],
+    //   ),
   ],
 ),
         ),
@@ -1963,13 +1963,14 @@ class _ConfirmBar extends StatelessWidget {
   final DateTime?    selectedDate;
   final String?      selectedSlot;
   final String?      queueStartTime;
-  final double?      fee;
+  // final double?      fee;
   final bool         isLoading;
   final VoidCallback onConfirm;
 
   const _ConfirmBar({
     required this.isQueue,      required this.selectedDate,
-    required this.selectedSlot, required this.fee,
+    required this.selectedSlot, 
+    // required this.fee,
     required this.isLoading,    required this.onConfirm,
     this.queueStartTime, this.isReschedule = false,
   });
@@ -2005,20 +2006,20 @@ class _ConfirmBar extends StatelessWidget {
                     overflow: TextOverflow.ellipsis),
               ]),
               const Spacer(),
-              if (fee != null)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text('Consult fee',
-                        style: TextStyle(
-                            fontSize: 11, color: kTextMuted)),
-                    Text('₹${fee!.toStringAsFixed(0)}',
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: kSuccess)),
-                  ],
-                ),
+              // if (fee != null)
+                // Column(
+                //   crossAxisAlignment: CrossAxisAlignment.end,
+                  // children: [
+                  //   const Text('Consult fee',
+                  //       style: TextStyle(
+                  //           fontSize: 11, color: kTextMuted)),
+                  //   Text('₹${fee!.toStringAsFixed(0)}',
+                  //       style: const TextStyle(
+                  //           fontSize: 15,
+                  //           fontWeight: FontWeight.w700,
+                  //           color: kSuccess)),
+                  // ],
+                // ),
             ]),
           ),
         SizedBox(
