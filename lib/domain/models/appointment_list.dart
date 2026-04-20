@@ -9,6 +9,8 @@ class AppointmentList {
 
   @JsonKey(name: 'patient_id')
   int? patientId;
+  @JsonKey(name: 'queue_id')
+  int? queueId;
 
   @JsonKey(name: 'doctor_id')
   int? doctorId;
@@ -89,6 +91,10 @@ class AppointmentList {
   @JsonKey(name: 'estimated_arrival_time')
   String? estimatedArrivalTime;
 
+  
+  @JsonKey(name: 'queue_state')
+  String? queueState;
+
   @JsonKey(name: 'queue_started')
   bool? queueStarted;
 
@@ -96,6 +102,8 @@ class AppointmentList {
   bool? isMyTurn;
 
   AppointmentList({
+    this.queueId,
+    this.queueState,
     this.appointmentId,
     this.patientId,
     this.doctorId,
