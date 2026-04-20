@@ -112,6 +112,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.queuePause(appointmentRequest);
+      await fetchPatientAppointments(appointmentRequest.doctorId!);
       state = state.copyWith(isLoading: false, queueState: QueueState.paused);
       return result;
     } catch (e) {
@@ -128,6 +129,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.queueStop(appointmentRequest);
+      await fetchPatientAppointments(appointmentRequest.doctorId!);
       state = state.copyWith(isLoading: false, queueState: QueueState.stopped);
       return result;
     } catch (e) {
@@ -220,7 +222,21 @@ Future<AppointmentResponseModel> startSession(
     }
     }
 
-    Future<List<TodayQueueModel>> getTodayQueue(int doctorId) async {
+  // ── Queue Pause Emergency ──────────────────────────────────────────────────
+
+  Future<AppointmentResponseModel> queuePauseEmergency(int queueId) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await usecase.queuePauseEmergency(queueId);
+      state = state.copyWith(isLoading: false, queueState: QueueState.paused);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  Future<List<TodayQueueModel>> getTodayQueue(int doctorId) async {
     state = state.copyWith(
       todayQueueResult: const AsyncValue.loading(),
       error: null,

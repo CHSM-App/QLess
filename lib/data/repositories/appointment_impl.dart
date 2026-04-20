@@ -135,4 +135,9 @@ class AppointmentImpl implements AppointmentRepository {
   Future<List<TodayQueueModel>> getTodayQueue(int doctorId) {
     return apiService.getTodayQueue(doctorId);
   }
+
+  @override
+  Future<AppointmentResponseModel> queuePauseEmergency(int queueId) {
+    return apiService.queuePauseEmergency(queueId);
+  }
 }

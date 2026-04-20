@@ -68,5 +68,6 @@ abstract class AppointmentRepository {
   );
 
   Future<List<TodayQueueModel>> getTodayQueue(int doctorId);
-  
+
+  Future<AppointmentResponseModel> queuePauseEmergency(int queueId);
 }

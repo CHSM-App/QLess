@@ -112,4 +112,8 @@ class AppointmentUsecase {
   Future<List<TodayQueueModel>> getTodayQueue(int doctorId) {
     return appointmentRepository.getTodayQueue(doctorId);
   }
+
+  Future<AppointmentResponseModel> queuePauseEmergency(int queueId) {
+    return appointmentRepository.queuePauseEmergency(queueId);
+  }
 }
