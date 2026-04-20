@@ -660,6 +660,7 @@ Widget _buildTabContent(List<AppointmentList> appointments) {
               isMyTurn:             live ? (a.isMyTurn ?? false) : false,
               patientsAhead:        live ? a.patientsAhead : null,
               estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
+              queueState  : a.queueState,
             );
           },
         ),
@@ -805,6 +806,7 @@ class _AppointmentCard extends StatelessWidget {
   final bool    isLiveQueue, queueStarted, isMyTurn;
   final int?    patientsAhead;
   final String? estimatedArrivalTime;
+  final String? queueState;
 
   const _AppointmentCard({
     required this.appointment,
@@ -816,6 +818,8 @@ class _AppointmentCard extends StatelessWidget {
     this.isMyTurn       = false,
     this.patientsAhead,
     this.estimatedArrivalTime,
+    this.queueState,
+
   });
 
   @override
@@ -961,6 +965,7 @@ class _AppointmentCard extends StatelessWidget {
                         isMyTurn:             isMyTurn,
                         estimatedArrivalTime: estimatedArrivalTime,
                         patientsAhead:        patientsAhead,
+                        queueState : queueState,
                       ),
                     ],
 
@@ -1114,11 +1119,13 @@ class _LiveQueueBanner extends StatefulWidget {
   final int?    queueNumber;
   final bool    queueStarted, isMyTurn;
   final String? estimatedArrivalTime;
+  final String? queueState;
   final int?    patientsAhead;
+
 
   const _LiveQueueBanner({
     this.queueNumber, this.queueStarted = false,
-    this.isMyTurn = false, this.estimatedArrivalTime, this.patientsAhead,
+    this.isMyTurn = false, this.estimatedArrivalTime, this.patientsAhead, this.queueState
   });
 
   @override
@@ -1150,9 +1157,11 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
   Widget build(BuildContext context) {
     final myTurn   = widget.isMyTurn;
     final started  = widget.queueStarted;
+    
     final q        = widget.queueNumber;
     final ahead    = widget.patientsAhead;
     final arrival  = widget.estimatedArrivalTime;
+    final queueState = widget.queueState ?? "";
 
     final topColor  = myTurn || started ? kSuccess : kWarning;
     final topBg     = topColor.withOpacity(0.07);
@@ -1230,7 +1239,7 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                       const SizedBox(width: 4),
                     ],
                     Text(
-                      myTurn ? 'YOUR TURN' : (started ? 'LIVE' : 'WAITING'),
+                      myTurn ? 'YOUR TURN' : queueState,
                       style: const TextStyle(
                           color: Colors.white, fontSize: 10,
                           fontWeight: FontWeight.w700, letterSpacing: 0.5),

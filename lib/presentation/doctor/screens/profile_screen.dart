@@ -10,6 +10,7 @@ import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // ── Colour Palette (matches QueueHomePage + DoctorMedicinePage exactly) ───────
 const kPrimary        = Color(0xFF26C6B0);
@@ -881,17 +882,18 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
   // ── Support Card ──────────────────────────────────────────────────────────
 
-  Widget _buildSupportCard() => _tileCard([
-        _Item(Icons.help_outline_rounded, 'Help Center',
-            'FAQs & documentation'),
-        _Item(Icons.chat_bubble_outline_rounded, 'Contact Support',
-            'Chat, Email, Phone'),
-        _Item(Icons.privacy_tip_outlined, 'Privacy Policy', null),
-        _Item(Icons.description_outlined, 'Terms of Service', null),
-        _Item(Icons.info_outline_rounded, 'App Version',
-            'v2.4.1 (Build 204)'),
-      ]);
-
+Widget _buildSupportCard() => _tileCard([
+    _Item(Icons.help_outline_rounded, 'Help Center', 'FAQs & documentation'),
+    _Item(Icons.chat_bubble_outline_rounded, 'Contact Support', 'Chat, Email, Phone'),
+    _Item(Icons.privacy_tip_outlined, 'Privacy Policy', null, onTap: () async {
+      final uri = Uri.parse('https://qless.vengurlatech.com/login/privacy');
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }),
+    _Item(Icons.description_outlined, 'Terms of Service', null),
+    _Item(Icons.info_outline_rounded, 'App Version', 'v2.4.1 (Build 204)'),
+  ]);
   // ── Logout Button ─────────────────────────────────────────────────────────
 
   Widget _buildLogoutButton() => SizedBox(
