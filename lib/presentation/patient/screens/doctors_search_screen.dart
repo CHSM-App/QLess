@@ -5,6 +5,7 @@ import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ── Colour palette (shared across all screens) ────────────────────────────────
@@ -226,37 +227,33 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      // ── AppBar — back arrow + icon badge + title, matches explore/profile ──
- appBar: AppBar(
-  backgroundColor: Colors.white,
-  elevation: 0,
-  titleSpacing: 0, // 🔥 removes default gap
-
-  leading: GestureDetector(
-    onTap: () => Navigator.pop(context),
-    child: Container(
-      margin: const EdgeInsets.all(10), // 👈 only left, not all
-      decoration: BoxDecoration(
-        color: kPrimaryLight,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Icon(
-        Icons.arrow_back_ios_new_rounded,
-        size: 16,
-        color: kPrimary,
-      ),
-    ),
-  ),
-
-  title: const Text(
-    'Find Doctor',
-    style: TextStyle(
-      fontSize: 15,
-      fontWeight: FontWeight.w700,
-      color: kTextPrimary,
-    ),
-  ),
-
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        titleSpacing: 0,
+        leading: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            margin: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 16,
+              color: kPrimary,
+            ),
+          ),
+        ),
+        title: const Text(
+          'Find Doctor',
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: kTextPrimary,
+          ),
+        ),
         actions: [
           // Favorites toggle
           GestureDetector(
@@ -533,73 +530,84 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       ]),
     );
   }
-Widget _buildDoctorList(List<DoctorDetails> docs) {
-  if (docs.isEmpty) {
+
+  // ── Doctor List ────────────────────────────────────────────────────
+  Widget _buildDoctorList(List<DoctorDetails> docs) {
+    if (docs.isEmpty) {
+      return RefreshIndicator(
+        onRefresh: _refresh,
+        color: kPrimary,
+        strokeWidth: 2,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverFillRemaining(
+              child: Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 56, height: 56,
+                    decoration: const BoxDecoration(
+                        color: kPrimaryLight, shape: BoxShape.circle),
+                    child: Icon(
+                      _favOnly
+                          ? Icons.favorite_border_rounded
+                          : Icons.search_off_rounded,
+                      size: 24, color: kPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _favOnly ? 'No favorites yet' : 'No results found',
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('Pull down to refresh',
+                      style: TextStyle(fontSize: 12, color: kTextMuted)),
+                ]),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: _refresh,
       color: kPrimary,
       strokeWidth: 2,
-      child: CustomScrollView(
+      child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverFillRemaining(
-            child: Center(
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Container(
-                  width: 56, height: 56,
-                  decoration: const BoxDecoration(
-                      color: kPrimaryLight, shape: BoxShape.circle),
-                  child: Icon(
-                    _favOnly
-                        ? Icons.favorite_border_rounded
-                        : Icons.search_off_rounded,
-                    size: 24, color: kPrimary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _favOnly ? 'No favorites yet' : 'No results found',
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: kTextPrimary),
-                ),
-                const SizedBox(height: 4),
-                const Text('Pull down to refresh',
-                    style: TextStyle(fontSize: 12, color: kTextMuted)),
-              ]),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
+        itemCount: docs.length,
+        itemBuilder: (_, i) => _DoctorCard(
+          doctor: docs[i],
+          selectedMemberId: _selectedMemberId,
+          // Tapping the card → Book Appointment
+          onTap: (d) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => BookAppointmentScreen(
+                doctor: d,
+                bookingForMemberId: _selectedMemberId,
+              ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  return RefreshIndicator(
-    onRefresh: _refresh,
-    color: kPrimary,
-    strokeWidth: 2,
-    child: ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 24),
-      itemCount: docs.length,
-      itemBuilder: (_, i) => _DoctorCard(
-        doctor: docs[i],
-        selectedMemberId: _selectedMemberId,
-        onBook: (d) => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => BookAppointmentScreen(
-              doctor: d,
-              bookingForMemberId: _selectedMemberId,
+          // Tapping the info icon → Doctor Profile
+          onInfo: (d) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DoctorProfileScreen(doctor: d),
             ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
-}
+
 // ════════════════════════════════════════════════════════════════════
 //  BOOKING ROW HELPERS
 // ════════════════════════════════════════════════════════════════════
@@ -694,17 +702,20 @@ class _SpecChip extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  DOCTOR CARD  — compact, no overflow
+//  DOCTOR CARD  — tappable card → BookAppointment
+//                info icon     → DoctorProfile
 // ════════════════════════════════════════════════════════════════════
 class _DoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
   final int?          selectedMemberId;
-  final void Function(DoctorDetails) onBook;
+  final void Function(DoctorDetails) onTap;   // whole card → BookAppointment
+  final void Function(DoctorDetails) onInfo;  // info icon  → DoctorProfile
 
   const _DoctorCard({
     required this.doctor,
     required this.selectedMemberId,
-    required this.onBook,
+    required this.onTap,
+    required this.onInfo,
   });
 
   @override
@@ -720,132 +731,135 @@ class _DoctorCard extends StatelessWidget {
         .where((s) => s != null && s.isNotEmpty)
         .join(' · ');
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-            color: qs.tintCard ? kError.withOpacity(0.25) : kBorder),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Avatar ─────────────────────────────────────────
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 46, height: 46,
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: accent.withOpacity(0.2), width: 1.5),
-                ),
-                alignment: Alignment.center,
-                child: Text(init,
-                    style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                        color: accent)),
-              ),
-              Positioned(
-                bottom: -2, right: -2,
-                child: Container(
-                  width: 11, height: 11,
+    return GestureDetector(
+      onTap: () => onTap(doctor),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+              color: qs.tintCard ? kError.withOpacity(0.25) : kBorder),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 4)),
+          ],
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Avatar ─────────────────────────────────────────
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 46, height: 46,
                   decoration: BoxDecoration(
-                    color: qs.dot,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: accent.withOpacity(0.2), width: 1.5),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(init,
+                      style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: accent)),
+                ),
+                Positioned(
+                  bottom: -2, right: -2,
+                  child: Container(
+                    width: 11, height: 11,
+                    decoration: BoxDecoration(
+                      color: qs.dot,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 10),
+              ],
+            ),
+            const SizedBox(width: 10),
 
-          // ── Info ───────────────────────────────────────────
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Name + fee row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Dr. ${d.name ?? 'Unknown'}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary),
-                      ),
-                    ),
-                    if (d.consultationFee != null) ...[
-                      const SizedBox(width: 6),
-                      _FeeTag(fee: d.consultationFee!),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 4),
-
-                // Specialty + exp + rating
-                Wrap(
-                  spacing: 5,
-                  runSpacing: 4,
-                  children: [
-                    if (d.specialization != null)
-                      _SpecTag(
-                          label: _cap(d.specialization!),
-                          accent: accent,
-                          bg: specBg),
-                    if (d.experience != null)
-                      _ExpTag(years: d.experience!),
-                    const _RatingDot(),
-                  ],
-                ),
-
-                // Clinic
-                if (clinicText.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Row(children: [
-                    const Icon(Icons.location_on_rounded,
-                        size: 10, color: kTextMuted),
-                    const SizedBox(width: 2),
-                    Expanded(
-                      child: Text(clinicText,
+            // ── Info ───────────────────────────────────────────
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Name row
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Dr. ${d.name ?? 'Unknown'}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 11, color: kTextMuted)),
-                    ),
-                  ]),
-                ],
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary),
+                        ),
+                      ),
+                      // if (d.consultationFee != null) ...[
+                      //   const SizedBox(width: 6),
+                      //   _FeeTag(fee: d.consultationFee!),
+                      // ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
 
-                // Queue pill
-                if (qs.isVisible) ...[
-                  const SizedBox(height: 5),
-                  _QueuePill(status: qs),
+                  // Specialty + exp + rating
+                  Wrap(
+                    spacing: 5,
+                    runSpacing: 4,
+                    children: [
+                      if (d.specialization != null)
+                        _SpecTag(
+                            label: _cap(d.specialization!),
+                            accent: accent,
+                            bg: specBg),
+                      if (d.experience != null)
+                        _ExpTag(years: d.experience!),
+                      const _RatingDot(),
+                    ],
+                  ),
+
+                  // Clinic
+                  if (clinicText.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(children: [
+                      const Icon(Icons.location_on_rounded,
+                          size: 10, color: kTextMuted),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        child: Text(clinicText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, color: kTextMuted)),
+                      ),
+                    ]),
+                  ],
+
+                  // Queue pill
+                  if (qs.isVisible) ...[
+                    const SizedBox(height: 5),
+                    _QueuePill(status: qs),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          const SizedBox(width: 8),
+            const SizedBox(width: 8),
 
-          // ── Book Button ────────────────────────────────────
-          _BookButton(status: qs, onBook: () => onBook(doctor)),
-        ],
+            // ── Info Icon ──────────────────────────────────────
+            _InfoButton(onTap: () => onInfo(doctor)),
+          ],
+        ),
       ),
     );
   }
@@ -975,43 +989,38 @@ class _QueuePill extends StatelessWidget {
       );
 }
 
-class _BookButton extends StatelessWidget {
-  final _QueueStatus status;
-  final VoidCallback onBook;
-  const _BookButton({required this.status, required this.onBook});
+// ── Info Icon Button (replaces Book button) ───────────────────────────────────
+class _InfoButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _InfoButton({required this.onTap});
 
   @override
-  Widget build(BuildContext context) => Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 62, height: 34,
-            child: ElevatedButton(
-              onPressed: status.canBook ? onBook : null,
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    status.canBook ? kPrimary : status.color.withOpacity(0.1),
-                foregroundColor:
-                    status.canBook ? Colors.white : status.color,
-                disabledBackgroundColor:
-                    status.color.withOpacity(0.1),
-                disabledForegroundColor: status.color,
-                elevation: 0,
-                padding: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(9)),
-                textStyle: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w700),
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: kInfoLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kInfo.withOpacity(0.25)),
               ),
-              child: Text(status.btnLabel),
+              child: const Icon(
+                Icons.info_outline_rounded,
+                size: 18,
+                color: kInfo,
+              ),
             ),
-          ),
-          if (status.canBook) ...[
             const SizedBox(height: 3),
-            const Text('~15 min',
-                style: TextStyle(fontSize: 10, color: kTextMuted)),
+            const Text(
+              'Profile',
+              style: TextStyle(fontSize: 10, color: kTextMuted),
+            ),
           ],
-        ],
+        ),
       );
 }
 
@@ -1117,21 +1126,21 @@ class _ShimmerCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _bar(width: 150, height: 13),  // name
-                  _bar(width: 100, height: 11),  // specialty + exp
-                  _bar(width: 120, height: 10),  // clinic
-                  _bar(width: 80,  height: 20),  // queue pill
+                  _bar(width: 150, height: 13),
+                  _bar(width: 100, height: 11),
+                  _bar(width: 120, height: 10),
+                  _bar(width: 80,  height: 20),
                 ],
               ),
             ),
             const SizedBox(width: 8),
-            // Book button skeleton
+            // Info button skeleton
             Column(
               children: [
                 Container(
-                  width: 62, height: 34,
+                  width: 36, height: 36,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(10),
                     gradient: LinearGradient(
                       begin: Alignment(phase - 1, 0),
                       end: Alignment(phase + 1, 0),
@@ -1144,7 +1153,7 @@ class _ShimmerCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 5),
-                _bar(width: 40, height: 9),  // ~15 min label
+                _bar(width: 36, height: 9),
               ],
             ),
           ],
