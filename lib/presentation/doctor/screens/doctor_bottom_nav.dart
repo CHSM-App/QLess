@@ -81,6 +81,14 @@ const _navItems = [
   ),
 ];
 
+const _navAccent = Color(0xFF6366F1);
+const _navInactive = Color(0xFF1E293B);
+const _navActivePill = Color(0x1A6366F1);
+const _navPillBg = Color(0x12FFFFFF);
+const _navPillBorder = Color(0x26000000);
+const _compactNavHeight = 48.0;
+const _regularNavHeight = 56.0;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN SHELL WIDGET
 // ─────────────────────────────────────────────────────────────────────────────
@@ -378,7 +386,7 @@ appBar: null,
                             const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
                           color: selected
-                              ? DoctorNavTheme.activePill
+                              ? _navActivePill
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -393,8 +401,8 @@ appBar: null,
                                     : _navItems[i].icon,
                                 size: 22,
                                 color: selected
-                                    ? DoctorNavTheme.teal
-                                    : DoctorNavTheme.inactiveIconNav,
+                                    ? _navAccent
+                                    : _navInactive,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -406,8 +414,8 @@ appBar: null,
                                     ? FontWeight.w700
                                     : FontWeight.w400,
                                 color: selected
-                                    ? DoctorNavTheme.teal
-                                    : DoctorNavTheme.textPrimary,
+                                    ? _navAccent
+                                    : _navInactive,
                               ),
                               child: Text(
                                 _navItems[i].label,
@@ -433,6 +441,10 @@ appBar: null,
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildPillNav() {
+    final isCompact = MediaQuery.of(context).size.width < 360;
+    final navHeight = isCompact ? _compactNavHeight : _regularNavHeight;
+    final pillHeight = navHeight - 10;
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -440,26 +452,19 @@ appBar: null,
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.10),
-                blurRadius: 12,
-                offset: const Offset(0, 8),
-              ),
-            ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
               child: Container(
-                height: 64,
+                height: navHeight,
                 decoration: BoxDecoration(
-                  color: const Color(0x12FFFFFF),
+                  color: _navPillBg,
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: const Color(0x66FFFFFF),
-                    width: 1.6,
+                    color: _navPillBorder,
+                    width: 0.9,
                   ),
                 ),
                 child: LayoutBuilder(
@@ -468,7 +473,6 @@ appBar: null,
                     final itemCount   = _navItems.length;
                     final itemWidth   = totalWidth / itemCount;
                     final pillWidth   = itemWidth - 10;
-                    final pillHeight  = 64.0 - 16;
                     final curCenter   = (_currentIndex + 0.5) * itemWidth;
                     final minCenter   = itemWidth / 2;
                     final maxCenter   = totalWidth - itemWidth / 2;
@@ -526,12 +530,12 @@ appBar: null,
                                 : const Duration(milliseconds: 220),
                             curve: Curves.easeInOut,
                             left:   pillLeft,
-                            top:    8,
+                            top:    5,
                             width:  pillWidth,
                             height: pillHeight,
                             child: Container(
                               decoration: BoxDecoration(
-                                color: DoctorNavTheme.activePill,
+                                color: _navActivePill,
                                 borderRadius: BorderRadius.circular(22),
                               ),
                             ),
@@ -549,8 +553,8 @@ appBar: null,
                                     animation: _iconScales[i],
                                     builder: (_, __) => Container(
                                       margin: const EdgeInsets.symmetric(
-                                        horizontal: 5,
-                                        vertical: 8,
+                                        horizontal: 3,
+                                        vertical: 4,
                                       ),
                                       child: Column(
                                         mainAxisAlignment:
@@ -562,28 +566,31 @@ appBar: null,
                                               selected
                                                   ? _navItems[i].activeIcon
                                                   : _navItems[i].icon,
-                                              size: 22,
+                                              size: isCompact ? 18 : 20,
                                               color: selected
-                                                  ? DoctorNavTheme.teal
-                                                  : DoctorNavTheme.inactiveIcon,
+                                                  ? _navAccent
+                                                  : _navInactive,
                                             ),
                                           ),
-                                          const SizedBox(height: 3),
+                                          const SizedBox(height: 2),
                                           AnimatedDefaultTextStyle(
                                             duration: const Duration(
                                               milliseconds: 200,
                                             ),
                                             style: TextStyle(
-                                              fontSize: 10,
+                                              fontSize: isCompact ? 8 : 9,
                                               fontWeight: selected
                                                   ? FontWeight.w700
                                                   : FontWeight.w500,
                                               color: selected
-                                                  ? DoctorNavTheme.teal
-                                                  : DoctorNavTheme.inactiveIcon,
+                                                  ? _navAccent
+                                                  : _navInactive,
                                               letterSpacing: 0.1,
                                             ),
-                                            child: Text(_navItems[i].label),
+                                            child: Text(
+                                              _navItems[i].label,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
                                         ],
                                       ),
