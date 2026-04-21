@@ -586,124 +586,150 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             'Bank account, payouts'),
       ]);
 
-  // ── Availability Card ─────────────────────────────────────────────────────
-
-  Widget _buildAvailabilityCard() => Container(
-        decoration: _cardDec(),
-        padding: const EdgeInsets.all(14),
-        child:
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+Widget _buildAvailabilityCard() => Container(
+      decoration: _cardDec(),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           // Consultation toggle
-          Row(children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                  color:
-                      _availableForConsult ? kGreenLight : kRedLight,
-                  borderRadius: BorderRadius.circular(10)),
-              child: Icon(Icons.videocam_outlined,
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: _availableForConsult ? kGreenLight : kRedLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.videocam_outlined,
                   color: _availableForConsult ? kSuccess : kError,
-                  size: 17),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
+                  size: 17,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Available for Consultation',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary)),
+                    const Text(
+                      'Available for Consultation',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary,
+                      ),
+                    ),
                     Text(
                       _availableForConsult
                           ? 'Patients can book appointments'
                           : 'Not accepting patients',
                       style: const TextStyle(
-                          fontSize: 11, color: kTextMuted),
+                        fontSize: 11,
+                        color: kTextMuted,
+                      ),
                     ),
-                  ]),
-            ),
-            Switch.adaptive(
-              value: _availableForConsult,
-              activeColor: kSuccess,
-              onChanged: (v) =>
-                  setState(() => _availableForConsult = v),
-            ),
-          ]),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: _availableForConsult,
+                activeColor: kSuccess,
+                onChanged: (v) =>
+                    setState(() => _availableForConsult = v),
+              ),
+            ],
+          ),
 
           // Lead time (only when available)
           if (_availableForConsult) ...[
             const SizedBox(height: 12),
             const Divider(height: 1, color: kDivider),
             const SizedBox(height: 12),
-            const Text('Booking lead time',
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary)),
+            const Text(
+              'Booking lead time',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: kTextPrimary,
+              ),
+            ),
             const SizedBox(height: 10),
             _buildLeadTimeRow(),
+
             AnimatedSize(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeInOut,
               child: _leadTimeEdited
                   ? Padding(
                       padding: const EdgeInsets.only(top: 12),
-                      child: Row(children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _isSavingLeadTime
-                                ? null
-                                : _cancelLeadTimeEdit,
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: kTextSecondary,
-                              side: const BorderSide(color: kBorder),
-                              shape: RoundedRectangleBorder(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _isSavingLeadTime
+                                  ? null
+                                  : _cancelLeadTimeEdit,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: kTextSecondary,
+                                side: const BorderSide(color: kBorder),
+                                shape: RoundedRectangleBorder(
                                   borderRadius:
-                                      BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10),
-                            ),
-                            child: const Text('Cancel',
+                                      BorderRadius.circular(10),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              child: const Text(
+                                'Cancel',
                                 style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _isSavingLeadTime
-                                ? null
-                                : _updateLeadTime,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kPrimary,
-                              foregroundColor: Colors.white,
-                              disabledBackgroundColor: kPrimaryLight,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 10),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                            child: _isSavingLeadTime
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _isSavingLeadTime
+                                  ? null
+                                  : _updateLeadTime,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimary,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor: kPrimaryLight,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(10),
+                                ),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 10),
+                              ),
+                              child: _isSavingLeadTime
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child:
+                                          CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white))
-                                : const Text('Update',
-                                    style: TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Update',
+                                      style: TextStyle(
                                         fontSize: 13,
                                         fontWeight:
-                                            FontWeight.w600)),
+                                            FontWeight.w600,
+                                      ),
+                                    ),
+                            ),
                           ),
-                        ),
-                      ]),
+                        ],
+                      ),
                     )
                   : const SizedBox.shrink(),
             ),
@@ -713,36 +739,227 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           const Divider(height: 1, color: kDivider),
           const SizedBox(height: 12),
 
-          // Working hours
-          const Text('Working Hours',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: kTextPrimary)),
-          const SizedBox(height: 8),
-          _dayRow('Mon – Fri',  '9:00 AM – 5:00 PM', true),
-          const SizedBox(height: 5),
-          _dayRow('Saturday',   '10:00 AM – 2:00 PM', true),
-          const SizedBox(height: 5),
-          _dayRow('Sunday',     'Off', false),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const DoctorAvailabilityPage()),
-              ),
-              icon: const Icon(Icons.edit_calendar_outlined, size: 13),
-              label: const Text('Edit Schedule',
-                  style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
-              style: TextButton.styleFrom(foregroundColor: kPrimary),
-            ),
+          // ✅ Working Hours + Edit Schedule (same row)
+       Row(
+  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  children: [
+    Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: kGreenLight, // same style like queue/booking
+            borderRadius: BorderRadius.circular(8),
           ),
-        ]),
-      );
+          child: const Icon(
+            Icons.access_time,
+            size: 15,
+            color: kPrimary,
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Text(
+          'Working Hours',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: kTextPrimary,
+          ),
+        ),
+      ],
+    ),
+    TextButton.icon(
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const DoctorAvailabilityPage(),
+        ),
+      ),
+      icon: const Icon(Icons.edit_calendar_outlined, size: 13),
+      label: const Text(
+        'Edit Schedule',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      style: TextButton.styleFrom(
+        foregroundColor: kPrimary,
+        padding: EdgeInsets.zero,
+        minimumSize: const Size(0, 30),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    ),
+  ],
+),
+        ],
+      ),
+    );
+  // ── Availability Card ─────────────────────────────────────────────────────
+
+//   Widget _buildAvailabilityCard() => Container(
+//         decoration: _cardDec(),
+//         padding: const EdgeInsets.all(14),
+//         child:
+//             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//           // Consultation toggle
+//           Row(children: [
+//             Container(
+//               width: 34,
+//               height: 34,
+//               decoration: BoxDecoration(
+//                   color:
+//                       _availableForConsult ? kGreenLight : kRedLight,
+//                   borderRadius: BorderRadius.circular(10)),
+//               child: Icon(Icons.videocam_outlined,
+//                   color: _availableForConsult ? kSuccess : kError,
+//                   size: 17),
+//             ),
+//             const SizedBox(width: 12),
+//             Expanded(
+//               child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     const Text('Available for Consultation',
+//                         style: TextStyle(
+//                             fontSize: 13,
+//                             fontWeight: FontWeight.w700,
+//                             color: kTextPrimary)),
+//                     Text(
+//                       _availableForConsult
+//                           ? 'Patients can book appointments'
+//                           : 'Not accepting patients',
+//                       style: const TextStyle(
+//                           fontSize: 11, color: kTextMuted),
+//                     ),
+//                   ]),
+//             ),
+//             Switch.adaptive(
+//               value: _availableForConsult,
+//               activeColor: kSuccess,
+//               onChanged: (v) =>
+//                   setState(() => _availableForConsult = v),
+//             ),
+//           ]),
+
+//           // Lead time (only when available)
+//           if (_availableForConsult) ...[
+//             const SizedBox(height: 12),
+//             const Divider(height: 1, color: kDivider),
+//             const SizedBox(height: 12),
+//             const Text('Booking lead time',
+//                 style: TextStyle(
+//                     fontSize: 12,
+//                     fontWeight: FontWeight.w600,
+//                     color: kTextPrimary)),
+//             const SizedBox(height: 10),
+//             _buildLeadTimeRow(),
+//             AnimatedSize(
+//               duration: const Duration(milliseconds: 220),
+//               curve: Curves.easeInOut,
+//               child: _leadTimeEdited
+//                   ? Padding(
+//                       padding: const EdgeInsets.only(top: 12),
+//                       child: Row(children: [
+//                         Expanded(
+//                           child: OutlinedButton(
+//                             onPressed: _isSavingLeadTime
+//                                 ? null
+//                                 : _cancelLeadTimeEdit,
+//                             style: OutlinedButton.styleFrom(
+//                               foregroundColor: kTextSecondary,
+//                               side: const BorderSide(color: kBorder),
+//                               shape: RoundedRectangleBorder(
+//                                   borderRadius:
+//                                       BorderRadius.circular(10)),
+//                               padding: const EdgeInsets.symmetric(
+//                                   vertical: 10),
+//                             ),
+//                             child: const Text('Cancel',
+//                                 style: TextStyle(
+//                                     fontSize: 13,
+//                                     fontWeight: FontWeight.w600)),
+//                           ),
+//                         ),
+//                         const SizedBox(width: 10),
+//                         Expanded(
+//                           child: ElevatedButton(
+//                             onPressed: _isSavingLeadTime
+//                                 ? null
+//                                 : _updateLeadTime,
+//                             style: ElevatedButton.styleFrom(
+//                               backgroundColor: kPrimary,
+//                               foregroundColor: Colors.white,
+//                               disabledBackgroundColor: kPrimaryLight,
+//                               elevation: 0,
+//                               shape: RoundedRectangleBorder(
+//                                   borderRadius:
+//                                       BorderRadius.circular(10)),
+//                               padding: const EdgeInsets.symmetric(
+//                                   vertical: 10),
+//                             ),
+//                             child: _isSavingLeadTime
+//                                 ? const SizedBox(
+//                                     width: 16,
+//                                     height: 16,
+//                                     child: CircularProgressIndicator(
+//                                         strokeWidth: 2,
+//                                         color: Colors.white))
+//                                 : const Text('Update',
+//                                     style: TextStyle(
+//                                         fontSize: 13,
+//                                         fontWeight:
+//                                             FontWeight.w600)),
+//                           ),
+//                         ),
+//                       ]),
+//                     )
+//                   : const SizedBox.shrink(),
+//             ),
+//           ],
+
+//           const SizedBox(height: 12),
+//           const Divider(height: 1, color: kDivider),
+//           const SizedBox(height: 12),
+// // Working hours (single row)
+// Row(
+//   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+//   children: [
+//     const Text(
+//       'Working Hours',
+//       style: TextStyle(
+//         fontSize: 12,
+//         fontWeight: FontWeight.w600,
+//         color: kTextPrimary,
+//       ),
+//     ),
+//     TextButton.icon(
+//       onPressed: () => Navigator.push(
+//         context,
+//         MaterialPageRoute(
+//           builder: (_) => const DoctorAvailabilityPage(),
+//         ),
+//       ),
+//       icon: const Icon(Icons.edit_calendar_outlined, size: 13),
+//       label: const Text(
+//         'Edit Schedule',
+//         style: TextStyle(
+//           fontSize: 12,
+//           fontWeight: FontWeight.w600,
+//         ),
+//       ),
+//       style: TextButton.styleFrom(
+//         foregroundColor: kPrimary,
+//         padding: EdgeInsets.zero, // keeps it compact
+//         minimumSize: Size(0, 30),
+//         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+//       ),
+//     ),
+//   ],
+// ),
+//         ]),
+//       );
 
   Widget _buildLeadTimeRow() => Row(
         crossAxisAlignment: CrossAxisAlignment.center,
