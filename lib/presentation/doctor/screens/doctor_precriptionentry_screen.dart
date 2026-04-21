@@ -807,7 +807,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     try {
       await ref.read(appointmentViewModelProvider.notifier).queueSkip(
         AppointmentRequestModel(doctorId: widget.doctorId,
-            appointmentId: widget.appointmentId, patientId: widget.patientId));
+            appointmentId: widget.appointmentId, patientId: widget.patientId,
+            isNext: 1));
       if (!mounted) return;
       await ref.read(appointmentViewModelProvider.notifier)
           .fetchPatientAppointments(widget.doctorId);

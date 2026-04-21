@@ -267,6 +267,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         AppointmentRequestModel(
           doctorId: did, appointmentId: p.appointmentId ?? 0,
           patientId: p.patientId ?? 0,
+          isNext: 0,
         ),
       );
       if (!mounted) return;
