@@ -364,9 +364,14 @@ class _BookAppointmentScreenState
   void _pickDate(DateTime date, List<DoctorAvailabilityModel> sessions) {
     final isToday  = _isToday(date);
     final bookable = sessions.where((s) => _bookable(s.bookingMode, isToday)).toList();
+    // Auto-select if there is exactly one queue session and no slot sessions
+    final queueOnly = bookable.every((s) =>
+        s.bookingMode == 1 || (s.bookingMode == 3 && isToday));
     setState(() {
       _selectedDate      = date;
-      _selectedSlotId    = bookable.length == 1 ? bookable.first.slotId : null;
+      _selectedSlotId    = (bookable.length == 1 && queueOnly)
+          ? bookable.first.slotId
+          : null;
       _selectedTime      = null;
       _estimatedWaitTime = null;
       _isEstimateLoading = false;
@@ -385,7 +390,7 @@ class _BookAppointmentScreenState
     }
   }
 
-  void _onSessionPicked(int? slotId) {
+  void _onQueueSessionSelected(int? slotId) {
     final enabled = ref.read(doctorsViewModelProvider).doctorAvailabilities
         .where((a) => a.isEnabled == true).toList();
     setState(() {
@@ -398,6 +403,13 @@ class _BookAppointmentScreenState
     final picked = enabled.firstWhere(
       (a) => a.slotId == slotId, orElse: () => DoctorAvailabilityModel());
     if (_isQueueSession(picked)) _fetchQueueEstimate();
+  }
+
+  void _onSlotTimePicked(int slotId, String time) {
+    setState(() {
+      _selectedSlotId = slotId;
+      _selectedTime   = time;
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -491,8 +503,7 @@ class _BookAppointmentScreenState
     final mode       = selAvail?.bookingMode ?? 0;
     final isQueue    = mode == 1 || (mode == 3 && dayIsToday);
 
-    // Queue open-time check
-    String? queueOpenTimeStr;
+    // Queue open-time check (for the selected session only, used in canConfirm)
     bool isQueueOpen = true;
     if (isQueue && dayIsToday && selAvail != null) {
       final leadMin = widget.doctor.qStartSection ?? widget.doctor.leadTime ?? 0;
@@ -500,12 +511,6 @@ class _BookAppointmentScreenState
         final sessionStart = _parseTime(selAvail.startTime);
         final openMin      = sessionStart.hour * 60 + sessionStart.minute - leadMin;
         if (openMin >= 0) {
-          final openH = openMin ~/ 60;
-          final openM = openMin % 60;
-          final sf    = openH < 12 ? 'AM' : 'PM';
-          final dh    = openH == 0 ? 12 : (openH > 12 ? openH - 12 : openH);
-          queueOpenTimeStr =
-              '${dh.toString().padLeft(2, '0')}:${openM.toString().padLeft(2, '0')} $sf';
           final nowMin = DateTime.now().hour * 60 + DateTime.now().minute;
           isQueueOpen  = nowMin >= openMin;
         }
@@ -553,23 +558,22 @@ class _BookAppointmentScreenState
           else
             SliverToBoxAdapter(
               child: _Body(
-                grouped:           grouped,
-                enabled:           enabled,
-                selectedDate:      _selectedDate,
-                selectedSlotId:    _selectedSlotId,
-                selectedTime:      _selectedTime,
-                selectedAvail:     selAvail,
-                dayIsToday:        dayIsToday,
-                bookedTimes:       bookedTimes,
-                queueOpenTimeStr:  queueOpenTimeStr,
-                isQueueOpen:       isQueueOpen,
-                estimatedWaitTime: _estimatedWaitTime,
-                isEstimateLoading: _isEstimateLoading,
-                onPickDate:        _pickDate,
-                onPickSession:     _onSessionPicked,
-                onPickTime: (t) => setState(() => _selectedTime = t),
-                buildSlots:        _buildSlots,
-                fmtTime:           _fmtTime,
+                grouped:              grouped,
+                enabled:              enabled,
+                selectedDate:         _selectedDate,
+                selectedSlotId:       _selectedSlotId,
+                selectedTime:         _selectedTime,
+                dayIsToday:           dayIsToday,
+                bookedTimes:          bookedTimes,
+                estimatedWaitTime:    _estimatedWaitTime,
+                isEstimateLoading:    _isEstimateLoading,
+                leadMin:              widget.doctor.qStartSection ?? widget.doctor.leadTime ?? 0,
+                onPickDate:           _pickDate,
+                onQueueSelected:      _onQueueSessionSelected,
+                onSlotTimePicked:     _onSlotTimePicked,
+                buildSlots:           _buildSlots,
+                fmtTime:              _fmtTime,
+                parseTime:            _parseTime,
               ),
             ),
         ],
@@ -1232,37 +1236,54 @@ class _BookingFor extends StatelessWidget {
 class _Body extends StatelessWidget {
   final Map<String, List<DoctorAvailabilityModel>> grouped;
   final List<DoctorAvailabilityModel> enabled;
-  final DateTime?    selectedDate;
-  final int?         selectedSlotId;
-  final String?      selectedTime;
-  final DoctorAvailabilityModel? selectedAvail;
-  final bool         dayIsToday;
-  final Set<String>  bookedTimes;
-  final String?      queueOpenTimeStr;
-  final bool         isQueueOpen;
-  final String?      estimatedWaitTime;
-  final bool         isEstimateLoading;
+  final DateTime?   selectedDate;
+  final int?        selectedSlotId;
+  final String?     selectedTime;
+  final bool        dayIsToday;
+  final Set<String> bookedTimes;
+  final String?     estimatedWaitTime;
+  final bool        isEstimateLoading;
+  final int         leadMin;
 
   final void Function(DateTime, List<DoctorAvailabilityModel>) onPickDate;
-  final ValueChanged<int?>    onPickSession;
-  final ValueChanged<String>  onPickTime;
+  final ValueChanged<int?>                  onQueueSelected;
+  final void Function(int slotId, String t) onSlotTimePicked;
   final List<String> Function(DoctorAvailabilityModel) buildSlots;
-  final String Function(String?) fmtTime;
+  final String   Function(String?)     fmtTime;
+  final TimeOfDay Function(String?)    parseTime;
 
   const _Body({
-    required this.grouped, required this.enabled,
-    required this.selectedDate, required this.selectedSlotId,
-    required this.selectedTime, required this.selectedAvail,
-    required this.dayIsToday, required this.bookedTimes,
-    required this.onPickDate, required this.onPickSession,
-    required this.onPickTime, required this.buildSlots, required this.fmtTime,
-    this.queueOpenTimeStr, this.isQueueOpen = true,
-    this.estimatedWaitTime, this.isEstimateLoading = false,
+    required this.grouped,          required this.enabled,
+    required this.selectedDate,     required this.selectedSlotId,
+    required this.selectedTime,     required this.dayIsToday,
+    required this.bookedTimes,      required this.onPickDate,
+    required this.onQueueSelected,  required this.onSlotTimePicked,
+    required this.buildSlots,       required this.fmtTime,
+    required this.parseTime,
+    this.estimatedWaitTime,  this.isEstimateLoading = false,
+    this.leadMin = 0,
   });
 
   String _dayName(int w) {
     const n = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     return n[(w - 1).clamp(0, 6)];
+  }
+
+  /// Compute queue-open info for a given availability session.
+  ({String? openTimeStr, bool isOpen}) _queueOpenInfo(
+      DoctorAvailabilityModel avail) {
+    if (!dayIsToday || leadMin <= 0) return (openTimeStr: null, isOpen: true);
+    final sessionStart = parseTime(avail.startTime);
+    final openMin = sessionStart.hour * 60 + sessionStart.minute - leadMin;
+    if (openMin < 0) return (openTimeStr: null, isOpen: true);
+    final openH = openMin ~/ 60;
+    final openM = openMin % 60;
+    final sf    = openH < 12 ? 'AM' : 'PM';
+    final dh    = openH == 0 ? 12 : (openH > 12 ? openH - 12 : openH);
+    final openTimeStr =
+        '${dh.toString().padLeft(2, '0')}:${openM.toString().padLeft(2, '0')} $sf';
+    final nowMin = DateTime.now().hour * 60 + DateTime.now().minute;
+    return (openTimeStr: openTimeStr, isOpen: nowMin >= openMin);
   }
 
   @override
@@ -1272,6 +1293,13 @@ class _Body extends StatelessWidget {
         : (grouped[_dayName(selectedDate!.weekday)] ?? [])
             .where((s) => _bookable(s.bookingMode, dayIsToday))
             .toList();
+
+    final queueSessions = sessions
+        .where((s) => s.bookingMode == 1 || (s.bookingMode == 3 && dayIsToday))
+        .toList();
+    final slotSessions = sessions
+        .where((s) => s.bookingMode == 2 || (s.bookingMode == 3 && !dayIsToday))
+        .toList();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 100),
@@ -1286,36 +1314,33 @@ class _Body extends StatelessWidget {
           const SizedBox(height: 12),
           _DateBadge(date: selectedDate!),
         ],
-        if (sessions.length > 1) ...[
-          const SizedBox(height: 18),
-          _sectionLabel('Select Session'),
-          const SizedBox(height: 8),
-          _SessionRow(
-            sessions:       sessions,
-            selectedSlotId: selectedSlotId,
-            onSelected:     onPickSession,
-            fmtTime:        fmtTime,
+
+        // ── Queue sessions ───────────────────────────────────────────
+        for (final s in queueSessions) ...[
+          const SizedBox(height: 20),
+          _SelectableQueueCard(
+            avail:             s,
+            isSelected:        selectedSlotId == s.slotId,
+            queueOpenInfo:     _queueOpenInfo(s),
+            estimatedWaitTime: selectedSlotId == s.slotId ? estimatedWaitTime : null,
+            isEstimateLoading: selectedSlotId == s.slotId && isEstimateLoading,
+            onTap:             () => onQueueSelected(s.slotId),
           ),
         ],
-        if (selectedAvail != null) ...[
+
+        // ── Slot sessions ────────────────────────────────────────────
+        for (final s in slotSessions) ...[
           const SizedBox(height: 20),
-          if (selectedAvail!.bookingMode == 1 ||
-              (selectedAvail!.bookingMode == 3 && dayIsToday))
-            _QueueCard(
-              avail:             selectedAvail!,
-              queueOpenTimeStr:  queueOpenTimeStr,
-              isQueueOpen:       isQueueOpen,
-              estimatedWaitTime: estimatedWaitTime,
-              isEstimateLoading: isEstimateLoading,
-            )
-          else
-            _SlotPicker(
-              slots:       buildSlots(selectedAvail!),
-              selected:    selectedTime,
-              isToday:     dayIsToday,
-              bookedTimes: bookedTimes,
-              onSelected:  onPickTime,
-            ),
+          _SlotPicker(
+            slots:       buildSlots(s),
+            selected:    selectedSlotId == s.slotId ? selectedTime : null,
+            isToday:     dayIsToday,
+            bookedTimes: bookedTimes,
+            onSelected:  (t) => onSlotTimePicked(s.slotId!, t),
+            sessionLabel: slotSessions.length > 1
+                ? '${fmtTime(s.startTime)}  –  ${fmtTime(s.endTime)}'
+                : null,
+          ),
         ],
       ]),
     );
@@ -1538,198 +1563,140 @@ class _DateBadge extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  SESSION ROW
+//  SELECTABLE QUEUE CARD
 // ════════════════════════════════════════════════════════════════════
-class _SessionRow extends StatelessWidget {
-  final List<DoctorAvailabilityModel> sessions;
-  final int?                          selectedSlotId;
-  final ValueChanged<int?>            onSelected;
-  final String Function(String?)      fmtTime;
-
-  const _SessionRow({
-    required this.sessions, required this.selectedSlotId,
-    required this.onSelected, required this.fmtTime,
-  });
-
-  Color _modeColor(int? m) => switch (m) {
-    1 => kWarning, 2 => kPrimary, 3 => kSuccess, _ => kTextMuted,
-  };
-
-  String _modeLabel(int? m) => switch (m) {
-    1 => 'Queue', 2 => 'Slots', 3 => 'Queue + Slots', _ => 'Session',
-  };
-
-  @override
-  Widget build(BuildContext context) => Column(
-        children: sessions.map((s) {
-          final sel   = selectedSlotId == s.slotId;
-          final color = _modeColor(s.bookingMode);
-          return GestureDetector(
-            onTap: () => onSelected(s.slotId),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: sel ? kPrimary : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: sel ? kPrimary : kBorder,
-                    width: sel ? 1.5 : 1),
-              ),
-              child: Row(children: [
-                Icon(Icons.access_time_rounded,
-                    size: 15,
-                    color: sel ? Colors.white : kPrimary),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${fmtTime(s.startTime)}  –  ${fmtTime(s.endTime)}',
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: sel ? Colors.white : kTextPrimary),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: sel
-                        ? Colors.white.withOpacity(0.15)
-                        : color.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    _modeLabel(s.bookingMode),
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: sel ? Colors.white : color),
-                  ),
-                ),
-              ]),
-            ),
-          );
-        }).toList(),
-      );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  QUEUE CARD
-// ════════════════════════════════════════════════════════════════════
-class _QueueCard extends StatelessWidget {
+class _SelectableQueueCard extends StatelessWidget {
   final DoctorAvailabilityModel avail;
-  final String? queueOpenTimeStr;
-  final bool    isQueueOpen;
+  final bool   isSelected;
+  final ({String? openTimeStr, bool isOpen}) queueOpenInfo;
   final String? estimatedWaitTime;
   final bool    isEstimateLoading;
+  final VoidCallback onTap;
 
-  const _QueueCard({
+  const _SelectableQueueCard({
     required this.avail,
-    this.queueOpenTimeStr,
-    this.isQueueOpen      = true,
+    required this.isSelected,
+    required this.queueOpenInfo,
+    required this.onTap,
     this.estimatedWaitTime,
     this.isEstimateLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final noteColor = isQueueOpen ? kSuccess : kError;
-    final noteBg    = isQueueOpen
-        ? kGreenLight.withOpacity(0.4)
-        : kRedLight.withOpacity(0.4);
-    final noteIcon  = isQueueOpen
-        ? Icons.check_circle_rounded
-        : Icons.access_time_rounded;
-    final noteText  = !isQueueOpen && queueOpenTimeStr != null
-        ? 'Queue booking opens at $queueOpenTimeStr'
+    final isOpen    = queueOpenInfo.isOpen;
+    final openStr   = queueOpenInfo.openTimeStr;
+    final noteColor = isOpen ? kSuccess : kError;
+    final noteBg    = isOpen ? kGreenLight.withOpacity(0.4) : kRedLight.withOpacity(0.4);
+    final noteIcon  = isOpen ? Icons.check_circle_rounded : Icons.access_time_rounded;
+    final noteText  = !isOpen && openStr != null
+        ? 'Queue booking opens at $openStr'
         : 'Queue booking is open';
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionLabel('Queue Booking'),
-      const SizedBox(height: 8),
-
-      // Open/closed status
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+    return GestureDetector(
+      onTap: isOpen ? onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         decoration: BoxDecoration(
-          color: noteBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: noteColor.withOpacity(0.3)),
-        ),
-        child: Row(children: [
-          Icon(noteIcon, size: 15, color: noteColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(noteText,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: noteColor)),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected ? kWarning : kBorder,
+            width: isSelected ? 1.5 : 1,
           ),
-        ]),
-      ),
-      const SizedBox(height: 8),
-
-      // Estimate banner
-      AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        transitionBuilder: (child, anim) =>
-            FadeTransition(opacity: anim, child: child),
-        child: isEstimateLoading
-            ? _EstimateBanner.loading(key: const ValueKey('loading'))
-            : (estimatedWaitTime?.isNotEmpty == true)
-                ? _EstimateBanner.value(
-                    key: const ValueKey('value'),
-                    text: estimatedWaitTime!)
-                : const SizedBox.shrink(key: ValueKey('empty')),
-      ),
-
-      if (estimatedWaitTime?.isNotEmpty == true || isEstimateLoading)
-        const SizedBox(height: 8),
-
-      // Walk-in card
-      Container(
-        width: double.infinity,
+          color: isSelected ? kAmberLight.withOpacity(0.3) : Colors.white,
+        ),
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: kAmberLight.withOpacity(0.5),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kWarning.withOpacity(0.3)),
-        ),
-        child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: kWarning.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: const Icon(Icons.confirmation_number_rounded,
-                size: 20, color: kWarning),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Walk-in Queue',
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // Header row
+          Row(children: [
+            _sectionLabel('Queue Booking'),
+            const Spacer(),
+            if (isSelected)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: kWarning.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Text('Selected',
                     style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary)),
-                const SizedBox(height: 2),
-                Text('Show up today  ·  ${avail.slotDuration ?? 10} min per patient',
-                    style: const TextStyle(
-                        fontSize: 12, color: kTextSecondary)),
-              ],
+                        fontSize: 11, fontWeight: FontWeight.w700, color: kWarning)),
+              ),
+          ]),
+          const SizedBox(height: 10),
+
+          // Open/closed status
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            decoration: BoxDecoration(
+              color: noteBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: noteColor.withOpacity(0.3)),
             ),
+            child: Row(children: [
+              Icon(noteIcon, size: 15, color: noteColor),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(noteText,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: noteColor)),
+              ),
+            ]),
           ),
+
+          // Estimate banner (only when selected)
+          if (isSelected) ...[
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              transitionBuilder: (child, anim) =>
+                  FadeTransition(opacity: anim, child: child),
+              child: isEstimateLoading
+                  ? _EstimateBanner.loading(key: const ValueKey('loading'))
+                  : (estimatedWaitTime?.isNotEmpty == true)
+                      ? _EstimateBanner.value(
+                          key: const ValueKey('value'),
+                          text: estimatedWaitTime!)
+                      : const SizedBox.shrink(key: ValueKey('empty')),
+            ),
+          ],
+
+          const SizedBox(height: 10),
+
+          // Walk-in info row
+          Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: kWarning.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.confirmation_number_rounded,
+                  size: 18, color: kWarning),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Walk-in Queue',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary)),
+                  const SizedBox(height: 2),
+                  Text('Show up today  ·  ${avail.slotDuration ?? 10} min per patient',
+                      style: const TextStyle(fontSize: 12, color: kTextSecondary)),
+                ],
+              ),
+            ),
+          ]),
         ]),
       ),
-    ]);
+    );
   }
 }
 
@@ -1795,11 +1762,12 @@ class _SlotPicker extends StatelessWidget {
   final bool                 isToday;
   final Set<String>          bookedTimes;
   final ValueChanged<String> onSelected;
+  final String?              sessionLabel;
 
   const _SlotPicker({
     required this.slots,       required this.selected,
     required this.bookedTimes, required this.onSelected,
-    this.isToday = false,
+    this.isToday = false,      this.sessionLabel,
   });
 
   int _mins(String slot) {
@@ -1834,6 +1802,16 @@ class _SlotPicker extends StatelessWidget {
     final evening   = slots.where((s) => _mins(s) >= 1020).toList();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (sessionLabel != null) ...[
+        Row(children: [
+          const Icon(Icons.access_time_rounded, size: 13, color: kTextMuted),
+          const SizedBox(width: 5),
+          Text(sessionLabel!,
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600, color: kTextMuted)),
+        ]),
+        const SizedBox(height: 8),
+      ],
       _sectionLabel('Select Time Slot'),
       const SizedBox(height: 12),
       if (morning.isNotEmpty) ...[

@@ -679,6 +679,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               icon: Icons.calendar_month_rounded,
                               label: 'Book Appt.',
                               color: kPrimary,
+                              highlighted: true,
                               onTap: () => widget.onTabChange(1),
                             ),
                             const SizedBox(width: 8),
@@ -1397,11 +1398,13 @@ class _QuickAction extends StatelessWidget {
   final String label;
   final Color color;
   final VoidCallback onTap;
+  final bool highlighted;
   const _QuickAction({
     required this.icon,
     required this.label,
     required this.color,
     required this.onTap,
+    this.highlighted = false,
   });
 
   @override
@@ -1411,9 +1414,27 @@ class _QuickAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          gradient: highlighted
+              ? const LinearGradient(
+                  colors: [kPrimary, kPrimaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: highlighted ? null : color.withOpacity(0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.15)),
+          border: Border.all(
+            color: highlighted ? kPrimaryDark : color.withOpacity(0.15),
+          ),
+          boxShadow: highlighted
+              ? [
+                  BoxShadow(
+                    color: kPrimary.withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           children: [
@@ -1421,20 +1442,23 @@ class _QuickAction extends StatelessWidget {
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                color: color,
+                color: highlighted
+                    ? Colors.white.withOpacity(0.2)
+                    : color,
                 borderRadius: BorderRadius.circular(9),
               ),
-              child: Icon(icon, color: Colors.white, size: 17),
+              child: Icon(icon,
+                  color: highlighted ? Colors.white : Colors.white, size: 17),
             ),
             const SizedBox(height: 5),
             Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 10,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 height: 1.3,
-                color: kTextPrimary,
+                color: highlighted ? Colors.white : kTextPrimary,
               ),
             ),
           ],

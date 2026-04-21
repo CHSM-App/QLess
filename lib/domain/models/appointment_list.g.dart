@@ -39,6 +39,7 @@ AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
       estimatedArrivalTime: json['estimated_arrival_time'] as String?,
       queueStarted: json['queue_started'] as bool?,
       isMyTurn: json['is_my_turn'] as bool?,
+      cancelledBy: json['cancelled_by'] as String?,
     )..patientName = json['patient_name'] as String?;
 
 Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
@@ -75,4 +76,5 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'queue_state': instance.queueState,
       'queue_started': instance.queueStarted,
       'is_my_turn': instance.isMyTurn,
+      'cancelled_by': instance.cancelledBy,
     };
