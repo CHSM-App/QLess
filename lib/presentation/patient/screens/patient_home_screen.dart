@@ -1158,7 +1158,20 @@ Widget build(BuildContext context) {
                         const SizedBox(height: 2),
                         Text(spec,
                           style: const TextStyle(fontSize: 11, color: kTextSecondary)),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 2),
+                     
+      if ((appt.patientName ?? '').isNotEmpty)
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.person_outline_rounded, size: 10, color: kTextMuted),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              appt.patientName ?? '',
+              style: const TextStyle(fontSize: 10, color: kTextMuted, fontWeight: FontWeight.w500),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ]),
                         Row(children: [
                           const Icon(Icons.calendar_today_rounded, size: 10, color: kPrimary),
                           const SizedBox(width: 3),

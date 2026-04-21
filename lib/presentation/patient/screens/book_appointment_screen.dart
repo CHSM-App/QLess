@@ -222,6 +222,7 @@ class _BookAppointmentScreenState
 
   String? _estimatedWaitTime;
   bool    _isEstimateLoading = false;
+  final TextEditingController _symptomsController = TextEditingController();
 
   @override
   void initState() {
@@ -257,12 +258,13 @@ class _BookAppointmentScreenState
     _favFetchedPatientId = null;
     _tryFetchFavorite();
   }
-
-  @override
-  void dispose() {
-    _queueTimer?.cancel();
-    super.dispose();
-  }
+  
+@override
+void dispose() {
+  _symptomsController.dispose();
+  _queueTimer?.cancel();
+  super.dispose();
+}
 
   // ---------------------------------------------------------------------------
   // Helpers
@@ -570,6 +572,7 @@ class _BookAppointmentScreenState
                 onPickTime: (t) => setState(() => _selectedTime = t),
                 buildSlots:        _buildSlots,
                 fmtTime:           _fmtTime,
+                  symptomsController: _symptomsController,   // ← ADD
               ),
             ),
         ],
@@ -688,6 +691,8 @@ class _BookAppointmentScreenState
           appointmentDate: _fmtDateApi(_selectedDate!),
           startTime:       start,
           slotId:          _selectedSlotId,
+            symptoms:        _symptomsController.text.trim().isEmpty
+                       ? null : _symptomsController.text.trim(),
         ),
       );
     } else {
@@ -701,6 +706,8 @@ class _BookAppointmentScreenState
           startTime:       start,
           userType:        isForMember ? 2 : 1,
           slotId:          _selectedSlotId,
+            symptoms:        _symptomsController.text.trim().isEmpty
+                       ? null : _symptomsController.text.trim(),
         ),
       );
     }
@@ -1248,6 +1255,7 @@ class _Body extends StatelessWidget {
   final ValueChanged<String>  onPickTime;
   final List<String> Function(DoctorAvailabilityModel) buildSlots;
   final String Function(String?) fmtTime;
+  final TextEditingController symptomsController;
 
   const _Body({
     required this.grouped, required this.enabled,
@@ -1256,6 +1264,7 @@ class _Body extends StatelessWidget {
     required this.dayIsToday, required this.bookedTimes,
     required this.onPickDate, required this.onPickSession,
     required this.onPickTime, required this.buildSlots, required this.fmtTime,
+      required this.symptomsController,   // ← ADD
     this.queueOpenTimeStr, this.isQueueOpen = true,
     this.estimatedWaitTime, this.isEstimateLoading = false,
   });
@@ -1303,6 +1312,7 @@ class _Body extends StatelessWidget {
               (selectedAvail!.bookingMode == 3 && dayIsToday))
             _QueueCard(
               avail:             selectedAvail!,
+                symptomsController: symptomsController,   
               queueOpenTimeStr:  queueOpenTimeStr,
               isQueueOpen:       isQueueOpen,
               estimatedWaitTime: estimatedWaitTime,
@@ -1616,20 +1626,19 @@ class _SessionRow extends StatelessWidget {
       );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  QUEUE CARD
-// ════════════════════════════════════════════════════════════════════
 class _QueueCard extends StatelessWidget {
   final DoctorAvailabilityModel avail;
-  final String? queueOpenTimeStr;
-  final bool    isQueueOpen;
-  final String? estimatedWaitTime;
-  final bool    isEstimateLoading;
+  final String?                 queueOpenTimeStr;
+  final bool                    isQueueOpen;
+  final String?                 estimatedWaitTime;
+  final bool                    isEstimateLoading;
+  final TextEditingController   symptomsController;   // ← NEW
 
   const _QueueCard({
     required this.avail,
+    required this.symptomsController,                 // ← NEW
     this.queueOpenTimeStr,
-    this.isQueueOpen      = true,
+    this.isQueueOpen       = true,
     this.estimatedWaitTime,
     this.isEstimateLoading = false,
   });
@@ -1644,14 +1653,14 @@ class _QueueCard extends StatelessWidget {
         ? Icons.check_circle_rounded
         : Icons.access_time_rounded;
     final noteText  = !isQueueOpen && queueOpenTimeStr != null
-        ? 'Queue booking opens at $queueOpenTimeStr'
+        ? 'Queue opens at $queueOpenTimeStr'
         : 'Queue booking is open';
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _sectionLabel('Queue Booking'),
       const SizedBox(height: 8),
 
-      // Open/closed status
+      // ── Open / Closed status ────────────────────────────────────
       Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -1674,7 +1683,7 @@ class _QueueCard extends StatelessWidget {
       ),
       const SizedBox(height: 8),
 
-      // Estimate banner
+      // ── Estimated wait banner ───────────────────────────────────
       AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         transitionBuilder: (child, anim) =>
@@ -1691,40 +1700,105 @@ class _QueueCard extends StatelessWidget {
       if (estimatedWaitTime?.isNotEmpty == true || isEstimateLoading)
         const SizedBox(height: 8),
 
-      // Walk-in card
+      // ── Walk-in card ────────────────────────────────────────────
+      // Container(
+      //   width: double.infinity,
+      //   padding: const EdgeInsets.all(14),
+      //   decoration: BoxDecoration(
+      //     color: kAmberLight.withOpacity(0.5),
+      //     borderRadius: BorderRadius.circular(12),
+      //     border: Border.all(color: kWarning.withOpacity(0.3)),
+      //   ),
+      //   child: Row(children: [
+      //     Container(
+      //       width: 44, height: 44,
+      //       decoration: BoxDecoration(
+      //         color: kWarning.withOpacity(0.15),
+      //         borderRadius: BorderRadius.circular(11),
+      //       ),
+      //       child: const Icon(Icons.confirmation_number_rounded,
+      //           size: 20, color: kWarning),
+      //     ),
+      //     const SizedBox(width: 12),
+      //     Expanded(
+      //       child: Column(
+      //         crossAxisAlignment: CrossAxisAlignment.start,
+      //         children: [
+      //           const Text('Walk-in Queue',
+      //               style: TextStyle(
+      //                   fontSize: 14,
+      //                   fontWeight: FontWeight.w700,
+      //                   color: kTextPrimary)),
+      //           const SizedBox(height: 2),
+      //           Text(
+      //             'Show up today  ·  ${avail.slotDuration ?? 10} min per patient',
+      //             style: const TextStyle(
+      //                 fontSize: 12, color: kTextSecondary)),
+      //         ],
+      //       ),
+      //     ),
+      //   ]),
+      // ),
+      const SizedBox(height: 12),
+
+      // ── Symptoms field ──────────────────────────────────────────
       Container(
-        width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: kAmberLight.withOpacity(0.5),
+          color: kPrimaryLight.withOpacity(0.4),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kWarning.withOpacity(0.3)),
+          border: Border.all(color: kPrimary.withOpacity(0.2)),
         ),
-        child: Row(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: kWarning.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(11),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.info_outline_rounded,
+                size: 14, color: kPrimary),
+            const SizedBox(width: 6),
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontSize: 13, color: kTextPrimary),
+                children: [
+                  TextSpan(text: 'Describe your symptoms ',
+                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  TextSpan(text: '(optional)',
+                      style: TextStyle(
+                          fontSize: 12, color: kTextSecondary,
+                          fontWeight: FontWeight.w400)),
+                ],
+              ),
             ),
-            child: const Icon(Icons.confirmation_number_rounded,
-                size: 20, color: kWarning),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Walk-in Queue',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary)),
-                const SizedBox(height: 2),
-                Text('Show up today  ·  ${avail.slotDuration ?? 10} min per patient',
-                    style: const TextStyle(
-                        fontSize: 12, color: kTextSecondary)),
-              ],
+          ]),
+          const SizedBox(height: 10),
+          TextField(
+            controller: symptomsController,
+            maxLines:   3,
+            maxLength:  300,
+            style: const TextStyle(fontSize: 13, color: kTextPrimary),
+            decoration: InputDecoration(
+              hintText: 'e.g. Fever since 2 days, headache, sore throat…',
+              hintStyle:
+                  const TextStyle(fontSize: 13, color: kTextMuted),
+              filled:      true,
+              fillColor:   Colors.white,
+              counterStyle:
+                  const TextStyle(fontSize: 11, color: kTextMuted),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    BorderSide(color: kPrimary.withOpacity(0.25)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    BorderSide(color: kPrimary.withOpacity(0.2)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    const BorderSide(color: kPrimary, width: 1.5),
+              ),
             ),
           ),
         ]),
@@ -1732,7 +1806,6 @@ class _QueueCard extends StatelessWidget {
     ]);
   }
 }
-
 class _EstimateBanner extends StatelessWidget {
   final bool    _isLoading;
   final String? _text;
