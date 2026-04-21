@@ -756,9 +756,7 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
                   .firstOrNull;
 
           final waitingPts = sessionPatients
-              .where((p) =>
-                  p.appointmentId != currentPt?.appointmentId &&
-                  (p.status?.toLowerCase() ?? '') != 'in_progress')
+              .where((p) => p.appointmentId != currentPt?.appointmentId)
               .toList();
 
           // Sequential lock: first session not stopped → rest locked
@@ -971,8 +969,6 @@ class _SessionAccordion extends StatelessWidget {
                             ...allWaiting.map((p) {
                               final status     = p.status?.toLowerCase() ?? '';
                               final isIP       = status == 'in_progress';
-                              final isCurrent  = p.appointmentId == currentPatient?.appointmentId;
-                              final isHighlighted = isCurrent && queueStarted;
                               final isQActive  = globalQs == QueueState.running || globalQs == QueueState.paused;
                               final hasIP      = sessionPatients.any(
                                   (x) => (x.status?.toLowerCase() ?? '') == 'in_progress');
@@ -980,6 +976,9 @@ class _SessionAccordion extends StatelessWidget {
                                   .where((x) => (x.status?.toLowerCase() ?? '') == 'booked')
                                   .toList()
                                 ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+                              final isNextUp   = !hasIP && p.queueNumber == nextBooked.firstOrNull?.queueNumber;
+                              final isCurrent  = p.appointmentId == currentPatient?.appointmentId || isIP || isNextUp;
+                              final isHighlighted = isCurrent && queueStarted;
                               bool accessible = false;
                               if (isIP) {
                                 accessible = true;

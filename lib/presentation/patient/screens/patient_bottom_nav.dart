@@ -40,9 +40,11 @@ class _PatientBottomNavState extends State<PatientBottomNav>
 // ── Palette (update these to match doctor) ─────────────────────
 static const _accent      = Color(0xFF6366F1); // match doctor indigo
 static const _inactiveClr = Color(0xFF1E293B); // match doctor dark slate
-static const _pillBg      = Color(0x00FFFFFF); // fully transparent
-static const _pillBorder  = Color(0x00FFFFFF); // fully transparent border
+static const _pillBg      = Color(0x12FFFFFF);
+static const _pillBorder  = Color(0x26000000);
 static const _activePill  = Color(0x1A6366F1); // match doctor 10% indigo tint
+static const _compactNavHeight = 48.0;
+static const _regularNavHeight = 56.0;
 
   static const _navItems = [
     _NavItem(
@@ -150,6 +152,10 @@ Widget build(BuildContext context) {
 }
   // ── Floating Glass Pill ───────────────────────────────────────
   Widget _buildBottomNav() {
+    final isCompact = MediaQuery.of(context).size.width < 360;
+    final navHeight = isCompact ? _compactNavHeight : _regularNavHeight;
+    final pillHeight = navHeight - 10;
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -157,26 +163,19 @@ Widget build(BuildContext context) {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(30),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.10),
-                blurRadius: 12,
-                offset: const Offset(0, 8),
-              ),
-            ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(30),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
               child: Container(
-          height: MediaQuery.of(context).size.width < 360 ? 56 : 64,
+                height: navHeight,
                 decoration: BoxDecoration(
-                  color: const Color(0x12FFFFFF), // slightly stronger wash
+                  color: _pillBg,
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
-                    color: const Color(0x66FFFFFF),
-                    width: 1.6,
+                    color: _pillBorder,
+                    width: 0.3,
                   ),
                 ),
                 child: LayoutBuilder(
@@ -185,7 +184,6 @@ Widget build(BuildContext context) {
                     final itemCount = _navItems.length;
                     final itemWidth = totalWidth / itemCount;
                     final pillWidth = itemWidth - 10;
-                    final pillHeight = (64 - 16).toDouble();
                     final currentCenter = (_tab + 0.5) * itemWidth;
                     final minCenter = itemWidth / 2;
                     final maxCenter = totalWidth - itemWidth / 2;
@@ -249,7 +247,7 @@ Widget build(BuildContext context) {
                                 : const Duration(milliseconds: 220),
                             curve: Curves.easeInOut,
                             left: pillLeft,
-                            top: 8,
+                            top: 5,
                             width: pillWidth,
                             height: pillHeight,
                             child: Container(
@@ -269,10 +267,10 @@ Widget build(BuildContext context) {
                                   child: AnimatedBuilder(
                                     animation: _iconScales[i],
                                     builder: (context, _) => Container(
-                                    margin: const EdgeInsets.symmetric(
-  horizontal: 3, // was 5
-  vertical: 6,   // was 8
-),
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 3,
+                                        vertical: 4,
+                                      ),
                                       child: Column(
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
@@ -283,18 +281,18 @@ Widget build(BuildContext context) {
                                               selected
                                                   ? _navItems[i].activeIcon
                                                   : _navItems[i].icon,
-                                          size: MediaQuery.of(context).size.width < 360 ? 20 : 22,
+                                              size: isCompact ? 18 : 20,
                                               color: selected
                                                   ? _accent
                                                   : _inactiveClr,
                                             ),
                                           ),
-                                          const SizedBox(height: 3),
+                                          const SizedBox(height: 2),
                                           AnimatedDefaultTextStyle(
                                             duration: const Duration(
                                                 milliseconds: 200),
                                             style: TextStyle(
-                                            fontSize: MediaQuery.of(context).size.width < 360 ? 9 : 10,
+                                              fontSize: isCompact ? 8 : 9,
                                               fontWeight: selected
                                                   ? FontWeight.w700
                                                   : FontWeight.w500,
@@ -303,10 +301,10 @@ Widget build(BuildContext context) {
                                                   : _inactiveClr,
                                               letterSpacing: 0.1,
                                             ),
-                                         child: Text(
-  _navItems[i].label,
-  overflow: TextOverflow.ellipsis,
-),
+                                            child: Text(
+                                              _navItems[i].label,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
                                           ),
                                         ],
                                       ),

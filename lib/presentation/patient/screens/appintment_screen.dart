@@ -3,13 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
-import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
-import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
-import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
@@ -1345,7 +1342,6 @@ class _DetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a      = appointment;
-    final sColor = _statusColor(a.status);
     final sIcon  = _statusIcon(a.status);
     final hasMap = a.latitude != null && a.longitude != null;
 
