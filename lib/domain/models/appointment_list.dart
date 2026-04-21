@@ -101,6 +101,9 @@ class AppointmentList {
   @JsonKey(name: 'is_my_turn')
   bool? isMyTurn;
 
+  @JsonKey(name: 'cancelled_by')
+  String? cancelledBy;
+
   AppointmentList({
     this.queueId,
     this.queueState,
@@ -135,6 +138,7 @@ class AppointmentList {
     this.estimatedArrivalTime,
     this.queueStarted,
     this.isMyTurn,
+    this.cancelledBy,
   });
 
   factory AppointmentList.fromJson(Map<String, dynamic> json) =>

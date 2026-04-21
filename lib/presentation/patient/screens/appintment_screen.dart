@@ -58,19 +58,19 @@ class _FilterTab {
 Color _statusColor(String? s) => switch (s?.toLowerCase()) {
   'upcoming' || 'confirmed' || 'booked' => kInfo,
   'complete' || 'completed'             => kSuccess,
-  'cancelled'                           => kError,
+  'cancelled' || 'cancled'              => kError,
   _                                     => kWarning,
 };
 Color _statusBg(String? s) => switch (s?.toLowerCase()) {
   'upcoming' || 'confirmed' || 'booked' => kInfoLight,
   'complete' || 'completed'             => kGreenLight,
-  'cancelled'                           => kRedLight,
+  'cancelled' || 'cancled'              => kRedLight,
   _                                     => kAmberLight,
 };
 IconData _statusIcon(String? s) => switch (s?.toLowerCase()) {
   'upcoming' || 'confirmed' || 'booked' => Icons.schedule_rounded,
   'complete' || 'completed'             => Icons.check_circle_rounded,
-  'cancelled'                           => Icons.cancel_rounded,
+  'cancelled' || 'cancled'              => Icons.cancel_rounded,
   _                                     => Icons.info_rounded,
 };
 
@@ -134,7 +134,10 @@ bool _isCompleted(AppointmentList a) {
   return s == 'completed' || s == 'complete';
 }
 
-bool _isCancelled(AppointmentList a) => a.status?.toLowerCase() == 'cancelled';
+bool _isCancelled(AppointmentList a) {
+  final s = a.status?.toLowerCase();
+  return s == 'cancelled' || s == 'cancled';
+}
 
 List<AppointmentList> applyFilter(
     List<AppointmentList> list, String filter, String search) {
@@ -916,7 +919,10 @@ class _AppointmentCard extends StatelessWidget {
                             children: [
                               Icon(sIcon, size: 10, color: sColor),
                               const SizedBox(width: 4),
-                              Text(_cap(a.status),
+                              Text(
+                                  a.status?.toLowerCase() == 'cancled'
+                                      ? 'Cancelled by Doctor'
+                                      : _cap(a.status),
                                   style: TextStyle(
                                       color: sColor,
                                       fontSize: 11,
@@ -955,6 +961,7 @@ class _AppointmentCard extends StatelessWidget {
                         ),
                       ],
                     ),
+
 
                     // ── Live Queue Banner ───────────────────────────
                     if (isLiveQueue) ...[
@@ -1017,7 +1024,7 @@ class _AppointmentCard extends StatelessWidget {
                           _iconBtn(Icons.edit_calendar_rounded,
                               kAmberLight, kWarning, onReschedule!),
                         ],
-                        if (onCancel != null) ...[
+                        if (onCancel != null && queueState?.toLowerCase() != 'queue closed') ...[
                           const SizedBox(width: 6),
                           _iconBtn(Icons.cancel_rounded,
                               kRedLight, kError, onCancel!),
@@ -1039,7 +1046,7 @@ class _AppointmentCard extends StatelessWidget {
         ),
 
         // Queue badge
-        if (queueNumber != null)
+        if (queueNumber != null && queueState?.toLowerCase() != 'queue closed')
           Positioned(
             top: -7, left: 12,
             child: Container(
@@ -1150,8 +1157,12 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
   @override
   void dispose() { _ctrl.dispose(); super.dispose(); }
 
+  bool get _isClosed =>
+      widget.queueState?.toLowerCase() == 'queue closed';
+
   bool get _hasEstRow =>
-      widget.estimatedArrivalTime != null || widget.patientsAhead != null;
+      !_isClosed &&
+      (widget.estimatedArrivalTime != null || widget.patientsAhead != null);
 
   @override
   Widget build(BuildContext context) {
@@ -1208,12 +1219,14 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                             ? "It's your turn!  "
                             : started
                                 ? 'Queue position  '
-                                : 'Queue token  ',
+                                : _isClosed
+                                    ? ''
+                                    : 'Queue token  ',
                         style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w500,
                             color: kTextSecondary),
                       ),
-                      if (!myTurn)
+                      if (!myTurn && !_isClosed)
                         TextSpan(
                           text: q != null ? '#$q' : '—',
                           style: TextStyle(
@@ -1599,6 +1612,10 @@ class _DetailSheet extends StatelessWidget {
                         if (a.bookingFor != null) ...[
                           _divLine(),
                           _detailRow(Icons.people_rounded,    kPurpleLight, kPurple,  'Booking For',  a.bookingFor!),
+                        ],
+                        if (a.cancelledBy != null) ...[
+                          _divLine(),
+                          _detailRow(Icons.cancel_rounded,    kRedLight,    kError,   'Cancelled By', _cap(a.cancelledBy)),
                         ],
                       ],
                     ),
