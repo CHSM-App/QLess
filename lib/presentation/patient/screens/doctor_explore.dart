@@ -10,7 +10,6 @@ import 'package:qless/presentation/patient/screens/location_services.dart';
 
 // ── Colour palette (mirrors home_screen.dart) ─────────────────────────────────
 const _kPrimary      = Color(0xFF26C6B0);
-const _kPrimaryDark  = Color(0xFF2BB5A0);
 const _kPrimaryLight = Color(0xFFD9F5F1);
 
 const _kTextPrimary   = Color(0xFF2D3748);
@@ -18,8 +17,6 @@ const _kTextSecondary = Color(0xFF718096);
 const _kTextMuted     = Color(0xFFA0AEC0);
 
 const _kBorder  = Color(0xFFEDF2F7);
-const _kDivider = Color(0xFFE5E7EB);
-
 const _kError      = Color(0xFFFC8181);
 const _kRedLight   = Color(0xFFFEE2E2);
 const _kSuccess    = Color(0xFF68D391);
