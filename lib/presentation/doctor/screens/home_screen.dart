@@ -80,7 +80,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   int get _doctorId =>
       ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
 
-  // ── Grab doctor's name from the login state ────────────────────────────
   String get _doctorName =>
       ref.read(doctorLoginViewModelProvider).name ?? 'Doctor';
 
@@ -91,6 +90,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         .read(appointmentViewModelProvider.notifier)
         .fetchPatientAppointments(_doctorId);
   }
+
+void _refreshData() {
+  _hasFetched = false;
+  _loadData();
+}
+  
 
   // ── Queue filters ─────────────────────────────────────────────────────────
 
@@ -157,6 +162,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .read(appointmentViewModelProvider.notifier)
           .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue started');
+        _refreshData(); 
     } catch (_) {
       _snack('Failed to start queue');
     }
@@ -168,6 +174,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue paused');
+        _refreshData(); 
     } catch (_) {
       _snack('Failed to pause queue');
     }
@@ -179,6 +186,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .read(appointmentViewModelProvider.notifier)
           .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue closed');
+        _refreshData(); 
     } catch (_) {
       _snack('Failed to close queue');
     }
@@ -209,6 +217,22 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       _snack(res.message ?? 'Patient skipped');
     } catch (_) {
       _snack('Failed to skip');
+    }
+  }
+
+  Future<void> _onQueuePauseEmergency(int? queueId) async {
+    if (queueId == null) {
+      _snack('Queue ID not available');
+      return;
+    }
+    try {
+      final res = await ref
+          .read(appointmentViewModelProvider.notifier)
+          .queuePauseEmergency(queueId);
+      _snack(res.message ?? 'Queue paused (emergency)');
+        _refreshData(); 
+    } catch (_) {
+      _snack('Failed to pause queue');
     }
   }
 
@@ -245,17 +269,32 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       return null;
     }
   }
-String _fmtTime(String? raw) {
-  if (raw == null) return '';
-  try {
-    final dt = DateTime.parse(raw).toUtc(); // keep as UTC, don't convert to local
-    return DateFormat('h:mm a').format(dt);
-  } catch (_) {
-    return raw;
-  }
-}
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  String _fmtTime(String? raw) {
+    if (raw == null) return '';
+    try {
+      final dt = DateTime.parse(raw).toUtc();
+      return DateFormat('h:mm a').format(dt);
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  // ── FILTER: which sessions to show as cards ───────────────────────────────
+  // Hide a session when:
+  //   • queue_status == 0 (idle) AND start_time == null  → no slot assigned yet, skip it
+  //   • queue_status == 3 (stopped/closed)               → hide closed queues
+  bool _shouldShowSession(dynamic session) {
+    final qs = session.queueStatus ?? 0;
+    final hasSlot = session.startTime != null;
+    if (qs == 3) return false;               // closed → hide
+    if (qs == 0 && !hasSlot) return false;   // idle + no time slot → hide
+    return true;
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -269,7 +308,6 @@ String _fmtTime(String? raw) {
     final vmState           = ref.watch(appointmentViewModelProvider);
     final appointmentsAsync = vmState.patientAppointmentsList;
 
-    // Read doctor name reactively
     final doctorName = ref.watch(
       doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'),
     );
@@ -286,14 +324,17 @@ String _fmtTime(String? raw) {
           final completed  = _completedToday(list);
           final skipped    = _skippedToday(list);
 
-          // Today's queue sessions from getTodayQueue API
-          final todayQueues = vmState.todayQueueResult?.value ?? [];
+          // All today's sessions from API
+          final allSessions = vmState.todayQueueResult?.value ?? [];
+          
 
-          // Limit waiting list to 3 unless "Show All" is toggled
+          // Filter: only show sessions that should be visible
+          final visibleSessions = allSessions.where(_shouldShowSession).toList();
+
+          // Limit waiting list
           final visibleWaiting = _showAllWaiting
               ? waiting
               : waiting.take(3).toList();
-          final hasMore = !_showAllWaiting && waiting.length > 3;
 
           return CustomScrollView(
             slivers: [
@@ -301,26 +342,15 @@ String _fmtTime(String? raw) {
               SliverToBoxAdapter(
                 child: _buildHeader(greeting, doctorName),
               ),
-              // ── STAT STRIP ───────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-                  child: _buildStatStrip(
-                    total:   todayQueue.length,
-                    waiting: waiting.length,
-                    done:    completed.length,
-                    skipped: skipped.length,
-                  ),
-                ),
-              ),
-              // ── LIVE QUEUE CARDS (one per session) ───────────────────
-              if (todayQueues.isNotEmpty)
+
+              // ── SESSION QUEUE CARDS ─────────────────────────────────
+              if (visibleSessions.isNotEmpty)
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (_, i) {
-                        final session   = todayQueues[i];
+                        final session   = visibleSessions[i];
                         final qs        = _sessionQueueState(session.queueStatus);
                         final currentPt = _findCurrentPatient(list, session.currentServing);
                         final nextQNo   = session.currentQueueNo != null &&
@@ -330,24 +360,38 @@ String _fmtTime(String? raw) {
                         final slotLbl = (session.startTime != null)
                             ? '${_fmtTime(session.startTime)} – ${_fmtTime(session.endTime)}'
                             : null;
+
+                        // ── Per-session stat strip ───────────────────
+                        // Waiting for this session = totalQueue - completedCount - (currentServing > 0 ? 1 : 0)
+                        final sessionTotal     = session.totalQueue ?? 0;
+                        final sessionDone      = session.completedCount ?? 0;
+                        final sessionServing   = (session.currentServing ?? 0) > 0 ? 1 : 0;
+                        final sessionWaiting   = (sessionTotal - sessionDone - sessionServing).clamp(0, sessionTotal);
+                        // Skipped not available per session from API, show dash/0
+                        final sessionSkipped   = 0;
+
                         return Padding(
                           padding: EdgeInsets.only(
-                              bottom: i < todayQueues.length - 1 ? 12 : 0),
+                              bottom: i < visibleSessions.length - 1 ? 12 : 0),
                           child: _buildQueueCard(
-                            current:     currentPt,
-                            nextQueueNo: nextQNo,
-                            total:       session.totalQueue ?? 0,
-                            done:        session.completedCount ?? 0,
-                            queueState:  qs,
-                            queueId:     session.queueId,
-                            slotLabel:   slotLbl,
+                            current:          currentPt,
+                            nextQueueNo:      nextQNo,
+                            total:            sessionTotal,
+                            done:             sessionDone,
+                            sessionWaiting:   sessionWaiting,
+                            sessionSkipped:   sessionSkipped,
+                            queueState:       qs,
+                            queueId:          session.queueId,
+                            slotLabel:        slotLbl,
+                            isOnlySession:    i == 0, // first session always full card
                           ),
                         );
                       },
-                      childCount: todayQueues.length,
+                      childCount: visibleSessions.length,
                     ),
                   ),
                 ),
+
               // ── QUICK ACTIONS ────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
@@ -355,6 +399,7 @@ String _fmtTime(String? raw) {
                   child: _buildQuickActions(current),
                 ),
               ),
+
               // ── WAITING LIST HEADER ──────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
@@ -399,6 +444,7 @@ String _fmtTime(String? raw) {
                   ),
                 ),
               ),
+
               // ── WAITING PATIENT CARDS ────────────────────────────────
               waiting.isEmpty
                   ? SliverToBoxAdapter(
@@ -441,6 +487,7 @@ String _fmtTime(String? raw) {
                         ),
                       ),
                     ),
+
               // ── SHOW ALL / SHOW LESS ─────────────────────────────────
               if (waiting.length > 3)
                 SliverToBoxAdapter(
@@ -484,7 +531,8 @@ String _fmtTime(String? raw) {
                     ),
                   ),
                 ),
-         const SliverToBoxAdapter(child: SizedBox(height: 100)),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 100)),
             ],
           );
         },
@@ -501,8 +549,7 @@ String _fmtTime(String? raw) {
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
           const SliverFillRemaining(
-            child:
-                Center(child: CircularProgressIndicator(color: kPrimary)),
+            child: Center(child: CircularProgressIndicator(color: kPrimary)),
           ),
         ],
       );
@@ -547,7 +594,7 @@ String _fmtTime(String? raw) {
       );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // HEADER  — greeting + doctor name, no "Queue Management" label
+  // HEADER
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(String greeting, String doctorName) {
@@ -568,7 +615,6 @@ String _fmtTime(String? raw) {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Greeting (was label, now the primary line) ───────
                     Text(
                       greeting,
                       style: const TextStyle(
@@ -577,7 +623,6 @@ String _fmtTime(String? raw) {
                           color: kTextPrimary),
                     ),
                     const SizedBox(height: 2),
-                    // ── Doctor name ──────────────────────────────────────
                     Text(
                       'Dr. $doctorName',
                       style: const TextStyle(
@@ -586,7 +631,6 @@ String _fmtTime(String? raw) {
                           color: kTextSecondary),
                     ),
                     const SizedBox(height: 6),
-                    // ── Date pill ────────────────────────────────────────
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
@@ -662,7 +706,7 @@ String _fmtTime(String? raw) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // STAT STRIP
+  // STAT STRIP  (global across all sessions)
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildStatStrip({
@@ -741,7 +785,9 @@ String _fmtTime(String? raw) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // LIVE QUEUE CARD  (unchanged)
+  // LIVE QUEUE CARD
+  // When idle (queue_status == 0 but has a slot) → compact card (screenshot style)
+  // When running/paused → full card with patient info, token row, actions
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildQueueCard({
@@ -749,13 +795,83 @@ String _fmtTime(String? raw) {
     required int? nextQueueNo,
     required int total,
     required int done,
+    required int sessionWaiting,
+    required int sessionSkipped,
     required QueueState queueState,
     int? queueId,
     String? slotLabel,
+    bool isOnlySession = false,  // true when all other sessions are closed/hidden
   }) {
+    final isIdle    = queueState == QueueState.idle;
     final isRunning = queueState == QueueState.running;
     final isStopped = queueState == QueueState.stopped;
+    final isPaused  = queueState == QueueState.paused;
 
+    // ── COMPACT CARD for Idle sessions with siblings present ──────────────
+    // If this is the ONLY remaining session (others closed), show full card
+    if (isIdle && !isOnlySession) {
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: kPrimaryLight.withOpacity(0.8)),
+        ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row — badge left, slot label right
+            Row(children: [
+              _pulseDot(),
+              const SizedBox(width: 6),
+              _queueStateBadge(queueState),
+              const Spacer(),
+              if (slotLabel != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    slotLabel,
+                    style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: kPrimaryDark),
+                  ),
+                ),
+            ]),
+
+            const SizedBox(height: 12),
+
+            // Progress row — no mini stats for idle (matches screenshot)
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              const Text('Daily progress',
+                  style: TextStyle(fontSize: 10, color: kTextSecondary)),
+              Text('$done / $total seen',
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimary)),
+            ]),
+            const SizedBox(height: 5),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: LinearProgressIndicator(
+                value: total == 0 ? 0 : (done / total).clamp(0.0, 1.0),
+                minHeight: 7,
+                backgroundColor: kPrimaryLight,
+                valueColor: const AlwaysStoppedAnimation<Color>(kPrimary),
+              ),
+            ),
+
+          ],
+        ),
+      );
+    }
+
+    // ── FULL CARD for Running / Paused sessions ────────────────────────────
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -763,20 +879,14 @@ String _fmtTime(String? raw) {
         border: Border.all(color: kPrimaryLight.withOpacity(0.8)),
       ),
       padding: const EdgeInsets.all(16),
-      child:
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Header row — badge left, slot label right
         Row(children: [
           _pulseDot(),
           const SizedBox(width: 6),
-          const Expanded(
-            child: Text('Live Queue Status',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
-                    color: kPrimary)),
-          ),
-          if (slotLabel != null) ...[
+          _queueStateBadge(queueState),
+          const Spacer(),
+          if (slotLabel != null)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
@@ -791,19 +901,35 @@ String _fmtTime(String? raw) {
                     color: kPrimaryDark),
               ),
             ),
-            const SizedBox(width: 6),
-          ],
-          _queueStateBadge(queueState),
         ]),
+
         const SizedBox(height: 12),
-        _buildTokenRow(
-          currentNo: current?.queueNumber ?? 0,
-          nextNo:    nextQueueNo ?? 0,
-          total:     total,
+
+        // Session mini stat strip
+        _buildSessionMiniStats(
+          total:   total,
+          waiting: sessionWaiting,
+          done:    done,
+          skipped: sessionSkipped,
         ),
+
         const SizedBox(height: 12),
-        _buildCurrentPatientBand(current),
-        const SizedBox(height: 12),
+
+        // Token row (Current / Up Next / Remaining)
+        // _buildTokenRow(
+        //   currentNo: current?.queueNumber ?? 0,
+        //   nextNo:    nextQueueNo ?? 0,
+        //   total:     total,
+        // ),
+
+        // const SizedBox(height: 12),
+
+        // // Current patient band
+        // _buildCurrentPatientBand(current),
+
+        // const SizedBox(height: 12),
+
+        // Progress
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Daily progress',
               style: TextStyle(fontSize: 10, color: kTextSecondary)),
@@ -823,23 +949,31 @@ String _fmtTime(String? raw) {
             valueColor: const AlwaysStoppedAnimation<Color>(kPrimary),
           ),
         ),
+
         const SizedBox(height: 12),
+
+        // Pause / Start + Emergency + Close Queue
         Row(children: [
-          Expanded(
-            child: _actionBtn(
-              label: isRunning ? '⏸  Pause' : '▶  Start',
-              onTap: isRunning
-                  ? () => _onQueuePause(queueId)
-                  : () => _onQueueStart(queueId),
-              isPrimary: isRunning,
-            ),
-          ),
+          // ── Start / Pause ──────────────────────────────────────────
+        Expanded(
+  child: _actionBtn(
+    label: isRunning ? '⏸  Pause' : '▶  Start',
+    onTap: isRunning
+        ? () => _onQueuePause(queueId)
+        : () => _onQueueStart(queueId),
+    isPrimary: !isRunning, 
+  ),
+),
           const SizedBox(width: 8),
+
+          // ── Emergency ──────────────────────────────────────────────
+          
+          // ── Close Queue (with confirmation dialog) ─────────────────
           Expanded(
             child: Opacity(
               opacity: isStopped ? 0.4 : 1.0,
               child: GestureDetector(
-                onTap: isStopped ? null : () => _onQueueStop(queueId),
+                onTap: isStopped ? null : () => _showCloseDialog(queueId),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   decoration: BoxDecoration(
@@ -848,7 +982,7 @@ String _fmtTime(String? raw) {
                     border: Border.all(color: kRedBorder),
                   ),
                   alignment: Alignment.center,
-                  child: const Text('✕  Close Queue',
+                  child: const Text('✕  Close',
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
@@ -857,10 +991,257 @@ String _fmtTime(String? raw) {
               ),
             ),
           ),
+            const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => _showEmergencyDialog(queueId),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+              decoration: BoxDecoration(
+                color: kRedLight,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: kRedBorder),
+              ),
+              child: const Icon(Icons.warning_amber_rounded,
+    color: kRedDark, size: 18),
+            ),
+          ),
+          const SizedBox(width: 8),
+
         ]),
       ]),
     );
   }
+
+  // ── Dialogs ───────────────────────────────────────────────────────────────
+
+  Future<void> _showCloseDialog(int? queueId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                  color: kRedLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: kRedBorder)),
+              child: const Icon(Icons.close_rounded, color: kRed, size: 26),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Close Queue?',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Are you sure you want to close this queue? This action cannot be undone.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+        actions: [
+          Row(children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx, false),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('No',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSecondary)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx, true),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: kRedLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kRedBorder),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('Yes, Close',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kRedDark)),
+                ),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+    if (confirmed == true) await _onQueueStop(queueId);
+  }
+
+  Future<void> _showEmergencyDialog(int? queueId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                  color: kPurpleLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: kPurpleBorder)),
+              child: const Icon(Icons.warning_amber_rounded,
+                  color: kPurple, size: 26),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Emergency Pause?',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Queue is Emergency Pause. Do you want to pause immediately?',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+        actions: [
+          Row(children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx, false),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('No',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSecondary)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx, true),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: kPurpleLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kPurpleBorder),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('Yes, Pause',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kPurpleDark)),
+                ),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+    if (confirmed == true) await _onQueuePauseEmergency(queueId);
+  }
+
+  // ── Session mini stat strip (inside each card) ─────────────────────────
+
+  Widget _buildSessionMiniStats({
+    required int total,
+    required int waiting,
+    required int done,
+    required int skipped,
+  }) {
+    return Row(children: [
+      _miniStatChip(label: 'Total',   value: total,   accent: kPrimary,   textColor: kPrimaryDark),
+      const SizedBox(width: 6),
+      _miniStatChip(label: 'Waiting', value: waiting, accent: kPrimary,   textColor: kPrimaryDark),
+      const SizedBox(width: 6),
+      _miniStatChip(label: 'Done',    value: done,    accent: kGreen,     textColor: kGreenDark),
+      const SizedBox(width: 6),
+      _miniStatChip(label: 'Skipped', value: skipped, accent: kAmber,     textColor: kAmberDark),
+    ]);
+  }
+
+  Widget _miniStatChip({
+    required String label,
+    required int value,
+    required Color accent,
+    required Color textColor,
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+        decoration: BoxDecoration(
+          color: accent.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: accent.withOpacity(0.2)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.w600,
+                  color: textColor.withOpacity(0.7)),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value.toString().padLeft(2, '0'),
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: textColor,
+                  height: 1),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   Widget _actionBtn({
     required String label,
@@ -1093,7 +1474,7 @@ String _fmtTime(String? raw) {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // QUICK ACTIONS  (unchanged)
+  // QUICK ACTIONS
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildQuickActions(AppointmentList? current) {

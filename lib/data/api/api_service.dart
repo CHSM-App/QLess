@@ -130,6 +130,11 @@ Future<AppointmentResponseModel> endSession(
   @Body() AppointmentRequestModel appointmentRequest,
 );
 
+@POST("doctor/insert/appointment/queuePauseEmergency/{queue_id}")
+Future<AppointmentResponseModel> queuePauseEmergency(
+  @Path("queue_id") int queueId,
+);
+
   @POST("doctor/insert/addQueueStartTime/")
   Future<dynamic> updateLeadTime(
      @Body() DoctorDetails doctor

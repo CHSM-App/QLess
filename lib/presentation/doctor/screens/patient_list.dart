@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -7,7 +8,6 @@ import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 
-// ── Colour Palette (matches QueueHomePage / MedicinePage / SettingsPage) ──────
 const kPrimary        = Color(0xFF26C6B0);
 const kPrimaryDark    = Color(0xFF2BB5A0);
 const kPrimaryLight   = Color(0xFFD9F5F1);
@@ -63,6 +63,24 @@ const _avatarPalette = [
 
 enum _Tab { today, upcoming, completed }
 
+String _fmtTime(String? raw) {
+  if (raw == null) return '';
+  try {
+    return DateFormat('h:mm a').format(DateTime.parse(raw).toUtc());
+  } catch (_) {
+    return raw;
+  }
+}
+
+QueueState _sessionQueueState(int? status) {
+  switch (status) {
+    case 1: return QueueState.running;
+    case 2: return QueueState.paused;
+    case 3: return QueueState.stopped;
+    default: return QueueState.idle;
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  MAIN SCREEN
 // ════════════════════════════════════════════════════════════════════
@@ -114,11 +132,11 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     super.dispose();
   }
 
-  // ── Data ──────────────────────────────────────────────────────────────────
+  int get _doctorId => ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
 
   void _refresh({required bool force}) {
     if (_hasFetched && !force) return;
-    final id = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+    final id = _doctorId;
     if (id == 0) return;
     _hasFetched = true;
     ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(id);
@@ -167,8 +185,6 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       })
       .toList();
 
-  // ── Snack ─────────────────────────────────────────────────────────────────
-
   void _snack(String msg, {bool isError = false}) =>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -189,11 +205,9 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         ),
       );
 
-  // ── Actions ───────────────────────────────────────────────────────────────
-
   Future<void> _startSession(AppointmentList p) async {
     final pid = p.patientId ?? 0;
-    final did = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+    final did = _doctorId;
     if (pid == 0 || did == 0) { _snack('Missing info', isError: true); return; }
     try {
       await ref.read(appointmentViewModelProvider.notifier).startSession(
@@ -224,7 +238,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   }
 
   Future<void> _skipPatient(AppointmentList p) async {
-    final did = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+    final did = _doctorId;
     if (did == 0) return;
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
@@ -271,8 +285,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           ),
           const SizedBox(height: 12),
           const Text('Cancel Appointment',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-                  color: kTextPrimary)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
           const SizedBox(height: 6),
           Text('Cancel appointment for ${p.patientName ?? 'this patient'}?',
               textAlign: TextAlign.center,
@@ -297,8 +310,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 11),
               ),
-              child: const Text('Yes, Cancel',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              child: const Text('Yes, Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             )),
           ]),
         ]),
@@ -316,22 +328,104 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     return y < 0 ? null : '$y yrs';
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
+  // ── Queue Controls ────────────────────────────────────────────────────────
+
+  Future<void> _onQueueStart(int? queueId) async {
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier)
+          .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+      _snack(res.message ?? 'Queue started');
+      _hasFetched = false;
+      _refresh(force: true);
+    } catch (_) {
+      _snack('Failed to start queue', isError: true);
+    }
+  }
+
+  Future<void> _onQueuePause(int? queueId) async {
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier)
+          .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+      _snack(res.message ?? 'Queue paused');
+      _hasFetched = false;
+      _refresh(force: true);
+    } catch (_) {
+      _snack('Failed to pause queue', isError: true);
+    }
+  }
+
+  Future<void> _onQueueStop(int? queueId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 48, height: 48,
+              decoration: const BoxDecoration(color: kRedLight, shape: BoxShape.circle),
+              child: const Icon(Icons.stop_circle_outlined, color: kError, size: 22),
+            ),
+            const SizedBox(height: 12),
+            const Text('Close Queue?',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+            const SizedBox(height: 6),
+            const Text('Are you sure you want to close this queue?',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: kTextSecondary, height: 1.5)),
+            const SizedBox(height: 20),
+            Row(children: [
+              Expanded(child: OutlinedButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: kBorder),
+                  foregroundColor: kTextSecondary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                child: const Text('No', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              )),
+              const SizedBox(width: 10),
+              Expanded(child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kError, foregroundColor: Colors.white, elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                child: const Text('Yes, Close', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              )),
+            ]),
+          ]),
+        ),
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier)
+          .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+      _snack(res.message ?? 'Queue closed');
+      _hasFetched = false;
+      _refresh(force: true);
+    } catch (_) {
+      _snack('Failed to close queue', isError: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isWide  = MediaQuery.of(context).size.width >= _kWideBreak;
-    final vmState = ref.watch(appointmentViewModelProvider);
-    final async   = vmState.patientAppointmentsList;
-    final qs      = vmState.queueState;
+    final isWide      = MediaQuery.of(context).size.width >= _kWideBreak;
+    final vmState     = ref.watch(appointmentViewModelProvider);
+    final async       = vmState.patientAppointmentsList;
+    final qs          = vmState.queueState;
+    final allSessions = vmState.todayQueueResult?.value ?? [];
 
     return Scaffold(
       backgroundColor: kBg,
       body: Column(children: [
-        // ── Header — exact same structure as Medicine + Settings pages ────
         _buildHeader(),
-
-        // ── Body ──────────────────────────────────────────────────────────
         Expanded(
           child: async.when(
             loading: () => const _SkeletonPatientList(),
@@ -341,10 +435,12 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
               final upcoming  = _upcomingList(all);
               final completed = _completedList(all);
               return isWide
-                  ? _buildDesktop(today: today, upcoming: upcoming,
-                      completed: completed, qs: qs)
-                  : _buildMobile(today: today, upcoming: upcoming,
-                      completed: completed, qs: qs);
+                  ? _buildDesktop(
+                      today: today, upcoming: upcoming, completed: completed,
+                      qs: qs, allSessions: allSessions, allAppointments: all)
+                  : _buildMobile(
+                      today: today, upcoming: upcoming, completed: completed,
+                      qs: qs, allSessions: allSessions, allAppointments: all);
             },
           ),
         ),
@@ -352,7 +448,6 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     );
   }
 
-  // ── Header — matches DoctorMedicinePage / DoctorSettingsPage exactly ──────
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -364,7 +459,6 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
           child: Row(children: [
-            // Icon badge — 34×34, same as all other pages
             Container(
               width: 34, height: 34,
               decoration: BoxDecoration(
@@ -372,19 +466,15 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: kPrimary.withOpacity(0.2)),
               ),
-              child: const Icon(Icons.people_alt_outlined,
-                  color: kPrimary, size: 17),
+              child: const Icon(Icons.people_alt_outlined, color: kPrimary, size: 17),
             ),
             const SizedBox(width: 8),
-
-            // Title + subtitle — same font sizes (16 / 11)
             const Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Patients',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-                          color: kTextPrimary)),
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
                   SizedBox(height: 1),
                   Text('Manage your patient queue',
                       style: TextStyle(fontSize: 11, color: kTextSecondary)),
@@ -397,13 +487,13 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     );
   }
 
-  // ── Mobile layout ─────────────────────────────────────────────────────────
-
   Widget _buildMobile({
     required List<AppointmentList> today,
     required List<AppointmentList> upcoming,
     required List<AppointmentList> completed,
     required QueueState qs,
+    required List<dynamic> allSessions,
+    required List<AppointmentList> allAppointments,
   }) {
     return Column(children: [
       _SearchBarWidget(controller: _searchCtrl),
@@ -417,31 +507,50 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         child: TabBarView(
           controller: _tabCtrl,
           children: [
-            _PatientListBody(patients: today, tab: _Tab.today, qs: qs,
-                onStart: _startSession, onSkip: _skipPatient,
-                onPrescription: _viewPrescription, onCancel: _cancelConfirm,
-                extraBottom: _kBottomClear),
-            _PatientListBody(patients: upcoming, tab: _Tab.upcoming, qs: qs,
-                onStart: _startSession, onSkip: _skipPatient,
-                onPrescription: _viewPrescription, onCancel: _cancelConfirm,
-                extraBottom: _kBottomClear),
-            _PatientListBody(patients: completed, tab: _Tab.completed, qs: qs,
-                onStart: _startSession, onSkip: _skipPatient,
-                onPrescription: _viewPrescription, onCancel: _cancelConfirm,
-                extraBottom: _kBottomClear),
+            _SessionGroupedBody(
+              allSessions: allSessions,
+              allAppointments: allAppointments,
+              todayPatients: today,
+              qs: qs,
+              onStart: _startSession,
+              onSkip: _skipPatient,
+              onPrescription: _viewPrescription,
+              onCancel: _cancelConfirm,
+              extraBottom: _kBottomClear,
+              onQueueStart: _onQueueStart,
+              onQueuePause: _onQueuePause,
+              onQueueStop: _onQueueStop,
+              onRefresh: () async {
+                ref.read(appointmentViewModelProvider.notifier)
+                    .fetchPatientAppointments(_doctorId);
+                await Future.delayed(const Duration(milliseconds: 600));
+              },
+            ),
+            _PatientListBody(
+              patients: upcoming, tab: _Tab.upcoming, qs: qs,
+              onStart: _startSession, onSkip: _skipPatient,
+              onPrescription: _viewPrescription, onCancel: _cancelConfirm,
+              extraBottom: _kBottomClear,
+            ),
+            _PatientListBody(
+              patients: completed, tab: _Tab.completed, qs: qs,
+              onStart: _startSession, onSkip: _skipPatient,
+              onPrescription: _viewPrescription, onCancel: _cancelConfirm,
+              extraBottom: _kBottomClear,
+            ),
           ],
         ),
       ),
     ]);
   }
 
-  // ── Desktop layout ────────────────────────────────────────────────────────
-
   Widget _buildDesktop({
     required List<AppointmentList> today,
     required List<AppointmentList> upcoming,
     required List<AppointmentList> completed,
     required QueueState qs,
+    required List<dynamic> allSessions,
+    required List<AppointmentList> allAppointments,
   }) {
     final list = switch (_activeTab) {
       _Tab.today     => today,
@@ -449,7 +558,6 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       _Tab.completed => completed,
     };
     return Row(children: [
-      // Sidebar
       _DesktopSidebar(
         activeTab: _activeTab,
         todayCount: today.length,
@@ -463,20 +571,38 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           _tabCtrl.animateTo(_Tab.values.indexOf(t));
         }),
       ),
-
-      // List
       Expanded(
-        child: _PatientListBody(
-          patients: list, tab: _activeTab, qs: qs,
-          onStart: _startSession, onSkip: _skipPatient,
-          onPrescription: _viewPrescription, onCancel: _cancelConfirm,
-          extraBottom: 0,
-          selected: _selected,
-          onSelect: (p) => setState(() => _selected = p),
-        ),
+        child: _activeTab == _Tab.today
+            ? _SessionGroupedBody(
+                allSessions: allSessions,
+                allAppointments: allAppointments,
+                todayPatients: today,
+                qs: qs,
+                onStart: _startSession,
+                onSkip: _skipPatient,
+                onPrescription: _viewPrescription,
+                onCancel: _cancelConfirm,
+                extraBottom: 0,
+                selected: _selected,
+                onSelect: (p) => setState(() => _selected = p),
+                onQueueStart: _onQueueStart,
+                onQueuePause: _onQueuePause,
+                onQueueStop: _onQueueStop,
+                onRefresh: () async {
+                  ref.read(appointmentViewModelProvider.notifier)
+                      .fetchPatientAppointments(_doctorId);
+                  await Future.delayed(const Duration(milliseconds: 600));
+                },
+              )
+            : _PatientListBody(
+                patients: list, tab: _activeTab, qs: qs,
+                onStart: _startSession, onSkip: _skipPatient,
+                onPrescription: _viewPrescription, onCancel: _cancelConfirm,
+                extraBottom: 0,
+                selected: _selected,
+                onSelect: (p) => setState(() => _selected = p),
+              ),
       ),
-
-      // Detail panel
       SizedBox(
         width: _kDeskDetail,
         child: _DetailPanel(
@@ -490,8 +616,855 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  SEARCH BAR
+//  SESSION-GROUPED BODY
 // ════════════════════════════════════════════════════════════════════
+class _SessionGroupedBody extends StatefulWidget {
+  final List<dynamic> allSessions;
+  final List<AppointmentList> allAppointments;
+  final List<AppointmentList> todayPatients;
+  final QueueState qs;
+  final Future<void> Function(AppointmentList) onStart, onSkip;
+  final void Function(AppointmentList) onPrescription, onCancel;
+  final double extraBottom;
+  final AppointmentList? selected;
+  final void Function(AppointmentList)? onSelect;
+  final Future<void> Function() onRefresh;
+  final Future<void> Function(int? queueId) onQueueStart;
+  final Future<void> Function(int? queueId) onQueuePause;
+  final Future<void> Function(int? queueId) onQueueStop;
+
+  const _SessionGroupedBody({
+    required this.allSessions,
+    required this.allAppointments,
+    required this.todayPatients,
+    required this.qs,
+    required this.onStart,
+    required this.onSkip,
+    required this.onPrescription,
+    required this.onCancel,
+    required this.extraBottom,
+    required this.onRefresh,
+    required this.onQueueStart,
+    required this.onQueuePause,
+    required this.onQueueStop,
+    this.selected,
+    this.onSelect,
+  });
+
+  @override
+  State<_SessionGroupedBody> createState() => _SessionGroupedBodyState();
+}
+
+class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
+  final Map<int, bool> _expanded = {};
+
+  bool _shouldShow(dynamic session) {
+    final qs      = session.queueStatus ?? 0;
+    final hasSlot = session.startTime != null;
+    if (qs == 3) return false;
+    if (qs == 0 && !hasSlot) return false;
+    return true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleSessions = widget.allSessions.where(_shouldShow).toList();
+
+    if (visibleSessions.isEmpty) {
+      return _PatientListBody(
+        patients: widget.todayPatients,
+        tab: _Tab.today,
+        qs: widget.qs,
+        onStart: widget.onStart,
+        onSkip: widget.onSkip,
+        onPrescription: widget.onPrescription,
+        onCancel: widget.onCancel,
+        extraBottom: widget.extraBottom,
+        selected: widget.selected,
+        onSelect: widget.onSelect,
+      );
+    }
+
+    return RefreshIndicator(
+      color: kPrimary,
+      strokeWidth: 2.5,
+      onRefresh: widget.onRefresh,
+      child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + widget.extraBottom),
+        itemCount: visibleSessions.length,
+        itemBuilder: (_, i) {
+          final session    = visibleSessions[i];
+          final queueId    = session.queueId as int? ?? i;
+          final isExpanded = _expanded[queueId] ?? true;
+
+          final sessionPatients = _patientsForSession(session, i, visibleSessions.length);
+          final qs         = _sessionQueueState(session.queueStatus as int?);
+          final slotLabel  = (session.startTime != null)
+              ? '${_fmtTime(session.startTime as String?)} – ${_fmtTime(session.endTime as String?)}'
+              : null;
+
+          final currentServingId = session.currentServing as int?;
+          final currentPt = (currentServingId != null && currentServingId > 0)
+              ? sessionPatients.where((p) => p.appointmentId == currentServingId).firstOrNull
+              : null;
+
+          final waitingPts = sessionPatients
+              .where((p) => p.appointmentId != currentPt?.appointmentId)
+              .toList();
+
+          // Sequential lock: পहिला session stopped नसेल तर बाकी locked
+          final firstSessionStopped = visibleSessions.isEmpty
+              ? true
+              : (_sessionQueueState(visibleSessions[0].queueStatus as int?) ==
+                  QueueState.stopped);
+          final controlsEnabled = (i == 0) || firstSessionStopped;
+
+          return _SessionAccordion(
+            key: ValueKey(queueId),
+            session: session,
+            sessionIndex: i,
+            slotLabel: slotLabel,
+            queueState: qs,
+            sessionPatients: sessionPatients,
+            currentPatient: currentPt,
+            waitingPatients: waitingPts,
+            isExpanded: isExpanded,
+            selected: widget.selected,
+            controlsEnabled: controlsEnabled,
+            onToggle: () => setState(() => _expanded[queueId] = !isExpanded),
+            onStart: widget.onStart,
+            onSkip: widget.onSkip,
+            onPrescription: widget.onPrescription,
+            onCancel: widget.onCancel,
+            onSelect: widget.onSelect,
+            globalQs: widget.qs,
+            onQueueStart: () => widget.onQueueStart(queueId),
+            onQueuePause: () => widget.onQueuePause(queueId),
+            onQueueStop:  () => widget.onQueueStop(queueId),
+          );
+        },
+      ),
+    );
+  }
+
+  List<AppointmentList> _patientsForSession(dynamic session, int index, int total) {
+    final all = widget.todayPatients;
+    if (total <= 1) return all;
+    final chunk = (all.length / total).ceil();
+    final start = index * chunk;
+    final end   = (start + chunk).clamp(0, all.length);
+    return all.sublist(start, end);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SESSION ACCORDION
+// ════════════════════════════════════════════════════════════════════
+class _SessionAccordion extends StatelessWidget {
+  final dynamic session;
+  final int sessionIndex;
+  final String? slotLabel;
+  final QueueState queueState;
+  final QueueState globalQs;
+  final List<AppointmentList> sessionPatients;
+  final AppointmentList? currentPatient;
+  final List<AppointmentList> waitingPatients;
+  final bool isExpanded;
+  final bool controlsEnabled;
+  final AppointmentList? selected;
+  final VoidCallback onToggle;
+  final Future<void> Function(AppointmentList) onStart, onSkip;
+  final void Function(AppointmentList) onPrescription, onCancel;
+  final void Function(AppointmentList)? onSelect;
+  final VoidCallback onQueueStart;
+  final VoidCallback onQueuePause;
+  final VoidCallback onQueueStop;
+
+  const _SessionAccordion({
+    super.key,
+    required this.session,
+    required this.sessionIndex,
+    required this.slotLabel,
+    required this.queueState,
+    required this.globalQs,
+    required this.sessionPatients,
+    required this.currentPatient,
+    required this.waitingPatients,
+    required this.isExpanded,
+    required this.controlsEnabled,
+    required this.onToggle,
+    required this.onStart,
+    required this.onSkip,
+    required this.onPrescription,
+    required this.onCancel,
+    required this.onQueueStart,
+    required this.onQueuePause,
+    required this.onQueueStop,
+    this.selected,
+    this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: kPrimaryLight.withOpacity(0.8)),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimary.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SessionHeader(
+              slotLabel: slotLabel,
+              queueState: queueState,
+              patientCount: sessionPatients.length,
+              isExpanded: isExpanded,
+              onTap: onToggle,
+              sessionIndex: sessionIndex,
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Divider(height: 1, color: kBorder),
+                    const SizedBox(height: 10),
+
+                    // Live Queue card with controls
+                    _LiveQueueCard(
+                      patients: sessionPatients,
+                      qs: queueState,
+                      onStart: onStart,
+                      onSkip: onSkip,
+                      controlsEnabled: controlsEnabled,
+                      onQueueStart: onQueueStart,
+                      onQueuePause: onQueuePause,
+                      onQueueStop: onQueueStop,
+                    ),
+
+                    if (waitingPatients.isNotEmpty) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8, top: 2),
+                        child: Row(children: [
+                          Container(
+                            width: 3, height: 14,
+                            decoration: BoxDecoration(
+                              color: kPrimary,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Waiting',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: kPrimaryLight,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text('${waitingPatients.length}',
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+                          ),
+                        ]),
+                      ),
+                      ...waitingPatients.map((p) {
+                        final status    = p.status?.toLowerCase() ?? '';
+                        final isIP      = status == 'in_progress';
+                        final isQActive = globalQs == QueueState.running || globalQs == QueueState.paused;
+                        final hasIP     = sessionPatients.any(
+                            (x) => (x.status?.toLowerCase() ?? '') == 'in_progress');
+                        final nextBooked = waitingPatients
+                            .where((x) => (x.status?.toLowerCase() ?? '') == 'booked')
+                            .toList()
+                          ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+                        bool accessible = false;
+                        if (isIP) {
+                          accessible = true;
+                        } else if (isQActive && status == 'booked') {
+                          accessible = !hasIP && p.queueNumber == nextBooked.firstOrNull?.queueNumber;
+                        } else if (isQActive && status == 'skipped') {
+                          accessible = !hasIP;
+                        }
+                        // Session locked किंवा queue idle → buttons disable
+                        final bool queueActive = queueState == QueueState.running || queueState == QueueState.paused;
+                        final bool effectiveAccessible = controlsEnabled && queueActive && accessible;
+                        final VoidCallback? effectiveSkip = controlsEnabled && queueActive && accessible && status == 'booked'
+                            ? () => onSkip(p) : null;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _PatientCard(
+                            key: ValueKey(p.appointmentId),
+                            patient: p,
+                            tab: _Tab.today,
+                            accessible: effectiveAccessible,
+                            selected: selected?.appointmentId == p.appointmentId,
+                            onTap: onSelect != null ? () => onSelect!(p) : null,
+                            onStart: () => onStart(p),
+                            onSkip: effectiveSkip,
+                            onPrescription: () => onPrescription(p),
+                            onCancel: () => onCancel(p),
+                          ),
+                        );
+                      }),
+                    ] else
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 40, height: 40,
+                              decoration: BoxDecoration(
+                                color: kPrimaryLighter,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: kPrimaryLight),
+                              ),
+                              child: const Icon(Icons.inbox_rounded, color: kPrimary, size: 18),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('No patients waiting',
+                                style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 260),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SESSION HEADER  —  S1 badge + slot time + state badge + chevron
+//  (patient count and controls  Live Queue card )
+// ════════════════════════════════════════════════════════════════════
+class _SessionHeader extends StatelessWidget {
+  final String? slotLabel;
+  final QueueState queueState;
+  final int patientCount;
+  final bool isExpanded;
+  final VoidCallback onTap;
+  final int sessionIndex;
+
+  const _SessionHeader({
+    required this.slotLabel,
+    required this.queueState,
+    required this.patientCount,
+    required this.isExpanded,
+    required this.onTap,
+    required this.sessionIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final (Color bg, Color fg, Color dot) = switch (queueState) {
+      QueueState.running => (kPrimaryLighter, kPrimaryDark, kPrimary),
+      QueueState.paused  => (kAmberLight,     kAmberDark,   kWarning),
+      QueueState.stopped => (const Color(0xFFF3F4F6), const Color(0xFF6B7280), const Color(0xFF9CA3AF)),
+      QueueState.idle    => (kRedLight,        kRedDark,     kError),
+    };
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.vertical(
+        top: const Radius.circular(18),
+        bottom: isExpanded ? Radius.zero : const Radius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(children: [
+          Container(
+            width: 26, height: 26,
+            decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(8)),
+            alignment: Alignment.center,
+            child: Text('S${sessionIndex + 1}',
+                style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kPrimaryDark)),
+          ),
+          const SizedBox(width: 10),
+          if (slotLabel != null)
+            Expanded(child: Text(slotLabel!,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                overflow: TextOverflow.ellipsis))
+          else
+            const Expanded(child: Text('Session',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary))),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              Text(
+                switch (queueState) {
+                  QueueState.running => 'Running',
+                  QueueState.paused  => 'Paused',
+                  QueueState.stopped => 'Closed',
+                  QueueState.idle    => 'Idle',
+                },
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 8),
+          AnimatedRotation(
+            turns: isExpanded ? 0.5 : 0.0,
+            duration: const Duration(milliseconds: 260),
+            child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: kTextSecondary),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  LIVE QUEUE CARD
+//  Top row: pulse + LIVE QUEUE + 👥 count + ▶/⏸ + ⏹ + state badge
+// ════════════════════════════════════════════════════════════════════
+class _LiveQueueCard extends StatelessWidget {
+  final List<AppointmentList> patients;
+  final QueueState qs;
+  final Future<void> Function(AppointmentList) onStart, onSkip;
+  final bool controlsEnabled;
+  final VoidCallback onQueueStart;
+  final VoidCallback onQueuePause;
+  final VoidCallback onQueueStop;
+
+  const _LiveQueueCard({
+    required this.patients,
+    required this.qs,
+    required this.onStart,
+    required this.onSkip,
+    required this.controlsEnabled,
+    required this.onQueueStart,
+    required this.onQueuePause,
+    required this.onQueueStop,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ip = patients.firstWhere(
+      (p) => (p.status?.toLowerCase() ?? '') == 'in_progress',
+      orElse: () => AppointmentList(),
+    );
+    final hasIP  = (ip.appointmentId ?? 0) != 0;
+    final booked = patients
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+    final current   = hasIP ? ip : booked.firstOrNull;
+    final next      = hasIP ? booked.firstOrNull : (booked.length > 1 ? booked[1] : null);
+    final isRunning = qs == QueueState.running;
+    final isStopped = qs == QueueState.stopped;
+    final name      = current?.patientName ?? current?.bookingFor ?? '—';
+    final inits     = name.trim().split(' ').take(2)
+        .map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
+
+    String info = '';
+    if (current != null) {
+      final parts = <String>[];
+      if (current.gender != null) parts.add(current.gender!);
+      final d = current.dob == null ? null : DateTime.tryParse(current.dob!);
+      if (d != null) {
+        final n = DateTime.now();
+        var y = n.year - d.year;
+        if (n.month < d.month || (n.month == d.month && n.day < d.day)) y--;
+        if (y >= 0) parts.add('$y yrs');
+      }
+      info = parts.join(' · ');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kPrimaryLighter,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kPrimaryLight),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+          // ── Top row: pulse + label + count + controls + state ─────
+          Row(children: [
+            _PulseDot(),
+            const SizedBox(width: 6),
+            const Text('LIVE QUEUE',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1, color: kPrimary)),
+            const SizedBox(width: 6),
+
+            // Patient count pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(20)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.people_alt_outlined, size: 10, color: kPrimaryDark),
+                const SizedBox(width: 3),
+                Text('${patients.length}',
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+              ]),
+            ),
+
+            const Spacer(),
+
+            // Start / Pause + Stop buttons (hidden when stopped)
+            if (!isStopped) ...[
+              _QueueIconBtn(
+                icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: isRunning ? kAmberDark : kPrimaryDark,
+                bg:    isRunning ? kAmberLight : kPrimaryLight,
+                enabled: controlsEnabled,
+                tooltip: isRunning ? 'Pause' : 'Start',
+                onTap: controlsEnabled
+                    ? (isRunning ? onQueuePause : onQueueStart)
+                    : null,
+              ),
+              const SizedBox(width: 5),
+              _QueueIconBtn(
+                icon: Icons.stop_rounded,
+                color: kRedDark,
+                bg: kRedLight,
+                enabled: controlsEnabled,
+                tooltip: 'Close queue',
+                onTap: controlsEnabled ? onQueueStop : null,
+              ),
+              const SizedBox(width: 8),
+            ],
+
+           // _QueueStateBadge(state: qs),
+          ]),
+
+          const SizedBox(height: 10),
+
+          // Lock notice for sequential sessions
+          if (!controlsEnabled) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: kAmberLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kAmberBorder),
+              ),
+              child: Row(children: [
+                const Icon(Icons.lock_outline_rounded, size: 13, color: kAmberDark),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text('Will start after the previous session is closed',
+                      style: TextStyle(fontSize: 11, color: kAmberDark, fontWeight: FontWeight.w500)),
+                ),
+              ]),
+            ),
+          ],
+
+          // Token boxes
+          Row(children: [
+            _TokBox(
+                label: 'CURRENT',
+                value: (current?.queueNumber ?? 0).toString().padLeft(2, '0'),
+                isActive: true),
+            const SizedBox(width: 6),
+            _TokBox(
+                label: 'UP NEXT',
+                value: next != null ? (next.queueNumber ?? 0).toString().padLeft(2, '0') : '--'),
+            const SizedBox(width: 6),
+            _TokBox(label: 'REMAINING', value: patients.length.toString().padLeft(2, '0'), isGreen: true),
+          ]),
+          const SizedBox(height: 10),
+
+          // Current patient info
+          current == null
+              ? Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  alignment: Alignment.center,
+                  child: const Text('No active patient',
+                      style: TextStyle(color: kTextMuted, fontSize: 12)),
+                )
+              : Row(children: [
+                  Stack(children: [
+                    Container(
+                      width: 40, height: 40,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                            colors: [_kGradFrom, _kGradTo],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(inits,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                    Positioned(bottom: 0, right: 0,
+                      child: Container(
+                        width: 10, height: 10,
+                        decoration: BoxDecoration(
+                          color: kSuccess, shape: BoxShape.circle,
+                          border: Border.all(color: kPrimaryLighter, width: 2),
+                        ),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(width: 8),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+                          overflow: TextOverflow.ellipsis),
+                      if (info.isNotEmpty)
+                        Text(info, style: const TextStyle(fontSize: 10, color: kTextSecondary)),
+                    ],
+                  )),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(7)),
+                    child: const Text('Now',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.white)),
+                  ),
+                ]),
+
+          // Skip / Start Session buttons —  controlsEnabled 
+          // queue running/paused   Skip+Start 
+          if (controlsEnabled && (qs == QueueState.running || qs == QueueState.paused)) ...[
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(child: GestureDetector(
+                onTap: current != null ? () => onSkip(current) : null,
+                child: Opacity(
+                  opacity: current != null ? 1.0 : 0.4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      color: kRedLight,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: kRedBorder),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('⏭  Skip',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kRedDark)),
+                  ),
+                ),
+              )),
+              const SizedBox(width: 8),
+              Expanded(flex: 2, child: GestureDetector(
+                onTap: current != null ? () => onStart(current) : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    gradient: current != null
+                        ? const LinearGradient(
+                            colors: [_kGradFrom, _kGradTo],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight)
+                        : null,
+                    color: current == null ? kBorder : null,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    (current?.status?.toLowerCase() ?? '') == 'in_progress'
+                        ? '▶  Continue' : '▶  Start Session',
+                    style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w700,
+                        color: current != null ? Colors.white : kTextMuted),
+                  ),
+                ),
+              )),
+            ]),
+          ],
+        ]),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  QUEUE ICON BUTTON  (Live Queue card top row )
+// ════════════════════════════════════════════════════════════════════
+class _QueueIconBtn extends StatelessWidget {
+  final IconData icon;
+  final Color color, bg;
+  final bool enabled;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _QueueIconBtn({
+    required this.icon,
+    required this.color,
+    required this.bg,
+    required this.enabled,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: enabled ? tooltip : 'Previous session close करा',
+    preferBelow: false,
+    child: Opacity(
+      opacity: enabled ? 1.0 : 0.35,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 28, height: 28,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withOpacity(0.25)),
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, size: 15, color: color),
+        ),
+      ),
+    ),
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  PATIENT LIST BODY  (Upcoming + Completed tabs)
+// ════════════════════════════════════════════════════════════════════
+class _PatientListBody extends ConsumerWidget {
+  final List<AppointmentList> patients;
+  final _Tab tab;
+  final QueueState qs;
+  final Future<void> Function(AppointmentList) onStart, onSkip;
+  final void Function(AppointmentList) onPrescription, onCancel;
+  final double extraBottom;
+  final AppointmentList? selected;
+  final void Function(AppointmentList)? onSelect;
+
+  const _PatientListBody({
+    required this.patients, required this.tab, required this.qs,
+    required this.onStart, required this.onSkip,
+    required this.onPrescription, required this.onCancel,
+    required this.extraBottom,
+    this.selected, this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (patients.isEmpty) return _EmptyState(tab: tab);
+
+    final hasIP = tab == _Tab.today &&
+        patients.any((p) => (p.status?.toLowerCase() ?? '') == 'in_progress');
+
+    final booked = tab == _Tab.today
+        ? (patients.where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+              .toList()..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0)))
+        : <AppointmentList>[];
+    final firstBooked = booked.firstOrNull;
+
+    final isQueueActive = qs == QueueState.running || qs == QueueState.paused;
+    final isToday       = tab == _Tab.today;
+
+    final currentAppointmentId = hasIP
+        ? patients.firstWhere((p) => (p.status?.toLowerCase() ?? '') == 'in_progress').appointmentId
+        : firstBooked?.appointmentId;
+
+    final displayPatients = isToday
+        ? patients.where((p) => p.appointmentId != currentAppointmentId).toList()
+        : patients;
+
+    final hdrCount = isToday ? 2 : 1;
+
+    return RefreshIndicator(
+      color: kPrimary,
+      strokeWidth: 2.5,
+      displacement: 40,
+      onRefresh: () async {
+        ref.read(appointmentViewModelProvider.notifier)
+            .fetchPatientAppointments(ref.read(doctorLoginViewModelProvider).doctorId ?? 0);
+        await Future.delayed(const Duration(milliseconds: 600));
+      },
+      child: ListView.builder(
+        padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + extraBottom),
+        itemCount: displayPatients.length + hdrCount,
+        itemBuilder: (ctx, i) {
+          if (i == 0 && isToday)
+            return _LiveQueueCard(
+              patients: patients, qs: qs,
+              onStart: onStart, onSkip: onSkip,
+              controlsEnabled: true,
+              onQueueStart: () {},
+              onQueuePause: () {},
+              onQueueStop: () {},
+            );
+
+          if ((isToday && i == 1) || (!isToday && i == 0)) {
+            final title = switch (tab) {
+              _Tab.today     => 'Waiting',
+              _Tab.upcoming  => 'Upcoming',
+              _Tab.completed => 'Completed',
+            };
+            final badge = switch (tab) {
+              _Tab.today     => '${displayPatients.length} left',
+              _Tab.upcoming  => '${displayPatients.length} scheduled',
+              _Tab.completed => '${displayPatients.length} done',
+            };
+            return _SectionHeader(title: title, badge: badge);
+          }
+
+          final p      = displayPatients[i - hdrCount];
+          final status = p.status?.toLowerCase() ?? '';
+          bool accessible = true;
+          if (tab == _Tab.today) {
+            if (status == 'in_progress') {
+              accessible = true;
+            } else if (!isQueueActive) {
+              accessible = false;
+            } else if (status == 'booked') {
+              final nextBooked = displayPatients
+                  .where((x) => (x.status?.toLowerCase() ?? '') == 'booked')
+                  .toList()
+                ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+              accessible = !hasIP && p.queueNumber == nextBooked.firstOrNull?.queueNumber;
+            } else if (status == 'skipped') {
+              accessible = !hasIP;
+            }
+          }
+
+          return _PatientCard(
+            key: ValueKey(p.appointmentId),
+            patient: p, tab: tab,
+            accessible: accessible,
+            selected: selected?.appointmentId == p.appointmentId,
+            onTap: onSelect != null ? () => onSelect!(p) : null,
+            onStart: () => onStart(p),
+            onSkip: accessible && tab == _Tab.today && status == 'booked' ? () => onSkip(p) : null,
+            onPrescription: () => onPrescription(p),
+            onCancel: () => onCancel(p),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Search Bar ────────────────────────────────────────────────────────────────
 class _SearchBarWidget extends StatelessWidget {
   final TextEditingController controller;
   const _SearchBarWidget({required this.controller});
@@ -531,10 +1504,8 @@ class _SearchBarWidget extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.only(right: 10),
               width: 18, height: 18,
-              decoration: const BoxDecoration(
-                  color: kTextMuted, shape: BoxShape.circle),
-              child: const Icon(Icons.close_rounded,
-                  size: 11, color: Colors.white),
+              decoration: const BoxDecoration(color: kTextMuted, shape: BoxShape.circle),
+              child: const Icon(Icons.close_rounded, size: 11, color: Colors.white),
             ),
           ),
       ]),
@@ -542,9 +1513,7 @@ class _SearchBarWidget extends StatelessWidget {
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  PILL TAB BAR
-// ════════════════════════════════════════════════════════════════════
+// ── Pill Tab Bar ───────────────────────────────────────────────────────────────
 class _PillTabBar extends StatelessWidget {
   final TabController controller;
   final int todayCount, upcomingCount, completedCount;
@@ -572,14 +1541,12 @@ class _PillTabBar extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.07),
-                blurRadius: 6, offset: const Offset(0, 1)),
+            BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 6, offset: const Offset(0, 1)),
           ],
         ),
         indicatorPadding: const EdgeInsets.all(3),
         labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        unselectedLabelStyle:
-            const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
         dividerColor: Colors.transparent,
         tabs: [
           Tab(text: 'Today ($todayCount)'),
@@ -591,9 +1558,7 @@ class _PillTabBar extends StatelessWidget {
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  DESKTOP SIDEBAR
-// ════════════════════════════════════════════════════════════════════
+// ── Desktop Sidebar ────────────────────────────────────────────────────────────
 class _DesktopSidebar extends StatelessWidget {
   final _Tab activeTab;
   final int todayCount, upcomingCount, completedCount, total;
@@ -618,30 +1583,20 @@ class _DesktopSidebar extends StatelessWidget {
       border: Border(right: BorderSide(color: kBorder)),
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // Sidebar header — same icon badge + title style
       Container(
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-        decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: kBorder)),
-        ),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: kBorder))),
         child: Row(children: [
           Container(
             width: 30, height: 30,
-            decoration: BoxDecoration(
-              color: kPrimaryLight,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.people_alt_outlined,
-                color: kPrimary, size: 15),
+            decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.people_alt_outlined, color: kPrimary, size: 15),
           ),
           const SizedBox(width: 8),
           const Text('Queue',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
-                  color: kTextPrimary)),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
         ]),
       ),
-
-      // Search
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
         child: Container(
@@ -670,8 +1625,6 @@ class _DesktopSidebar extends StatelessWidget {
           ]),
         ),
       ),
-
-      // Nav items
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Column(children: [
@@ -689,17 +1642,13 @@ class _DesktopSidebar extends StatelessWidget {
               onTap: () => onTabChange(_Tab.completed)),
         ]),
       ),
-
       const SizedBox(height: 14),
       const Padding(
         padding: EdgeInsets.symmetric(horizontal: 14),
         child: Text('OVERVIEW',
-            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700,
-                letterSpacing: 1.2, color: kTextMuted)),
+            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1.2, color: kTextMuted)),
       ),
       const SizedBox(height: 8),
-
-      // Mini stat grid
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12),
         child: GridView.count(
@@ -708,10 +1657,10 @@ class _DesktopSidebar extends StatelessWidget {
           crossAxisSpacing: 8, mainAxisSpacing: 8,
           childAspectRatio: 1.4,
           children: [
-            _MiniStat('Total',    total,         kPrimary),
-            _MiniStat('Waiting',  todayCount,    kPrimary),
+            _MiniStat('Total',    total,          kPrimary),
+            _MiniStat('Waiting',  todayCount,     kPrimary),
             _MiniStat('Done',     completedCount, kSuccess),
-            _MiniStat('Upcoming', upcomingCount, kWarning),
+            _MiniStat('Upcoming', upcomingCount,  kWarning),
           ],
         ),
       ),
@@ -743,8 +1692,7 @@ class _SideNavItem extends StatelessWidget {
         border: selected ? Border.all(color: kPrimary.withOpacity(0.20)) : null,
       ),
       child: Row(children: [
-        Icon(icon, size: 16,
-            color: selected ? kPrimary : kTextMuted),
+        Icon(icon, size: 16, color: selected ? kPrimary : kTextMuted),
         const SizedBox(width: 10),
         Expanded(child: Text(label,
             style: TextStyle(
@@ -782,371 +1730,14 @@ class _MiniStat extends StatelessWidget {
     ),
     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Text(value.toString().padLeft(2, '0'),
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
-              color: color, height: 1)),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color, height: 1)),
       const SizedBox(height: 3),
-      Text(label,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500,
-              color: kTextSecondary)),
+      Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: kTextSecondary)),
     ]),
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  PATIENT LIST BODY
-// ════════════════════════════════════════════════════════════════════
-class _PatientListBody extends ConsumerWidget {
-  final List<AppointmentList> patients;
-  final _Tab tab;
-  final QueueState qs;
-  final Future<void> Function(AppointmentList) onStart, onSkip;
-  final void Function(AppointmentList) onPrescription, onCancel;
-  final double extraBottom;
-  final AppointmentList? selected;
-  final void Function(AppointmentList)? onSelect;
-
-  const _PatientListBody({
-    required this.patients, required this.tab, required this.qs,
-    required this.onStart, required this.onSkip,
-    required this.onPrescription, required this.onCancel,
-    required this.extraBottom,
-    this.selected, this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (patients.isEmpty) return _EmptyState(tab: tab);
-
-    final hasIP = tab == _Tab.today &&
-        patients.any((p) => (p.status?.toLowerCase() ?? '') == 'in_progress');
-    final booked = tab == _Tab.today
-        ? (patients.where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
-              .toList()..sort((a, b) =>
-                  (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0)))
-        : <AppointmentList>[];
-    final firstBooked = booked.firstOrNull;
-    final isQueueActive =
-        qs == QueueState.running || qs == QueueState.paused;
-    final isToday    = tab == _Tab.today;
-    final hdrCount   = isToday ? 2 : 1;
-
-    return RefreshIndicator(
-      color: kPrimary,
-      strokeWidth: 2.5,
-      displacement: 40,
-      onRefresh: () async {
-        ref
-            .read(appointmentViewModelProvider.notifier)
-            .fetchPatientAppointments(
-                ref.read(doctorLoginViewModelProvider).doctorId ?? 0);
-        await Future.delayed(const Duration(milliseconds: 600));
-      },
-      child: ListView.builder(
-        padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + extraBottom),
-        itemCount: patients.length + hdrCount,
-        itemBuilder: (ctx, i) {
-          // Live queue card (today only)
-          if (i == 0 && isToday)
-            return _LiveQueueCard(patients: patients, qs: qs,
-                onStart: onStart, onSkip: onSkip);
-
-          // Section header
-          if ((isToday && i == 1) || (!isToday && i == 0)) {
-            final title = switch (tab) {
-              _Tab.today     => 'Waiting',
-              _Tab.upcoming  => 'Upcoming',
-              _Tab.completed => 'Completed',
-            };
-            final badge = switch (tab) {
-              _Tab.today     => '${patients.length} left',
-              _Tab.upcoming  => '${patients.length} scheduled',
-              _Tab.completed => '${patients.length} done',
-            };
-            return _SectionHeader(title: title, badge: badge);
-          }
-
-          final p      = patients[i - hdrCount];
-          final status = p.status?.toLowerCase() ?? '';
-          bool accessible = true;
-          if (tab == _Tab.today) {
-            if (status == 'in_progress') {
-              accessible = true;
-            } else if (!isQueueActive) {
-              accessible = false;
-            } else if (status == 'booked') {
-              accessible = !hasIP && p.queueNumber == firstBooked?.queueNumber;
-            } else if (status == 'skipped') {
-              accessible = !hasIP;
-            }
-          }
-
-          return _PatientCard(
-            key: ValueKey(p.appointmentId),
-            patient: p, tab: tab,
-            accessible: accessible,
-            selected: selected?.appointmentId == p.appointmentId,
-            onTap: onSelect != null ? () => onSelect!(p) : null,
-            onStart: () => onStart(p),
-            onSkip: accessible && tab == _Tab.today && status == 'booked'
-                ? () => onSkip(p) : null,
-            onPrescription: () => onPrescription(p),
-            onCancel: () => onCancel(p),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  LIVE QUEUE CARD
-// ════════════════════════════════════════════════════════════════════
-class _LiveQueueCard extends StatelessWidget {
-  final List<AppointmentList> patients;
-  final QueueState qs;
-  final Future<void> Function(AppointmentList) onStart, onSkip;
-  const _LiveQueueCard({
-    required this.patients, required this.qs,
-    required this.onStart, required this.onSkip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ip = patients.firstWhere(
-      (p) => (p.status?.toLowerCase() ?? '') == 'in_progress',
-      orElse: () => AppointmentList(),
-    );
-    final hasIP  = (ip.appointmentId ?? 0) != 0;
-    final booked = patients
-        .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
-        .toList()..sort((a, b) =>
-            (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
-    final current = hasIP ? ip : booked.firstOrNull;
-    final next    = hasIP ? booked.firstOrNull
-        : (booked.length > 1 ? booked[1] : null);
-    final isRunning = qs == QueueState.running;
-    final name      = current?.patientName ?? current?.bookingFor ?? '—';
-    final inits     = name.trim().split(' ').take(2)
-        .map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
-
-    String info = '';
-    if (current != null) {
-      final parts = <String>[];
-      if (current.gender != null) parts.add(current.gender!);
-      final d = current.dob == null ? null : DateTime.tryParse(current.dob!);
-      if (d != null) {
-        final n = DateTime.now();
-        var y   = n.year - d.year;
-        if (n.month < d.month || (n.month == d.month && n.day < d.day)) y--;
-        if (y >= 0) parts.add('$y yrs');
-      }
-      info = parts.join(' · ');
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kPrimaryLight.withOpacity(0.8)),
-          boxShadow: [
-            BoxShadow(color: kPrimary.withOpacity(0.08),
-                blurRadius: 12, offset: const Offset(0, 3)),
-          ],
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Row: pulse + label + state badge + controls
-          Row(children: [
-            _PulseDot(),
-            const SizedBox(width: 6),
-            const Text('LIVE QUEUE',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1, color: kPrimary)),
-            const Spacer(),
-            _QueueStateBadge(state: qs),
-            const SizedBox(width: 8),
-            _CtrlBtn(icon: Icons.pause_rounded, enabled: isRunning,
-                onTap: () {}),
-            const SizedBox(width: 4),
-            _CtrlBtn(icon: Icons.stop_rounded, enabled: true,
-                isRed: true, onTap: () {}),
-          ]),
-          const SizedBox(height: 12),
-
-          // Token boxes
-          Row(children: [
-            _TokBox(label: 'CURRENT',
-                value: (current?.queueNumber ?? 0).toString().padLeft(2, '0'),
-                isActive: true),
-            const SizedBox(width: 8),
-            _TokBox(label: 'UP NEXT',
-                value: next != null
-                    ? (next.queueNumber ?? 0).toString().padLeft(2, '0')
-                    : '--'),
-            const SizedBox(width: 8),
-            _TokBox(label: 'REMAINING',
-                value: patients.length.toString().padLeft(2, '0'),
-                isGreen: true),
-          ]),
-          const SizedBox(height: 12),
-
-          // Current patient band
-          current == null
-              ? Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: kPrimaryLighter,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kPrimaryLight),
-                  ),
-                  child: const Center(child: Text('No active patient',
-                      style: TextStyle(color: kTextMuted, fontSize: 12))),
-                )
-              : Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: kPrimaryLighter,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kPrimaryLight),
-                  ),
-                  child: Row(children: [
-                    Stack(children: [
-                      Container(
-                        width: 46, height: 46,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                              colors: [_kGradFrom, _kGradTo],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight),
-                          shape: BoxShape.circle,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(inits, style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800,
-                            color: Colors.white)),
-                      ),
-                      Positioned(bottom: 1, right: 1,
-                        child: Container(
-                          width: 11, height: 11,
-                          decoration: BoxDecoration(
-                            color: kSuccess, shape: BoxShape.circle,
-                            border: Border.all(color: kPrimaryLighter, width: 2),
-                          ),
-                        ),
-                      ),
-                    ]),
-                    const SizedBox(width: 10),
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(name, style: const TextStyle(fontSize: 13,
-                          fontWeight: FontWeight.w700, color: kTextPrimary),
-                          overflow: TextOverflow.ellipsis),
-                      if (info.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        Text(info, style: const TextStyle(
-                            fontSize: 11, color: kTextSecondary)),
-                      ],
-                      const SizedBox(height: 5),
-                      Row(children: [
-                        Container(width: 7, height: 7,
-                            decoration: const BoxDecoration(
-                                color: kPrimary, shape: BoxShape.circle)),
-                        const SizedBox(width: 4),
-                        const Text('In Consultation',
-                            style: TextStyle(fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: kPrimaryDark)),
-                      ]),
-                    ])),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                          color: kPrimary,
-                          borderRadius: BorderRadius.circular(8)),
-                      child: const Text('Now', style: TextStyle(
-                          fontSize: 10, fontWeight: FontWeight.w700,
-                          color: Colors.white)),
-                    ),
-                  ]),
-                ),
-
-          const SizedBox(height: 12),
-
-          // Progress
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Daily progress',
-                style: TextStyle(fontSize: 10, color: kTextSecondary)),
-            const Text('— / — seen', style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700, color: kPrimary)),
-          ]),
-          const SizedBox(height: 5),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: const LinearProgressIndicator(
-              value: 0.5, minHeight: 6,
-              backgroundColor: kPrimaryLight,
-              valueColor: AlwaysStoppedAnimation<Color>(kPrimary),
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // Action buttons
-          Row(children: [
-            Expanded(child: GestureDetector(
-              onTap: current != null ? () => onSkip(current) : null,
-              child: Opacity(
-                opacity: current != null ? 1.0 : 0.4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: kRedLight,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kRedBorder),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text('⏭  Skip', style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w700,
-                      color: kRedDark)),
-                ),
-              ),
-            )),
-            const SizedBox(width: 10),
-            Expanded(flex: 2, child: GestureDetector(
-              onTap: current != null ? () => onStart(current) : null,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: current != null
-                      ? const LinearGradient(
-                          colors: [_kGradFrom, _kGradTo],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight)
-                      : null,
-                  color: current == null ? kBorder : null,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  (current?.status?.toLowerCase() ?? '') == 'in_progress'
-                      ? '▶  Continue' : '▶  Start Session',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                      color: current != null ? Colors.white : kTextMuted),
-                ),
-              ),
-            )),
-          ]),
-        ]),
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  SECTION HEADER
-// ════════════════════════════════════════════════════════════════════
+// ── Section Header ────────────────────────────────────────────────────────────
 class _SectionHeader extends StatelessWidget {
   final String title, badge;
   const _SectionHeader({required this.title, required this.badge});
@@ -1159,11 +1750,9 @@ class _SectionHeader extends StatelessWidget {
       children: [
         Row(children: [
           Container(width: 3, height: 16,
-              decoration: BoxDecoration(
-                  color: kPrimary, borderRadius: BorderRadius.circular(4))),
+              decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(4))),
           const SizedBox(width: 8),
-          Text(title, style: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
         ]),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
@@ -1172,18 +1761,15 @@ class _SectionHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: kPrimaryLight),
           ),
-          child: Text(badge, style: const TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w700,
-              color: kPrimaryDark)),
+          child: Text(badge,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kPrimaryDark)),
         ),
       ],
     ),
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  PATIENT CARD
-// ════════════════════════════════════════════════════════════════════
+// ── Patient Card ───────────────────────────────────────────────────────────────
 class _PatientCard extends StatelessWidget {
   final AppointmentList patient;
   final _Tab tab;
@@ -1224,158 +1810,111 @@ class _PatientCard extends StatelessWidget {
     if (raw == null) return '—';
     final d = DateTime.tryParse(raw);
     if (d == null) return raw;
-    const mo = ['Jan','Feb','Mar','Apr','May','Jun',
-                 'Jul','Aug','Sep','Oct','Nov','Dec'];
+    const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return '${d.day} ${mo[d.month - 1]}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final av     = _av;
-    final st     = patient.status ?? 'unknown';
-    final isIP   = st.toLowerCase() == 'in_progress';
+    final av   = _av;
+    final st   = patient.status ?? 'unknown';
+    final isIP = st.toLowerCase() == 'in_progress';
     final (Color sBg, Color sFg, Color sDot) = switch (st.toLowerCase()) {
-      'booked'                       => (kGreenLight,    kGreenDark,    kSuccess),
-      'in_progress'                  => (kPrimaryLighter, kPrimaryDark, kPrimary),
-      'skipped'                      => (kAmberLight,    kAmberDark,    kWarning),
-      'completed' || 'done' || 'closed' => (kGreenLight, kGreenDark,   kSuccess),
-      _                              => (kRedLight,      kRedDark,      kError),
+      'booked'                          => (kGreenLight,    kGreenDark,    kSuccess),
+      'in_progress'                     => (kPrimaryLighter, kPrimaryDark, kPrimary),
+      'skipped'                         => (kAmberLight,    kAmberDark,    kWarning),
+      'completed' || 'done' || 'closed' => (kGreenLight,    kGreenDark,    kSuccess),
+      _                                 => (kRedLight,      kRedDark,      kError),
     };
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? kPrimary : kBorder,
-              width: selected ? 1.5 : 1,
-            ),
-            boxShadow: [BoxShadow(
-              color: selected
-                  ? kPrimary.withOpacity(0.10)
-                  : Colors.black.withOpacity(0.04),
-              blurRadius: selected ? 10 : 6,
-              offset: const Offset(0, 2),
-            )],
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top row: avatar + info + token
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Container(
-                  width: 42, height: 42,
-                  decoration: BoxDecoration(
-                    color: av.bg,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(_inits, style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w800, color: av.fg)),
-                ),
-                const SizedBox(width: 10),
-
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(patient.patientName ?? 'Patient',
-                      style: const TextStyle(fontSize: 13,
-                          fontWeight: FontWeight.w700, color: kTextPrimary),
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(_info, style: const TextStyle(
-                      fontSize: 11, color: kTextSecondary)),
-                  const SizedBox(height: 5),
-
-                  // Chips — use Wrap to prevent overflow
-                  Wrap(spacing: 5, runSpacing: 4, children: [
-                    if (patient.specialization != null)
-                      _Chip(label: patient.specialization!,
-                          bg: kPrimaryLighter, fg: kPrimaryDark),
-                    _DotChip(
-                        label: st[0].toUpperCase() +
-                            st.substring(1).replaceAll('_', ' '),
-                        bg: sBg, fg: sFg, dot: sDot),
-                    _Chip(label: _fmtDate(patient.appointmentDate),
-                        bg: kInfoLight, fg: kInfoDark),
-                  ]),
-                ])),
-
-                const SizedBox(width: 8),
-                Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Text(
-                    (patient.queueNumber ?? 0).toString().padLeft(2, '0'),
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
-                        color: av.fg, height: 1),
-                  ),
-                  const Text('Token', style: TextStyle(
-                      fontSize: 10, color: kTextMuted)),
-                ]),
-              ]),
-
-              const SizedBox(height: 10),
-
-              // Action buttons
-              Row(children: [
-                if (tab == _Tab.today) ...[
-                  if (onSkip != null) ...[
-                    Expanded(child: _ActionBtn(
-                      label: '⏭  Skip',
-                      bg: kRedLight, fg: kRedDark, border: kRedBorder,
-                      onTap: onSkip,
-                    )),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(flex: 2, child: _ActionBtn(
-                    label: isIP ? '▶  Continue' : '▶  Start Session',
-                    isGrad: accessible,
-                    bg: accessible ? null : kBorder,
-                    fg: accessible ? Colors.white : kTextMuted,
-                    onTap: accessible ? onStart : null,
-                  )),
-                ] else if (tab == _Tab.upcoming) ...[
-                  Expanded(child: _ActionBtn(
-                    label: 'View',
-                    bg: kPrimaryLighter, fg: kPrimaryDark,
-                    border: kPrimaryLight, onTap: () {},
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ActionBtn(
-                    label: '✕  Cancel',
-                    bg: kRedLight, fg: kRedDark,
-                    border: kRedBorder, onTap: onCancel,
-                  )),
-                ] else ...[
-                  Expanded(child: _ActionBtn(
-                    label: '📋  Prescription',
-                    bg: kPurpleLight, fg: kPurpleDark,
-                    border: kPurpleBorder, onTap: onPrescription,
-                  )),
-                  const SizedBox(width: 8),
-                  Expanded(child: _ActionBtn(
-                    label: '✓  Done',
-                    bg: const Color(0xFFF3F4F6),
-                    fg: const Color(0xFF6B7280),
-                    onTap: null,
-                  )),
-                ],
-              ]),
-            ],
-          ),
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: selected ? kPrimary : kBorder, width: selected ? 1.5 : 1),
+          boxShadow: [BoxShadow(
+            color: selected ? kPrimary.withOpacity(0.10) : Colors.black.withOpacity(0.03),
+            blurRadius: selected ? 10 : 4,
+            offset: const Offset(0, 2),
+          )],
         ),
+        padding: const EdgeInsets.all(11),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(color: av.bg, borderRadius: BorderRadius.circular(11)),
+              alignment: Alignment.center,
+              child: Text(_inits,
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: av.fg)),
+            ),
+            const SizedBox(width: 9),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(patient.patientName ?? 'Patient',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+                  overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 1),
+              Text(_info, style: const TextStyle(fontSize: 10, color: kTextSecondary)),
+              const SizedBox(height: 4),
+              Wrap(spacing: 4, runSpacing: 3, children: [
+                if (patient.specialization != null)
+                  _Chip(label: patient.specialization!, bg: kPrimaryLighter, fg: kPrimaryDark),
+                _DotChip(
+                    label: st[0].toUpperCase() + st.substring(1).replaceAll('_', ' '),
+                    bg: sBg, fg: sFg, dot: sDot),
+                _Chip(label: _fmtDate(patient.appointmentDate), bg: kInfoLight, fg: kInfoDark),
+              ]),
+            ])),
+            const SizedBox(width: 6),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text((patient.queueNumber ?? 0).toString().padLeft(2, '0'),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: av.fg, height: 1)),
+              const Text('Token', style: TextStyle(fontSize: 9, color: kTextMuted)),
+            ]),
+          ]),
+          const SizedBox(height: 8),
+          Row(children: [
+            if (tab == _Tab.today) ...[
+              if (onSkip != null) ...[
+                Expanded(child: _ActionBtn(
+                  label: '⏭  Skip', bg: kRedLight, fg: kRedDark, border: kRedBorder, onTap: onSkip)),
+                const SizedBox(width: 7),
+              ],
+              Expanded(flex: 2, child: _ActionBtn(
+                label: isIP ? '▶  Continue' : '▶  Start Session',
+                isGrad: accessible,
+                bg: accessible ? null : kBorder,
+                fg: accessible ? Colors.white : kTextMuted,
+                onTap: accessible ? onStart : null,
+              )),
+            ] else if (tab == _Tab.upcoming) ...[
+              Expanded(child: _ActionBtn(
+                  label: 'View', bg: kPrimaryLighter, fg: kPrimaryDark,
+                  border: kPrimaryLight, onTap: () {})),
+              const SizedBox(width: 7),
+              Expanded(child: _ActionBtn(
+                  label: '✕  Cancel', bg: kRedLight, fg: kRedDark,
+                  border: kRedBorder, onTap: onCancel)),
+            ] else ...[
+              Expanded(child: _ActionBtn(
+                  label: '📋  Prescription', bg: kPurpleLight, fg: kPurpleDark,
+                  border: kPurpleBorder, onTap: onPrescription)),
+              const SizedBox(width: 7),
+              Expanded(child: _ActionBtn(
+                  label: '✓  Done',
+                  bg: const Color(0xFFF3F4F6), fg: const Color(0xFF6B7280), onTap: null)),
+            ],
+          ]),
+        ]),
       ),
     );
   }
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  DETAIL PANEL (desktop)
-// ════════════════════════════════════════════════════════════════════
+// ── Detail Panel (desktop) ─────────────────────────────────────────────────────
 class _DetailPanel extends StatelessWidget {
   final AppointmentList? patient;
   final _Tab tab;
@@ -1402,19 +1941,17 @@ class _DetailPanel extends StatelessWidget {
             Icon(Icons.person_search_rounded, size: 40, color: kTextMuted),
             SizedBox(height: 10),
             Text('Select a patient',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500,
-                    color: kTextSecondary)),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: kTextSecondary)),
             SizedBox(height: 3),
-            Text('to view details',
-                style: TextStyle(fontSize: 12, color: kTextMuted)),
+            Text('to view details', style: TextStyle(fontSize: 12, color: kTextMuted)),
           ],
         ),
       );
     }
 
-    final p    = patient!;
-    final av   = _avatarPalette[(p.appointmentId ?? 0) % _avatarPalette.length];
-    final name = p.patientName ?? 'Patient';
+    final p     = patient!;
+    final av    = _avatarPalette[(p.appointmentId ?? 0) % _avatarPalette.length];
+    final name  = p.patientName ?? 'Patient';
     final inits = name.trim().split(' ').take(2)
         .map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
 
@@ -1422,8 +1959,7 @@ class _DetailPanel extends StatelessWidget {
       if (raw == null) return '—';
       final d = DateTime.tryParse(raw);
       if (d == null) return raw;
-      const mo = ['Jan','Feb','Mar','Apr','May','Jun',
-                   'Jul','Aug','Sep','Oct','Nov','Dec'];
+      const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       return '${d.day} ${mo[d.month - 1]} ${d.year}';
     }
 
@@ -1435,25 +1971,20 @@ class _DetailPanel extends StatelessWidget {
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
-          // Avatar
           Container(
             width: 60, height: 60,
-            decoration: BoxDecoration(
-                color: av.bg, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: av.bg, shape: BoxShape.circle),
             alignment: Alignment.center,
-            child: Text(inits, style: TextStyle(
-                fontSize: 20, fontWeight: FontWeight.w800, color: av.fg)),
+            child: Text(inits,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: av.fg)),
           ),
           const SizedBox(height: 8),
-          Text(name, style: const TextStyle(
-              fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary),
+          Text(name,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary),
               textAlign: TextAlign.center),
           const SizedBox(height: 2),
           if (p.gender != null)
-            Text(p.gender!, style: const TextStyle(
-                fontSize: 12, color: kTextSecondary)),
-
-          // Token box
+            Text(p.gender!, style: const TextStyle(fontSize: 12, color: kTextSecondary)),
           Container(
             margin: const EdgeInsets.symmetric(vertical: 12),
             padding: const EdgeInsets.symmetric(vertical: 10),
@@ -1464,42 +1995,29 @@ class _DetailPanel extends StatelessWidget {
             ),
             width: double.infinity,
             child: Column(children: [
-              Text(
-                (p.queueNumber ?? 0).toString().padLeft(2, '0'),
-                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800,
-                    color: kPrimary, height: 1),
-              ),
+              Text((p.queueNumber ?? 0).toString().padLeft(2, '0'),
+                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: kPrimary, height: 1)),
               const SizedBox(height: 3),
-              const Text('Token', style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w700,
-                  color: kTextSecondary)),
+              const Text('Token',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kTextSecondary)),
             ]),
           ),
-
-          // Details
           const Divider(height: 1, color: kDivider),
           _DetailRow('Specialty',  p.specialization ?? '—'),
           _DetailRow('Status',
-              (p.status ?? 'Unknown')[0].toUpperCase() +
-              (p.status ?? 'unknown').substring(1)),
+              (p.status ?? 'Unknown')[0].toUpperCase() + (p.status ?? 'unknown').substring(1)),
           _DetailRow('Date',       fmtDate(p.appointmentDate)),
           _DetailRow('Appt. ID',   '${p.appointmentId ?? '—'}'),
           const SizedBox(height: 14),
-
-          // CTA buttons
           if (tab == _Tab.today) ...[
-            _PanelBtn(label: '▶  Start Session', isGrad: true,
-                onTap: () => onStart(p)),
+            _PanelBtn(label: '▶  Start Session', isGrad: true, onTap: () => onStart(p)),
             const SizedBox(height: 8),
-            _PanelBtn(label: '⏭  Skip', bg: kRedLight, fg: kRedDark,
-                border: kRedBorder, onTap: () => onSkip(p)),
+            _PanelBtn(label: '⏭  Skip', bg: kRedLight, fg: kRedDark, border: kRedBorder, onTap: () => onSkip(p)),
           ] else if (tab == _Tab.upcoming)
-            _PanelBtn(label: '✕  Cancel', bg: kRedLight, fg: kRedDark,
-                border: kRedBorder, onTap: () => onCancel(p))
+            _PanelBtn(label: '✕  Cancel', bg: kRedLight, fg: kRedDark, border: kRedBorder, onTap: () => onCancel(p))
           else
-            _PanelBtn(label: '📋  Prescription', bg: kPurpleLight,
-                fg: kPurpleDark, border: kPurpleBorder,
-                onTap: () => onPrescription(p)),
+            _PanelBtn(label: '📋  Prescription', bg: kPurpleLight, fg: kPurpleDark,
+                border: kPurpleBorder, onTap: () => onPrescription(p)),
         ]),
       ),
     );
@@ -1517,8 +2035,8 @@ class _DetailRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(k, style: const TextStyle(fontSize: 12, color: kTextSecondary)),
-        Flexible(child: Text(v, style: const TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+        Flexible(child: Text(v,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
             textAlign: TextAlign.end, overflow: TextOverflow.ellipsis)),
       ],
     ),
@@ -1551,17 +2069,14 @@ class _PanelBtn extends StatelessWidget {
         border: border != null ? Border.all(color: border!) : null,
       ),
       alignment: Alignment.center,
-      child: Text(label, style: TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w700,
-          color: isGrad ? Colors.white : fg)),
+      child: Text(label,
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+              color: isGrad ? Colors.white : fg)),
     ),
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  SHARED SMALL WIDGETS
-// ════════════════════════════════════════════════════════════════════
-
+// ── Small shared widgets ──────────────────────────────────────────────────────
 class _Chip extends StatelessWidget {
   final String label;
   final Color bg, fg;
@@ -1570,32 +2085,24 @@ class _Chip extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(
-        color: bg, borderRadius: BorderRadius.circular(6)),
-    child: Text(label, style: TextStyle(
-        fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+    child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
   );
 }
 
 class _DotChip extends StatelessWidget {
   final String label;
   final Color bg, fg, dot;
-  const _DotChip({
-    required this.label, required this.bg,
-    required this.fg, required this.dot,
-  });
+  const _DotChip({required this.label, required this.bg, required this.fg, required this.dot});
 
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(
-        color: bg, borderRadius: BorderRadius.circular(6)),
+    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 6, height: 6,
-          decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+      Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
       const SizedBox(width: 4),
-      Text(label, style: TextStyle(
-          fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
+      Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
     ]),
   );
 }
@@ -1616,7 +2123,7 @@ class _ActionBtn extends StatelessWidget {
     child: GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
           gradient: isGrad
               ? const LinearGradient(colors: [_kGradFrom, _kGradTo],
@@ -1627,16 +2134,13 @@ class _ActionBtn extends StatelessWidget {
           border: border != null ? Border.all(color: border!) : null,
         ),
         alignment: Alignment.center,
-        child: Text(label, style: TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
+        child: Text(label,
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
       ),
     ),
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  QUEUE STATE BADGE
-// ════════════════════════════════════════════════════════════════════
 class _QueueStateBadge extends StatelessWidget {
   final QueueState state;
   const _QueueStateBadge({required this.state});
@@ -1647,42 +2151,34 @@ class _QueueStateBadge extends StatelessWidget {
       QueueState.running => ('Running', kPrimaryLighter, kPrimaryDark, kPrimary),
       QueueState.paused  => ('Paused',  kAmberLight,    kAmberDark,   kWarning),
       QueueState.stopped => ('Closed',
-          const Color(0xFFF3F4F6), const Color(0xFF6B7280),
-          const Color(0xFF9CA3AF)),
+          const Color(0xFFF3F4F6), const Color(0xFF6B7280), const Color(0xFF9CA3AF)),
       QueueState.idle    => ('Idle', kRedLight, kRedDark, kError),
     };
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-      decoration: BoxDecoration(
-          color: bg, borderRadius: BorderRadius.circular(20)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 6, height: 6,
-            decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+        Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
         const SizedBox(width: 4),
-        Text(label, style: TextStyle(
-            fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
+        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
       ]),
     );
   }
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  PULSE DOT
-// ════════════════════════════════════════════════════════════════════
 class _PulseDot extends StatefulWidget {
   @override
   State<_PulseDot> createState() => _PulseDotState();
 }
 
-class _PulseDotState extends State<_PulseDot>
-    with SingleTickerProviderStateMixin {
+class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixin {
   late AnimationController _c;
 
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(vsync: this,
-        duration: const Duration(milliseconds: 900))..repeat(reverse: true);
+    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))
+      ..repeat(reverse: true);
   }
 
   @override
@@ -1693,45 +2189,10 @@ class _PulseDotState extends State<_PulseDot>
     opacity: Tween<double>(begin: .3, end: 1.0)
         .animate(CurvedAnimation(parent: _c, curve: Curves.easeInOut)),
     child: Container(width: 7, height: 7,
-        decoration: const BoxDecoration(
-            color: kPrimary, shape: BoxShape.circle)),
+        decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle)),
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  QUEUE CONTROL BUTTON
-// ════════════════════════════════════════════════════════════════════
-class _CtrlBtn extends StatelessWidget {
-  final IconData icon;
-  final bool enabled, isRed;
-  final VoidCallback onTap;
-  const _CtrlBtn({
-    required this.icon, required this.enabled,
-    required this.onTap, this.isRed = false,
-  });
-
-  @override
-  Widget build(BuildContext context) => Opacity(
-    opacity: enabled ? 1.0 : 0.3,
-    child: GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: Container(
-        width: 28, height: 28,
-        decoration: BoxDecoration(
-          color: isRed ? kRedLight : kPrimaryLighter,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: isRed ? kRedBorder : kPrimaryLight),
-        ),
-        child: Icon(icon, size: 14,
-            color: isRed ? kRedDark : kPrimary),
-      ),
-    ),
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  TOKEN BOX
-// ════════════════════════════════════════════════════════════════════
 class _TokBox extends StatelessWidget {
   final String label, value;
   final bool isActive, isGreen;
@@ -1743,35 +2204,33 @@ class _TokBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
     child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
       decoration: BoxDecoration(
         gradient: isActive
             ? const LinearGradient(colors: [_kGradFrom, _kGradTo],
                 begin: Alignment.topLeft, end: Alignment.bottomRight)
             : null,
         color: isActive ? null : isGreen ? kGreenLight : kPrimaryLighter,
-        borderRadius: BorderRadius.circular(12),
-        border: isActive ? null : Border.all(
-            color: isGreen ? kGreenBorder : kPrimaryLight),
+        borderRadius: BorderRadius.circular(10),
+        border: isActive ? null : Border.all(color: isGreen ? kGreenBorder : kPrimaryLight),
       ),
       child: Column(children: [
-        Text(label, style: TextStyle(
-            fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: .8,
-            color: isActive ? Colors.white.withOpacity(0.78)
-                : isGreen ? kGreenDark : kTextSecondary)),
-        const SizedBox(height: 3),
-        Text(value, style: TextStyle(
-            fontSize: 28, fontWeight: FontWeight.w800, height: 1,
-            color: isActive ? Colors.white
-                : isGreen ? kGreenDark : kTextPrimary)),
+        Text(label,
+            style: TextStyle(
+                fontSize: 8, fontWeight: FontWeight.w700, letterSpacing: .8,
+                color: isActive ? Colors.white.withOpacity(0.78)
+                    : isGreen ? kGreenDark : kTextSecondary)),
+        const SizedBox(height: 2),
+        Text(value,
+            style: TextStyle(
+                fontSize: 22, fontWeight: FontWeight.w800, height: 1,
+                color: isActive ? Colors.white : isGreen ? kGreenDark : kTextPrimary)),
       ]),
     ),
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  EMPTY & ERROR STATES
-// ════════════════════════════════════════════════════════════════════
+// ── Empty / Error States ───────────────────────────────────────────────────────
 class _EmptyState extends StatelessWidget {
   final _Tab tab;
   const _EmptyState({required this.tab});
@@ -1781,10 +2240,8 @@ class _EmptyState extends StatelessWidget {
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(
         width: 60, height: 60,
-        decoration: const BoxDecoration(
-            color: kPrimaryLight, shape: BoxShape.circle),
-        child: const Icon(Icons.person_search_rounded,
-            size: 28, color: kPrimary),
+        decoration: const BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle),
+        child: const Icon(Icons.person_search_rounded, size: 28, color: kPrimary),
       ),
       const SizedBox(height: 12),
       Text(
@@ -1793,12 +2250,10 @@ class _EmptyState extends StatelessWidget {
           _Tab.upcoming  => 'No upcoming appointments',
           _Tab.completed => 'No completed appointments',
         },
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
-            color: kTextPrimary),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextPrimary),
       ),
       const SizedBox(height: 4),
-      const Text('Pull down to refresh',
-          style: TextStyle(fontSize: 12, color: kTextMuted)),
+      const Text('Pull down to refresh', style: TextStyle(fontSize: 12, color: kTextMuted)),
     ]),
   );
 }
@@ -1812,15 +2267,12 @@ class _ErrorView extends StatelessWidget {
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(
         width: 60, height: 60,
-        decoration: const BoxDecoration(
-            color: kRedLight, shape: BoxShape.circle),
-        child: const Icon(Icons.wifi_off_rounded,
-            color: kError, size: 26),
+        decoration: const BoxDecoration(color: kRedLight, shape: BoxShape.circle),
+        child: const Icon(Icons.wifi_off_rounded, color: kError, size: 26),
       ),
       const SizedBox(height: 12),
       const Text('Failed to load appointments',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
-              color: kTextPrimary)),
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextPrimary)),
       const SizedBox(height: 4),
       const Text('Check your connection and try again',
           style: TextStyle(fontSize: 12, color: kTextMuted)),
@@ -1828,189 +2280,64 @@ class _ErrorView extends StatelessWidget {
       ElevatedButton.icon(
         onPressed: onRetry,
         icon: const Icon(Icons.refresh_rounded, size: 16),
-        label: const Text('Retry',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        label: const Text('Retry', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
         style: ElevatedButton.styleFrom(
-          backgroundColor: kPrimary, foregroundColor: Colors.white,
-          elevation: 0,
+          backgroundColor: kPrimary, foregroundColor: Colors.white, elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     ]),
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  SHIMMER HELPER
-// ════════════════════════════════════════════════════════════════════
+// ── Shimmer + Skeleton ─────────────────────────────────────────────────────────
 class _Shimmer extends StatefulWidget {
   final double width, height, radius;
-  const _Shimmer(
-      {required this.width, required this.height, this.radius = 6});
+  const _Shimmer({required this.width, required this.height, this.radius = 6});
 
   @override
   State<_Shimmer> createState() => _ShimmerState();
 }
 
-class _ShimmerState extends State<_Shimmer>
-    with SingleTickerProviderStateMixin {
+class _ShimmerState extends State<_Shimmer> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 1100))
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))
       ..repeat(reverse: true);
-    _anim = Tween<double>(begin: 0.4, end: 1.0).animate(
-        CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+    _anim = Tween<double>(begin: 0.4, end: 1.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
   }
 
   @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
+  void dispose() { _ctrl.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) => FadeTransition(
-        opacity: _anim,
-        child: Container(
-          width: widget.width,
-          height: widget.height,
-          decoration: BoxDecoration(
-            color: const Color(0xFFE2E8F0),
-            borderRadius: BorderRadius.circular(widget.radius),
-          ),
-        ),
-      );
+    opacity: _anim,
+    child: Container(
+      width: widget.width, height: widget.height,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(widget.radius),
+      ),
+    ),
+  );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  SKELETON — LIVE QUEUE CARD
-// ════════════════════════════════════════════════════════════════════
-class _SkeletonLiveQueueCard extends StatelessWidget {
-  const _SkeletonLiveQueueCard();
+class _SkeletonPatientList extends StatelessWidget {
+  const _SkeletonPatientList();
 
   @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kPrimaryLight),
-        ),
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // top row: pulse label + badge + buttons
-          Row(children: const [
-            _Shimmer(width: 80, height: 10),
-            Spacer(),
-            _Shimmer(width: 60, height: 22, radius: 20),
-            SizedBox(width: 8),
-            _Shimmer(width: 28, height: 28, radius: 8),
-            SizedBox(width: 4),
-            _Shimmer(width: 28, height: 28, radius: 8),
-          ]),
-          const SizedBox(height: 12),
-          // token boxes
-          Row(children: const [
-            Expanded(child: _Shimmer(width: double.infinity, height: 60, radius: 12)),
-            SizedBox(width: 8),
-            Expanded(child: _Shimmer(width: double.infinity, height: 60, radius: 12)),
-            SizedBox(width: 8),
-            Expanded(child: _Shimmer(width: double.infinity, height: 60, radius: 12)),
-          ]),
-          const SizedBox(height: 12),
-          // current patient band
-          const _Shimmer(width: double.infinity, height: 70, radius: 12),
-          const SizedBox(height: 12),
-          // progress bar
-          const _Shimmer(width: double.infinity, height: 6, radius: 20),
-          const SizedBox(height: 12),
-          // action buttons
-          Row(children: const [
-            Expanded(child: _Shimmer(width: double.infinity, height: 38, radius: 10)),
-            SizedBox(width: 10),
-            Expanded(flex: 2, child: _Shimmer(width: double.infinity, height: 38, radius: 10)),
-          ]),
-        ]),
-      );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  SKELETON — PATIENT CARD
-// ════════════════════════════════════════════════════════════════════
-class _SkeletonPatientCard extends StatelessWidget {
-  const _SkeletonPatientCard();
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder),
-        ),
-        padding: const EdgeInsets.all(12),
-        child: Column(children: [
-          // top row: avatar + info + token
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: const [
-            _Shimmer(width: 42, height: 42, radius: 12),
-            SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Shimmer(width: 120, height: 13),
-                  SizedBox(height: 5),
-                  _Shimmer(width: 80, height: 10),
-                  SizedBox(height: 8),
-                  Row(children: [
-                    _Shimmer(width: 56, height: 20, radius: 6),
-                    SizedBox(width: 5),
-                    _Shimmer(width: 64, height: 20, radius: 6),
-                    SizedBox(width: 5),
-                    _Shimmer(width: 44, height: 20, radius: 6),
-                  ]),
-                ],
-              ),
-            ),
-            SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _Shimmer(width: 32, height: 26),
-                SizedBox(height: 4),
-                _Shimmer(width: 28, height: 10),
-              ],
-            ),
-          ]),
-          const SizedBox(height: 10),
-          // action buttons
-          Row(children: const [
-            Expanded(child: _Shimmer(width: double.infinity, height: 36, radius: 10)),
-            SizedBox(width: 8),
-            Expanded(flex: 2, child: _Shimmer(width: double.infinity, height: 36, radius: 10)),
-          ]),
-        ]),
-      );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  SKELETON — SEARCH BAR + TABS
-// ════════════════════════════════════════════════════════════════════
-class _SkeletonSearchAndTabs extends StatelessWidget {
-  const _SkeletonSearchAndTabs();
-
-  @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => Column(
+    children: [
+      Container(
         color: Colors.white,
         child: Column(children: [
-          // search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
             child: Container(
@@ -2025,7 +2352,6 @@ class _SkeletonSearchAndTabs extends StatelessWidget {
               child: const _Shimmer(width: 140, height: 13),
             ),
           ),
-          // tab bar
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
             child: Container(
@@ -2035,7 +2361,7 @@ class _SkeletonSearchAndTabs extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
               ),
               padding: const EdgeInsets.all(4),
-              child: Row(children: const [
+              child: const Row(children: [
                 Expanded(child: _Shimmer(width: double.infinity, height: double.infinity, radius: 20)),
                 SizedBox(width: 4),
                 Expanded(child: _Shimmer(width: double.infinity, height: double.infinity, radius: 20)),
@@ -2045,43 +2371,18 @@ class _SkeletonSearchAndTabs extends StatelessWidget {
             ),
           ),
         ]),
-      );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  SKELETON — FULL PATIENT LIST
-// ════════════════════════════════════════════════════════════════════
-class _SkeletonPatientList extends StatelessWidget {
-  const _SkeletonPatientList();
-
-  @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          const _SkeletonSearchAndTabs(),
-          Expanded(
-            child: ListView(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
-              children: const [
-                _SkeletonLiveQueueCard(),
-                // section header
-                Padding(
-                  padding: EdgeInsets.only(bottom: 10),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _Shimmer(width: 70, height: 13),
-                      _Shimmer(width: 60, height: 22, radius: 20),
-                    ],
-                  ),
-                ),
-                _SkeletonPatientCard(),
-                _SkeletonPatientCard(),
-                _SkeletonPatientCard(),
-                _SkeletonPatientCard(),
-              ],
-            ),
-          ),
-        ],
-      );
+      ),
+      Expanded(
+        child: ListView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 120),
+          children: const [
+            _Shimmer(width: double.infinity, height: 200, radius: 18),
+            SizedBox(height: 14),
+            _Shimmer(width: double.infinity, height: 180, radius: 18),
+          ],
+        ),
+      ),
+    ],
+  );
 }
