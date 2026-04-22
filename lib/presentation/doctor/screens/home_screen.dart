@@ -313,7 +313,7 @@ void _refreshData() {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:Colors.grey[50],
       body: appointmentsAsync.when(
         loading: () => _buildLoadingBody(greeting, doctorName),
         error: (e, _) => _buildErrorBody(e, greeting, doctorName),

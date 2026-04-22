@@ -1318,7 +1318,8 @@ class _Body extends StatelessWidget {
               estimatedWaitTime: estimatedWaitTime,
               isEstimateLoading: isEstimateLoading,
             )
-          else
+         
+          else ...[
             _SlotPicker(
               slots:       buildSlots(selectedAvail!),
               selected:    selectedTime,
@@ -1326,6 +1327,9 @@ class _Body extends StatelessWidget {
               bookedTimes: bookedTimes,
               onSelected:  onPickTime,
             ),
+            const SizedBox(height: 16),
+            _SymptomsField(controller: symptomsController),
+          ],
         ],
       ]),
     );
@@ -2140,6 +2144,75 @@ class _ConfirmBar extends StatelessWidget {
       ]),
     );
   }
+}
+// ════════════════════════════════════════════════════════════════════
+//  SYMPTOMS FIELD (reusable for slot booking)
+// ════════════════════════════════════════════════════════════════════
+class _SymptomsField extends StatelessWidget {
+  final TextEditingController controller;
+  const _SymptomsField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: kPrimaryLight.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kPrimary.withOpacity(0.2)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.info_outline_rounded, size: 14, color: kPrimary),
+            const SizedBox(width: 6),
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(fontSize: 13, color: kTextPrimary),
+                children: [
+                  TextSpan(
+                    text: 'Describe your symptoms ',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  TextSpan(
+                    text: '(optional)',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: kTextSecondary,
+                        fontWeight: FontWeight.w400),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          TextField(
+            controller: controller,
+            maxLines:   3,
+            maxLength:  300,
+            style: const TextStyle(fontSize: 13, color: kTextPrimary),
+            decoration: InputDecoration(
+              hintText: 'e.g. Fever since 2 days, headache, sore throat…',
+              hintStyle: const TextStyle(fontSize: 13, color: kTextMuted),
+              filled:      true,
+              fillColor:   Colors.white,
+              counterStyle: const TextStyle(fontSize: 11, color: kTextMuted),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: kPrimary.withOpacity(0.25)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: kPrimary.withOpacity(0.2)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kPrimary, width: 1.5),
+              ),
+            ),
+          ),
+        ]),
+      );
 }
 
 // ════════════════════════════════════════════════════════════════════
