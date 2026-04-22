@@ -65,11 +65,24 @@ enum _Tab { today, upcoming, completed }
 
 String _fmtTime(String? raw) {
   if (raw == null) return '';
-  try {
-    return DateFormat('h:mm a').format(DateTime.parse(raw).toUtc());
-  } catch (_) {
-    return raw;
+  final value = raw.trim();
+  if (value.isEmpty || value == '--' || value.toLowerCase() == 'null') {
+    return '';
   }
+  try {
+    return DateFormat('h:mm a').format(DateTime.parse(value).toUtc());
+  } catch (_) {
+    return value;
+  }
+}
+
+String? _slotTimeLabel(String? startTime, String? endTime) {
+  final startLabel = _fmtTime(startTime);
+  final endLabel = _fmtTime(endTime);
+  if (startLabel.isEmpty && endLabel.isEmpty) return null;
+  if (startLabel.isEmpty) return endLabel;
+  if (endLabel.isEmpty) return startLabel;
+  return '$startLabel - $endLabel';
 }
 
 bool _isSlotBooking(AppointmentList appointment) => appointment.bookingType == 2;
@@ -92,6 +105,19 @@ String _appointmentDateLabel(
   if (timeLabel.isEmpty) return dateLabel;
   if (dateLabel == '--') return timeLabel;
   return '$dateLabel | $timeLabel';
+}
+
+String? _slotAppointmentMetaLabel(
+  String? appointmentDate,
+  String? startTime, {
+  bool includeYear = false,
+}) {
+  final label = _appointmentDateLabel(
+    appointmentDate,
+    startTime,
+    includeYear: includeYear,
+  );
+  return label == '--' ? null : label;
 }
 
 QueueState _sessionQueueState(int? status) {
@@ -683,7 +709,11 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
 
   bool _shouldShow(dynamic session) {
     final qs      = session.queueStatus ?? 0;
-    final hasSlot = session.startTime != null;
+    final hasSlot = _slotTimeLabel(
+          session.startTime as String?,
+          session.endTime as String?,
+        ) !=
+        null;
     if (qs == 3) return false;
     if (qs == 0 && !hasSlot) return false;
     return true;
@@ -744,9 +774,10 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
 
           final sessionPatients = _patientsForSession(session, i, visibleSessions.length);
           final qs         = _sessionQueueState(session.queueStatus as int?);
-          final slotLabel  = (session.startTime != null)
-              ? '${_fmtTime(session.startTime as String?)} – ${_fmtTime(session.endTime as String?)}'
-              : null;
+          final slotLabel  = _slotTimeLabel(
+            session.startTime as String?,
+            session.endTime as String?,
+          );
 
           final currentServingId = session.currentServing as int?;
           final currentPt = (currentServingId != null && currentServingId > 0)
@@ -1074,9 +1105,19 @@ class _SessionHeader extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           if (slotLabel != null)
-            Expanded(child: Text(slotLabel!,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
-                overflow: TextOverflow.ellipsis))
+            Expanded(
+              child: Row(
+                children: [
+                  const Icon(Icons.access_time_rounded, size: 14, color: kTextSecondary),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(slotLabel!,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                        overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            )
           else
             const Expanded(child: Text('Session',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary))),
@@ -1875,6 +1916,9 @@ class _PatientCard extends StatelessWidget {
     final status = st.toLowerCase();
     final isIP = status == 'in_progress';
     final isSlotBooking = _isSlotBooking(patient);
+    final slotMetaLabel = isSlotBooking
+        ? _slotAppointmentMetaLabel(patient.appointmentDate, patient.startTime)
+        : null;
     final showBookedTag = !(isSlotBooking && status == 'booked');
     final (Color sBg, Color sFg, Color sDot) = switch (status) {
       'booked' => (kGreenLight, kGreenDark, kSuccess),
@@ -1950,13 +1994,14 @@ class _PatientCard extends StatelessWidget {
                               fg: sFg,
                               dot: sDot,
                             ),
-                          _Chip(
-                            label: isSlotBooking
-                                ? _appointmentDateLabel(patient.appointmentDate, patient.startTime)
-                                : _fmtDateLabel(patient.appointmentDate),
-                            bg: kInfoLight,
-                            fg: kInfoDark,
-                          ),
+                          if (!isSlotBooking || slotMetaLabel != null)
+                            _Chip(
+                              label: isSlotBooking
+                                  ? slotMetaLabel!
+                                  : _fmtDateLabel(patient.appointmentDate),
+                              bg: kInfoLight,
+                              fg: kInfoDark,
+                            ),
                         ],
                       ),
                     ],
@@ -2094,6 +2139,13 @@ class _DetailPanel extends StatelessWidget {
 
     final p = patient!;
     final isSlotBooking = _isSlotBooking(p);
+    final slotMetaLabel = isSlotBooking
+        ? _slotAppointmentMetaLabel(
+            p.appointmentDate,
+            p.startTime,
+            includeYear: true,
+          )
+        : null;
     final av = _avatarPalette[(p.appointmentId ?? 0) % _avatarPalette.length];
     final name = p.patientName ?? 'Patient';
     final inits = name
@@ -2167,12 +2219,13 @@ class _DetailPanel extends StatelessWidget {
               'Status',
               (p.status ?? 'Unknown')[0].toUpperCase() + (p.status ?? 'unknown').substring(1),
             ),
-            _DetailRow(
-              'Date',
-              isSlotBooking
-                  ? _appointmentDateLabel(p.appointmentDate, p.startTime, includeYear: true)
-                  : _fmtDateLabel(p.appointmentDate, includeYear: true),
-            ),
+            if (!isSlotBooking || slotMetaLabel != null)
+              _DetailRow(
+                'Date',
+                isSlotBooking
+                    ? slotMetaLabel!
+                    : _fmtDateLabel(p.appointmentDate, includeYear: true),
+              ),
             _DetailRow('Appt. ID', '${p.appointmentId ?? '--'}'),
             const SizedBox(height: 14),
             if (tab == _Tab.today) ...[

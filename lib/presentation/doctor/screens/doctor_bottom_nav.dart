@@ -464,7 +464,7 @@ appBar: null,
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(
                     color: _navPillBorder,
-                    width: 0.9,
+                    width: 0.3,
                   ),
                 ),
                 child: LayoutBuilder(
