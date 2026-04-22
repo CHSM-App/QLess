@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:path/path.dart' as p;
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -10,8 +14,52 @@ class DoctorLoginImpl implements DoctorLoginRepository {
   DoctorLoginImpl(this.apiService);
 
   @override
-  Future<dynamic> addDoctorDetails(DoctorDetails doctorLogin) {
-    return apiService.addDoctorDetails(doctorLogin);
+  Future<dynamic> addDoctorDetails(
+    DoctorDetails doctorLogin, {
+    File? doctorImage,
+    File? clinicImage,
+  }) async {
+    MultipartFile? multipartDoctorImage;
+    MultipartFile? multipartClinicImage;
+
+    if (doctorImage != null) {
+      multipartDoctorImage = await MultipartFile.fromFile(
+        doctorImage.path,
+        filename: p.basename(doctorImage.path),
+      );
+    }
+
+    if (clinicImage != null) {
+      multipartClinicImage = await MultipartFile.fromFile(
+        clinicImage.path,
+        filename: p.basename(clinicImage.path),
+      );
+    }
+
+    return apiService.addDoctorMultipart(
+      doctorLogin.doctorId,
+      doctorLogin.name ?? "",
+      doctorLogin.email ?? "",
+      doctorLogin.mobile ?? "",
+      doctorLogin.qualification ?? "",
+      doctorLogin.licenseNo ?? "",
+    doctorLogin.experience?.toString() ?? "0",
+      doctorLogin.specialization ?? "",
+      doctorLogin.roleId ?? 0,
+      doctorLogin.clinicName ?? "",
+      doctorLogin.clinicAddress ?? "",
+doctorLogin.latitude?.toString() ?? "0",
+doctorLogin.longitude?.toString() ?? "0",
+   doctorLogin.consultationFee != null 
+    ? doctorLogin.consultationFee.toString() 
+    : "0",
+      doctorLogin.websiteName ?? "",
+      doctorLogin.clinicEmail ?? "",
+      doctorLogin.clinicContact ?? "",
+      doctorLogin.genderId ?? 0,
+      multipartDoctorImage,
+      multipartClinicImage,
+    );
   }
 
   @override

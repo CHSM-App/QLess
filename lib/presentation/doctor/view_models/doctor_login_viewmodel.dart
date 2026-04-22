@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -128,13 +130,24 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   //   }
   // }
 
-  Future<void> addDoctorDetails(DoctorDetails doctorLogin) async {
+  Future<void> addDoctorDetails(
+    DoctorDetails doctorLogin, {
+    File? doctorImage,
+    File? clinicImage,
+  }) async {
   state = state.copyWith(isLoading: true, error: null);
   try {
-    final result = await usecase.addDoctorDetails(doctorLogin);
-    // API returns: { "success": true, "doctor_id": 42, "clinic_id": "CL001" }
-    final doctorId = result['doctor_id'] as int?;
-    final clinicId = result['clinic_id'] as String?;
+    final result = await usecase.addDoctorDetails(
+      doctorLogin,
+      doctorImage: doctorImage,
+      clinicImage: clinicImage,
+    );
+    final dynamic rawDoctorId = result['doctor_id'];
+    final dynamic rawClinicId = result['clinic_id'];
+    final int? doctorId = rawDoctorId is int
+        ? rawDoctorId
+        : int.tryParse(rawDoctorId?.toString() ?? '');
+    final String? clinicId = rawClinicId?.toString();
     state = state.copyWith(
       isLoading: false,
       doctorId: doctorId,   // stored on state for the screen to read

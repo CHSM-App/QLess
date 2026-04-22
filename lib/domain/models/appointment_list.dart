@@ -110,6 +110,9 @@ class AppointmentList {
   @JsonKey(name: 'current_serving')
   int? currentServing;
 
+    @JsonKey(name: 'symptoms')
+  String? symptoms;
+
   AppointmentList({
     this.queueId,
     this.queueState,
@@ -147,6 +150,7 @@ class AppointmentList {
     this.cancelledBy,
     this.totalQueue,
     this.currentServing,
+    this.symptoms,
   });
 
   factory AppointmentList.fromJson(Map<String, dynamic> json) =>

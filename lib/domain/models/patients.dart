@@ -42,6 +42,8 @@ class Patients {
 
   @JsonKey(name: 'blood_group_id')
   final int? bloodGroupId;
+    @JsonKey(name: 'img_url')
+  final String? imgUrl;
 
 
 
@@ -58,7 +60,8 @@ class Patients {
     this.roleId,
     this.Token,
     this.genderId,
-    this.bloodGroupId
+    this.bloodGroupId,
+    this.imgUrl,
   });
   
   factory Patients.fromJson(Map<String, dynamic> json) =>

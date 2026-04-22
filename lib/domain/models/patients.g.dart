@@ -20,6 +20,7 @@ Patients _$PatientsFromJson(Map<String, dynamic> json) => Patients(
   Token: json['token'] as String?,
   genderId: (json['gender_id'] as num?)?.toInt(),
   bloodGroupId: (json['blood_group_id'] as num?)?.toInt(),
+  imgUrl: json['img_url'] as String?,
 );
 
 Map<String, dynamic> _$PatientsToJson(Patients instance) => <String, dynamic>{
@@ -36,4 +37,5 @@ Map<String, dynamic> _$PatientsToJson(Patients instance) => <String, dynamic>{
   'token': instance.Token,
   'gender_id': instance.genderId,
   'blood_group_id': instance.bloodGroupId,
+  'img_url': instance.imgUrl,
 };

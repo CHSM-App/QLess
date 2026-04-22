@@ -552,6 +552,7 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
   final String? patientGender;
   final int?    queueNumber;
   final String  patientStatus;
+  final String? symptoms;
 
   const PrescriptionScreen({
     super.key,
@@ -564,6 +565,7 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
     this.patientGender,
     this.queueNumber,
     this.patientStatus = 'booked',
+    this.symptoms,
   });
 
   @override
@@ -580,9 +582,25 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   int _lastDoctorId = 0;
   late final ProviderSubscription<int?> _doctorIdSub;
 
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _doctorIdSub = ref.listenManual<int?>(
+  //     doctorLoginViewModelProvider.select((s) => s.doctorId),
+  //     (_, next) => _maybeFetchMedicines(next ?? 0),
+  //   );
+  //   WidgetsBinding.instance.addPostFrameCallback((_) {
+  //     if (mounted) _maybeFetchMedicines(widget.doctorId);
+  //   });
+  // }
+
   @override
   void initState() {
     super.initState();
+    if (widget.symptoms != null && widget.symptoms!.trim().isNotEmpty) {
+      _sympCtrl.text = widget.symptoms!.trim();
+    }
+ 
     _doctorIdSub = ref.listenManual<int?>(
       doctorLoginViewModelProvider.select((s) => s.doctorId),
       (_, next) => _maybeFetchMedicines(next ?? 0),
@@ -591,7 +609,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       if (mounted) _maybeFetchMedicines(widget.doctorId);
     });
   }
-
+ 
   @override
   void dispose() {
     _sympCtrl.dispose(); _diagCtrl.dispose();

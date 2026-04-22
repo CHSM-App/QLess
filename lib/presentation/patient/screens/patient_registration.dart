@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
@@ -47,15 +50,35 @@ class _PatientRegistrationScreenState
   int?      _selectedBloodGroupId;
   DateTime? _selectedDob;
 
+  // ── Image ────────────────────────────────────────────────────────────────
+  File?               _patientImage;
+  final ImagePicker   _picker = ImagePicker();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      ref.read(masterViewModelProvider.notifier).fetchGenderList();
-      ref.read(masterViewModelProvider.notifier).fetchBloodGroupList();
+     
     });
   }
+  // Add this at the top of your State class
+final List<_Option> _genderOptions = const [
+  _Option(id: 1, label: 'Male'),
+  _Option(id: 2, label: 'Female'),
+  _Option(id: 3, label: 'Other'),
+];
+
+final List<_Option> _bloodGroupOptions = const [
+  _Option(id: 1, label: 'A+'),
+  _Option(id: 2, label: 'A-'),
+  _Option(id: 3, label: 'B+'),
+  _Option(id: 4, label: 'B-'),
+  _Option(id: 5, label: 'AB+'),
+  _Option(id: 6, label: 'AB-'),
+  _Option(id: 7, label: 'O+'),
+  _Option(id: 8, label: 'O-'),
+];
 
   @override
   void dispose() {
@@ -66,6 +89,116 @@ class _PatientRegistrationScreenState
     _dobController.dispose();
     _weightController.dispose();
     super.dispose();
+  }
+
+  // ── Image picker ─────────────────────────────────────────────────────────
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? picked = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+      if (picked != null) {
+        setState(() => _patientImage = File(picked.path));
+      }
+    } catch (e) {
+      _snack('Could not pick image: $e', isError: true);
+    }
+  }
+
+  /// Shows a bottom sheet to choose Camera or Gallery
+  void _showImageSourceSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: kBorder,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Upload Profile Photo',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: kTextDark,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Choose how you want to upload your photo',
+                style: TextStyle(fontSize: 12.5, color: kTextMid),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ImageSourceTile(
+                      icon: Icons.camera_alt_outlined,
+                      label: 'Camera',
+                      color: kPrimary,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickImage(ImageSource.camera);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ImageSourceTile(
+                      icon: Icons.photo_library_outlined,
+                      label: 'Gallery',
+                      color: kPurple,
+                      onTap: () {
+                        Navigator.pop(context);
+                        _pickImage(ImageSource.gallery);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Remove option — only shown when image is selected
+              if (_patientImage != null)
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      setState(() => _patientImage = null);
+                    },
+                    icon: const Icon(Icons.delete_outline_rounded,
+                        color: kRed, size: 18),
+                    label: const Text(
+                      'Remove Photo',
+                      style: TextStyle(color: kRed, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // ── Validation ──────────────────────────────────────────────────────────
@@ -153,8 +286,11 @@ class _PatientRegistrationScreenState
       bloodGroupId: _selectedBloodGroupId,
       weight:       _weightController.text.trim(),
     );
-
-    ref.read(patientLoginViewModelProvider.notifier).addPatient(patient);
+  debugPrint('Image before submit: $_patientImage'); 
+    // ── Pass optional image to viewmodel ──────────────────────────────────
+    ref
+        .read(patientLoginViewModelProvider.notifier)
+        .addPatient(patient, image: _patientImage);
   }
 
   void _snack(String msg, {bool isError = false}) {
@@ -272,6 +408,11 @@ class _PatientRegistrationScreenState
 
               const SizedBox(height: 24),
 
+              // ── Profile Photo (Optional) ───────────────────────
+              Center(child: _buildAvatarPicker()),
+
+              const SizedBox(height: 24),
+
               // ════════════════════════════════════════════════════
               // SECTION: Personal Information
               // ════════════════════════════════════════════════════
@@ -349,33 +490,41 @@ class _PatientRegistrationScreenState
 
               const _FieldLabel(label: 'Gender'),
               const SizedBox(height: 8),
-              masterState.fetchGender.when(
-                data: (list) {
-                  final options = list
-                      .where((e) =>
-                          (e.gender?.trim().isNotEmpty ?? false) &&
-                          (e.genderId != null))
-                      .map((e) => _Option(
-                            id: e.genderId!,
-                            label: e.gender!.trim(),
-                          ))
-                      .toList();
-                  if (options.isEmpty) {
-                    return const _InlineError(text: 'No gender data found');
-                  }
-                  return _GenderSelector(
-                    options: options,
-                    selectedId: _selectedGenderId,
-                    onChanged: (opt) => setState(() {
-                      _selectedGender   = opt.label;
-                      _selectedGenderId = opt.id;
-                    }),
-                  );
-                },
-                loading: () => const _InlineLoading(),
-                error: (e, _) => const _InlineError(
-                    text: 'Unable to load gender list. Please retry.'),
-              ),
+              // masterState.fetchGender.when(
+              //   data: (list) {
+              //     final options = list
+              //         .where((e) =>
+              //             (e.gender?.trim().isNotEmpty ?? false) &&
+              //             (e.genderId != null))
+              //         .map((e) => _Option(
+              //               id: e.genderId!,
+              //               label: e.gender!.trim(),
+              //             ))
+              //         .toList();
+              //     if (options.isEmpty) {
+              //       return const _InlineError(text: 'No gender data found');
+              //     }
+              //     return _GenderSelector(
+              //       options: options,
+              //       selectedId: _selectedGenderId,
+              //       onChanged: (opt) => setState(() {
+              //         _selectedGender   = opt.label;
+              //         _selectedGenderId = opt.id;
+              //       }),
+              //     );
+              //   },
+              //   loading: () => const _InlineLoading(),
+              //   error: (e, _) => const _InlineError(
+              //       text: 'Unable to load gender list. Please retry.'),
+              // ),
+              _GenderSelector(
+  options: _genderOptions,
+  selectedId: _selectedGenderId,
+  onChanged: (opt) => setState(() {
+    _selectedGender   = opt.label;
+    _selectedGenderId = opt.id;  // sends 1, 2, or 3
+  }),
+),
 
               const SizedBox(height: 16),
 
@@ -400,35 +549,42 @@ class _PatientRegistrationScreenState
 
               const _FieldLabel(label: 'Blood Group'),
               const SizedBox(height: 8),
-              masterState.fetchBloodGroup.when(
-                data: (list) {
-                  final groups = list
-                      .where((e) =>
-                          (e.bloodGroupName?.trim().isNotEmpty ?? false) &&
-                          (e.bloodGroupId != null))
-                      .map((e) => _Option(
-                            id: e.bloodGroupId!,
-                            label: e.bloodGroupName!.trim(),
-                          ))
-                      .toList();
-                  if (groups.isEmpty) {
-                    return const _InlineError(
-                        text: 'No blood group data found');
-                  }
-                  return _BloodGroupPicker(
-                    groups: groups,
-                    selectedId: _selectedBloodGroupId,
-                    onChanged: (opt) => setState(() {
-                      _selectedBloodGroup   = opt.label;
-                      _selectedBloodGroupId = opt.id;
-                    }),
-                  );
-                },
-                loading: () => const _InlineLoading(),
-                error: (e, _) => const _InlineError(
-                    text: 'Unable to load blood groups. Please retry.'),
-              ),
-
+              // masterState.fetchBloodGroup.when(
+              //   data: (list) {
+              //     final groups = list
+              //         .where((e) =>
+              //             (e.bloodGroupName?.trim().isNotEmpty ?? false) &&
+              //             (e.bloodGroupId != null))
+              //         .map((e) => _Option(
+              //               id: e.bloodGroupId!,
+              //               label: e.bloodGroupName!.trim(),
+              //             ))
+              //         .toList();
+              //     if (groups.isEmpty) {
+              //       return const _InlineError(
+              //           text: 'No blood group data found');
+              //     }
+              //     return _BloodGroupPicker(
+              //       groups: groups,
+              //       selectedId: _selectedBloodGroupId,
+              //       onChanged: (opt) => setState(() {
+              //         _selectedBloodGroup   = opt.label;
+              //         _selectedBloodGroupId = opt.id;
+              //       }),
+              //     );
+              //   },
+              //   loading: () => const _InlineLoading(),
+              //   error: (e, _) => const _InlineError(
+              //       text: 'Unable to load blood groups. Please retry.'),
+              // ),
+_BloodGroupPicker(
+  groups: _bloodGroupOptions,
+  selectedId: _selectedBloodGroupId,
+  onChanged: (opt) => setState(() {
+    _selectedBloodGroup   = opt.label;
+    _selectedBloodGroupId = opt.id;  // sends 1–8
+  }),
+),
               const SizedBox(height: 16),
 
               const _FieldLabel(label: 'Weight (kg)'),
@@ -535,6 +691,78 @@ class _PatientRegistrationScreenState
     );
   }
 
+  // ── Avatar picker widget ─────────────────────────────────────────────────
+  Widget _buildAvatarPicker() {
+    return GestureDetector(
+      onTap: _showImageSourceSheet,
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: kPrimaryBg,
+                  border: Border.all(
+                    color: _patientImage != null ? kPrimary : kBorder,
+                    width: _patientImage != null ? 2.5 : 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kPrimary.withOpacity(0.12),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: _patientImage != null
+                    ? ClipOval(
+                        child: Image.file(
+                          _patientImage!,
+                          fit: BoxFit.cover,
+                          width: 96,
+                          height: 96,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.person_outline_rounded,
+                        size: 42,
+                        color: kPrimary,
+                      ),
+              ),
+              // Camera badge
+              Container(
+                width: 30,
+                height: 30,
+                decoration: const BoxDecoration(
+                  color: kPrimary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.camera_alt_rounded,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _patientImage != null ? 'Change Photo' : 'Add Photo (Optional)',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: _patientImage != null ? kPrimary : kTextMid,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Input decoration factory ─────────────────────────────────────────────
   static const _inputStyle = TextStyle(fontSize: 14, color: kTextDark);
 
@@ -573,6 +801,61 @@ class _PatientRegistrationScreenState
           ? const EdgeInsets.symmetric(horizontal: 16, vertical: 14)
           : const EdgeInsets.symmetric(vertical: 16),
       errorStyle: const TextStyle(fontSize: 11.5, color: kRed),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Image Source Tile (Camera / Gallery)
+// ─────────────────────────────────────────────
+class _ImageSourceTile extends StatelessWidget {
+  const _ImageSourceTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData  icon;
+  final String    label;
+  final Color     color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

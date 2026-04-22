@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
@@ -65,10 +67,10 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     loadFromStoragePatient();
   }
 
-  Future<void> addPatient(Patients patient) async {
+  Future<void> addPatient(Patients patient, {File? image}) async {
     state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
     try {
-      await usecase.addPatient(patient);
+      await usecase.addPatient(patient, image: image);
       state = state.copyWith(isLoading: false, isSuccess: true);
     } catch (e) {
       state = state.copyWith(

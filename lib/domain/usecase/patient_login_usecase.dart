@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/repository/patient_login_repo.dart';
 
@@ -6,8 +8,8 @@ class PatientLoginUsecase {
 
   PatientLoginUsecase(this.patientLoginRepository);
 
-  Future<dynamic> addPatient(Patients patient) {
-    return patientLoginRepository.addPatient(patient);
+  Future<dynamic> addPatient(Patients patient, {File? image}) {
+    return patientLoginRepository.addPatient(patient, image: image);
   }
 
   Future<List<Patients>> checkPhonePatient(String mobileNo) {
