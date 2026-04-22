@@ -93,9 +93,37 @@ String _fmtDateRel(String? d) {
 }
 
 String _fmtTime(String? t) {
-  if (t == null) return '—';
-  final p = DateTime.tryParse(t);
-  return p == null ? t : DateFormat('hh:mm a').format(p);
+  if (t == null) return '';
+  final value = t.trim();
+  if (value.isEmpty || value == '--' || value.toLowerCase() == 'null') {
+    return '';
+  }
+  final p = DateTime.tryParse(value);
+  return p == null ? value : DateFormat('hh:mm a').format(p);
+}
+
+bool _hasAppointmentTime(AppointmentList a) =>
+    _fmtTime(a.startTime).isNotEmpty || _fmtTime(a.endTime).isNotEmpty;
+
+String _appointmentTimePrimary(AppointmentList a) {
+  final start = _fmtTime(a.startTime);
+  final end = _fmtTime(a.endTime);
+  if (start.isNotEmpty) return start;
+  return end;
+}
+
+String _appointmentTimeSecondary(AppointmentList a) {
+  final start = _fmtTime(a.startTime);
+  final end = _fmtTime(a.endTime);
+  if (start.isNotEmpty && end.isNotEmpty) return '– $end';
+  return '';
+}
+
+String _appointmentTimeChipSub(AppointmentList a) {
+  final start = _fmtTime(a.startTime);
+  final end = _fmtTime(a.endTime);
+  if (start.isNotEmpty && end.isNotEmpty) return 'Ends $end';
+  return '';
 }
 
 String _cap(String? s) {
@@ -946,16 +974,16 @@ class _AppointmentCard extends StatelessWidget {
                             bottom: _fmtDate(a.appointmentDate),
                           ),
                         ),
-                        Expanded(
-                          child: _infoTile(
-                            icon: Icons.access_time_rounded,
-                            iconFg: kSuccess, iconBg: kGreenLight,
-                            top: _fmtTime(a.startTime),
-                            bottom: a.endTime != null
-                                ? '– ${_fmtTime(a.endTime)}'
-                                : '',
+                        if (_hasAppointmentTime(a))
+                          Expanded(
+                            child: _infoTile(
+                              icon: Icons.access_time_rounded,
+                              iconFg: kSuccess,
+                              iconBg: kGreenLight,
+                              top: _appointmentTimePrimary(a),
+                              bottom: _appointmentTimeSecondary(a),
+                            ),
                           ),
-                        ),
                       ],
                     ),
 
@@ -1460,18 +1488,19 @@ class _DetailSheet extends StatelessWidget {
                           sub: _fmtDateRel(a.appointmentDate),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: _schedChip(
-                          icon: Icons.access_time_filled_rounded,
-                          fg: kSuccess, bg: kGreenLight,
-                          label: 'Time',
-                          value: _fmtTime(a.startTime),
-                          sub: a.endTime != null
-                              ? 'Ends ${_fmtTime(a.endTime)}'
-                              : '',
+                      if (_hasAppointmentTime(a)) ...[
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _schedChip(
+                            icon: Icons.access_time_filled_rounded,
+                            fg: kSuccess,
+                            bg: kGreenLight,
+                            label: 'Time',
+                            value: _appointmentTimePrimary(a),
+                            sub: _appointmentTimeChipSub(a),
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 16),

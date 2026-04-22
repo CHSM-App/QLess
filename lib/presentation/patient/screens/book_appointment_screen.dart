@@ -374,14 +374,14 @@ void dispose() {
       _isEstimateLoading = false;
     });
 
-    if (widget.doctor.doctorId != null) {
-      ref.read(appointmentViewModelProvider.notifier).getAppointmentAvailability(
-        AppointmentRequestModel(
-          doctorId: widget.doctor.doctorId,
-          appointmentDate: _fmtDateApi(date),
-        ),
-      );
-    }
+    // if (widget.doctor.doctorId != null) {
+    //   ref.read(appointmentViewModelProvider.notifier).getAppointmentAvailability(
+    //     AppointmentRequestModel(
+    //       doctorId: widget.doctor.doctorId,
+    //       appointmentDate: _fmtDateApi(date),
+    //     ),
+    //   );
+    // }
     if (bookable.length == 1 && _isQueueSession(bookable.first)) {
       _fetchQueueEstimate();
     }
