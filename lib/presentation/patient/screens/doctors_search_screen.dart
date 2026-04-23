@@ -736,7 +736,7 @@ class _DoctorCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: qs.tintCard ? kError.withOpacity(0.25) : kBorder),
@@ -1091,7 +1091,7 @@ class _ShimmerCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: kBorder),
           boxShadow: [

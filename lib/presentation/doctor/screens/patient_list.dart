@@ -472,7 +472,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     final allSessions = vmState.todayQueueResult?.value ?? [];
 
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: Colors.white,
       body: Column(children: [
         _buildHeader(),
         Expanded(
@@ -706,6 +706,7 @@ class _SessionGroupedBody extends StatefulWidget {
 
 class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
   final Map<int, bool> _expanded = {};
+  bool _slotBookingsExpanded = true;
 
   bool _shouldShow(dynamic session) {
     final qs      = session.queueStatus ?? 0;
@@ -758,6 +759,10 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
           if (i == visibleSessions.length) {
             return _SlotBookingsSection(
               patients: slotPatients,
+              isExpanded: _slotBookingsExpanded,
+              onToggle: () => setState(
+                () => _slotBookingsExpanded = !_slotBookingsExpanded,
+              ),
               selected: widget.selected,
               onStart: widget.onStart,
               onSkip: widget.onSkip,
@@ -894,7 +899,7 @@ class _SessionAccordion extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 14),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: kBg,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: kPrimaryLight.withOpacity(0.8)),
           boxShadow: [
@@ -1342,6 +1347,8 @@ class _QueueIconBtn extends StatelessWidget {
 class _SlotBookingsSection extends StatelessWidget {
   final List<AppointmentList> patients;
   final QueueState qs;
+  final bool isExpanded;
+  final VoidCallback onToggle;
   final Future<void> Function(AppointmentList) onStart, onSkip;
   final void Function(AppointmentList) onPrescription, onCancel;
   final AppointmentList? selected;
@@ -1350,6 +1357,8 @@ class _SlotBookingsSection extends StatelessWidget {
   const _SlotBookingsSection({
     required this.patients,
     required this.qs,
+    required this.isExpanded,
+    required this.onToggle,
     required this.onStart,
     required this.onSkip,
     required this.onPrescription,
@@ -1364,7 +1373,7 @@ class _SlotBookingsSection extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 14),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: kBg,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: kInfoLight),
           boxShadow: [
@@ -1378,57 +1387,75 @@ class _SlotBookingsSection extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              child: Row(children: [
-                Container(
-                  width: 26, height: 26,
-                  decoration: BoxDecoration(color: kInfoLight, borderRadius: BorderRadius.circular(8)),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.calendar_month_rounded, size: 14, color: kInfoDark),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text('Slot Bookings',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: kInfoLight, borderRadius: BorderRadius.circular(20)),
-                  child: Text('${patients.length}',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kInfoDark)),
-                ),
-              ]),
-            ),
-
-            const Divider(height: 1, color: kBorder),
-
-            // Patient cards
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-              child: Column(
-                children: patients.map((p) {
-                  final status = p.status?.toLowerCase() ?? '';
-                  // Slot bookings are always accessible (not queue-locked)
-                  final accessible = status == 'booked' || status == 'in_progress' || status == 'skipped';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _PatientCard(
-                      key: ValueKey(p.appointmentId),
-                      patient: p,
-                      tab: _Tab.today,
-                      accessible: accessible,
-                      selected: selected?.appointmentId == p.appointmentId,
-                      onTap: onSelect != null ? () => onSelect!(p) : null,
-                      onStart: () => onStart(p),
-                      onSkip: accessible && status == 'booked' ? () => onSkip(p) : null,
-                      onPrescription: () => onPrescription(p),
-                      onCancel: () => onCancel(p),
-                    ),
-                  );
-                }).toList(),
+            InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.vertical(
+                top: const Radius.circular(18),
+                bottom: isExpanded ? Radius.zero : const Radius.circular(18),
               ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Row(children: [
+                  Container(
+                    width: 26, height: 26,
+                    decoration: BoxDecoration(color: kInfoLight, borderRadius: BorderRadius.circular(8)),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.calendar_month_rounded, size: 14, color: kInfoDark),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text('Slot Bookings',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: kInfoLight, borderRadius: BorderRadius.circular(20)),
+                    child: Text('${patients.length}',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kInfoDark)),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 260),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: kTextSecondary),
+                  ),
+                ]),
+              ),
+            ),
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Column(
+                children: [
+                  const Divider(height: 1, color: kBorder),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                    child: Column(
+                      children: patients.map((p) {
+                        final status = p.status?.toLowerCase() ?? '';
+                        // Slot bookings are always accessible (not queue-locked)
+                        final accessible = status == 'booked' || status == 'in_progress' || status == 'skipped';
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _PatientCard(
+                            key: ValueKey(p.appointmentId),
+                            patient: p,
+                            tab: _Tab.today,
+                            accessible: accessible,
+                            selected: selected?.appointmentId == p.appointmentId,
+                            onTap: onSelect != null ? () => onSelect!(p) : null,
+                            onStart: () => onStart(p),
+                            onSkip: accessible && status == 'booked' ? () => onSkip(p) : null,
+                            onPrescription: () => onPrescription(p),
+                            onCancel: () => onCancel(p),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
+              ),
+              crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 260),
             ),
           ],
         ),
@@ -1933,7 +1960,7 @@ class _PatientCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: kBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? kPrimary : highlightBorder ? const Color(0xFF0E9384) : kBorder,
@@ -2118,7 +2145,7 @@ class _DetailPanel extends StatelessWidget {
     if (patient == null) {
       return Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: kBg,
           border: Border(left: BorderSide(color: kBorder)),
         ),
         child: const Column(
@@ -2158,7 +2185,7 @@ class _DetailPanel extends StatelessWidget {
 
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: kBg,
         border: Border(left: BorderSide(color: kBorder)),
       ),
       child: SingleChildScrollView(

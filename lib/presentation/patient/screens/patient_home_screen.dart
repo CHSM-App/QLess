@@ -116,6 +116,50 @@ Widget _doctorAvatar(String image, {double size = 46}) {
 }
 
 // ── Shimmer ────────────────────────────────────────────────────────
+DateTime? _timeTodayFromRaw(String? raw) {
+  final value = raw?.trim();
+  if (value == null ||
+      value.isEmpty ||
+      value == '--' ||
+      value.toLowerCase() == 'null') {
+    return null;
+  }
+
+  final now = DateTime.now();
+  final iso = DateTime.tryParse(value);
+  if (iso != null) {
+    final u = iso.toUtc();
+    return DateTime(now.year, now.month, now.day, u.hour, u.minute);
+  }
+
+  final match = RegExp(
+    r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*([aApP][mM])?$',
+  ).firstMatch(value);
+  if (match == null) return null;
+
+  var hour = int.tryParse(match.group(1) ?? '');
+  final minute = int.tryParse(match.group(2) ?? '');
+  if (hour == null || minute == null || minute > 59) return null;
+
+  final meridiem = match.group(3)?.toLowerCase();
+  if (meridiem != null) {
+    if (hour < 1 || hour > 12) return null;
+    if (hour == 12) hour = 0;
+    if (meridiem == 'pm') hour += 12;
+  } else if (hour > 23) {
+    return null;
+  }
+
+  return DateTime(now.year, now.month, now.day, hour, minute);
+}
+
+String _fmtClockTime(String? raw) {
+  final parsed = _timeTodayFromRaw(raw);
+  if (parsed != null) return DateFormat('h:mm a').format(parsed);
+  final value = raw?.trim();
+  return value == null || value.isEmpty ? '--' : value;
+}
+
 class _Shimmer extends StatefulWidget {
   final double width, height;
   const _Shimmer({required this.width, required this.height});
@@ -174,6 +218,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _locationLoaded = false;
   bool _didFetch = false;
   bool _isFetching = false;
+  bool _popupShown = false;
 
   @override
   void initState() {
@@ -315,6 +360,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final combined = [...today, ...upcoming];
         final shown    = combined.take(3).toList();
         final hasMore  = combined.length > 3;
+
+        if (!_popupShown) {
+          final todayActive = today.where((a) {
+            final s = a.status?.toLowerCase().trim() ?? '';
+            return s != 'cancelled' && s != 'cancled' && s != 'completed' && s != 'complete';
+          }).toList();
+          if (todayActive.isNotEmpty) {
+            final now = DateTime.now();
+            DateTime? resolveTime(AppointmentList a) =>
+                _timeTodayFromRaw(a.startTime) ??
+                _timeTodayFromRaw(a.estimatedArrivalTime);
+
+            todayActive.sort((a, b) {
+              final ta = resolveTime(a)?.millisecondsSinceEpoch;
+              final tb = resolveTime(b)?.millisecondsSinceEpoch;
+              if (ta == null && tb == null) return 0;
+              if (ta == null) return 1;
+              if (tb == null) return -1;
+              return ta.compareTo(tb);
+            });
+
+            final nowMinutes = now.hour * 60 + now.minute;
+            AppointmentList? next;
+            for (final a in todayActive) {
+              final t = resolveTime(a);
+              if (t == null) continue;
+              final apptMinutes = t.hour * 60 + t.minute;
+              if (apptMinutes >= nowMinutes) { next = a; break; }
+            }
+            if (next == null) {
+              for (final a in todayActive.reversed) {
+                if (resolveTime(a) != null) { next = a; break; }
+              }
+            }
+            final popupAppointment = next ?? todayActive.first;
+            _popupShown = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _showTodayAppointmentPopup(popupAppointment);
+            });
+          }
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -332,6 +419,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ],
         );
       },
+    );
+  }
+
+  void _showTodayAppointmentPopup(AppointmentList appt) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _TodayAppointmentPopup(appointment: appt),
     );
   }
 
@@ -1101,11 +1196,7 @@ class _ApptCardState extends State<_ApptCard> with SingleTickerProviderStateMixi
     return dt == null ? raw : DateFormat('d MMM yyyy').format(dt);
   }
   String _fmtTime(String? raw) {
-    if (raw == null || raw.isEmpty) return '—';
-    final parts = raw.split(':');
-    if (parts.length < 2) return raw;
-    final dt = DateTime(2000, 1, 1, int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
-    return DateFormat('h:mm a').format(dt);
+    return _fmtClockTime(raw);
   }
 @override
 Widget build(BuildContext context) {
@@ -1324,6 +1415,274 @@ Widget build(BuildContext context) {
     },
   );
 }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  TODAY APPOINTMENT POPUP
+// ════════════════════════════════════════════════════════════════════
+class _TodayAppointmentPopup extends StatelessWidget {
+  final AppointmentList appointment;
+  const _TodayAppointmentPopup({required this.appointment});
+
+  String _fmtTime(String? raw) {
+    if (raw == null || raw.isEmpty) return '—';
+    // ISO 8601 with dummy date (e.g. "1970-01-01T10:40:00.000Z") — read UTC hours/minutes directly
+    final parsed = _timeTodayFromRaw(raw);
+    if (parsed != null) return DateFormat('h:mm a').format(parsed);
+    // Fallback: plain HH:mm
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    final dt = DateTime(2000, 1, 1, int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
+    return DateFormat('h:mm a').format(dt);
+  }
+
+  String _bookingLabel(int? type) {
+    if (type == 2) return 'Slot';
+    if (type == 1) return 'Queue';
+    return 'Appointment';
+  }
+
+  Color _bookingColor(int? type) => type == 2 ? kInfo : kPrimary;
+
+  @override
+  Widget build(BuildContext context) {
+    final appt       = appointment;
+    final doctorName = appt.doctorName ?? 'Doctor';
+    final spec       = appt.specialization ?? '';
+    final clinic     = appt.clinicName ?? '';
+    final isQueue    = appt.bookingType == 1 || (appt.startTime == null || appt.startTime!.isEmpty);
+    final timeStr    = isQueue ? _fmtTime(appt.estimatedArrivalTime) : _fmtTime(appt.startTime);
+    final endStr     = isQueue ? null : _fmtTime(appt.endTime);
+    final myToken    = appt.myQueueNumber ?? appt.queueNumber;
+    final serving    = appt.currentServing;
+    final isMyTurn   = appt.isMyTurn ?? false;
+    final typeLabel  = _bookingLabel(appt.bookingType);
+    final typeColor  = _bookingColor(appt.bookingType);
+    final doctorID   = appt.appointmentId ?? 'general';
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      backgroundColor: Colors.white,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // ── Main content ──────────────────────────────────────
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Header gradient banner
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 20, 48, 16),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [kPrimary, kPrimaryDark],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.calendar_today_rounded, color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Today\'s Appointment',
+                            style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 2),
+                          Text('You have an appointment today',
+                            style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Body
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Doctor row
+                    Row(
+                      children: [
+                        _doctorAvatar('cardio', size: 48),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('$doctorName ($doctorID)',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary),
+                                overflow: TextOverflow.ellipsis),
+                              if (spec.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(spec, style: const TextStyle(fontSize: 11, color: kTextSecondary)),
+                              ],
+                              if (clinic.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Row(children: [
+                                  const Icon(Icons.local_hospital_outlined, size: 10, color: kTextMuted),
+                                  const SizedBox(width: 3),
+                                  Flexible(child: Text(clinic,
+                                    style: const TextStyle(fontSize: 10, color: kTextMuted),
+                                    overflow: TextOverflow.ellipsis)),
+                                ]),
+                              ],
+                            ],
+                          ),
+                        ),
+                        // Booking type badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: typeColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: typeColor.withOpacity(0.3)),
+                          ),
+                          child: Text(typeLabel,
+                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: typeColor)),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+                    Divider(color: kBorder, height: 1),
+                    const SizedBox(height: 14),
+
+                    // Time row
+                    Row(
+                      children: [
+                        _InfoChip(
+                          icon: Icons.access_time_rounded,
+                          label: isQueue ? 'Est. Arrival' : 'Time',
+                          value: (endStr != null && endStr.isNotEmpty && endStr != '—')
+                              ? '$timeStr – $endStr'
+                              : timeStr,
+                          color: kPrimary,
+                        ),
+                        if (myToken != null) ...[
+                          const SizedBox(width: 8),
+                          _InfoChip(
+                            icon: Icons.confirmation_number_outlined,
+                            label: 'Your Token',
+                            value: myToken.toString().padLeft(2, '0'),
+                            color: kPurple,
+                          ),
+                        ],
+                        if (serving != null && serving > 0) ...[
+                          const SizedBox(width: 8),
+                          _InfoChip(
+                            icon: Icons.people_alt_outlined,
+                            label: 'Now Serving',
+                            value: serving.toString().padLeft(2, '0'),
+                            color: kInfo,
+                          ),
+                        ],
+                      ],
+                    ),
+
+                    if (isMyTurn) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: kPrimary,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.notifications_active_rounded, color: Colors.white, size: 15),
+                            SizedBox(width: 6),
+                            Text('It\'s Your Turn!',
+                              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    if ((appt.patientName ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        const Icon(Icons.person_outline_rounded, size: 12, color: kTextMuted),
+                        const SizedBox(width: 4),
+                        Text('For: ${appt.patientName}',
+                          style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500)),
+                      ]),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // ── Close (X) button — top-right ──────────────────────
+          Positioned(
+            top: 10,
+            right: 10,
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).pop(),
+              child: Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.25),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close_rounded, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Info chip used inside today popup ─────────────────────────────
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label, value;
+  final Color color;
+  const _InfoChip({required this.icon, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, size: 10, color: color),
+            const SizedBox(width: 3),
+            Text(label, style: TextStyle(fontSize: 9, color: color, fontWeight: FontWeight.w600)),
+          ]),
+          const SizedBox(height: 3),
+          Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: color)),
+        ],
+      ),
+    ),
+  );
 }
 
 // ── Small dot widget ───────────────────────────────────────────────

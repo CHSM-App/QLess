@@ -392,13 +392,13 @@ void _refreshData() {
                   ),
                 ),
 
-              // ── QUICK ACTIONS ────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-                  child: _buildQuickActions(current),
-                ),
-              ),
+              // // ── QUICK ACTIONS ────────────────────────────────────────
+              // SliverToBoxAdapter(
+              //   child: Padding(
+              //     padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+              //     child: _buildQuickActions(current),
+              //   ),
+              // ),
 
               // ── WAITING LIST HEADER ──────────────────────────────────
               SliverToBoxAdapter(

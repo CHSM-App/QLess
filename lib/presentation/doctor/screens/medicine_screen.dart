@@ -38,6 +38,8 @@ const kPurpleDark    = Color(0xFF6B46C1);
 const kInfo          = Color(0xFF3B82F6);
 const kInfoLight     = Color(0xFFDBEAFE);
 const kInfoDark      = Color(0xFF1E40AF);
+const kPageBg        = Colors.white;
+const kCardBg        = Color(0xFFF7F8FA);
 
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE TYPE STYLES
@@ -278,7 +280,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
     final medicinesAsync = state.medicines ?? const AsyncValue.loading();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: kPageBg,
       body: Column(
         children: [
           // ── Header (matches QueueHomePage header style exactly) ──────────
@@ -573,7 +575,7 @@ class _MedicineCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: kBorder),
         boxShadow: [
@@ -813,7 +815,7 @@ class _SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: kCardBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: kBorder),
           boxShadow: [

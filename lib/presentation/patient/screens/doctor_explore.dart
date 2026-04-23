@@ -603,7 +603,7 @@ class _RecentDoctorCard extends StatelessWidget {
       child: Container(
         width: 130,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _kBorder),
           boxShadow: [
@@ -700,7 +700,7 @@ class _NearbyDoctorCard extends StatelessWidget {
       child: Container(
         width: 210,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _kBorder),
           boxShadow: [
@@ -943,7 +943,7 @@ class _RecentDoctorSkeleton extends StatelessWidget {
     return Container(
       width: 130,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF7F8FA),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _kBorder),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
@@ -978,7 +978,7 @@ class _NearbyDoctorSkeleton extends StatelessWidget {
     return Container(
       width: 210,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF7F8FA),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _kBorder),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],

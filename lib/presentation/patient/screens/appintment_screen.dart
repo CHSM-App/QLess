@@ -206,18 +206,35 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: _filters.length, vsync: this, initialIndex: 1);
-    _tabCtrl.addListener(() {
-      if (!_tabCtrl.indexIsChanging) {
-        setState(() => _filterStatus = _filters[_tabCtrl.index].key);
-      }
-    });
+    _tabCtrl.addListener(_syncFilterToSettledTab);
+    _tabCtrl.animation?.addListener(_syncFilterToSwipeProgress);
     Future.microtask(_fetch);
   }
 
   @override
   void dispose() {
+    _tabCtrl.animation?.removeListener(_syncFilterToSwipeProgress);
+    _tabCtrl.removeListener(_syncFilterToSettledTab);
     _tabCtrl.dispose();
     super.dispose();
+  }
+
+  void _setFilterIndex(int index) {
+    final next = _filters[index].key;
+    if (_filterStatus == next) return;
+    setState(() => _filterStatus = next);
+  }
+
+  void _syncFilterToSettledTab() {
+    if (!_tabCtrl.indexIsChanging) _setFilterIndex(_tabCtrl.index);
+  }
+
+  void _syncFilterToSwipeProgress() {
+    if (_tabCtrl.indexIsChanging) return;
+    final value = _tabCtrl.animation?.value;
+    if (value == null) return;
+    final index = value.round().clamp(0, _filters.length - 1).toInt();
+    _setFilterIndex(index);
   }
 
   bool _isLive(AppointmentList a) {
@@ -865,7 +882,7 @@ class _AppointmentCard extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: const Color(0xFFF7F8FA),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: kBorder),
             boxShadow: [
@@ -1743,7 +1760,7 @@ class _DetailSheet extends StatelessWidget {
       Container(
         padding: padding ?? const EdgeInsets.all(13),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: kBorder),
         ),
@@ -1758,7 +1775,7 @@ class _DetailSheet extends StatelessWidget {
       Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: const Color(0xFFF7F8FA),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: kBorder),
         ),
@@ -2097,7 +2114,7 @@ class _SkeletonCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: const Color(0xFFF7F8FA),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kBorder),
         boxShadow: [
