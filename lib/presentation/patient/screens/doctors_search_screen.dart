@@ -233,7 +233,7 @@ Widget build(BuildContext context) {
           ),
           child: const Icon(
             Icons.arrow_back_ios_new_rounded,
-            size: 16,
+            size: 16, 
             color: kPrimary,
           ),
         ),

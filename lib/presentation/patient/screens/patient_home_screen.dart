@@ -4,7 +4,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
@@ -35,128 +37,64 @@ const kPurpleLight = Color(0xFFEDE9FE);
 const kInfo = Color(0xFF3B82F6);
 const kInfoLight = Color(0xFFDBEAFE);
 
-// ── Doctor model ───────────────────────────────────────────────────
-class Doctor {
-  final String id, name, specialty, image, about, clinic, address;
-  final double rating;
-  final int experience, patientsAhead, reviewCount, waitMinutes;
-  final bool isAvailable;
-  final List<String> availableSlots;
+// ── Specialty colour/icon helpers (hash-based, same logic as explore screen) ──
+const _kAccentPalette = [
+  Color(0xFFFC8181), Color(0xFFF6AD55), Color(0xFF68D391), Color(0xFF9F7AEA),
+  Color(0xFF3B82F6), Color(0xFF26C6B0), Color(0xFFF687B3), Color(0xFF4FD1C5),
+  Color(0xFFED8936), Color(0xFF667EEA),
+];
+const _kIconPalette = <IconData>[
+  Icons.favorite_rounded, Icons.face_retouching_natural, Icons.child_care_rounded,
+  Icons.accessibility_new_rounded, Icons.psychology_rounded, Icons.local_hospital_rounded,
+  Icons.pregnant_woman_rounded, Icons.visibility_rounded, Icons.medical_services_rounded,
+  Icons.hearing_rounded,
+];
 
-  Doctor({
-    required this.id,
-    required this.name,
-    required this.specialty,
-    required this.image,
-    required this.rating,
-    required this.experience,
-    required this.patientsAhead,
-    required this.waitMinutes,
-    required this.reviewCount,
-    required this.about,
-    required this.clinic,
-    required this.address,
-    required this.isAvailable,
-    required this.availableSlots,
-  });
+int _hashIndex(String? s, int length) {
+  if (s == null || s.isEmpty) return 0;
+  var h = 0;
+  for (final c in s.toLowerCase().codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
+  return h % length;
 }
 
-final List<Map<String, dynamic>> specialties = [
-  {'name': 'Cardiology', 'icon': Icons.favorite_rounded, 'color': kError},
-  {'name': 'Orthopedics', 'icon': Icons.accessibility_new, 'color': kInfo},
-  {
-    'name': 'Dermatology',
-    'icon': Icons.face_retouching_natural,
-    'color': kWarning,
-  },
-  {'name': 'Neurology', 'icon': Icons.psychology, 'color': kPurple},
-  {'name': 'Pediatrics', 'icon': Icons.child_care, 'color': kSuccess},
-  {'name': 'Dentistry', 'icon': Icons.medical_services, 'color': kPrimary},
-  {
-    'name': 'Ophthalmology',
-    'icon': Icons.visibility,
-    'color': Color(0xFFEC4899),
-  },
-  {'name': 'Gynecology', 'icon': Icons.pregnant_woman, 'color': kPrimary},
-];
+Color    _accentForSpec(String? s) => _kAccentPalette[_hashIndex(s, _kAccentPalette.length)];
+IconData _iconForSpec(String? s)   => _kIconPalette[_hashIndex(s, _kIconPalette.length)];
 
-const List<String> _allCities = [
-  'Bengaluru, IN',
-  'Mumbai, IN',
-  'Delhi, IN',
-  'Hyderabad, IN',
-  'Pune, IN',
-  'Chennai, IN',
-  'Kolkata, IN',
-  'Ahmedabad, IN',
-  'Jaipur, IN',
-  'Surat, IN',
-  'Lucknow, IN',
-  'Kanpur, IN',
-  'Nagpur, IN',
-  'Indore, IN',
-  'Thane, IN',
-  'Bhopal, IN',
-  'Visakhapatnam, IN',
-  'Patna, IN',
-  'Vadodara, IN',
-  'Ghaziabad, IN',
-  'Ludhiana, IN',
-  'Agra, IN',
-  'Nashik, IN',
-  'Faridabad, IN',
-  'Meerut, IN',
-  'Rajkot, IN',
-  'Varanasi, IN',
-  'Srinagar, IN',
-  'Aurangabad, IN',
-  'Dhanbad, IN',
-  'Amritsar, IN',
-  'Navi Mumbai, IN',
-  'Coimbatore, IN',
-  'Madurai, IN',
-  'Vijayawada, IN',
-  'Guwahati, IN',
-  'Chandigarh, IN',
-  'Hubli, IN',
-  'Mysuru, IN',
-  'Tiruchirappalli, IN',
-];
+List<Map<String, dynamic>> _buildSpecialtyList(List<DoctorDetails> doctors) {
+  final seen   = <String>{};
+  final result = <Map<String, dynamic>>[];
+  for (final d in doctors) {
+    final s = d.specialization?.trim();
+    if (s != null && s.isNotEmpty && seen.add(s.toLowerCase())) {
+      result.add({
+        'name' : s,
+        'icon' : _iconForSpec(s),
+        'color': _accentForSpec(s),
+      });
+    }
+  }
+  return result;
+}
 
-// ── Specialty helpers ──────────────────────────────────────────────
-Color _accentFor(String image) => switch (image) {
-  'cardio' => kError,
-  'ortho' => kInfo,
-  'derm' => kWarning,
-  'neuro' => kPurple,
-  _ => kPrimary,
-};
-IconData _iconFor(String image) => switch (image) {
-  'cardio' => Icons.favorite_rounded,
-  'ortho' => Icons.accessibility_new,
-  'derm' => Icons.face_retouching_natural,
-  'neuro' => Icons.psychology,
-  _ => Icons.local_hospital,
-};
-Color _bgFor(String image) => switch (image) {
-  'cardio' => kRedLight,
-  'ortho' => kInfoLight,
-  'derm' => kAmberLight,
-  'neuro' => kPurpleLight,
-  _ => kPrimaryLight,
-};
+// ── Doctor avatar helper ───────────────────────────────────────────
+Color _avatarBg(String? spec) {
+  final c = _accentForSpec(spec);
+  return c.withOpacity(0.15);
+}
 
-Widget _doctorAvatar(String image, {double size = 46}) {
-  final color = _accentFor(image);
+Widget _doctorAvatar(String? spec, {double size = 46}) {
+  final color = _accentForSpec(spec);
   return Container(
     width: size,
     height: size,
     decoration: BoxDecoration(
-      color: _bgFor(image),
+      color: _avatarBg(spec),
       borderRadius: BorderRadius.circular(size * 0.27),
       border: Border.all(color: color.withOpacity(0.2), width: 1.5),
     ),
-    child: Icon(_iconFor(image), color: color, size: size * 0.44),
+    child: Icon(_iconForSpec(spec), color: color, size: size * 0.44),
   );
 }
 
@@ -263,19 +201,24 @@ class HomeScreen extends ConsumerStatefulWidget {
     required this.themeMode,
     required this.onTabChange,
   });
+
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
     with SingleTickerProviderStateMixin {
+
   late AnimationController _animCtrl;
   late List<Animation<double>> _anims;
 
-  String _location = '';
-  bool _locationLoaded = false;
-  bool _didFetch = false;
-  bool _isFetching = false;
+  String _location      = '';
+  bool   _locationLoaded = false;
+  bool   _didFetch      = false;
+  bool   _isFetching    = false;
+
+  // Cache specialty list so we don't rebuild on every frame
+  List<Map<String, dynamic>> _cachedSpecialties = [];
   bool _popupShown = false;
 
   @override
@@ -299,6 +242,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     Future.microtask(_ensurePatientIdAndFetch);
   }
 
+  @override
+  void dispose() {
+    _animCtrl.dispose();
+    super.dispose();
+  }
+
+  // ── Data fetch ─────────────────────────────────────────────────
   Future<void> _ensurePatientIdAndFetch() async {
     if (_isFetching || _didFetch) return;
     _isFetching = true;
@@ -311,24 +261,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
       if (pid == 0) return;
       _didFetch = true;
-      await ref
-          .read(appointmentViewModelProvider.notifier)
-          .getPatientAppointments(pid);
+      // Fetch both appointments AND doctors in parallel
+      await Future.wait([
+        ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(pid),
+        ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
+      ]);
     } finally {
       _isFetching = false;
     }
   }
 
-  @override
-  void dispose() {
-    _animCtrl.dispose();
-    super.dispose();
-  }
-
+  // ── Location ───────────────────────────────────────────────────
   Future<void> _ensureLocationPermission() async {
     var perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied)
+    if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
+    }
     if (perm == LocationPermission.deniedForever) {
       if (mounted) _showLocationSnack();
       await _loadLocation();
@@ -404,23 +352,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _showLocationSnack() {
-    final isWindows =
-        !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isWindows
-              ? 'Enable Windows location services'
-              : 'Enable phone location services',
-        ),
-        action: SnackBarAction(
+    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(isWindows
+          ? 'Enable Windows location services'
+          : 'Enable phone location services'),
+      action: SnackBarAction(
           label: 'Open Settings',
-          onPressed: () => Geolocator.openLocationSettings(),
-        ),
-      ),
-    );
+          onPressed: () => Geolocator.openLocationSettings()),
+    ));
   }
 
+  // ── Appointment helpers ────────────────────────────────────────
   bool _isToday(AppointmentList a) {
     final p = DateTime.tryParse(a.appointmentDate ?? '');
     if (p == null) return false;
@@ -439,17 +382,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return DateTime(p.year, p.month, p.day).isAfter(today);
   }
 
+  // ── Fade animation helper ──────────────────────────────────────
   Widget _fade(int i, Widget child) => AnimatedBuilder(
     animation: _anims[i],
     builder: (_, w) => Opacity(
       opacity: _anims[i].value,
       child: Transform.translate(
-        offset: Offset(0, 14 * (1 - _anims[i].value)),
-        child: w,
-      ),
+          offset: Offset(0, 14 * (1 - _anims[i].value)), child: w),
     ),
     child: child,
   );
+
+  // ── Navigate to search with specialty ─────────────────────────
+  void _goToSearch({String? specialty}) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DoctorSearchScreen(initialSpecialty: specialty),
+      ),
+    );
+  }
 
   // ── Appointments section ───────────────────────────────────────
   Widget _buildAppointmentsSection() {
@@ -460,7 +412,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       return _apptShell(loading: true);
     return async.when(
       loading: () => _apptShell(loading: true),
-      error: (_, __) => const SizedBox.shrink(),
+      error:   (_, __) => const SizedBox.shrink(),
       data: (list) {
         final today = list.where(_isToday).toList();
         final upcoming = list.where(_isUpcoming).toList();
@@ -521,11 +473,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _SectionTitle(
-              'Upcoming Appointments',
-              action: hasMore ? 'See All' : null,
-              onAction: () => widget.onTabChange(2),
-            ),
+            _SectionTitle('Upcoming Appointments',
+                action:   hasMore ? 'See All' : null,
+                onAction: () => widget.onTabChange(2)),
             const SizedBox(height: 10),
             if (shown.isEmpty)
               _EmptyNote('No upcoming appointments')
@@ -553,11 +503,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Widget _apptShell({required bool loading}) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      _SectionTitle(
-        'Upcoming Appointments',
-        action: 'See All',
-        onAction: () => widget.onTabChange(2),
-      ),
+      _SectionTitle('Upcoming Appointments',
+          action: 'See All', onAction: () => widget.onTabChange(2)),
       const SizedBox(height: 10),
       if (loading) ...[
         const _ApptSkeletonCard(),
@@ -567,17 +514,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ],
   );
 
-  // ── Build ──────────────────────────────────────────────────────
+  // ── Specialties section ────────────────────────────────────────
+  Widget _buildSpecialtiesSection(List<DoctorDetails> doctors, bool isLoading) {
+    // Update cache when doctors change
+    if (doctors.isNotEmpty) {
+      _cachedSpecialties = _buildSpecialtyList(doctors);
+    }
+    final specList = _cachedSpecialties;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle('Most Searched Specialties'),
+        const SizedBox(height: 10),
+        if (isLoading && specList.isEmpty)
+          // Shimmer skeleton while loading
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: 6,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, __) => _SpecialtyChipSkeleton(),
+            ),
+          )
+        else if (specList.isEmpty)
+          const SizedBox.shrink()
+        else
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              itemCount: specList.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (_, i) {
+                final s = specList[i];
+                return _SpecialtyChip(
+                  icon:  s['icon']  as IconData,
+                  label: s['name']  as String,
+                  color: s['color'] as Color,
+                  onTap: () => _goToSearch(specialty: s['name'] as String),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  //  BUILD
+  // ════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
-    final loginState = ref.watch(patientLoginViewModelProvider);
-    final name = loginState.name ?? 'there';
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
+    final loginState    = ref.watch(patientLoginViewModelProvider);
+    final doctorsState  = ref.watch(doctorsViewModelProvider);
+    final name          = loginState.name ?? 'there';
+    final hour          = DateTime.now().hour;
+    final greeting      = hour < 12
         ? 'Good Morning 👋'
-        : hour < 17
-        ? 'Good Afternoon 👋'
-        : 'Good Evening 👋';
+        : hour < 17 ? 'Good Afternoon 👋' : 'Good Evening 👋';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -591,14 +589,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-            // ── HEADER ──────────────────────────────────────────
+
+            // ── HEADER ────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Container(
                 decoration: const BoxDecoration(
                   color: Colors.white,
                   border: Border(
-                    bottom: BorderSide(color: Color(0xFFEDF2F7), width: 1),
-                  ),
+                      bottom: BorderSide(color: Color(0xFFEDF2F7), width: 1)),
                 ),
                 child: SafeArea(
                   bottom: false,
@@ -607,123 +605,104 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _fade(
-                          0,
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      greeting,
+                        _fade(0, Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(greeting,
                                       style: const TextStyle(
-                                        color: kTextSecondary,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 1),
-                                    Text(
-                                      name,
+                                          color: kTextSecondary,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500)),
+                                  const SizedBox(height: 1),
+                                  Text(name,
                                       style: const TextStyle(
-                                        color: kTextPrimary,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
+                                          color: kTextPrimary,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 5),
+                                  GestureDetector(
+                                    onTap: _openLocationPicker,
+                                    child: Container(
+                                      constraints:
+                                          const BoxConstraints(maxWidth: 140),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: kPrimaryLight,
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                            color: kPrimary.withOpacity(0.2)),
                                       ),
-                                    ),
-                                    const SizedBox(height: 5),
-                                    GestureDetector(
-                                      onTap: _openLocationPicker,
-                                      child: Container(
-                                        constraints: const BoxConstraints(
-                                          maxWidth: 140,
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: kPrimaryLight,
-                                          borderRadius: BorderRadius.circular(
-                                            20,
-                                          ),
-                                          border: Border.all(
-                                            color: kPrimary.withOpacity(0.2),
-                                          ),
-                                        ),
-                                        child: Row(
+                                      child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             const Icon(
-                                              Icons.location_on_rounded,
-                                              color: kPrimary,
-                                              size: 10,
-                                            ),
+                                                Icons.location_on_rounded,
+                                                color: kPrimary,
+                                                size: 10),
                                             const SizedBox(width: 3),
                                             if (!_locationLoaded)
                                               _Shimmer(width: 60, height: 8)
                                             else
                                               Flexible(
-                                                child: Text(
-                                                  _location,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  maxLines: 1,
-                                                  style: const TextStyle(
-                                                    color: kPrimary,
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
+                                                child: Text(_location,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    maxLines: 1,
+                                                    style: const TextStyle(
+                                                        color: kPrimary,
+                                                        fontSize: 10,
+                                                        fontWeight:
+                                                            FontWeight.w600)),
                                               ),
                                             const SizedBox(width: 2),
                                             const Icon(
-                                              Icons.keyboard_arrow_down,
-                                              color: kPrimary,
-                                              size: 12,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                                Icons.keyboard_arrow_down,
+                                                color: kPrimary,
+                                                size: 12),
+                                          ]),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              _HeaderBtn(
-                                icon: Icons.notifications_outlined,
-                                badge: true,
-                                onTap: () => Navigator.push(
+                            ),
+                            const SizedBox(width: 8),
+                            _HeaderBtn(
+                              icon: Icons.notifications_outlined,
+                              badge: true,
+                              onTap: () => Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) => const NotificationsScreen(),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                                      builder: (_) =>
+                                          const NotificationsScreen())),
+                            ),
+                          ],
+                        )),
                         const SizedBox(height: 14),
-                        _fade(
-                          1,
-                          AppExpandableHeaderSearch(
-                            leadingIcon: Icons.medical_services_rounded,
-                            title: 'Search Doctors',
-                            subtitle: 'Doctors or specialties',
-                            hintText: 'Search doctors or specialties...',
-                            accentColor: kPrimary,
-                            leadingBackgroundColor: kPrimaryLight,
-                            titleColor: kTextPrimary,
-                            subtitleColor: kTextMuted,
-                            fieldColor: const Color(0xFFF7F8FA),
-                            borderColor: kBorder,
-                            iconColor: kTextMuted,
-                            textColor: kTextPrimary,
-                            onSubmitted: (_) => widget.onTabChange(1),
+                        _fade(1, GestureDetector(
+                          onTap: () => widget.onTabChange(1),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F8FA),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: kBorder),
+                            ),
+                            child: const Row(children: [
+                              Icon(Icons.search_rounded,
+                                  color: kTextMuted, size: 17),
+                              SizedBox(width: 8),
+                              Text('Search doctors or specialties…',
+                                  style: TextStyle(
+                                      color: kTextMuted, fontSize: 13)),
+                            ]),
                           ),
-                        ),
+                        ),)
                       ],
                     ),
                   ),
@@ -731,128 +710,86 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
 
-            // ── BODY ────────────────────────────────────────────
+            // ── BODY ──────────────────────────────────────────────
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(14, 16, 14, 90),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
-                  // Quick Actions 2×2 grid
-                  _fade(
-                    2,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _SectionTitle('Quick Actions'),
-                        const SizedBox(height: 10),
-                        // Row 1
-                        Row(
-                          children: [
-                            _QuickAction(
-                              icon: Icons.calendar_month_rounded,
-                              label: 'Book Appointment',
-                              subtitle: 'Find & reserve',
-                              color: kPrimary,
-                              highlighted: true,
-                              onTap: () => widget.onTabChange(1),
-                            ),
-                            const SizedBox(width: 8),
-                            _QuickAction(
-                              icon: Icons.history_rounded,
-                              label: 'My Appointments',
-                              subtitle: 'History & upcoming',
-                              color: kPrimary,
-                              onTap: () => widget.onTabChange(2),
-                            ),
-                          ],
+
+                  // ── Quick Actions 2×2 grid ──────────────────────
+                  _fade(2, Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionTitle('Quick Actions'),
+                      const SizedBox(height: 10),
+                      Row(children: [
+                        _QuickAction(
+                          icon: Icons.calendar_month_rounded,
+                          label: 'Book Appointment',
+                          subtitle: 'Find & reserve',
+                          color: kPrimary,
+                          highlighted: true,
+                          onTap: () => widget.onTabChange(1),
                         ),
-                        const SizedBox(height: 8),
-                        // Row 2
-                        Row(
-                          children: [
-                            _QuickAction(
-                              icon: Icons.group_add_rounded,
-                              label: 'Family',
-                              subtitle: 'Manage members',
-                              color: kPurple,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const FamilyMembersScreen(),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _QuickAction(
-                              icon: Icons.medical_information_rounded,
-                              label: 'Records',
-                              subtitle: 'Prescriptions',
-                              color: kWarning,
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
+                        const SizedBox(width: 8),
+                        _QuickAction(
+                          icon: Icons.history_rounded,
+                          label: 'My Appointments',
+                          subtitle: 'History & upcoming',
+                          color: kPrimary,
+                          onTap: () => widget.onTabChange(2),
+                        ),
+                      ]),
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        _QuickAction(
+                          icon: Icons.group_add_rounded,
+                          label: 'Family',
+                          subtitle: 'Manage members',
+                          color: kPurple,
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
                                   builder: (_) =>
-                                      const PatientPrescriptionListScreen(),
-                                ),
-                              ),
-                            ),
-                          ],
+                                      const FamilyMembersScreen())),
                         ),
-                      ],
-                    ),
-                  ),
+                        const SizedBox(width: 8),
+                        _QuickAction(
+                          icon: Icons.medical_information_rounded,
+                          label: 'Records',
+                          subtitle: 'Prescriptions',
+                          color: kWarning,
+                          onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const PatientPrescriptionListScreen())),
+                        ),
+                      ]),
+                    ],
+                  )),
                   const SizedBox(height: 22),
 
-                  // Appointments
+                  // ── Upcoming Appointments ───────────────────────
                   _fade(3, _buildAppointmentsSection()),
                   const SizedBox(height: 22),
 
-                  // Specialties
-                  _fade(
-                    4,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _SectionTitle('Most Searched Specialties'),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          height: 96,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            physics: const BouncingScrollPhysics(),
-                            itemCount: specialties.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 8),
-                            itemBuilder: (_, i) {
-                              final s = specialties[i];
-                              return _SpecialtyChip(
-                                icon: s['icon'],
-                                label: s['name'],
-                                color: s['color'] as Color,
-                                onTap: () {},
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // ── Specialties — dynamic from API ──────────────
+                  _fade(4, _buildSpecialtiesSection(
+                      doctorsState.doctors, doctorsState.isLoading)),
                   const SizedBox(height: 22),
 
-                  // Top Doctors
-                  _fade(
-                    5,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _SectionTitle(
-                          'Top Rated Doctors',
+                  // ── Top Rated Doctors header ────────────────────
+                  _fade(5, Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionTitle('Top Rated Doctors',
                           action: 'View All',
-                          onAction: () => widget.onTabChange(1),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
+                          onAction: () => widget.onTabChange(1)),
+                      const SizedBox(height: 10),
+                    ],
+                  )),
+
                 ]),
               ),
             ),
@@ -866,13 +803,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 // ════════════════════════════════════════════════════════════════════
 //  LOCATION SHEET
 // ════════════════════════════════════════════════════════════════════
+const List<String> _allCities = [
+  'Bengaluru, IN','Mumbai, IN','Delhi, IN','Hyderabad, IN','Pune, IN',
+  'Chennai, IN','Kolkata, IN','Ahmedabad, IN','Jaipur, IN','Surat, IN',
+  'Lucknow, IN','Kanpur, IN','Nagpur, IN','Indore, IN','Thane, IN',
+  'Bhopal, IN','Visakhapatnam, IN','Patna, IN','Vadodara, IN','Ghaziabad, IN',
+  'Ludhiana, IN','Agra, IN','Nashik, IN','Faridabad, IN','Meerut, IN',
+  'Rajkot, IN','Varanasi, IN','Srinagar, IN','Aurangabad, IN','Dhanbad, IN',
+  'Amritsar, IN','Navi Mumbai, IN','Coimbatore, IN','Madurai, IN',
+  'Vijayawada, IN','Guwahati, IN','Chandigarh, IN','Hubli, IN',
+  'Mysuru, IN','Tiruchirappalli, IN',
+];
+
 class _LocationSheet extends StatefulWidget {
   final String currentLocation;
   final ValueChanged<String> onSelected;
-  const _LocationSheet({
-    required this.currentLocation,
-    required this.onSelected,
-  });
+  const _LocationSheet(
+      {required this.currentLocation, required this.onSelected});
   @override
   State<_LocationSheet> createState() => _LocationSheetState();
 }
@@ -916,8 +863,7 @@ class _LocationSheetState extends State<_LocationSheet> {
     try {
       final current = await LocationService.getCurrentAddress();
       if (!mounted) return;
-      final hasIssue =
-          current.toLowerCase().contains('location disabled') ||
+      final hasIssue = current.toLowerCase().contains('location disabled') ||
           current.toLowerCase().contains('permission');
       widget.onSelected(current);
       if (!hasIssue) {
@@ -931,410 +877,318 @@ class _LocationSheetState extends State<_LocationSheet> {
       if (!mounted) return;
       setState(() => _isLoadingGPS = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to detect location')),
-      );
+          const SnackBar(content: Text('Unable to detect location')));
     }
   }
 
   void _snack() {
     final isWindows =
         !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          isWindows
-              ? 'Enable Windows location services'
-              : 'Enable phone location services',
-        ),
-        action: SnackBarAction(
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(isWindows
+          ? 'Enable Windows location services'
+          : 'Enable phone location services'),
+      action: SnackBarAction(
           label: 'Settings',
-          onPressed: () => Geolocator.openLocationSettings(),
-        ),
-      ),
-    );
+          onPressed: () => Geolocator.openLocationSettings()),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
+      padding:
+          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.85,
-        ),
+            maxHeight: MediaQuery.of(context).size.height * 0.85),
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 10),
-            Container(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const SizedBox(height: 10),
+          Container(
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: kBorder,
-                borderRadius: BorderRadius.circular(2),
+                  color: kBorder, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.location_on_rounded,
+                      color: kPrimary, size: 17)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Choose Location',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: kTextPrimary)),
+                      if (widget.currentLocation.isNotEmpty)
+                        Text('Current: ${widget.currentLocation}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 11, color: kTextMuted)),
+                    ]),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7F8FA),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: const Icon(Icons.close_rounded,
+                        size: 15, color: kTextMuted)),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBorder),
+              ),
+              child: TextField(
+                controller: _ctrl,
+                focusNode: _focus,
+                textInputAction: TextInputAction.done,
+                style: const TextStyle(
+                    color: kTextPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: 'Search city…',
+                  hintStyle:
+                      const TextStyle(color: kTextMuted, fontSize: 13),
+                  prefixIcon: const Icon(Icons.search_rounded,
+                      color: kTextMuted, size: 17),
+                  suffixIcon: _ctrl.text.isNotEmpty
+                      ? GestureDetector(
+                          onTap: () {
+                            _ctrl.clear();
+                            _focus.requestFocus();
+                          },
+                          child: const Icon(Icons.clear_rounded,
+                              color: kTextMuted, size: 15))
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 11),
+                ),
+                onSubmitted: (val) {
+                  final v = val.trim();
+                  if (v.isEmpty) return;
+                  _pick(_suggestions.isNotEmpty ? _suggestions.first : v);
+                },
               ),
             ),
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GestureDetector(
+              onTap: _isLoadingGPS ? null : _useGPS,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kPrimary.withOpacity(0.3)),
+                ),
+                child: Row(children: [
                   Container(
-                    width: 34,
-                    height: 34,
+                    width: 30,
+                    height: 30,
                     decoration: BoxDecoration(
-                      color: kPrimaryLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.location_on_rounded,
-                      color: kPrimary,
-                      size: 17,
-                    ),
+                        color: kPrimary,
+                        borderRadius: BorderRadius.circular(8)),
+                    child: _isLoadingGPS
+                        ? const Padding(
+                            padding: EdgeInsets.all(7),
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.my_location_rounded,
+                            color: Colors.white, size: 15),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Choose Location',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary,
-                          ),
-                        ),
-                        if (widget.currentLocation.isNotEmpty)
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Current: ${widget.currentLocation}',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: kTextMuted,
-                            ),
-                          ),
-                      ],
-                    ),
+                              _isLoadingGPS
+                                  ? 'Detecting…'
+                                  : 'Use Current Location',
+                              style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: kTextPrimary)),
+                          const Text('Auto-detect via GPS',
+                              style: TextStyle(
+                                  fontSize: 10, color: kTextMuted)),
+                        ]),
                   ),
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF7F8FA),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: kBorder),
-                      ),
-                      child: const Icon(
-                        Icons.close_rounded,
-                        size: 15,
-                        color: kTextMuted,
-                      ),
-                    ),
-                  ),
-                ],
+                  if (!_isLoadingGPS)
+                    const Icon(Icons.chevron_right_rounded,
+                        color: kPrimary, size: 17),
+                ]),
               ),
             ),
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GestureDetector(
+              onTap: () async {
+                await LocationStorage.clearLocation();
+                if (!mounted) return;
+                widget.onSelected('');
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('Location cache cleared')));
+              },
               child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 9),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF7F8FA),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: kBorder),
                 ),
-                child: TextField(
-                  controller: _ctrl,
-                  focusNode: _focus,
-                  textInputAction: TextInputAction.done,
-                  style: const TextStyle(
-                    color: kTextPrimary,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search city…',
-                    hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      color: kTextMuted,
-                      size: 17,
-                    ),
-                    suffixIcon: _ctrl.text.isNotEmpty
-                        ? GestureDetector(
-                            onTap: () {
-                              _ctrl.clear();
-                              _focus.requestFocus();
-                            },
-                            child: const Icon(
-                              Icons.clear_rounded,
-                              color: kTextMuted,
-                              size: 15,
-                            ),
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 11,
-                    ),
-                  ),
-                  onSubmitted: (val) {
-                    final v = val.trim();
-                    if (v.isEmpty) return;
-                    _pick(_suggestions.isNotEmpty ? _suggestions.first : v);
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GestureDetector(
-                onTap: _isLoadingGPS ? null : _useGPS,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kPrimaryLight.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kPrimary.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: kPrimary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: _isLoadingGPS
-                            ? const Padding(
-                                padding: EdgeInsets.all(7),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.my_location_rounded,
-                                color: Colors.white,
-                                size: 15,
-                              ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _isLoadingGPS
-                                  ? 'Detecting…'
-                                  : 'Use Current Location',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: kTextPrimary,
-                              ),
-                            ),
-                            const Text(
-                              'Auto-detect via GPS',
-                              style: TextStyle(fontSize: 10, color: kTextMuted),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (!_isLoadingGPS)
-                        const Icon(
-                          Icons.chevron_right_rounded,
-                          color: kPrimary,
-                          size: 17,
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GestureDetector(
-                onTap: () async {
-                  await LocationStorage.clearLocation();
-                  if (!mounted) return;
-                  widget.onSelected('');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Location cache cleared')),
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF7F8FA),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kBorder),
-                  ),
-                  child: const Row(
-                    children: [
-                      Icon(
-                        Icons.delete_outline_rounded,
-                        size: 15,
-                        color: kTextMuted,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Clear Saved Location',
-                        style: TextStyle(
+                child: const Row(children: [
+                  Icon(Icons.delete_outline_rounded,
+                      size: 15, color: kTextMuted),
+                  SizedBox(width: 8),
+                  Text('Clear Saved Location',
+                      style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: kTextPrimary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                          color: kTextPrimary)),
+                ]),
               ),
             ),
-            const SizedBox(height: 8),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  const Expanded(child: Divider(color: kBorder, height: 1)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Text(
-                      _ctrl.text.isEmpty ? 'POPULAR CITIES' : 'RESULTS',
-                      style: const TextStyle(
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              const Expanded(child: Divider(color: kBorder, height: 1)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                    _ctrl.text.isEmpty ? 'POPULAR CITIES' : 'RESULTS',
+                    style: const TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1.0,
-                        color: kTextMuted,
-                      ),
-                    ),
-                  ),
-                  const Expanded(child: Divider(color: kBorder, height: 1)),
-                ],
+                        color: kTextMuted)),
               ),
-            ),
-            const SizedBox(height: 4),
-            Flexible(
-              child: _suggestions.isEmpty
-                  ? const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.search_off_rounded,
-                            size: 28,
-                            color: kTextMuted,
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            'No cities found',
-                            style: TextStyle(color: kTextMuted, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    )
-                  : ListView.separated(
-                      shrinkWrap: true,
-                      padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
-                      itemCount: _suggestions.length,
-                      separatorBuilder: (_, __) =>
-                          const Divider(color: kBorder, height: 1),
-                      itemBuilder: (_, i) {
-                        final loc = _suggestions[i];
-                        final isActive = loc == widget.currentLocation;
-                        return GestureDetector(
-                          onTap: () => _pick(loc),
-                          child: Container(
-                            color: Colors.transparent,
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            child: Row(
-                              children: [
-                                AnimatedContainer(
-                                  duration: const Duration(milliseconds: 180),
-                                  width: 28,
-                                  height: 28,
-                                  decoration: BoxDecoration(
-                                    color: isActive
-                                        ? kPrimary
-                                        : const Color(0xFFF7F8FA),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    isActive
-                                        ? Icons.location_on_rounded
-                                        : Icons.location_city_rounded,
-                                    color: isActive ? Colors.white : kTextMuted,
-                                    size: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    loc,
+              const Expanded(child: Divider(color: kBorder, height: 1)),
+            ]),
+          ),
+          const SizedBox(height: 4),
+          Flexible(
+            child: _suggestions.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.search_off_rounded,
+                          size: 28, color: kTextMuted),
+                      SizedBox(height: 6),
+                      Text('No cities found',
+                          style: TextStyle(color: kTextMuted, fontSize: 12)),
+                    ]),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                    itemCount: _suggestions.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(color: kBorder, height: 1),
+                    itemBuilder: (_, i) {
+                      final loc      = _suggestions[i];
+                      final isActive = loc == widget.currentLocation;
+                      return GestureDetector(
+                        onTap: () => _pick(loc),
+                        child: Container(
+                          color: Colors.transparent,
+                          padding:
+                              const EdgeInsets.symmetric(vertical: 9),
+                          child: Row(children: [
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: isActive
+                                    ? kPrimary
+                                    : const Color(0xFFF7F8FA),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                  isActive
+                                      ? Icons.location_on_rounded
+                                      : Icons.location_city_rounded,
+                                  color: isActive
+                                      ? Colors.white
+                                      : kTextMuted,
+                                  size: 14),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                                child: Text(loc,
                                     style: TextStyle(
                                       fontSize: 13,
                                       fontWeight: isActive
                                           ? FontWeight.w700
                                           : FontWeight.w500,
-                                      color: isActive ? kPrimary : kTextPrimary,
-                                    ),
-                                  ),
-                                ),
-                                if (isActive)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: kPrimaryLight,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: const Text(
-                                      'Active',
-                                      style: TextStyle(
+                                      color: isActive
+                                          ? kPrimary
+                                          : kTextPrimary,
+                                    ))),
+                            if (isActive)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                    color: kPrimaryLight,
+                                    borderRadius:
+                                        BorderRadius.circular(6)),
+                                child: const Text('Active',
+                                    style: TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w700,
-                                        color: kPrimary,
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  const Icon(
-                                    Icons.chevron_right_rounded,
-                                    color: kBorder,
-                                    size: 15,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
-          ],
-        ),
+                                        color: kPrimary)),
+                              )
+                            else
+                              const Icon(Icons.chevron_right_rounded,
+                                  color: kBorder, size: 15),
+                          ]),
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          SizedBox(height: MediaQuery.of(context).padding.bottom),
+        ]),
       ),
     );
   }
@@ -1347,43 +1201,35 @@ class _HeaderBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool badge;
-  const _HeaderBtn({
-    required this.icon,
-    required this.onTap,
-    this.badge = false,
-  });
+  const _HeaderBtn(
+      {required this.icon, required this.onTap, this.badge = false});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Stack(
-      children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kBorder),
-          ),
-          child: Icon(icon, color: kTextPrimary, size: 17),
-        ),
-        if (badge)
-          Positioned(
-            right: 7,
-            top: 7,
-            child: Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
-                color: kWarning,
-                shape: BoxShape.circle,
-              ),
+        onTap: onTap,
+        child: Stack(children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F8FA),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder),
             ),
+            child: Icon(icon, color: kTextPrimary, size: 17),
           ),
-      ],
-    ),
-  );
+          if (badge)
+            Positioned(
+              right: 7,
+              top: 7,
+              child: Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                      color: kWarning, shape: BoxShape.circle)),
+            ),
+        ]),
+      );
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1397,34 +1243,28 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Text(
-        title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: kTextPrimary,
-        ),
-      ),
-      if (action != null)
-        GestureDetector(
-          onTap: onAction,
-          child: Text(
-            action!,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: kPrimary,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary)),
+          if (action != null)
+            GestureDetector(
+              onTap: onAction,
+              child: Text(action!,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: kPrimary)),
             ),
-          ),
-        ),
-    ],
-  );
+        ],
+      );
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  QUICK ACTION  — 2×2 layout, Book Appt animated
+//  QUICK ACTION — 2×2 layout, Book Appt animated
 // ════════════════════════════════════════════════════════════════════
 class _QuickAction extends StatefulWidget {
   final IconData icon;
@@ -1459,25 +1299,17 @@ class _QuickActionState extends State<_QuickAction>
     super.initState();
     if (!widget.highlighted) return;
     _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
-    _ripple = Tween<double>(
-      begin: 0,
-      end: 1,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _shimmer = Tween<double>(begin: -1.5, end: 2.0).animate(
-      CurvedAnimation(
+        vsync: this, duration: const Duration(milliseconds: 2400))
+      ..repeat();
+    _ripple  = Tween<double>(begin: 0, end: 1)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _shimmer = Tween<double>(begin: -1.5, end: 2.0).animate(CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.1, 0.7, curve: Curves.easeInOut),
-      ),
-    );
-    _bounce = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(
+        curve: const Interval(0.1, 0.7, curve: Curves.easeInOut)));
+    _bounce  = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.5, curve: Curves.elasticOut),
-      ),
-    );
+        curve:
+            const Interval(0.0, 0.5, curve: Curves.elasticOut)));
   }
 
   @override
@@ -1508,92 +1340,72 @@ class _QuickActionState extends State<_QuickAction>
             border: Border.all(color: kPrimaryDark),
             boxShadow: [
               BoxShadow(
-                color: kPrimary.withOpacity(0.35),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
+                  color: kPrimary.withOpacity(0.35),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4))
             ],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(9),
-            child: Stack(
-              children: [
-                // Ripple ring 1
-                Positioned.fill(child: _buildRipple(0.0)),
-                // Ripple ring 2
-                Positioned.fill(child: _buildRipple(0.33)),
-                // Ripple ring 3
-                Positioned.fill(child: _buildRipple(0.66)),
-                // Shimmer sweep
-                Positioned.fill(
-                  child: Transform.translate(
-                    offset: Offset(_shimmer.value * 120, 0),
-                    child: Container(
-                      width: 60,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            Colors.white.withOpacity(0.15),
-                            Colors.transparent,
-                          ],
-                          stops: const [0.0, 0.5, 1.0],
-                        ),
+            child: Stack(children: [
+              Positioned.fill(child: _buildRipple(0.0)),
+              Positioned.fill(child: _buildRipple(0.33)),
+              Positioned.fill(child: _buildRipple(0.66)),
+              Positioned.fill(
+                child: Transform.translate(
+                  offset: Offset(_shimmer.value * 120, 0),
+                  child: Container(
+                    width: 60,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.transparent,
+                          Colors.white.withOpacity(0.15),
+                          Colors.transparent
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
                       ),
                     ),
                   ),
                 ),
-                // Content
-                Row(
-                  children: [
-                    // Bouncing icon
-                    Transform.translate(
-                      offset: Offset(
-                        0,
-                        -3 * (0.5 - (_bounce.value - 0.5).abs()) * 2,
-                      ),
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.22),
-                          borderRadius: BorderRadius.circular(9),
-                        ),
-                        child: Icon(widget.icon, color: Colors.white, size: 15),
-                      ),
+              ),
+              Row(children: [
+                Transform.translate(
+                  offset: Offset(
+                      0, -3 * (0.5 - (_bounce.value - 0.5).abs()) * 2),
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.22),
+                      borderRadius: BorderRadius.circular(9),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.label,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            widget.subtitle,
-                            style: TextStyle(
-                              fontSize: 9,
-                              color: Colors.white.withOpacity(0.85),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    child: Icon(widget.icon, color: Colors.white, size: 15),
+                  ),
                 ),
-              ],
-            ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(widget.label,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1),
+                        const SizedBox(height: 2),
+                        Text(widget.subtitle,
+                            style: TextStyle(
+                                fontSize: 9,
+                                color: Colors.white.withOpacity(0.85)),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1),
+                      ]),
+                ),
+              ]),
+            ]),
           ),
         );
       },
@@ -1601,8 +1413,8 @@ class _QuickActionState extends State<_QuickAction>
   }
 
   Widget _buildRipple(double phaseOffset) {
-    final phase = (_ctrl.value + phaseOffset) % 1.0;
-    final size = 52.0 + phase * 60.0;
+    final phase   = (_ctrl.value + phaseOffset) % 1.0;
+    final size    = 52.0 + phase * 60.0;
     final opacity = (1.0 - phase) * 0.35;
     return Align(
       alignment: Alignment.centerLeft,
@@ -1614,9 +1426,7 @@ class _QuickActionState extends State<_QuickAction>
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
-              color: Colors.white.withOpacity(opacity),
-              width: 1.5,
-            ),
+                color: Colors.white.withOpacity(opacity), width: 1.5),
           ),
         ),
       ),
@@ -1631,44 +1441,36 @@ class _QuickActionState extends State<_QuickAction>
         borderRadius: BorderRadius.circular(9),
         border: Border.all(color: widget.color.withOpacity(0.2)),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
+      child: Row(children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
               color: widget.color,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(widget.icon, color: Colors.white, size: 15),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
+              borderRadius: BorderRadius.circular(10)),
+          child: Icon(widget.icon, color: Colors.white, size: 15),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  widget.label,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: kTextPrimary,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
+                Text(widget.label,
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1),
                 const SizedBox(height: 2),
-                Text(
-                  widget.subtitle,
-                  style: const TextStyle(fontSize: 9, color: kTextSecondary),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+                Text(widget.subtitle,
+                    style: const TextStyle(
+                        fontSize: 9, color: kTextSecondary),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1),
+              ]),
+        ),
+      ]),
     );
   }
 }
@@ -1682,28 +1484,23 @@ class _EmptyNote extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-    decoration: BoxDecoration(
-      color: kPrimaryLight.withOpacity(0.4),
-      borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: kPrimary.withOpacity(0.15)),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(Icons.calendar_today_rounded, size: 13, color: kPrimary),
-        const SizedBox(width: 6),
-        Text(
-          message,
-          style: const TextStyle(fontSize: 12, color: kTextSecondary),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+        decoration: BoxDecoration(
+          color: kPrimaryLight.withOpacity(0.4),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: kPrimary.withOpacity(0.15)),
         ),
-      ],
-    ),
-  );
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.calendar_today_rounded, size: 13, color: kPrimary),
+          const SizedBox(width: 6),
+          Text(message,
+              style: const TextStyle(fontSize: 12, color: kTextSecondary)),
+        ]),
+      );
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  APPOINTMENT CARD  — queue strip merged inside same card
+//  APPOINTMENT CARD
 // ════════════════════════════════════════════════════════════════════
 class _ApptCard extends StatefulWidget {
   final AppointmentList appointment;
@@ -1723,19 +1520,13 @@ class _ApptCardState extends State<_ApptCard>
   void initState() {
     super.initState();
     _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat();
-    _badgePulse = Tween<double>(
-      begin: 0.0,
-      end: 6.0,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _dotBlink = Tween<double>(begin: 1.0, end: 0.25).animate(
-      CurvedAnimation(
+        vsync: this, duration: const Duration(milliseconds: 2000))
+      ..repeat();
+    _badgePulse = Tween<double>(begin: 0.0, end: 6.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _dotBlink = Tween<double>(begin: 1.0, end: 0.25).animate(CurvedAnimation(
         parent: _ctrl,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeInOut),
-      ),
-    );
+        curve: const Interval(0.0, 0.5, curve: Curves.easeInOut)));
   }
 
   @override
@@ -1751,20 +1542,24 @@ class _ApptCardState extends State<_ApptCard>
   }
 
   String _fmtTime(String? raw) {
-    return _fmtClockTime(raw);
+    if (raw == null || raw.isEmpty) return '—';
+    final parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    final dt = DateTime(2000, 1, 1, int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
+    return DateFormat('h:mm a').format(dt);
   }
 
   @override
   Widget build(BuildContext context) {
-    final appt = widget.appointment;
-    final name = appt.doctorName ?? 'Doctor';
-    final spec = appt.specialization ?? '';
-    final dateStr = _fmtDate(appt.appointmentDate);
-    final timeStr = _fmtTime(appt.startTime);
-    final myToken = appt.myQueueNumber ?? appt.queueNumber;
-    final totalQ = appt.totalQueue;
-    final serving = appt.currentServing;
-    final isMyTurn = appt.isMyTurn ?? false;
+    final appt      = widget.appointment;
+    final name      = appt.doctorName ?? 'Doctor';
+    final spec      = appt.specialization ?? '';
+    final dateStr   = _fmtDate(appt.appointmentDate);
+    final timeStr   = _fmtTime(appt.startTime);
+    final myToken   = appt.myQueueNumber ?? appt.queueNumber;
+    final totalQ    = appt.totalQueue;
+    final serving   = appt.currentServing;
+    final isMyTurn  = appt.isMyTurn ?? false;
     final showQueue = widget.isToday && myToken != null;
 
     return AnimatedBuilder(
@@ -1777,126 +1572,88 @@ class _ApptCardState extends State<_ApptCard>
             border: Border.all(
               color: isMyTurn
                   ? kPrimary
-                  : (widget.isToday ? kPrimary.withOpacity(0.2) : kBorder),
+                  : (widget.isToday
+                      ? kPrimary.withOpacity(0.2)
+                      : kBorder),
               width: isMyTurn ? 1.5 : 1,
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3))
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── TOP: Avatar | Info | Serving Circle ──────────
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 11, 12, 9),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar
-                    _doctorAvatar('cardio', size: 40),
+                    _doctorAvatar(spec, size: 40),
                     const SizedBox(width: 10),
-
-                    // Name / Spec / Date+Time
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            name,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: kTextPrimary,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          Text(name,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: kTextPrimary),
+                              overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
-                          Text(
-                            spec,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: kTextSecondary,
-                            ),
-                          ),
+                          Text(spec,
+                              style: const TextStyle(
+                                  fontSize: 11, color: kTextSecondary)),
                           const SizedBox(height: 2),
-
                           if ((appt.patientName ?? '').isNotEmpty)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.person_outline_rounded,
-                                  size: 10,
-                                  color: kTextMuted,
-                                ),
-                                const SizedBox(width: 3),
-                                Flexible(
-                                  child: Text(
-                                    appt.patientName ?? '',
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.person_outline_rounded,
+                                  size: 10, color: kTextMuted),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(appt.patientName ?? '',
                                     style: const TextStyle(
-                                      fontSize: 10,
-                                      color: kTextMuted,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.calendar_today_rounded,
-                                size: 10,
-                                color: kPrimary,
+                                        fontSize: 10,
+                                        color: kTextMuted,
+                                        fontWeight: FontWeight.w500),
+                                    overflow: TextOverflow.ellipsis),
                               ),
-                              const SizedBox(width: 3),
-                              Text(
-                                dateStr,
+                            ]),
+                          Row(children: [
+                            const Icon(Icons.calendar_today_rounded,
+                                size: 10, color: kPrimary),
+                            const SizedBox(width: 3),
+                            Text(dateStr,
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: kPrimary,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Icon(
-                                Icons.access_time_rounded,
-                                size: 10,
-                                color: kPrimaryDark,
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                timeStr,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: kPrimary)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.access_time_rounded,
+                                size: 10, color: kPrimaryDark),
+                            const SizedBox(width: 3),
+                            Text(timeStr,
                                 style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                  color: kPrimaryDark,
-                                ),
-                              ),
-                            ],
-                          ),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: kPrimaryDark)),
+                          ]),
                         ],
                       ),
                     ),
                     const SizedBox(width: 8),
-
-                    // Now Serving Circle (right top)
                     if (showQueue)
-                      Column(
-                        children: [
-                          SizedBox(
-                            width: 42,
-                            height: 42,
-                            child: Stack(
+                      Column(children: [
+                        SizedBox(
+                          width: 42,
+                          height: 42,
+                          child: Stack(
                               alignment: Alignment.center,
                               children: [
-                                // ripple rings
                                 ...[0.0, 0.4, 0.8].map((phase) {
                                   final p = (_ctrl.value + phase) % 1.0;
                                   final sz = 28.0 + p * 20.0;
@@ -1907,13 +1664,12 @@ class _ApptCardState extends State<_ApptCard>
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: kPrimary.withOpacity(op),
-                                        width: 1.5,
-                                      ),
+                                          color:
+                                              kPrimary.withOpacity(op),
+                                          width: 1.5),
                                     ),
                                   );
                                 }),
-                                // solid circle
                                 Container(
                                   width: 38,
                                   height: 38,
@@ -1926,159 +1682,117 @@ class _ApptCardState extends State<_ApptCard>
                                     ),
                                   ),
                                   child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.center,
                                     children: [
+                                      Text('NOW',
+                                          style: TextStyle(
+                                              fontSize: 6,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white
+                                                  .withOpacity(0.85),
+                                              letterSpacing: 0.4)),
                                       Text(
-                                        'NOW',
-                                        style: TextStyle(
-                                          fontSize: 6,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white.withOpacity(0.85),
-                                          letterSpacing: 0.4,
-                                        ),
-                                      ),
-                                      Text(
-                                        (serving != null && serving > 0)
-                                            ? serving.toString().padLeft(2, '0')
-                                            : '--',
-                                        style: const TextStyle(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          height: 1,
-                                        ),
-                                      ),
+                                          (serving != null && serving > 0)
+                                              ? serving
+                                                  .toString()
+                                                  .padLeft(2, '0')
+                                              : '--',
+                                          style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              color: Colors.white,
+                                              height: 1)),
                                     ],
                                   ),
                                 ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Opacity(
-                                opacity: _dotBlink.value,
-                                child: Container(
-                                  width: 5,
-                                  height: 5,
-                                  decoration: const BoxDecoration(
+                              ]),
+                        ),
+                        const SizedBox(height: 3),
+                        Row(mainAxisSize: MainAxisSize.min, children: [
+                          Opacity(
+                            opacity: _dotBlink.value,
+                            child: Container(
+                                width: 5,
+                                height: 5,
+                                decoration: const BoxDecoration(
                                     color: kPrimary,
-                                    shape: BoxShape.circle,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 3),
-                              const Text(
-                                'live',
-                                style: TextStyle(
+                                    shape: BoxShape.circle)),
+                          ),
+                          const SizedBox(width: 3),
+                          const Text('live',
+                              style: TextStyle(
                                   fontSize: 8,
                                   color: kTextMuted,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                                  fontWeight: FontWeight.w500)),
+                        ]),
+                      ]),
                   ],
                 ),
               ),
-
-              // ── BOTTOM: Your # | Total | Today badge ─────────
               if (showQueue) ...[
                 Divider(color: kBorder, height: 1, indent: 12, endIndent: 12),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 7, 12, 9),
-                  child: Row(
-                    children: [
-                      // Queue number — big bold purple
-                      Text(
-                        myToken.toString().padLeft(2, '0'),
+                  child: Row(children: [
+                    Text(myToken.toString().padLeft(2, '0'),
                         style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF9F7AEA),
-                        ),
-                      ),
-                      // separator dot
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 6),
-                        child: Text(
-                          '·',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF9F7AEA))),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6),
+                      child: Text('·',
                           style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: kTextMuted,
-                          ),
-                        ),
-                      ),
-                      // Total label + value
-                      const Text(
-                        'Total :',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kTextMuted)),
+                    ),
+                    const Text('Total :',
                         style: TextStyle(
-                          fontSize: 10,
-                          color: kTextSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
+                            fontSize: 10,
+                            color: kTextSecondary,
+                            fontWeight: FontWeight.w500)),
+                    const SizedBox(width: 3),
+                    Text(
                         totalQ != null
                             ? totalQ.toString().padLeft(2, '0')
                             : '--',
                         style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF3B82F6),
-                        ),
-                      ),
-                      const Spacer(),
-                      // Today / Your Turn badge
-                      if (isMyTurn)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF3B82F6))),
+                    const Spacer(),
+                    if (isMyTurn)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
                             color: kPrimary,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text(
-                            'Your Turn!',
+                            borderRadius: BorderRadius.circular(6)),
+                        child: const Text('Your Turn!',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        )
-                      else
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: kPrimaryLight,
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: kPrimary.withOpacity(0.25),
-                            ),
-                          ),
-                          child: const Text(
-                            'Today',
-                            style: TextStyle(
-                              color: kPrimaryDark,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700)),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: kPrimaryLight,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: kPrimary.withOpacity(0.25)),
                         ),
-                    ],
-                  ),
+                        child: const Text('Today',
+                            style: TextStyle(
+                                color: kPrimaryDark,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                  ]),
                 ),
               ],
             ],
@@ -2088,6 +1802,222 @@ class _ApptCardState extends State<_ApptCard>
     );
   }
 }
+
+// ── Small dot widget ───────────────────────────────────────────────
+class _Dot extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) =>
+    Container(width: 3, height: 3, decoration: const BoxDecoration(color: kBorder, shape: BoxShape.circle));
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SPECIALTY CHIP  — dynamic, tappable
+// ════════════════════════════════════════════════════════════════════
+class _SpecialtyChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _SpecialtyChip(
+      {required this.icon,
+      required this.label,
+      required this.color,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 76,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.15)),
+          ),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                  color: color.withOpacity(0.15), shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 18),
+            ),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(label,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+            ),
+          ]),
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SPECIALTY CHIP SKELETON  — shown while loading
+// ════════════════════════════════════════════════════════════════════
+class _SpecialtyChipSkeleton extends StatefulWidget {
+  @override
+  State<_SpecialtyChipSkeleton> createState() => _SpecialtyChipSkeletonState();
+}
+
+class _SpecialtyChipSkeletonState extends State<_SpecialtyChipSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1300))
+      ..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) => Container(
+          width: 76,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment(_anim.value - 1, 0),
+              end: Alignment(_anim.value + 1, 0),
+              colors: const [
+                Color(0xFFEDF2F7),
+                Color(0xFFE2E8F0),
+                Color(0xFFCBD5E0),
+                Color(0xFFE2E8F0),
+                Color(0xFFEDF2F7),
+              ],
+            ),
+          ),
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  APPOINTMENT SKELETON CARD
+// ════════════════════════════════════════════════════════════════════
+class _ApptSkeletonCard extends StatefulWidget {
+  const _ApptSkeletonCard();
+  @override
+  State<_ApptSkeletonCard> createState() => _ApptSkeletonCardState();
+}
+
+class _ApptSkeletonCardState extends State<_ApptSkeletonCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1300))
+      ..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Widget _bar({double? width, required double height}) => AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) => Container(
+          width: width,
+          height: height,
+          margin: const EdgeInsets.only(bottom: 5),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(5),
+            gradient: LinearGradient(
+              begin: Alignment(_anim.value - 1, 0),
+              end: Alignment(_anim.value + 1, 0),
+              colors: const [
+                Color(0xFFEDF2F7),
+                Color(0xFFE2E8F0),
+                Color(0xFFCBD5E0),
+                Color(0xFFE2E8F0),
+                Color(0xFFEDF2F7)
+              ],
+            ),
+          ),
+        ),
+      );
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: _anim,
+        builder: (_, __) => Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorder),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3))
+            ],
+          ),
+          child: Row(children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  begin: Alignment(_anim.value - 1, 0),
+                  end: Alignment(_anim.value + 1, 0),
+                  colors: const [
+                    Color(0xFFEDF2F7),
+                    Color(0xFFCBD5E0),
+                    Color(0xFFEDF2F7)
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _bar(width: 130, height: 13),
+                    _bar(width: 90, height: 10),
+                    const SizedBox(height: 3),
+                    Row(children: [
+                      _bar(width: 70, height: 10),
+                      const SizedBox(width: 8),
+                      _bar(width: 55, height: 10),
+                    ]),
+                  ]),
+            ),
+          ]),
+        ),
+      );
+}
+
+
 
 // ════════════════════════════════════════════════════════════════════
 //  TODAY APPOINTMENT POPUP
@@ -2417,6 +2347,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
   }
 }
 
+
 // ── Info chip used inside today popup ─────────────────────────────
 class _InfoChip extends StatelessWidget {
   final IconData icon;
@@ -2470,421 +2401,3 @@ class _InfoChip extends StatelessWidget {
   );
 }
 
-// ── Small dot widget ───────────────────────────────────────────────
-class _Dot extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 3,
-    height: 3,
-    decoration: const BoxDecoration(color: kBorder, shape: BoxShape.circle),
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  QUEUE INFO BOX
-// ════════════════════════════════════════════════════════════════════
-class _QueueInfoBox extends StatelessWidget {
-  final String label, value;
-  final Color bg, fg;
-  const _QueueInfoBox({
-    required this.label,
-    required this.value,
-    required this.bg,
-    required this.fg,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-    decoration: BoxDecoration(
-      color: bg,
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: fg.withOpacity(0.25)),
-    ),
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w800,
-            color: fg,
-          ),
-        ),
-        const SizedBox(height: 1),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 8,
-            fontWeight: FontWeight.w600,
-            color: fg.withOpacity(0.7),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  SPECIALTY CHIP
-// ════════════════════════════════════════════════════════════════════
-class _SpecialtyChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _SpecialtyChip({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      width: 76,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.15)),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 4),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: kTextPrimary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  DOCTOR CARD
-// ════════════════════════════════════════════════════════════════════
-class _DoctorCard extends StatelessWidget {
-  final Doctor doctor;
-  final VoidCallback onTap;
-  const _DoctorCard({required this.doctor, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final ac = _accentFor(doctor.image);
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _doctorAvatar(doctor.image, size: 50),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        doctor.name,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: kTextPrimary,
-                        ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: kWarning,
-                          size: 12,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          doctor.rating.toString(),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: kWarning,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  doctor.specialty,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: ac,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 3,
-                  children: [
-                    _InfoTag(
-                      icon: Icons.work_history_rounded,
-                      label: '${doctor.experience}yr',
-                      color: kSuccess,
-                    ),
-                    _InfoTag(
-                      icon: Icons.people_rounded,
-                      label: '${doctor.patientsAhead} ahead',
-                      color: kWarning,
-                    ),
-                    _InfoTag(
-                      icon: Icons.timer_rounded,
-                      label: '~${doctor.waitMinutes}min',
-                      color: kPurple,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: onTap,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          side: const BorderSide(color: kPrimary),
-                          foregroundColor: kPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Profile',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          backgroundColor: kPrimary,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        child: const Text(
-                          'Book Now',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  INFO TAG
-// ════════════════════════════════════════════════════════════════════
-class _InfoTag extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _InfoTag({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.1),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 10, color: color),
-        const SizedBox(width: 3),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-            color: color,
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  APPOINTMENT SKELETON CARD
-// ════════════════════════════════════════════════════════════════════
-class _ApptSkeletonCard extends StatefulWidget {
-  const _ApptSkeletonCard();
-  @override
-  State<_ApptSkeletonCard> createState() => _ApptSkeletonCardState();
-}
-
-class _ApptSkeletonCardState extends State<_ApptSkeletonCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1300),
-    )..repeat();
-    _anim = Tween<double>(
-      begin: -2.0,
-      end: 2.0,
-    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Widget _bar({double? width, required double height}) => AnimatedBuilder(
-    animation: _anim,
-    builder: (_, __) => Container(
-      width: width,
-      height: height,
-      margin: const EdgeInsets.only(bottom: 5),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(5),
-        gradient: LinearGradient(
-          begin: Alignment(_anim.value - 1, 0),
-          end: Alignment(_anim.value + 1, 0),
-          colors: const [
-            Color(0xFFEDF2F7),
-            Color(0xFFE2E8F0),
-            Color(0xFFCBD5E0),
-            Color(0xFFE2E8F0),
-            Color(0xFFEDF2F7),
-          ],
-        ),
-      ),
-    ),
-  );
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: _anim,
-    builder: (_, __) => Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              gradient: LinearGradient(
-                begin: Alignment(_anim.value - 1, 0),
-                end: Alignment(_anim.value + 1, 0),
-                colors: const [
-                  Color(0xFFEDF2F7),
-                  Color(0xFFCBD5E0),
-                  Color(0xFFEDF2F7),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _bar(width: 130, height: 13),
-                _bar(width: 90, height: 10),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    _bar(width: 70, height: 10),
-                    const SizedBox(width: 8),
-                    _bar(width: 55, height: 10),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}

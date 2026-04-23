@@ -339,63 +339,53 @@ class _SearchSurface extends StatelessWidget {
             ),
           ),
           child: expanded
-              ? ClipRect(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: SizedBox(
-                      width: fullWidth,
-                      child: Row(
-                        children: [
-                          Padding(
-                            padding:
-                                EdgeInsets.symmetric(horizontal: hPadding),
-                            child: Icon(
-                              Icons.search_rounded,
-                              color: iconColor,
-                              size: searchIconSize,
-                            ),
-                          ),
-                          Expanded(
-                            child: TextField(
-                              controller: controller,
-                              focusNode: focusNode,
-                              onChanged: onChanged,
-                              onSubmitted: onSubmitted,
-                              style: TextStyle(
-                                fontSize: textFontSize,
-                                color: textColor,
-                              ),
-                              decoration: InputDecoration(
-                                border: InputBorder.none,
-                                hintText: hintText,
-                                hintStyle: TextStyle(
-                                  fontSize: textFontSize,
-                                  color: iconColor,
-                                ),
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                              ),
-                            ),
-                          ),
-                          // Close button — sized to fit height
-                          SizedBox(
-                            width: height,
-                            height: height,
-                            child: IconButton(
-                              tooltip: 'Close search',
-                              padding: EdgeInsets.zero,
-                              onPressed: onClose,
-                              icon: Icon(
-                                Icons.close_rounded,
-                                color: iconColor,
-                                size: closeIconSize,
-                              ),
-                            ),
-                          ),
-                        ],
+              ? Row(
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: hPadding),
+                      child: Icon(
+                        Icons.search_rounded,
+                        color: iconColor,
+                        size: searchIconSize,
                       ),
                     ),
-                  ),
+                    Expanded(
+                      child: TextField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        onChanged: onChanged,
+                        onSubmitted: onSubmitted,
+                        style: TextStyle(
+                          fontSize: textFontSize,
+                          color: textColor,
+                        ),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          hintText: hintText,
+                          hintStyle: TextStyle(
+                            fontSize: textFontSize,
+                            color: iconColor,
+                          ),
+                          isDense: true,
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ),
+                    SizedBox(
+                      width: height,
+                      height: height,
+                      child: IconButton(
+                        tooltip: 'Close search',
+                        padding: EdgeInsets.zero,
+                        onPressed: onClose,
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: iconColor,
+                          size: closeIconSize,
+                        ),
+                      ),
+                    ),
+                  ],
                 )
               : Center(
                   child: Icon(
