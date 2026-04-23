@@ -76,8 +76,33 @@ abstract class ApiService {
 
 
   //  POST API
-  @POST("login/addDoctorDetails")
-  Future<dynamic> addDoctorDetails(@Body() DoctorDetails doctorLogin);
+  // @POST("login/addDoctorDetails")
+  // Future<dynamic> addDoctorDetails(@Body() DoctorDetails doctorLogin);
+
+  @MultiPart()
+  @POST("login/doctor")
+  Future<dynamic> addDoctorMultipart(
+    @Part(name: "doctor_id") int? doctorId,
+    @Part(name: "name") String name,
+    @Part(name: "email") String email,
+    @Part(name: "mobile") String mobile,
+    @Part(name: "qualification") String qualification,
+    @Part(name: "license_no") String licenseNo,
+    @Part(name: "experience") String experience,
+    @Part(name: "specialization") String specialization,
+    @Part(name: "role_id") int roleId,
+    @Part(name: "clinic_name") String clinicName,
+    @Part(name: "clinic_address") String clinicAddress,
+    @Part(name: "latitude") String latitude,
+    @Part(name: "longitude") String longitude,
+    @Part(name: "consultation_fee") String consultationFee,
+    @Part(name: "website_name") String websiteName,
+    @Part(name: "clinic_email") String clinicEmail,
+    @Part(name: "clinic_contact") String clinicContact,
+    @Part(name: "gender_id") int genderId,
+    @Part(name: "doctor_image") MultipartFile? doctorImage,
+    @Part(name: "clinic_image") MultipartFile? clinicImage,
+  );
 
   @POST("doctor/insert/insertMedicine")
   Future<dynamic> addMedicine(@Body() Medicine medicine);
@@ -204,9 +229,24 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   @GET("patient/users/review/doctor/{doctor_id}")
   Future<List<ReviewModel>> getDoctorReviews(@Path("doctor_id") int doctorId);
 
-  // POST API
-  @POST("login/addPatientDetails")
-  Future<dynamic> addPatient(@Body() Patients patient);
+  // // POST API
+  // @POST("login/addPatientDetails")
+  // Future<dynamic> addPatient(@Body() Patients patient);
+
+  @MultiPart()
+  @POST("login/patient")
+  Future<dynamic> addPatientMultipart(
+    @Part(name: "patient_id") int? patientId,
+    @Part(name: "name") String name,
+    @Part(name: "mobile_no") String mobileNo,
+    @Part(name: "email") String email,
+    @Part(name: "address") String address,
+    @Part(name: "gender_id") int genderId,
+    @Part(name: "DOB") String dob,
+    @Part(name: "blood_group_id") int bloodGroupId,
+    @Part(name: "weight") String weight,
+    @Part(name: "image") MultipartFile? image,
+  );
 
   @POST("patient/insert/insertFamilyMember")
   Future<dynamic> addFamilyMember(@Body() FamilyMember member);

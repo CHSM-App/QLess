@@ -383,17 +383,69 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<dynamic> addDoctorDetails(DoctorDetails doctorLogin) async {
+  Future<dynamic> addDoctorMultipart(
+    int? doctorId,
+    String name,
+    String email,
+    String mobile,
+    String qualification,
+    String licenseNo,
+    String experience,
+    String specialization,
+    int roleId,
+    String clinicName,
+    String clinicAddress,
+    String latitude,
+    String longitude,
+    String consultationFee,
+    String websiteName,
+    String clinicEmail,
+    String clinicContact,
+    int genderId,
+    MultipartFile? doctorImage,
+    MultipartFile? clinicImage,
+  ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
-    final _data = <String, dynamic>{};
-    _data.addAll(doctorLogin.toJson());
+    final _data = FormData();
+    if (doctorId != null) {
+      _data.fields.add(MapEntry('doctor_id', doctorId.toString()));
+    }
+    _data.fields.add(MapEntry('name', name));
+    _data.fields.add(MapEntry('email', email));
+    _data.fields.add(MapEntry('mobile', mobile));
+    _data.fields.add(MapEntry('qualification', qualification));
+    _data.fields.add(MapEntry('license_no', licenseNo));
+    _data.fields.add(MapEntry('experience', experience));
+    _data.fields.add(MapEntry('specialization', specialization));
+    _data.fields.add(MapEntry('role_id', roleId.toString()));
+    _data.fields.add(MapEntry('clinic_name', clinicName));
+    _data.fields.add(MapEntry('clinic_address', clinicAddress));
+    _data.fields.add(MapEntry('latitude', latitude));
+    _data.fields.add(MapEntry('longitude', longitude));
+    _data.fields.add(MapEntry('consultation_fee', consultationFee));
+    _data.fields.add(MapEntry('website_name', websiteName));
+    _data.fields.add(MapEntry('clinic_email', clinicEmail));
+    _data.fields.add(MapEntry('clinic_contact', clinicContact));
+    _data.fields.add(MapEntry('gender_id', genderId.toString()));
+    if (doctorImage != null) {
+      _data.files.add(MapEntry('doctor_image', doctorImage));
+    }
+    if (clinicImage != null) {
+      _data.files.add(MapEntry('clinic_image', clinicImage));
+    }
     final _options = _setStreamType<dynamic>(
-      Options(method: 'POST', headers: _headers, extra: _extra)
+      Options(
+            method: 'POST',
+            headers: _headers,
+            extra: _extra,
+            contentType: 'multipart/form-data',
+          )
           .compose(
             _dio.options,
-            'login/addDoctorDetails',
+            'login/doctor',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -1172,17 +1224,47 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<dynamic> addPatient(Patients patient) async {
+  Future<dynamic> addPatientMultipart(
+    int? patientId,
+    String name,
+    String mobileNo,
+    String email,
+    String address,
+    int genderId,
+    String dob,
+    int bloodGroupId,
+    String weight,
+    MultipartFile? image,
+  ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
-    final _data = <String, dynamic>{};
-    _data.addAll(patient.toJson());
+    final _data = FormData();
+    if (patientId != null) {
+      _data.fields.add(MapEntry('patient_id', patientId.toString()));
+    }
+    _data.fields.add(MapEntry('name', name));
+    _data.fields.add(MapEntry('mobile_no', mobileNo));
+    _data.fields.add(MapEntry('email', email));
+    _data.fields.add(MapEntry('address', address));
+    _data.fields.add(MapEntry('gender_id', genderId.toString()));
+    _data.fields.add(MapEntry('DOB', dob));
+    _data.fields.add(MapEntry('blood_group_id', bloodGroupId.toString()));
+    _data.fields.add(MapEntry('weight', weight));
+    if (image != null) {
+      _data.files.add(MapEntry('image', image));
+    }
     final _options = _setStreamType<dynamic>(
-      Options(method: 'POST', headers: _headers, extra: _extra)
+      Options(
+            method: 'POST',
+            headers: _headers,
+            extra: _extra,
+            contentType: 'multipart/form-data',
+          )
           .compose(
             _dio.options,
-            'login/addPatientDetails',
+            'login/patient',
             queryParameters: queryParameters,
             data: _data,
           )

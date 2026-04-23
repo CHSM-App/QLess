@@ -1,3 +1,7 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
+import 'package:path/path.dart' as p;
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/domain/models/patients.dart';
@@ -9,8 +13,27 @@ class PatientLoginImpl implements PatientLoginRepository {
   PatientLoginImpl(this.apiService);
 
   @override
-  Future<dynamic> addPatient(Patients doctorLogin) {
-    return apiService.addPatient(doctorLogin);
+  Future<dynamic> addPatient(Patients patient, {File? image}) async {
+    MultipartFile? multipartImage;
+    if (image != null) {
+      multipartImage = await MultipartFile.fromFile(
+        image.path,
+        filename: p.basename(image.path),
+      );
+    }
+
+    return apiService.addPatientMultipart(
+      patient.patientId,
+      patient.name ?? "",
+      patient.mobileNo ?? "",
+      patient.email ?? "",
+      patient.address ?? "",
+      patient.genderId ?? 0,
+      patient.DOB?.toIso8601String().split('T').first ?? "",
+      patient.bloodGroupId ?? 0,
+      patient.weight ?? "",
+      multipartImage,
+    );
   }
 
   @override

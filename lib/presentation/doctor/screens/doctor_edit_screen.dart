@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
@@ -84,6 +87,12 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   final _clinicContactCtrl = TextEditingController();
   final _clinicEmailCtrl   = TextEditingController();
   final _websiteCtrl       = TextEditingController();
+  // Add these alongside existing state variables
+File? _doctorImage;
+File? _clinicImage;
+String? _doctorNetworkImage;
+String? _clinicNetworkImage;
+final ImagePicker _picker = ImagePicker();
 
   final _specs   = const [
     'Cardiology', 'General Physician', 'Dermatology',
@@ -149,6 +158,8 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     _set(_clinicContactCtrl, details.clinicContact);
     _set(_clinicEmailCtrl,   details.clinicEmail);
     _set(_websiteCtrl,       details.websiteName);
+    _doctorNetworkImage = details.image ?? details.image;
+_clinicNetworkImage = details.imageUrl ?? details.imageUrl;
 
     _originalMobile = (details.mobile ?? state.mobile ?? '').trim();
     _applyGender(details);
@@ -156,6 +167,163 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     if (mounted) setState(() {});
   }
 
+Future<void> _pickImage({required bool isDoctor}) async {
+  final current = isDoctor ? _doctorImage : _clinicImage;
+  final hasNetwork = isDoctor
+      ? (_doctorNetworkImage != null && _doctorNetworkImage!.isNotEmpty)
+      : (_clinicNetworkImage != null && _clinicNetworkImage!.isNotEmpty);
+
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: kBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              isDoctor ? 'Doctor Photo' : 'Clinic Photo',
+              style: const TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose how to set the profile picture',
+              style: TextStyle(fontSize: 12, color: kTextMuted),
+            ),
+            const SizedBox(height: 16),
+            _sourceOption(
+              icon: Icons.camera_alt_outlined,
+              iconBg: kPrimaryLight,
+              iconFg: kPrimary,
+              label: 'Take a Photo',
+              subtitle: 'Use your camera',
+              onTap: () async {
+                Navigator.pop(ctx);
+                final xfile = await _picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 80,
+                );
+                if (xfile != null) {
+                  setState(() {
+                    if (isDoctor) _doctorImage = File(xfile.path);
+                    else _clinicImage = File(xfile.path);
+                  });
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+            _sourceOption(
+              icon: Icons.photo_library_outlined,
+              iconBg: const Color(0xFFEDE9FE),
+              iconFg: const Color(0xFF9F7AEA),
+              label: 'Choose from Gallery',
+              subtitle: 'Pick from your photos',
+              onTap: () async {
+                Navigator.pop(ctx);
+                final xfile = await _picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 80,
+                );
+                if (xfile != null) {
+                  setState(() {
+                    if (isDoctor) _doctorImage = File(xfile.path);
+                    else _clinicImage = File(xfile.path);
+                  });
+                }
+              },
+            ),
+            if (current != null || hasNetwork) ...[
+              const SizedBox(height: 10),
+              _sourceOption(
+                icon: Icons.delete_outline_rounded,
+                iconBg: const Color(0xFFFEE2E2),
+                iconFg: const Color(0xFFFC8181),
+                label: 'Remove Photo',
+                subtitle: 'Reset to default avatar',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    if (isDoctor) {
+                      _doctorImage = null;
+                      _doctorNetworkImage = null;
+                    } else {
+                      _clinicImage = null;
+                      _clinicNetworkImage = null;
+                    }
+                  });
+                },
+              ),
+            ],
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _sourceOption({
+  required IconData icon,
+  required Color iconBg,
+  required Color iconFg,
+  required String label,
+  required String subtitle,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: iconFg),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary)),
+                Text(subtitle,
+                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, size: 18, color: kTextMuted),
+        ],
+      ),
+    ),
+  );
+}
   void _set(TextEditingController c, String? v) {
     final s = v?.trim();
     if (s == null || s.isEmpty) return;
@@ -271,8 +439,22 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
       genderId:        _genderId(_selectedGender),
       Token:           state.token,
     );
+      debugPrint('doctorId: ${details?.doctorId}');
+  debugPrint('name: ${_nameCtrl.text}');
+  debugPrint('email: ${_emailCtrl.text}');
+  debugPrint('mobile: ${_contactCtrl.text}');
+  debugPrint('roleId: ${details?.roleId}');
+  debugPrint('clinicId: ${details?.clinicId}');
+  debugPrint('genderId: ${_genderId(_selectedGender)}');
+  debugPrint('fee: ${_feeCtrl.text}');
+  debugPrint('exp: ${_expCtrl.text}');
+  debugPrint('clinicImage: $_clinicImage');
 
-    await ref.read(doctorLoginViewModelProvider.notifier).addDoctorDetails(doctor);
+await ref.read(doctorLoginViewModelProvider.notifier).addDoctorDetails(
+  doctor,
+  doctorImage: _doctorImage,   // ← add
+  clinicImage: _clinicImage,   // ← add
+);
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
@@ -289,8 +471,14 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     Navigator.pop(context, true);
   }
 
-  int?    _parseInt(String? v)    => v == null ? null : int.tryParse(v.trim());
-  double? _parseDouble(String? v) => v == null ? null : double.tryParse(v.trim());
+int? _parseInt(String? v) {
+  if (v == null || v.trim().isEmpty) return null;
+  return int.tryParse(v.trim());
+}
+  double? _parseDouble(String? v) {
+  if (v == null || v.trim().isEmpty) return null;
+  return double.tryParse(v.trim().replaceAll(',', ''));
+}
   int?    _genderId(String g)     =>
       g.toLowerCase() == 'female' ? 2 : g.toLowerCase() == 'other' ? 3 : 1;
 
@@ -490,15 +678,28 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   );
 
   // ── Widgets ───────────────────────────────────────────────────────
+Widget _avatarCard({required bool isDoctor}) {
+  final localFile   = isDoctor ? _doctorImage   : _clinicImage;
+  final networkUrl  = isDoctor ? _doctorNetworkImage : _clinicNetworkImage;
+  final hasImage    = localFile != null || (networkUrl != null && networkUrl.isNotEmpty);
 
-  Widget _avatarCard({required bool isDoctor}) => Container(
+  ImageProvider? imageProvider;
+  if (localFile != null) {
+    imageProvider = FileImage(localFile);
+  } else if (networkUrl != null && networkUrl.isNotEmpty) {
+    imageProvider = NetworkImage(networkUrl);
+  }
+
+  return Container(
     width: double.infinity,
     padding: const EdgeInsets.symmetric(vertical: 14),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: kBorder),
-      boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
+      boxShadow: const [
+        BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))
+      ],
     ),
     child: Column(children: [
       Stack(children: [
@@ -509,32 +710,49 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
             shape: isDoctor ? BoxShape.circle : BoxShape.rectangle,
             borderRadius: isDoctor ? null : BorderRadius.circular(14),
             border: Border.all(color: kPrimary, width: 1.8),
+            image: imageProvider != null
+                ? DecorationImage(
+                    image: imageProvider,
+                    fit: BoxFit.cover,
+                    onError: (_, __) {},
+                  )
+                : null,
           ),
-          child: Icon(
-            isDoctor ? Icons.person_rounded : Icons.local_hospital_outlined,
-            size: 28, color: kPrimary,
-          ),
+          child: !hasImage
+              ? Icon(
+                  isDoctor ? Icons.person_rounded : Icons.local_hospital_outlined,
+                  size: 28, color: kPrimary,
+                )
+              : null,
         ),
         Positioned(
           bottom: 0, right: 0,
-          child: Container(
-            width: 20, height: 20,
-            decoration: BoxDecoration(
-              color: kPrimary, shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
+          child: GestureDetector(
+            onTap: () => _pickImage(isDoctor: isDoctor),
+            child: Container(
+              width: 20, height: 20,
+              decoration: BoxDecoration(
+                color: kPrimary, shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.edit_rounded, size: 10, color: Colors.white),
             ),
-            child: const Icon(Icons.edit_rounded, size: 10, color: Colors.white),
           ),
         ),
       ]),
       const SizedBox(height: 5),
       Text(
-        isDoctor ? 'Tap to change photo' : 'Tap to change clinic photo',
-        style: const TextStyle(fontSize: 11, color: kTextMuted),
+        hasImage
+            ? (localFile != null ? 'Photo selected' : 'Tap to change photo')
+            : (isDoctor ? 'Tap to change photo' : 'Tap to change clinic photo'),
+        style: TextStyle(
+          fontSize: 11,
+          color: localFile != null ? kSuccess : kTextMuted,
+        ),
       ),
     ]),
   );
-
+}
   Widget _field(
     String label,
     TextEditingController ctrl, {

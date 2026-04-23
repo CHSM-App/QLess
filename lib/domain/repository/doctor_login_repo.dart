@@ -1,9 +1,15 @@
 
+import 'dart:io';
+
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
 
 abstract class DoctorLoginRepository {
-  Future<dynamic> addDoctorDetails(DoctorDetails doctorLogin);
+  Future<dynamic> addDoctorDetails(
+    DoctorDetails doctorLogin, {
+    File? doctorImage,
+    File? clinicImage,
+  });
    Future<List<DoctorDetails>> checkPhoneDoctor(String mobile);
 
    Future<dynamic> addMedicine(Medicine medicine);

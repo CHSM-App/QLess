@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
@@ -50,6 +53,11 @@ class _PatientEditProfilePageState
   final _emailController  = TextEditingController();
   final _addressController= TextEditingController();
   final _weightController = TextEditingController();
+  File? _pickedImage;
+final ImagePicker _picker = ImagePicker();
+
+String? _networkImageUrl;   // ← add this
+
 
   String    _selectedGender     = 'Female';
   String    _selectedBloodGroup = 'B+';
@@ -124,6 +132,7 @@ class _PatientEditProfilePageState
     _set(_emailController,   details.email   ?? state.email);
     _set(_addressController, details.address);
     _set(_weightController,  details.weight);
+    _networkImageUrl = details.imgUrl ?? details.imgUrl ?? details.imgUrl;
 
     _applyGender(details);
     _applyBloodGroup(details);
@@ -222,7 +231,7 @@ class _PatientEditProfilePageState
     );
 
     _didSubmit = true;
-    ref.read(patientLoginViewModelProvider.notifier).addPatient(patient);
+ref.read(patientLoginViewModelProvider.notifier).addPatient(patient, image: _pickedImage);
   }
 
   int? _genderIdFor(String g) {
@@ -456,82 +465,331 @@ class _PatientEditProfilePageState
   // Avatar Card
   // ---------------------------------------------------------------------------
 
-  Widget _avatarCard() {
-    final name = _nameController.text.trim().isNotEmpty
-        ? _nameController.text.trim()
-        : 'Patient';
-    final initials = name.trim().split(RegExp(r'\s+')).take(2)
-        .map((w) => w[0].toUpperCase()).join();
+  // Widget _avatarCard() {
+  //   final name = _nameController.text.trim().isNotEmpty
+  //       ? _nameController.text.trim()
+  //       : 'Patient';
+  //   final initials = name.trim().split(RegExp(r'\s+')).take(2)
+  //       .map((w) => w[0].toUpperCase()).join();
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kBorder),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 4)),
-        ],
-      ),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [kPrimary, kPrimaryDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+  //   return Container(
+  //     width: double.infinity,
+  //     padding: const EdgeInsets.symmetric(vertical: 18),
+  //     decoration: BoxDecoration(
+  //       color: Colors.white,
+  //       borderRadius: BorderRadius.circular(14),
+  //       border: Border.all(color: kBorder),
+  //       boxShadow: [
+  //         BoxShadow(
+  //             color: Colors.black.withOpacity(0.04),
+  //             blurRadius: 12,
+  //             offset: const Offset(0, 4)),
+  //       ],
+  //     ),
+  //     child: Column(
+  //       children: [
+  //         Stack(
+  //           children: [
+  //             Container(
+  //               width: 72,
+  //               height: 72,
+  //               decoration: BoxDecoration(
+  //                 gradient: const LinearGradient(
+  //                   colors: [kPrimary, kPrimaryDark],
+  //                   begin: Alignment.topLeft,
+  //                   end: Alignment.bottomRight,
+  //                 ),
+  //                 borderRadius: BorderRadius.circular(18),
+  //               ),
+  //               alignment: Alignment.center,
+  //               child: Text(initials,
+  //                   style: const TextStyle(
+  //                       fontSize: 24,
+  //                       fontWeight: FontWeight.w700,
+  //                       color: Colors.white)),
+  //             ),
+  //             Positioned(
+  //               bottom: 0,
+  //               right: 0,
+  //               child: GestureDetector(
+  //                 onTap: () {},
+  //                 child: Container(
+  //                   width: 24,
+  //                   height: 24,
+  //                   decoration: BoxDecoration(
+  //                     color: kWarning,
+  //                     shape: BoxShape.circle,
+  //                     border: Border.all(color: Colors.white, width: 2),
+  //                   ),
+  //                   child: const Icon(Icons.edit_rounded,
+  //                       size: 12, color: Colors.white),
+  //                 ),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //         const SizedBox(height: 8),
+  //         Text(name,
+  //             style: const TextStyle(
+  //                 fontSize: 14,
+  //                 fontWeight: FontWeight.w700,
+  //                 color: kTextPrimary)),
+  //         const SizedBox(height: 2),
+  //         const Text('Tap icon to change photo',
+  //             style: TextStyle(fontSize: 11, color: kTextMuted)),
+  //       ],
+  //     ),
+  //   );
+  // }
+
+  Widget _avatarCard() {
+  final name = _nameController.text.trim().isNotEmpty
+      ? _nameController.text.trim()
+      : 'Patient';
+  final initials = name.trim().split(RegExp(r'\s+')).take(2)
+      .map((w) => w[0].toUpperCase()).join();
+
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(vertical: 18),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: kBorder),
+      boxShadow: [
+        BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4)),
+      ],
+    ),
+    child: Column(
+      children: [
+        Stack(
+          children: [
+           
+          Container(
+  width: 72,
+  height: 72,
+  decoration: BoxDecoration(
+    gradient: (_pickedImage == null && _networkImageUrl == null)
+        ? const LinearGradient(
+            colors: [kPrimary, kPrimaryDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          )
+        : null,
+    borderRadius: BorderRadius.circular(18),
+    image: _pickedImage != null
+        ? DecorationImage(
+            image: FileImage(_pickedImage!),
+            fit: BoxFit.cover,
+          )
+        : (_networkImageUrl != null && _networkImageUrl!.isNotEmpty)
+            ? DecorationImage(
+                image: NetworkImage(_networkImageUrl!),
+                fit: BoxFit.cover,
+                onError: (_, __) {},   // silently fallback
+              )
+            : null,
+  ),
+  alignment: Alignment.center,
+  child: (_pickedImage == null && (_networkImageUrl == null || _networkImageUrl!.isEmpty))
+      ? Text(initials,
+          style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: Colors.white))
+      : null,
+),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: GestureDetector(
+                onTap: _pickImage,         // ← opens bottom sheet
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: kWarning,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
-                  borderRadius: BorderRadius.circular(18),
+                  child: const Icon(Icons.edit_rounded,
+                      size: 12, color: Colors.white),
                 ),
-                alignment: Alignment.center,
-                child: Text(initials,
-                    style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white)),
               ),
-              Positioned(
-                bottom: 0,
-                right: 0,
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: kWarning,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(Icons.edit_rounded,
-                        size: 12, color: Colors.white),
-                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(name,
+            style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary)),
+        const SizedBox(height: 2),
+       Text(
+  _pickedImage != null
+      ? 'Photo selected'
+      : (_networkImageUrl != null && _networkImageUrl!.isNotEmpty)
+          ? 'Tap icon to change photo'
+          : 'Tap icon to add photo',
+  style: TextStyle(
+      fontSize: 11,
+      color: _pickedImage != null ? kSuccess : kTextMuted),
+),
+      ],
+    ),
+  );
+}
+Future<void> _pickImage() async {
+  showModalBottomSheet(
+    context: context,
+    backgroundColor: Colors.white,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: kBorder,
+                  borderRadius: BorderRadius.circular(2),
                 ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Profile Photo',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Choose how to set your profile picture',
+              style: TextStyle(fontSize: 12, color: kTextMuted),
+            ),
+            const SizedBox(height: 16),
+            _sourceOption(
+              icon: Icons.camera_alt_outlined,
+              iconBg: kPrimaryLight,
+              iconFg: kPrimary,
+              label: 'Take a Photo',
+              subtitle: 'Use your camera',
+              onTap: () async {
+                Navigator.pop(ctx);
+                final xfile = await _picker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 80,
+                );
+                if (xfile != null) {
+                  setState(() => _pickedImage = File(xfile.path));
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+            _sourceOption(
+              icon: Icons.photo_library_outlined,
+              iconBg: kPurpleLight,
+              iconFg: kPurple,
+              label: 'Choose from Gallery',
+              subtitle: 'Pick from your photos',
+              onTap: () async {
+                Navigator.pop(ctx);
+                final xfile = await _picker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 80,
+                );
+                if (xfile != null) {
+                  setState(() => _pickedImage = File(xfile.path));
+                }
+              },
+            ),
+            if (_pickedImage != null) ...[
+              const SizedBox(height: 10),
+              _sourceOption(
+                icon: Icons.delete_outline_rounded,
+                iconBg: kRedLight,
+                iconFg: kError,
+                label: 'Remove Photo',
+                subtitle: 'Reset to initials avatar',
+              onTap: () {
+  Navigator.pop(ctx);
+  setState(() {
+    _pickedImage = null;
+    _networkImageUrl = null;   // ← add this
+  });
+},
               ),
             ],
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+Widget _sourceOption({
+  required IconData icon,
+  required Color iconBg,
+  required Color iconFg,
+  required String label,
+  required String subtitle,
+  required VoidCallback onTap,
+}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kBorder),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: iconFg),
           ),
-          const SizedBox(height: 8),
-          Text(name,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: kTextPrimary)),
-          const SizedBox(height: 2),
-          const Text('Tap icon to change photo',
-              style: TextStyle(fontSize: 11, color: kTextMuted)),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: kTextPrimary)),
+              Text(subtitle,
+                  style: const TextStyle(fontSize: 11, color: kTextMuted)),
+            ],
+          ),
+          const Spacer(),
+          const Icon(Icons.chevron_right_rounded, size: 18, color: kTextMuted),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ---------------------------------------------------------------------------
   // Section Card

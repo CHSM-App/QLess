@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
@@ -7,8 +9,16 @@ class DoctorLoginUsecase {
 
   DoctorLoginUsecase(this.doctorLoginRepository);
 
-  Future<dynamic> addDoctorDetails(DoctorDetails doctorLogin) {
-    return doctorLoginRepository.addDoctorDetails(doctorLogin);
+  Future<dynamic> addDoctorDetails(
+    DoctorDetails doctorLogin, {
+    File? doctorImage,
+    File? clinicImage,
+  }) {
+    return doctorLoginRepository.addDoctorDetails(
+      doctorLogin,
+      doctorImage: doctorImage,
+      clinicImage: clinicImage,
+    );
   }
 
   Future<List<DoctorDetails>> checkPhoneDoctor(String mobile) {

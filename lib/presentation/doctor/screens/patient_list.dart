@@ -277,6 +277,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           patientGender: p.gender,
           queueNumber: p.queueNumber,
           patientStatus: 'booked',
+          symptoms: p.symptoms,
         ),
       ),
     );
