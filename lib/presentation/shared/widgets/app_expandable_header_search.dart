@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppExpandableHeaderSearch extends StatefulWidget {
-  final IconData? leadingIcon; // Now optional
+  final IconData? leadingIcon;
   final String title;
   final String subtitle;
   final String hintText;
@@ -22,7 +22,7 @@ class AppExpandableHeaderSearch extends StatefulWidget {
 
   const AppExpandableHeaderSearch({
     super.key,
-    this.leadingIcon, // Optional — no `required`
+    this.leadingIcon,
     required this.title,
     required this.subtitle,
     required this.hintText,
@@ -91,22 +91,16 @@ class _AppExpandableHeaderSearchState
       builder: (context, constraints) {
         final width = constraints.maxWidth;
 
-        // Responsive breakpoints
         final isNarrow = width < 220;
         final isMedium = width >= 220 && width < 340;
         final isWide = width >= 340;
 
-        // Adaptive sizes
         final iconBoxSize = widget.height;
         final searchButtonSize = widget.height;
 
-        // On very narrow widths, hide subtitle to prevent overflow
         final showSubtitle = !isNarrow;
-
-        // Right padding reserves space for the search button + a small gap
         final titleAreaRightPadding = searchButtonSize + (isNarrow ? 6 : 12);
 
-        // Adaptive font sizes
         final titleFontSize = isNarrow
             ? 13.0
             : isMedium
@@ -124,64 +118,62 @@ class _AppExpandableHeaderSearchState
             height: widget.height,
             child: ClipRect(
               child: Stack(
-              alignment: Alignment.centerRight,
-              children: [
-                // ── Title area ──────────────────────────────────────────
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 140),
-                  opacity: _isExpanded ? 0 : 1,
-                  child: IgnorePointer(
-                    ignoring: _isExpanded,
-                    child: Padding(
-                      padding: EdgeInsets.only(right: titleAreaRightPadding),
-                      child: _HeaderTitle(
-                        height: iconBoxSize,
-                        leadingIcon: widget.leadingIcon,
-                        leadingBackgroundColor: widget.leadingBackgroundColor,
-                        accentColor: widget.accentColor,
-                        title: widget.title,
-                        subtitle: widget.subtitle,
-                        titleColor: widget.titleColor,
-                        subtitleColor: widget.subtitleColor,
-                        showSubtitle: showSubtitle,
-                        titleFontSize: titleFontSize,
-                        subtitleFontSize: subtitleFontSize,
-                        // On narrow widths with no icon, collapse icon+gap
-                        showLeadingIcon: widget.leadingIcon != null && isWide,
+                alignment: Alignment.centerRight,
+                children: [
+                  // ── Title area ────────────────────────────────────────
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 140),
+                    opacity: _isExpanded ? 0 : 1,
+                    child: IgnorePointer(
+                      ignoring: _isExpanded,
+                      child: Padding(
+                        padding: EdgeInsets.only(right: titleAreaRightPadding),
+                        child: _HeaderTitle(
+                          height: iconBoxSize,
+                          leadingIcon: widget.leadingIcon,
+                          leadingBackgroundColor: widget.leadingBackgroundColor,
+                          accentColor: widget.accentColor,
+                          title: widget.title,
+                          subtitle: widget.subtitle,
+                          titleColor: widget.titleColor,
+                          subtitleColor: widget.subtitleColor,
+                          showSubtitle: showSubtitle,
+                          titleFontSize: titleFontSize,
+                          subtitleFontSize: subtitleFontSize,
+                          showLeadingIcon: widget.leadingIcon != null && isWide,
+                        ),
                       ),
                     ),
                   ),
-                ),
 
-                // ── Search surface ───────────────────────────────────────
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  right: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: _isExpanded ? width : searchButtonSize,
-                  child: _SearchSurface(
-                    controller: _controller,
-                    focusNode: _focusNode,
-                    expanded: _isExpanded,
-                    fullWidth: width,
-                    hintText: widget.hintText,
-                    height: widget.height,
-                    accentColor: widget.accentColor,
-                    fieldColor: widget.fieldColor,
-                    borderColor: widget.borderColor,
-                    iconColor: widget.iconColor,
-                    textColor: widget.textColor,
-                    onTap: _expand,
-                    onClose: _collapse,
-                    onChanged: widget.onChanged,
-                    onSubmitted: widget.onSubmitted,
+                  // ── Search surface ─────────────────────────────────────
+                  AnimatedPositioned(
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: _isExpanded ? width : searchButtonSize,
+                    child: _SearchSurface(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      expanded: _isExpanded,
+                      hintText: widget.hintText,
+                      height: widget.height,
+                      accentColor: widget.accentColor,
+                      fieldColor: widget.fieldColor,
+                      borderColor: widget.borderColor,
+                      iconColor: widget.iconColor,
+                      textColor: widget.textColor,
+                      onTap: _expand,
+                      onClose: _collapse,
+                      onChanged: widget.onChanged,
+                      onSubmitted: widget.onSubmitted,
+                    ),
                   ),
-                ),
-              ],
+                ],
               ),
-            ), // ClipRect
+            ),
           ),
         );
       },
@@ -195,7 +187,7 @@ class _AppExpandableHeaderSearchState
 
 class _HeaderTitle extends StatelessWidget {
   final double height;
-  final IconData? leadingIcon; // Optional
+  final IconData? leadingIcon;
   final bool showLeadingIcon;
   final Color leadingBackgroundColor;
   final Color accentColor;
@@ -227,7 +219,6 @@ class _HeaderTitle extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ── Optional leading icon ──────────────────────────────────────
         if (showLeadingIcon && leadingIcon != null) ...[
           Container(
             width: height,
@@ -240,8 +231,6 @@ class _HeaderTitle extends StatelessWidget {
           ),
           const SizedBox(width: 10),
         ],
-
-        // ── Title + subtitle ───────────────────────────────────────────
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -285,7 +274,6 @@ class _SearchSurface extends StatelessWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool expanded;
-  final double fullWidth;
   final String hintText;
   final double height;
   final Color accentColor;
@@ -302,7 +290,6 @@ class _SearchSurface extends StatelessWidget {
     required this.controller,
     required this.focusNode,
     required this.expanded,
-    required this.fullWidth,
     required this.hintText,
     required this.height,
     required this.accentColor,
@@ -318,15 +305,13 @@ class _SearchSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Responsive: tighten horizontal padding on narrow surfaces
-    final hPadding = fullWidth < 260 ? 8.0 : 11.0;
     final searchIconSize = height < 40 ? 15.0 : 17.0;
     final closeIconSize = height < 40 ? 16.0 : 18.0;
-    final textFontSize = fullWidth < 260 ? 12.0 : 13.0;
 
     return Material(
       color: fieldColor,
       borderRadius: BorderRadius.circular(10),
+      clipBehavior: Clip.hardEdge,
       child: InkWell(
         onTap: expanded ? null : onTap,
         borderRadius: BorderRadius.circular(10),
@@ -338,62 +323,82 @@ class _SearchSurface extends StatelessWidget {
               color: expanded ? accentColor : borderColor,
             ),
           ),
-          child: expanded
-              ? Row(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: hPadding),
-                      child: Icon(
-                        Icons.search_rounded,
-                        color: iconColor,
-                        size: searchIconSize,
-                      ),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        onChanged: onChanged,
-                        onSubmitted: onSubmitted,
-                        style: TextStyle(
-                          fontSize: textFontSize,
-                          color: textColor,
-                        ),
-                        decoration: InputDecoration(
-                          border: InputBorder.none,
-                          hintText: hintText,
-                          hintStyle: TextStyle(
-                            fontSize: textFontSize,
-                            color: iconColor,
-                          ),
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      width: height,
-                      height: height,
-                      child: IconButton(
-                        tooltip: 'Close search',
-                        padding: EdgeInsets.zero,
-                        onPressed: onClose,
-                        icon: Icon(
-                          Icons.close_rounded,
-                          color: iconColor,
-                          size: closeIconSize,
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : Center(
+          // ── LayoutBuilder reads the ACTUAL rendered width on every
+          //    animation frame — this is the key fix. AnimatedPositioned
+          //    tweens the layout constraints each frame, so LayoutBuilder
+          //    always has the true current width, unlike a passed-in value
+          //    which is only a snapshot from the last setState.
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final actualWidth = constraints.maxWidth;
+              final hPadding = actualWidth < 260 ? 8.0 : 11.0;
+              final textFontSize = actualWidth < 260 ? 12.0 : 13.0;
+
+              // Only show the expanded row when there is genuinely enough
+              // room — this prevents the RenderFlex overflow that occurs
+              // while the surface is still narrow mid-animation.
+              final showExpandedContent = expanded && actualWidth >= 120.0;
+
+              if (!showExpandedContent) {
+                return Center(
                   child: Icon(
                     Icons.search_rounded,
                     color: accentColor,
-                    size: height * 0.43, // Proportional to height
+                    size: height * 0.43,
                   ),
-                ),
+                );
+              }
+
+              return Row(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: hPadding),
+                    child: Icon(
+                      Icons.search_rounded,
+                      color: iconColor,
+                      size: searchIconSize,
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      onChanged: onChanged,
+                      onSubmitted: onSubmitted,
+                      style: TextStyle(
+                        fontSize: textFontSize,
+                        color: textColor,
+                      ),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        hintText: hintText,
+                        hintStyle: TextStyle(
+                          fontSize: textFontSize,
+                          color: iconColor,
+                        ),
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: height,
+                    height: height,
+                    child: IconButton(
+                      tooltip: 'Close search',
+                      padding: EdgeInsets.zero,
+                      onPressed: onClose,
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: iconColor,
+                        size: closeIconSize,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

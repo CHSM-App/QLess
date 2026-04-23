@@ -248,36 +248,67 @@ Widget build(BuildContext context) {
            onChanged: (_) => setState(() {}),
         ),
       ),
+      // actions: [
+      //   GestureDetector(
+      //     onTap: () => setState(() {
+      //       _favOnly = !_favOnly;
+      //       if (!_favOnly) _specialty = null;
+      //     }),
+      //     child: AnimatedContainer(
+      //       duration: const Duration(milliseconds: 180),
+      //       width: 34,
+      //       height: 34,
+      //       margin: const EdgeInsets.only(right: 14),
+      //       decoration: BoxDecoration(
+      //         color: _favOnly ? kRedLight : const Color(0xFFF7F8FA),
+      //         borderRadius: BorderRadius.circular(10),
+      //         border: Border.all(
+      //           color: _favOnly
+      //               ? kError.withOpacity(0.3)
+      //               : kBorder,
+      //         ),
+      //       ),
+      //       child: Icon(
+      //         _favOnly
+      //             ? Icons.favorite_rounded
+      //             : Icons.favorite_border_rounded,
+      //         color: _favOnly ? kError : kTextPrimary,
+      //         size: 16,
+      //       ),
+      //     ),
+      //   ),
+      // ],
+
       actions: [
-        GestureDetector(
-          onTap: () => setState(() {
-            _favOnly = !_favOnly;
-            if (!_favOnly) _specialty = null;
-          }),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 34,
-            height: 34,
-            margin: const EdgeInsets.only(right: 14),
-            decoration: BoxDecoration(
-              color: _favOnly ? kRedLight : const Color(0xFFF7F8FA),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: _favOnly
-                    ? kError.withOpacity(0.3)
-                    : kBorder,
-              ),
-            ),
-            child: Icon(
-              _favOnly
-                  ? Icons.favorite_rounded
-                  : Icons.favorite_border_rounded,
-              color: _favOnly ? kError : kTextPrimary,
-              size: 16,
-            ),
-          ),
+  GestureDetector(
+    onTap: () => setState(() {
+      _favOnly = !_favOnly;
+      if (!_favOnly) _specialty = null;
+    }),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 36,   // ← leading button  (10 margin + 16 icon + 10 margin)
+      height: 36,
+      margin: const EdgeInsets.only(right: 14),
+      decoration: BoxDecoration(
+        color: _favOnly ? kRedLight : kPrimaryLight,  // leading  light bg
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _favOnly
+              ? kError.withOpacity(0.3)
+              : kPrimary.withOpacity(0.2),  // leading border
         ),
-      ],
+      ),
+      child: Icon(
+        _favOnly
+            ? Icons.favorite_rounded
+            : Icons.favorite_border_rounded,
+        color: _favOnly ? kError : kPrimary,  // leading icon color 
+        size: 16,  // ← leading icon size 
+      ),
+    ),
+  ),
+],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
         child: Container(color: kBorder, height: 1),

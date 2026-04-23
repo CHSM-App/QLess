@@ -682,27 +682,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ),
                           ],
                         )),
-                        const SizedBox(height: 14),
-                        _fade(1, GestureDetector(
-                          onTap: () => widget.onTabChange(1),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF7F8FA),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: kBorder),
-                            ),
-                            child: const Row(children: [
-                              Icon(Icons.search_rounded,
-                                  color: kTextMuted, size: 17),
-                              SizedBox(width: 8),
-                              Text('Search doctors or specialties…',
-                                  style: TextStyle(
-                                      color: kTextMuted, fontSize: 13)),
-                            ]),
-                          ),
-                        ),)
+                        // const SizedBox(height: 14),
+                        // _fade(1, GestureDetector(
+                        //   onTap: () => widget.onTabChange(1),
+                        //   child: Container(
+                        //     padding: const EdgeInsets.symmetric(
+                        //         horizontal: 14, vertical: 10),
+                        //     decoration: BoxDecoration(
+                        //       color: const Color(0xFFF7F8FA),
+                        //       borderRadius: BorderRadius.circular(12),
+                        //       border: Border.all(color: kBorder),
+                        //     ),
+                        //     child: const Row(children: [
+                        //       Icon(Icons.search_rounded,
+                        //           color: kTextMuted, size: 17),
+                        //       SizedBox(width: 8),
+                        //       Text('Search doctors or specialties…',
+                        //           style: TextStyle(
+                        //               color: kTextMuted, fontSize: 13)),
+                        //     ]),
+                        //   ),
+                        // ),)
                       ],
                     ),
                   ),
