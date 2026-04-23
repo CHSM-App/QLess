@@ -4,6 +4,7 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -350,7 +351,6 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
         child: Column(
           children: [
             _buildHeader(),
-            _buildSearchBar(),
             Expanded(
               child: familyState.allfamilyMembers.when(
                 loading: _buildLoading,
@@ -458,11 +458,6 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
   // UI sub-widgets
   // ---------------------------------------------------------------------------
 Widget _buildHeader() {
-  final name     = ref.read(patientLoginViewModelProvider).name ?? 'Patient';
-  final initials = name.trim().isNotEmpty
-      ? name.trim().split(' ').take(2).map((w) => w[0].toUpperCase()).join()
-      : '?';
-
   return Container(
     color: kBg,
     padding: EdgeInsets.fromLTRB(14, MediaQuery.of(context).padding.top + 8, 14, 8),
@@ -482,85 +477,42 @@ Widget _buildHeader() {
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('Family Members',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
-                      letterSpacing: -0.2)),
-              Text('Manage your health profiles',
-                  style: TextStyle(fontSize: 11, color: kTextMuted)),
-            ],
+          child: AppExpandableHeaderSearch(
+            controller: _searchController,
+            leadingIcon: Icons.people_alt_rounded,
+            title: 'Family Members',
+            subtitle: 'Manage your health profiles',
+            hintText: 'Search members...',
+            height: 40,
+            accentColor: kPrimary,
+            leadingBackgroundColor: kPrimaryLight,
+            titleColor: kTextPrimary,
+            subtitleColor: kTextMuted,
+            fieldColor: const Color(0xFFF7F8FA),
+
+            borderColor: kBorder,
+            iconColor: kTextMuted,
+            textColor: kTextPrimary,
           ),
         ),
-        Container(
-          width: 32, height: 32,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [kPrimary, kPrimaryDark],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(9),
-          ),
-          alignment: Alignment.center,
-          child: Text(initials,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white)),
-        ),
+        // Container(
+        //   width: 32, height: 32,
+        //   decoration: BoxDecoration(
+        //     gradient: const LinearGradient(
+        //       colors: [kPrimary, kPrimaryDark],
+        //       begin: Alignment.topLeft,
+        //       end: Alignment.bottomRight,
+        //     ),
+        //     borderRadius: BorderRadius.circular(9),
+        //   ),
+        //   alignment: Alignment.center,
+        //   child: Text(initials,
+        //       style: const TextStyle(
+        //           fontSize: 12,
+        //           fontWeight: FontWeight.w700,
+        //           color: Colors.white)),
+        // ),
       ],
-    ),
-  );
-}
-Widget _buildSearchBar() {
-  return Container(
-    color: kBg,
-    padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
-    child: Container(
-      height: 38,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
-      ),
-      child: Row(
-        children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10),
-            child: Icon(Icons.search_rounded, size: 15, color: kTextMuted),
-          ),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              style: const TextStyle(fontSize: 13, color: kTextPrimary),
-              decoration: const InputDecoration(
-                hintText: 'Search members…',
-                hintStyle: TextStyle(fontSize: 13, color: kTextMuted),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-          if (_searchQuery.isNotEmpty)
-            GestureDetector(
-              onTap: () => _searchController.clear(),
-              child: Container(
-                margin: const EdgeInsets.only(right: 8),
-                width: 16, height: 16,
-                decoration: const BoxDecoration(
-                    color: kTextMuted, shape: BoxShape.circle),
-                child: const Icon(Icons.close_rounded,
-                    size: 10, color: Colors.white),
-              ),
-            ),
-        ],
-      ),
     ),
   );
 }

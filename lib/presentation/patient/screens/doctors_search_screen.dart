@@ -1,4 +1,4 @@
-import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -7,6 +7,7 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour palette (shared across all screens) ────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -56,15 +57,6 @@ Color _bgFor(String? s)     => _kBgPalette[_hashIndex(s, _kBgPalette.length)];
 String _cap(String s) =>
     s.isEmpty ? s : '${s[0].toUpperCase()}${s.substring(1).toLowerCase()}';
 
-double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
-  const r = 6371.0;
-  final dLat = (lat2 - lat1) * pi / 180;
-  final dLon = (lon2 - lon1) * pi / 180;
-  final a = sin(dLat / 2) * sin(dLat / 2) +
-      cos(lat1 * pi / 180) * cos(lat2 * pi / 180) *
-      sin(dLon / 2) * sin(dLon / 2);
-  return r * 2 * atan2(sqrt(a), sqrt(1 - a));
-}
 
 // ── Queue State ───────────────────────────────────────────────────────────────
 enum _QueueState { noQueue, unavailable, opensSoon, full, open, hasQueue }
@@ -212,111 +204,106 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   // ════════════════════════════════════════════════════════════════════
   //  BUILD
   // ════════════════════════════════════════════════════════════════════
-  @override
-  Widget build(BuildContext context) {
-    final doctorsState = ref.watch(doctorsViewModelProvider);
-    final patState     = ref.watch(patientLoginViewModelProvider);
-    final famState     = ref.watch(familyViewModelProvider);
+ @override
+Widget build(BuildContext context) {
+  final doctorsState = ref.watch(doctorsViewModelProvider);
+  final patState     = ref.watch(patientLoginViewModelProvider);
+  final famState     = ref.watch(familyViewModelProvider);
 
-    final allDoctors  = doctorsState.doctors;
-    final members     = famState.allfamilyMembers.maybeWhen(
-        data: (m) => m, orElse: () => <FamilyMember>[]);
-    final docs        = _filtered(allDoctors);
-    final specialties = _specialties(allDoctors);
-    final isLoading   = doctorsState.isLoading;
+  final allDoctors  = doctorsState.doctors;
+  final members     = famState.allfamilyMembers.maybeWhen(
+      data: (m) => m, orElse: () => <FamilyMember>[]);
+  final docs        = _filtered(allDoctors);
+  final specialties = _specialties(allDoctors);
+  final isLoading   = doctorsState.isLoading;
 
-    return Scaffold(
+  return Scaffold(
+    backgroundColor: Colors.white,
+    appBar: AppBar(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        titleSpacing: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-            margin: const EdgeInsets.all(10),
+      elevation: 0,
+      titleSpacing: 0,
+      leading: GestureDetector(
+        onTap: () => Navigator.pop(context),
+        child: Container(
+          margin: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: kPrimaryLight,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 16,
+            color: kPrimary,
+          ),
+        ),
+      ),
+      title: SizedBox(
+        height: 40,
+        child: AppExpandableHeaderSearch( // from your widget :contentReference[oaicite:0]{index=0}
+          // leadingIcon: Icons.search_rounded,
+          title: 'Find Doctor',
+          subtitle: 'Search doctors, specialties',
+          hintText: 'Search doctor...',
+           onChanged: (_) => setState(() {}),
+        ),
+      ),
+      actions: [
+        GestureDetector(
+          onTap: () => setState(() {
+            _favOnly = !_favOnly;
+            if (!_favOnly) _specialty = null;
+          }),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 34,
+            height: 34,
+            margin: const EdgeInsets.only(right: 14),
             decoration: BoxDecoration(
-              color: kPrimaryLight,
+              color: _favOnly ? kRedLight : const Color(0xFFF7F8FA),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _favOnly
+                    ? kError.withOpacity(0.3)
+                    : kBorder,
+              ),
             ),
-            child: const Icon(
-              Icons.arrow_back_ios_new_rounded,
+            child: Icon(
+              _favOnly
+                  ? Icons.favorite_rounded
+                  : Icons.favorite_border_rounded,
+              color: _favOnly ? kError : kTextPrimary,
               size: 16,
-              color: kPrimary,
             ),
           ),
         ),
-        title: const Text(
-          'Find Doctor',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: kTextPrimary,
-          ),
-        ),
-        actions: [
-          // Favorites toggle
-          GestureDetector(
-            onTap: () => setState(() {
-              _favOnly = !_favOnly;
-              if (!_favOnly) _specialty = null;
-            }),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 34, height: 34,
-              margin: const EdgeInsets.only(right: 14),
-              decoration: BoxDecoration(
-                color: _favOnly ? kRedLight : const Color(0xFFF7F8FA),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: _favOnly
-                      ? kError.withOpacity(0.3)
-                      : kBorder,
-                ),
-              ),
-              child: Icon(
-                _favOnly
-                    ? Icons.favorite_rounded
-                    : Icons.favorite_border_rounded,
-                color: _favOnly ? kError : kTextPrimary,
-                size: 16,
-              ),
-            ),
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: kBorder, height: 1),
-        ),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(color: kBorder, height: 1),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Booking row ────────────────────────────────────────
-          _buildBookingRow(patState, members),
+    ),
+    body: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildBookingRow(patState, members),
 
-          // ── Search bar ─────────────────────────────────────────
-          _buildSearchBar(),
+        if (!_favOnly)
+          _buildSpecialtyChips(specialties)
+        else
+          _buildFavStrip(),
 
-          // ── Specialty chips / fav strip ─────────────────────────
-          if (!_favOnly)
-            _buildSpecialtyChips(specialties)
-          else
-            _buildFavStrip(),
+        if (!isLoading) _buildCountBadge(docs.length),
 
-          // ── Count badge ─────────────────────────────────────────
-          if (!isLoading) _buildCountBadge(docs.length),
-
-          // ── Doctor list ─────────────────────────────────────────
-          Expanded(
-            child: isLoading
-                ? const _LoadingShimmer()
-                : _buildDoctorList(docs),
-          ),
-        ],
-      ),
-    );
-  }
+        Expanded(
+          child: isLoading
+              ? const _LoadingShimmer()
+              : _buildDoctorList(docs),
+        ),
+      ],
+    ),
+  );
+}
 
   // ── Booking Row ────────────────────────────────────────────────────
   Widget _buildBookingRow(PatientLoginState patState, List<FamilyMember> members) {
@@ -385,59 +372,22 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-      child: Container(
+      child: AppExpandableHeaderSearch(
+        controller: _searchCtrl,
+        leadingIcon: Icons.medical_services_rounded,
+        title: 'Search Doctors',
+        subtitle: 'Doctor, specialty, clinic',
+        hintText: 'Doctor, specialty, clinic...',
         height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FA),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kBorder),
-        ),
-        child: Row(children: [
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 11),
-            child: Icon(Icons.search_rounded, color: kTextMuted, size: 17),
-          ),
-          Expanded(
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (_) => setState(() {}),
-              style: const TextStyle(
-                  fontSize: 13, color: kTextPrimary),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                hintText: 'Doctor, specialty, clinic…',
-                hintStyle:
-                    TextStyle(fontSize: 13, color: kTextMuted),
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ),
-          _searchCtrl.text.isNotEmpty
-              ? GestureDetector(
-                  onTap: () {
-                    _searchCtrl.clear();
-                    setState(() {});
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 10),
-                    width: 18, height: 18,
-                    decoration: const BoxDecoration(
-                        color: kTextMuted, shape: BoxShape.circle),
-                    child: const Icon(Icons.close_rounded,
-                        size: 11, color: Colors.white),
-                  ),
-                )
-              : Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  width: 26, height: 26,
-                  decoration: BoxDecoration(
-                      color: kPrimary,
-                      borderRadius: BorderRadius.circular(7)),
-                  child: const Icon(Icons.tune_rounded,
-                      color: Colors.white, size: 13),
-                ),
-        ]),
+        accentColor: kPrimary,
+        leadingBackgroundColor: kPrimaryLight,
+        titleColor: kTextPrimary,
+        subtitleColor: kTextMuted,
+        fieldColor: const Color(0xFFF7F8FA),
+        borderColor: kBorder,
+        iconColor: kTextMuted,
+        textColor: kTextPrimary,
+        onChanged: (_) => setState(() {}),
       ),
     );
   }

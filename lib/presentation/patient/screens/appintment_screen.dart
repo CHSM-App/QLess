@@ -10,6 +10,7 @@ import 'package:qless/presentation/patient/screens/book_appointment_screen.dart'
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
@@ -516,84 +517,23 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
           Padding(
             padding: EdgeInsets.fromLTRB(
                 16, MediaQuery.of(context).padding.top + 12, 16, 0),
-            child: Row(
-              children: [
-                Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                      color: kPrimaryLight,
-                      borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.calendar_month_rounded,
-                      color: kPrimary, size: 18),
-                ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Appointments',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: kTextPrimary,
-                              letterSpacing: -0.2)),
-                      SizedBox(height: 1),
-                      Text('Manage your schedule',
-                          style: TextStyle(fontSize: 11, color: kTextMuted)),
-                    ],
-                  ),
-                ),
-              ],
+            child: AppExpandableHeaderSearch(
+              leadingIcon: Icons.calendar_month_rounded,
+              title: 'Appointments',
+              subtitle: 'Manage your schedule',
+              hintText: 'Search by patient name...',
+              accentColor: kPrimary,
+              leadingBackgroundColor: kPrimaryLight,
+              titleColor: kTextPrimary,
+              subtitleColor: kTextMuted,
+              fieldColor: const Color(0xFFF7F8FA),
+              borderColor: kBorder,
+              iconColor: kTextMuted,
+              textColor: kTextPrimary,
+              onChanged: (v) => setState(() => _search = v),
             ),
           ),
-          const SizedBox(height: 10),
-
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            child: Container(
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF7F8FA),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBorder),
-              ),
-              child: Row(
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 11),
-                    child: Icon(Icons.search_rounded, color: kTextMuted, size: 17),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      onChanged: (v) => setState(() => _search = v),
-                      style: const TextStyle(fontSize: 13, color: kTextPrimary),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: 'Search by patient name…',
-                        hintStyle: TextStyle(fontSize: 13, color: kTextMuted),
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                    ),
-                  ),
-                  if (_search.isNotEmpty)
-                    GestureDetector(
-                      onTap: () => setState(() => _search = ''),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 10),
-                        width: 18, height: 18,
-                        decoration: const BoxDecoration(
-                            color: kTextMuted, shape: BoxShape.circle),
-                        child: const Icon(Icons.close_rounded,
-                            size: 11, color: Colors.white),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // Pill filter tabs — horizontal scroll
           SizedBox(

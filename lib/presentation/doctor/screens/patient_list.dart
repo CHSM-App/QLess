@@ -7,6 +7,7 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 const kPrimary        = Color(0xFF26C6B0);
 const kPrimaryDark    = Color(0xFF2BB5A0);
@@ -508,30 +509,21 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-          child: Row(children: [
-            Container(
-              width: 34, height: 34,
-              decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kPrimary.withOpacity(0.2)),
-              ),
-              child: const Icon(Icons.people_alt_outlined, color: kPrimary, size: 17),
-            ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Patients',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                  SizedBox(height: 1),
-                  Text('Manage your patient queue',
-                      style: TextStyle(fontSize: 11, color: kTextSecondary)),
-                ],
-              ),
-            ),
-          ]),
+          child: AppExpandableHeaderSearch(
+            controller: _searchCtrl,
+            leadingIcon: Icons.people_alt_outlined,
+            title: 'Patients',
+            subtitle: 'Manage your patient queue',
+            hintText: 'Search by name, status or queue...',
+            accentColor: kPrimary,
+            leadingBackgroundColor: kPrimaryLight,
+            titleColor: kTextPrimary,
+            subtitleColor: kTextSecondary,
+            fieldColor: kBg,
+            borderColor: kBorder,
+            iconColor: kTextMuted,
+            textColor: kTextPrimary,
+          ),
         ),
       ),
     );
@@ -546,7 +538,6 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     required List<AppointmentList> allAppointments,
   }) {
     return Column(children: [
-      _SearchBarWidget(controller: _searchCtrl),
       _PillTabBar(
         controller: _tabCtrl,
         todayCount: today.length,
@@ -1585,55 +1576,6 @@ class _PatientListBody extends ConsumerWidget {
   }
 }
 
-// ── Search Bar ────────────────────────────────────────────────────────────────
-class _SearchBarWidget extends StatelessWidget {
-  final TextEditingController controller;
-  const _SearchBarWidget({required this.controller});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    color: Colors.white,
-    padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-    child: Container(
-      height: 40,
-      decoration: BoxDecoration(
-        color: kBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kBorder),
-      ),
-      child: Row(children: [
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 11),
-          child: Icon(Icons.search_rounded, size: 17, color: kTextMuted),
-        ),
-        Expanded(
-          child: TextField(
-            controller: controller,
-            style: const TextStyle(fontSize: 13, color: kTextPrimary),
-            decoration: const InputDecoration(
-              hintText: 'Search by name, status or queue…',
-              hintStyle: TextStyle(fontSize: 13, color: kTextMuted),
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ),
-        if (controller.text.isNotEmpty)
-          GestureDetector(
-            onTap: controller.clear,
-            child: Container(
-              margin: const EdgeInsets.only(right: 10),
-              width: 18, height: 18,
-              decoration: const BoxDecoration(color: kTextMuted, shape: BoxShape.circle),
-              child: const Icon(Icons.close_rounded, size: 11, color: Colors.white),
-            ),
-          ),
-      ]),
-    ),
-  );
-}
-
 // ── Pill Tab Bar ───────────────────────────────────────────────────────────────
 class _PillTabBar extends StatelessWidget {
   final TabController controller;
@@ -1720,30 +1662,21 @@ class _DesktopSidebar extends StatelessWidget {
       ),
       Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-        child: Container(
+        child: AppExpandableHeaderSearch(
+          controller: searchCtrl,
+          leadingIcon: Icons.people_alt_outlined,
+          title: 'Search',
+          subtitle: 'Patients',
+          hintText: 'Search patients...',
           height: 36,
-          decoration: BoxDecoration(
-            color: kBg,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kBorder),
-          ),
-          child: Row(children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 9),
-              child: Icon(Icons.search_rounded, size: 15, color: kTextMuted),
-            ),
-            Expanded(child: TextField(
-              controller: searchCtrl,
-              style: const TextStyle(fontSize: 12, color: kTextPrimary),
-              decoration: const InputDecoration(
-                hintText: 'Search patients…',
-                hintStyle: TextStyle(fontSize: 12, color: kTextMuted),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.zero,
-              ),
-            )),
-          ]),
+          accentColor: kPrimary,
+          leadingBackgroundColor: kPrimaryLight,
+          titleColor: kTextPrimary,
+          subtitleColor: kTextMuted,
+          fieldColor: kBg,
+          borderColor: kBorder,
+          iconColor: kTextMuted,
+          textColor: kTextPrimary,
         ),
       ),
       Padding(

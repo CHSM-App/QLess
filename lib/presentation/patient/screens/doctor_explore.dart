@@ -7,6 +7,7 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour palette (mirrors home_screen.dart) ─────────────────────────────────
 const _kPrimary      = Color(0xFF26C6B0);
@@ -314,92 +315,20 @@ if (_position != null && (isLoading || nearby.isNotEmpty)) ...[
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Title row: icon + title + action button ──
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Icon badge
-                  Container(
-                    width: 34, height: 34,
-                    decoration: BoxDecoration(
-                      color: _kPrimaryLight,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: _kPrimary.withOpacity(0.2)),
-                    ),
-                    child: const Icon(Icons.explore_rounded,
-                        color: _kPrimary, size: 17),
-                  ),
-                  const SizedBox(width: 8),
-                  // Title + subtitle
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Find a Doctor',
-                            style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: _kTextPrimary)),
-                        const SizedBox(height: 1),
-                        const Text('Book appointments near you',
-                            style: TextStyle(
-                                fontSize: 11,
-                                color: _kTextSecondary)),
-                      ],
-                    ),
-                  ),
-                  // Notification button
-                  // _HeaderBtn(
-                  //   icon: Icons.notifications_outlined,
-                  //   badge: true,
-                  //   onTap: () {},
-                  // ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // ── Search bar — matches HomeScreen style ──
-              GestureDetector(
-                onTap: () => _goToSearch(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF7F8FA),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _kBorder),
-                  ),
-                  child: Row(children: [
-                    const Icon(Icons.search_rounded,
-                        color: _kTextMuted, size: 17),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Search doctors, specialties…',
-                        style: TextStyle(
-                            color: _kTextMuted, fontSize: 13),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                          color: _kPrimaryLight,
-                          borderRadius: BorderRadius.circular(6)),
-                      child: const Text('Search',
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: _kPrimary)),
-                    ),
-                  ]),
-                ),
-              ),
-            ],
+          child: AppExpandableHeaderSearch(
+            leadingIcon: Icons.explore_rounded,
+            title: 'Find a Doctor',
+            subtitle: 'Book appointments near you',
+            hintText: 'Search doctors, specialties...',
+            accentColor: _kPrimary,
+            leadingBackgroundColor: _kPrimaryLight,
+            titleColor: _kTextPrimary,
+            subtitleColor: _kTextSecondary,
+            fieldColor: const Color(0xFFF7F8FA),
+            borderColor: _kBorder,
+            iconColor: _kTextMuted,
+            textColor: _kTextPrimary,
+            onSubmitted: (_) => _goToSearch(context),
           ),
         ),
       ),

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour Palette (matches QueueHomePage exactly) ───────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -376,103 +377,21 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
 
-              // ── Title row ───────────────────────────────────────────────
-              Row(
-                children: [
-                  // Icon badge — same size/radius as home page
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: kPrimaryLight,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: kPrimary.withOpacity(0.2)),
-                    ),
-                    child: const Icon(Icons.medication_rounded,
-                        color: kPrimary, size: 17),
-                  ),
-                  const SizedBox(width: 8),
-
-                  // Title + subtitle — same font sizes as home page
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Medicines',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: kTextPrimary,
-                          ),
-                        ),
-                        SizedBox(height: 1),
-                        Text(
-                          'Manage your medicines list',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: kTextSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // ── Search bar ──────────────────────────────────────────────
-              Container(
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF7F8FA),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kBorder),
-                ),
-                child: Row(
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 11),
-                      child: Icon(Icons.search_rounded,
-                          size: 17, color: kTextMuted),
-                    ),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchCtrl,
-                        onChanged: (_) => setState(() {}),
-                        style: const TextStyle(
-                            fontSize: 13, color: kTextPrimary),
-                        decoration: const InputDecoration(
-                          hintText: 'Search medicines…',
-                          hintStyle: TextStyle(
-                              fontSize: 13, color: kTextMuted),
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                      ),
-                    ),
-                    if (_searchCtrl.text.isNotEmpty)
-                      GestureDetector(
-                        onTap: () {
-                          _searchCtrl.clear();
-                          setState(() {});
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(right: 10),
-                          width: 18,
-                          height: 18,
-                          decoration: const BoxDecoration(
-                              color: kTextMuted,
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.close_rounded,
-                              size: 11, color: Colors.white),
-                        ),
-                      ),
-                  ],
-                ),
+              AppExpandableHeaderSearch(
+                controller: _searchCtrl,
+                leadingIcon: Icons.medication_rounded,
+                title: 'Medicines',
+                subtitle: 'Manage your medicines list',
+                hintText: 'Search medicines...',
+                accentColor: kPrimary,
+                leadingBackgroundColor: kPrimaryLight,
+                titleColor: kTextPrimary,
+                subtitleColor: kTextMuted,
+                fieldColor: const Color(0xFFF7F8FA),
+                borderColor: kBorder,
+                iconColor: kTextMuted,
+                textColor: kTextPrimary,
+                onChanged: (_) => setState(() {}),
               ),
 
               const SizedBox(height: 8),

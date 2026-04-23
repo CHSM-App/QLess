@@ -8,6 +8,7 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/print_prescription_screen.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Shared colour palette ─────────────────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -358,42 +359,22 @@ class _PatientPrescriptionListScreenState
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
         child: Row(children: [
           Expanded(
-            child: SizedBox(
+            child: AppExpandableHeaderSearch(
+              controller: _searchCtrl,
+              leadingIcon: Icons.receipt_long_rounded,
+              title: 'Search Prescriptions',
+              subtitle: 'Diagnosis, Rx, doctor',
+              hintText: 'Search diagnosis, Rx, doctor...',
               height: 40,
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (v) => setState(() => _search = v),
-                style: const TextStyle(fontSize: 13, color: kTextPrimary),
-                decoration: InputDecoration(
-                  hintText: 'Search diagnosis, Rx, doctor…',
-                  hintStyle: const TextStyle(fontSize: 12, color: kTextMuted),
-                  prefixIcon: const Icon(Icons.search_rounded,
-                      color: kPrimary, size: 17),
-                  suffixIcon: _search.isNotEmpty
-                      ? GestureDetector(
-                          onTap: () => setState(
-                              () { _search = ''; _searchCtrl.clear(); }),
-                          child: Container(
-                            margin: const EdgeInsets.all(10),
-                            width: 18, height: 18,
-                            decoration: const BoxDecoration(
-                                color: kTextMuted, shape: BoxShape.circle),
-                            child: const Icon(Icons.close_rounded,
-                                color: Colors.white, size: 11),
-                          ),
-                        )
-                      : null,
-                  filled: true,
-                  fillColor: const Color(0xFFF7F8FA),
-                  contentPadding: EdgeInsets.zero,
-                  enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: kBorder)),
-                  focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: kPrimary, width: 1.5)),
-                ),
-              ),
+              accentColor: kPrimary,
+              leadingBackgroundColor: kPrimaryLight,
+              titleColor: kTextPrimary,
+              subtitleColor: kTextMuted,
+              fieldColor: const Color(0xFFF7F8FA),
+              borderColor: kBorder,
+              iconColor: kTextMuted,
+              textColor: kTextPrimary,
+              onChanged: (v) => setState(() => _search = v),
             ),
           ),
           const SizedBox(width: 8),
