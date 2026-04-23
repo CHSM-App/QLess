@@ -97,6 +97,50 @@ Widget _doctorAvatar(String? spec, {double size = 46}) {
 }
 
 // ── Shimmer ────────────────────────────────────────────────────────
+DateTime? _timeTodayFromRaw(String? raw) {
+  final value = raw?.trim();
+  if (value == null ||
+      value.isEmpty ||
+      value == '--' ||
+      value.toLowerCase() == 'null') {
+    return null;
+  }
+
+  final now = DateTime.now();
+  final iso = DateTime.tryParse(value);
+  if (iso != null) {
+    final u = iso.toUtc();
+    return DateTime(now.year, now.month, now.day, u.hour, u.minute);
+  }
+
+  final match = RegExp(
+    r'^(\d{1,2}):(\d{2})(?::\d{2})?\s*([aApP][mM])?$',
+  ).firstMatch(value);
+  if (match == null) return null;
+
+  var hour = int.tryParse(match.group(1) ?? '');
+  final minute = int.tryParse(match.group(2) ?? '');
+  if (hour == null || minute == null || minute > 59) return null;
+
+  final meridiem = match.group(3)?.toLowerCase();
+  if (meridiem != null) {
+    if (hour < 1 || hour > 12) return null;
+    if (hour == 12) hour = 0;
+    if (meridiem == 'pm') hour += 12;
+  } else if (hour > 23) {
+    return null;
+  }
+
+  return DateTime(now.year, now.month, now.day, hour, minute);
+}
+
+String _fmtClockTime(String? raw) {
+  final parsed = _timeTodayFromRaw(raw);
+  if (parsed != null) return DateFormat('h:mm a').format(parsed);
+  final value = raw?.trim();
+  return value == null || value.isEmpty ? '--' : value;
+}
+
 class _Shimmer extends StatefulWidget {
   final double width, height;
   const _Shimmer({required this.width, required this.height});
@@ -160,6 +204,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // Cache specialty list so we don't rebuild on every frame
   List<Map<String, dynamic>> _cachedSpecialties = [];
+  bool _popupShown = false;
 
   @override
   void initState() {
@@ -332,6 +377,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         final combined = [...today, ...upcoming];
         final shown    = combined.take(3).toList();
         final hasMore  = combined.length > 3;
+
+        if (!_popupShown) {
+          final todayActive = today.where((a) {
+            final s = a.status?.toLowerCase().trim() ?? '';
+            return s != 'cancelled' && s != 'cancled' && s != 'completed' && s != 'complete';
+          }).toList();
+          if (todayActive.isNotEmpty) {
+            final now = DateTime.now();
+            DateTime? resolveTime(AppointmentList a) =>
+                _timeTodayFromRaw(a.startTime) ??
+                _timeTodayFromRaw(a.estimatedArrivalTime);
+
+            todayActive.sort((a, b) {
+              final ta = resolveTime(a)?.millisecondsSinceEpoch;
+              final tb = resolveTime(b)?.millisecondsSinceEpoch;
+              if (ta == null && tb == null) return 0;
+              if (ta == null) return 1;
+              if (tb == null) return -1;
+              return ta.compareTo(tb);
+            });
+
+            final nowMinutes = now.hour * 60 + now.minute;
+            AppointmentList? next;
+            for (final a in todayActive) {
+              final t = resolveTime(a);
+              if (t == null) continue;
+              final apptMinutes = t.hour * 60 + t.minute;
+              if (apptMinutes >= nowMinutes) { next = a; break; }
+            }
+            if (next == null) {
+              for (final a in todayActive.reversed) {
+                if (resolveTime(a) != null) { next = a; break; }
+              }
+            }
+            final popupAppointment = next ?? todayActive.first;
+            _popupShown = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _showTodayAppointmentPopup(popupAppointment);
+            });
+          }
+        }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -349,6 +436,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ],
         );
       },
+    );
+  }
+
+  void _showTodayAppointmentPopup(AppointmentList appt) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _TodayAppointmentPopup(appointment: appt),
     );
   }
 
@@ -1397,8 +1492,7 @@ class _ApptCardState extends State<_ApptCard>
     if (raw == null || raw.isEmpty) return '—';
     final parts = raw.split(':');
     if (parts.length < 2) return raw;
-    final dt = DateTime(2000, 1, 1, int.tryParse(parts[0]) ?? 0,
-        int.tryParse(parts[1]) ?? 0);
+    final dt = DateTime(2000, 1, 1, int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
     return DateFormat('h:mm a').format(dt);
   }
 
@@ -1654,6 +1748,13 @@ class _ApptCardState extends State<_ApptCard>
       },
     );
   }
+}
+
+// ── Small dot widget ───────────────────────────────────────────────
+class _Dot extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) =>
+    Container(width: 3, height: 3, decoration: const BoxDecoration(color: kBorder, shape: BoxShape.circle));
 }
 
 // ════════════════════════════════════════════════════════════════════
