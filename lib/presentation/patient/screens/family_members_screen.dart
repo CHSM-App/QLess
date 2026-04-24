@@ -388,7 +388,7 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
     final rawSelfName  = selfDetails?.name ?? state.name;
     final selfName     = (rawSelfName != null && rawSelfName.trim().isNotEmpty)
         ? rawSelfName.trim()
-        : 'You';
+        : 'Self';
     final selfMobile   = selfDetails?.mobileNo ?? state.mobileNo;
 
     final hasSelf    = members.any((m) => _isSelf(m, patientId));
@@ -737,7 +737,7 @@ class _FamilyMemberCard extends StatelessWidget {
                       ),
                     ),
                     if (isSelf)
-                      _Badge('You', bg: kPrimaryLight, fg: kPrimary),
+                      _Badge('Self', bg: kPrimaryLight, fg: kPrimary),
                   ]),
                   const SizedBox(height: 3),
                   Wrap(

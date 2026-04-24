@@ -182,16 +182,6 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
         : 'D';
     final did        = d.doctorId;
 
-    // Sync fav from cache
-    final cached = did == null
-        ? null
-        : ref.watch(favoriteViewModelProvider).doctorFavorites[did];
-    if (cached != null && cached != _isFav) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _isFav = cached);
-      });
-    }
-
     ref.listen<FavoriteState>(favoriteViewModelProvider, (prev, next) {
       if (did == null) return;
       final nf = next.doctorFavorites[did];
@@ -594,22 +584,22 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             onTap: () => _toggleFav(!_isFav),
           ),
         ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ActionPill(
-            icon: Icons.share_outlined,
-            label: 'Share',
-            onTap: () {},
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: _ActionPill(
-            icon: Icons.message_outlined,
-            label: 'Message',
-            onTap: () {},
-          ),
-        ),
+        // const SizedBox(width: 8),
+        // Expanded(
+        //   child: _ActionPill(
+        //     icon: Icons.share_outlined,
+        //     label: 'Share',
+        //     onTap: () {},
+        //   ),
+        // ),
+        // const SizedBox(width: 8),
+        // Expanded(
+        //   child: _ActionPill(
+        //     icon: Icons.message_outlined,
+        //     label: 'Message',
+        //     onTap: () {},
+        //   ),
+        // ),
       ]),
     );
   }
@@ -687,7 +677,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
     final byDay = <String, (String, String)>{};
     for (final a in avail) {
-      if (a.isEnabled != true || a.dayOfWeek == null) continue;
+      if ((a.isEnabled ?? 1) == 0 || a.dayOfWeek == null) continue;
       final day = a.dayOfWeek!;
       final s   = a.startTime ?? '';
       final e   = a.endTime   ?? '';

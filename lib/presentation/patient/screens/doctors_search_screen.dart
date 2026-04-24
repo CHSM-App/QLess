@@ -6,6 +6,7 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
+import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
@@ -157,11 +158,21 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
-      ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid);
+      await ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid);
+      if (!mounted) return;
       if (pid > 0) {
         ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
+        final doctorIds = ref
+            .read(doctorsViewModelProvider)
+            .doctors
+            .map((d) => d.doctorId)
+            .whereType<int>()
+            .toList();
+        ref
+            .read(favoriteViewModelProvider.notifier)
+            .fetchFavoritesForDoctors(pid, doctorIds);
       }
       if (widget.initialSpecialty != null) {
         setState(() => _specialty = widget.initialSpecialty);
@@ -175,7 +186,10 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     super.dispose();
   }
 
-  List<DoctorDetails> _filtered(List<DoctorDetails> all) => all.where((d) {
+  List<DoctorDetails> _filtered(
+      List<DoctorDetails> all, Map<int, bool> favMap) =>
+      all.where((d) {
+        if (_favOnly) return favMap[d.doctorId] == true;
         final q = _searchCtrl.text.toLowerCase();
         final matchQ = q.isEmpty ||
             (d.name?.toLowerCase().contains(q) ?? false) ||
@@ -199,6 +213,16 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   Future<void> _refresh() async {
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     await ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid);
+    if (!mounted || pid <= 0) return;
+    final doctorIds = ref
+        .read(doctorsViewModelProvider)
+        .doctors
+        .map((d) => d.doctorId)
+        .whereType<int>()
+        .toList();
+    ref
+        .read(favoriteViewModelProvider.notifier)
+        .fetchFavoritesForDoctors(pid, doctorIds);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -209,11 +233,12 @@ Widget build(BuildContext context) {
   final doctorsState = ref.watch(doctorsViewModelProvider);
   final patState     = ref.watch(patientLoginViewModelProvider);
   final famState     = ref.watch(familyViewModelProvider);
+  final favMap       = ref.watch(favoriteViewModelProvider).doctorFavorites;
 
   final allDoctors  = doctorsState.doctors;
   final members     = famState.allfamilyMembers.maybeWhen(
       data: (m) => m, orElse: () => <FamilyMember>[]);
-  final docs        = _filtered(allDoctors);
+  final docs        = _filtered(allDoctors, favMap);
   final specialties = _specialties(allDoctors);
   final isLoading   = doctorsState.isLoading;
 
@@ -794,7 +819,7 @@ class _DoctorCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
 
-                  // Specialty + exp + rating
+                  // Specialty + exp
                   Wrap(
                     spacing: 5,
                     runSpacing: 4,
@@ -806,7 +831,6 @@ class _DoctorCard extends StatelessWidget {
                             bg: specBg),
                       if (d.experience != null)
                         _ExpTag(years: d.experience!),
-                      const _RatingDot(),
                     ],
                   ),
 
@@ -900,22 +924,6 @@ class _ExpTag extends StatelessWidget {
       );
 }
 
-class _RatingDot extends StatelessWidget {
-  const _RatingDot();
-  @override
-  Widget build(BuildContext context) => const Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.star_rounded, size: 11, color: kWarning),
-          SizedBox(width: 2),
-          Text('4.8',
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: kTextSecondary)),
-        ],
-      );
-}
 
 class _QueuePill extends StatelessWidget {
   final _QueueStatus status;

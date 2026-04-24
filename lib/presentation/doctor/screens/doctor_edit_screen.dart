@@ -576,41 +576,59 @@ int? _parseInt(String? v) {
   );
 
   // ── Tab bar ───────────────────────────────────────────────────────
-  Widget _buildTabBar() => Container(
-    color: Colors.white,
-    child: Column(children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFFF0F5F3),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: TabBar(
-            controller: _tabCtrl,
-            labelColor: kPrimaryDark,
-            unselectedLabelColor: kTextSecondary,
-            indicator: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.07),
-                  blurRadius: 6, offset: const Offset(0, 1))],
-            ),
-            indicatorPadding: const EdgeInsets.all(3),
-            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-            unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-            dividerColor: Colors.transparent,
-            tabs: const [
-              Tab(text: 'Personal Info'),
-              Tab(text: 'Clinic Info'),
-            ],
-          ),
-        ),
-      ),
-      const Divider(height: 1, color: kBorder),
-    ]),
-  );
+ Widget _buildTabBar() => Container(
+  color: Colors.white,
+  child: Column(children: [
+    Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: AnimatedBuilder(
+        animation: _tabCtrl.animation!,
+        builder: (context, _) {
+          final animValue = _tabCtrl.animation!.value;
+          return Row(
+            children: List.generate(2, (index) {
+              final isActive = index == 0
+                  ? animValue < 0.5
+                  : animValue >= 0.5;
 
+              return Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(right: index == 0 ? 10 : 0),
+                  child: GestureDetector(
+                    onTap: () => _tabCtrl.animateTo(index),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: 38,
+                      alignment: Alignment.center,
+                      // ✅ Full pill border — no bubble, no circle
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(40),
+                        border: Border.all(
+                          color: isActive ? kPrimary : kBorder,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        index == 0 ? 'Personal Info' : 'Clinic Info',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: isActive ? kPrimary : kTextSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          );
+        },
+      ),
+    ),
+    const Divider(height: 1, color: kBorder),
+  ]),
+);
   // ── Desktop: side-by-side ─────────────────────────────────────────
   Widget _buildDesktopBody() => Row(
     crossAxisAlignment: CrossAxisAlignment.start,
