@@ -83,6 +83,20 @@ class FavoriteViewmodel extends StateNotifier<FavoriteState> {
     }
   }
 
+  Future<void> fetchFavoritesForDoctors(
+      int patientId, List<int> doctorIds) async {
+    if (patientId <= 0 || doctorIds.isEmpty) return;
+    final results = await Future.wait(
+      doctorIds.map((did) => usecase
+          .getFavoriteDoctor(patientId, did)
+          .then((r) => MapEntry(did, _asBool(r['is_favorite'])))
+          .catchError((_) => MapEntry(did, false))),
+    );
+    final updated = Map<int, bool>.from(state.doctorFavorites)
+      ..addEntries(results);
+    state = state.copyWith(doctorFavorites: updated);
+  }
+
   void clearError() => state = state.copyWith(clearError: true);
 
   bool _asBool(Object? value, {bool defaultValue = false}) {

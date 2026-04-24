@@ -40,7 +40,7 @@ const kPurpleLight = Color(0xFFEDE9FE);
 const kInfo = Color(0xFF3B82F6);
 const kInfoLight = Color(0xFFDBEAFE);
 
-// ── Specialty colour/icon helpers (hash-based, same logic as explore screen) ──
+// ── Specialty colour/icon helpers ──────────────────────────────────
 const _kAccentPalette = [
   Color(0xFFFC8181), Color(0xFFF6AD55), Color(0xFF68D391), Color(0xFF9F7AEA),
   Color(0xFF3B82F6), Color(0xFF26C6B0), Color(0xFFF687B3), Color(0xFF4FD1C5),
@@ -101,7 +101,7 @@ Widget _doctorAvatar(String? spec, {double size = 46}) {
   );
 }
 
-// ── Shimmer ────────────────────────────────────────────────────────
+// ── Time helpers ───────────────────────────────────────────────────
 DateTime? _timeTodayFromRaw(String? raw) {
   final value = raw?.trim();
   if (value == null ||
@@ -140,6 +140,7 @@ DateTime? _timeTodayFromRaw(String? raw) {
 }
 
 
+// ── Shimmer ────────────────────────────────────────────────────────
 class _Shimmer extends StatefulWidget {
   final double width, height;
   const _Shimmer({required this.width, required this.height});
@@ -214,7 +215,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool   _didFetch      = false;
   bool   _isFetching    = false;
 
-  // Cache specialty list so we don't rebuild on every frame
   List<Map<String, dynamic>> _cachedSpecialties = [];
   bool _popupShown = false;
 
@@ -245,7 +245,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     super.dispose();
   }
 
-  // ── Data fetch ─────────────────────────────────────────────────
   Future<void> _ensurePatientIdAndFetch() async {
     if (_isFetching || _didFetch) return;
     _isFetching = true;
@@ -258,7 +257,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
       if (pid == 0) return;
       _didFetch = true;
-      // Fetch both appointments AND doctors in parallel
       await Future.wait([
         ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(pid),
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
@@ -268,7 +266,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  // ── Location ───────────────────────────────────────────────────
   Future<void> _ensureLocationPermission() async {
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
@@ -393,7 +390,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ));
   }
 
-  // ── Appointment helpers ────────────────────────────────────────
   bool _isToday(AppointmentList a) {
     final p = DateTime.tryParse(a.appointmentDate ?? '');
     if (p == null) return false;
@@ -412,7 +408,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return DateTime(p.year, p.month, p.day).isAfter(today);
   }
 
-  // ── Fade animation helper ──────────────────────────────────────
   Widget _fade(int i, Widget child) => AnimatedBuilder(
     animation: _anims[i],
     builder: (_, w) => Opacity(
@@ -423,7 +418,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     child: child,
   );
 
-  // ── Navigate to search with specialty ─────────────────────────
   void _goToSearch({String? specialty}) {
     Navigator.push(
       context,
@@ -433,7 +427,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  // ── Appointments section ───────────────────────────────────────
   Widget _buildAppointmentsSection() {
     final async = ref
         .watch(appointmentViewModelProvider)
@@ -444,8 +437,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       loading: () => _apptShell(loading: true),
       error:   (_, __) => const SizedBox.shrink(),
       data: (list) {
-        final today = list.where(_isToday).toList();
-        final upcoming = list.where(_isUpcoming).toList();
+        DateTime? apptTime(AppointmentList a) =>
+            _timeTodayFromRaw(a.startTime) ??
+            _timeTodayFromRaw(a.estimatedArrivalTime);
+
+        final today = list.where(_isToday).toList()
+          ..sort((a, b) {
+            final ta = apptTime(a)?.millisecondsSinceEpoch;
+            final tb = apptTime(b)?.millisecondsSinceEpoch;
+            if (ta == null && tb == null) return 0;
+            if (ta == null) return 1;
+            if (tb == null) return -1;
+            return ta.compareTo(tb);
+          });
+        final upcoming = list.where(_isUpcoming).toList()
+          ..sort((a, b) {
+            final da = DateTime.tryParse(a.appointmentDate ?? '');
+            final db = DateTime.tryParse(b.appointmentDate ?? '');
+            if (da == null && db == null) return 0;
+            if (da == null) return 1;
+            if (db == null) return -1;
+            return da.compareTo(db);
+          });
         final combined = [...today, ...upcoming];
         final shown = combined.take(3).toList();
         final hasMore = combined.length > 3;
@@ -544,9 +557,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ],
   );
 
-  // ── Specialties section ────────────────────────────────────────
   Widget _buildSpecialtiesSection(List<DoctorDetails> doctors, bool isLoading) {
-    // Update cache when doctors change
     if (doctors.isNotEmpty) {
       _cachedSpecialties = _buildSpecialtyList(doctors);
     }
@@ -558,7 +569,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         _SectionTitle('Most Searched Specialties'),
         const SizedBox(height: 10),
         if (isLoading && specList.isEmpty)
-          // Shimmer skeleton while loading
           SizedBox(
             height: 96,
             child: ListView.separated(
@@ -594,9 +604,43 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  // ════════════════════════════════════════════════════════════════
-  //  BUILD
-  // ════════════════════════════════════════════════════════════════
+  Widget _buildTopRatedDoctorsSection(
+      List<DoctorDetails> doctors, bool isLoading) {
+    final rated = doctors
+        .where((d) => d.rating != null)
+        .toList()
+      ..sort((a, b) => b.rating!.compareTo(a.rating!));
+    final shownDoctors = rated.take(4).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(
+          'Top Rated Doctors',
+          action: shownDoctors.isNotEmpty ? 'Show all' : null,
+          onAction: shownDoctors.isNotEmpty ? () => _goToSearch() : null,
+        ),
+        const SizedBox(height: 10),
+        if (isLoading && shownDoctors.isEmpty) ...[
+          const _TopDoctorSkeletonCard(),
+          const SizedBox(height: 8),
+          const _TopDoctorSkeletonCard(),
+        ] else if (shownDoctors.isEmpty)
+          const _EmptyNote('No top rated doctors available')
+        else
+          ...shownDoctors.map(
+            (doctor) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _TopDoctorCard(
+                doctor: doctor,
+                onTap: () => _goToSearch(specialty: doctor.specialization),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final loginState    = ref.watch(patientLoginViewModelProvider);
@@ -619,8 +663,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
-
-            // ── HEADER ────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Container(
                 decoration: const BoxDecoration(
@@ -712,27 +754,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                             ),
                           ],
                         )),
-                        // const SizedBox(height: 14),
-                        // _fade(1, GestureDetector(
-                        //   onTap: () => widget.onTabChange(1),
-                        //   child: Container(
-                        //     padding: const EdgeInsets.symmetric(
-                        //         horizontal: 14, vertical: 10),
-                        //     decoration: BoxDecoration(
-                        //       color: const Color(0xFFF7F8FA),
-                        //       borderRadius: BorderRadius.circular(12),
-                        //       border: Border.all(color: kBorder),
-                        //     ),
-                        //     child: const Row(children: [
-                        //       Icon(Icons.search_rounded,
-                        //           color: kTextMuted, size: 17),
-                        //       SizedBox(width: 8),
-                        //       Text('Search doctors or specialties…',
-                        //           style: TextStyle(
-                        //               color: kTextMuted, fontSize: 13)),
-                        //     ]),
-                        //   ),
-                        // ),)
                       ],
                     ),
                   ),
@@ -740,13 +761,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
 
-            // ── BODY ──────────────────────────────────────────────
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(14, 16, 14, 90),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
 
-                  // ── Quick Actions 2×2 grid ──────────────────────
                   _fade(2, Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -800,25 +819,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   )),
                   const SizedBox(height: 22),
 
-                  // ── Upcoming Appointments ───────────────────────
                   _fade(3, _buildAppointmentsSection()),
                   const SizedBox(height: 22),
 
-                  // ── Specialties — dynamic from API ──────────────
                   _fade(4, _buildSpecialtiesSection(
                       doctorsState.doctors, doctorsState.isLoading)),
                   const SizedBox(height: 22),
 
-                  // ── Top Rated Doctors header ────────────────────
-                  _fade(5, Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SectionTitle('Top Rated Doctors',
-                          action: 'View All',
-                          onAction: () => widget.onTabChange(1)),
-                      const SizedBox(height: 10),
-                    ],
-                  )),
+                  _fade(5, _buildTopRatedDoctorsSection(
+                      doctorsState.doctors, doctorsState.isLoading)),
 
                 ]),
               ),
@@ -1408,7 +1417,7 @@ class _SectionTitle extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  QUICK ACTION — 2×2 layout, Book Appt animated
+//  QUICK ACTION
 // ════════════════════════════════════════════════════════════════════
 class _QuickAction extends StatefulWidget {
   final IconData icon;
@@ -1452,8 +1461,7 @@ class _QuickActionState extends State<_QuickAction>
         curve: const Interval(0.1, 0.7, curve: Curves.easeInOut)));
     _bounce  = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
         parent: _ctrl,
-        curve:
-            const Interval(0.0, 0.5, curve: Curves.elasticOut)));
+        curve: const Interval(0.0, 0.5, curve: Curves.elasticOut)));
   }
 
   @override
@@ -1644,7 +1652,151 @@ class _EmptyNote extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  APPOINTMENT CARD
+//  TOP DOCTOR CARD
+// ════════════════════════════════════════════════════════════════════
+class _TopDoctorCard extends StatelessWidget {
+  final DoctorDetails doctor;
+  final VoidCallback onTap;
+  const _TopDoctorCard({required this.doctor, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = doctor.name?.trim();
+    final spec = doctor.specialization?.trim();
+    final clinic = doctor.clinicName?.trim();
+    final rating = doctor.rating;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _doctorAvatar(spec, size: 42),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dr. ${name?.isNotEmpty == true ? name : 'Doctor'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  if (spec != null && spec.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      spec,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                  ],
+                  if (clinic != null && clinic.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      clinic,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: kTextMuted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (rating != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(
+                  color: kAmberLight,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: kWarning.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, size: 12, color: kWarning),
+                    const SizedBox(width: 4),
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: kWarning,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopDoctorSkeletonCard extends StatelessWidget {
+  const _TopDoctorSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorder),
+        ),
+        child: Row(
+          children: const [
+            _Shimmer(width: 42, height: 42),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Shimmer(width: 140, height: 11),
+                  SizedBox(height: 5),
+                  _Shimmer(width: 100, height: 10),
+                  SizedBox(height: 5),
+                  _Shimmer(width: 120, height: 9),
+                ],
+              ),
+            ),
+            SizedBox(width: 8),
+            _Shimmer(width: 32, height: 22),
+          ],
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  APPOINTMENT CARD  ← FULLY REDESIGNED
+//  - Queue number chip moved to TOP row (alongside Today badge)
+//  - Compact single-section layout (no bottom divider row)
+//  - NOW badge stays on the right side of main row
 // ════════════════════════════════════════════════════════════════════
 class _ApptCard extends StatefulWidget {
   final AppointmentList appointment;
@@ -1657,7 +1809,6 @@ class _ApptCard extends StatefulWidget {
 class _ApptCardState extends State<_ApptCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
-  late Animation<double> _badgePulse;
   late Animation<double> _dotBlink;
 
   @override
@@ -1666,8 +1817,6 @@ class _ApptCardState extends State<_ApptCard>
     _ctrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 2000))
       ..repeat();
-    _badgePulse = Tween<double>(begin: 0.0, end: 6.0)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
     _dotBlink = Tween<double>(begin: 1.0, end: 0.25).animate(CurvedAnimation(
         parent: _ctrl,
         curve: const Interval(0.0, 0.5, curve: Curves.easeInOut)));
@@ -1689,7 +1838,8 @@ class _ApptCardState extends State<_ApptCard>
     if (raw == null || raw.isEmpty) return '—';
     final parts = raw.split(':');
     if (parts.length < 2) return raw;
-    final dt = DateTime(2000, 1, 1, int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
+    final dt = DateTime(2000, 1, 1,
+        int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
     return DateFormat('h:mm a').format(dt);
   }
 
@@ -1699,11 +1849,22 @@ class _ApptCardState extends State<_ApptCard>
     final name      = appt.doctorName ?? 'Doctor';
     final spec      = appt.specialization ?? '';
     final dateStr   = _fmtDate(appt.appointmentDate);
-    final timeStr   = _fmtTime(appt.startTime);
+    final isSlot    = appt.bookingType == 2;
+    final timeStr   = isSlot
+        ? () {
+            final start = _fmtClockTime(appt.startTime);
+            final end   = _fmtClockTime(appt.endTime);
+            return (end.isNotEmpty && end != '--')
+                ? '$start – $end'
+                : start;
+          }()
+        : 'Est. ${_fmtClockTime(appt.estimatedArrivalTime)}';
+
     final myToken   = appt.myQueueNumber ?? appt.queueNumber;
     final totalQ    = appt.totalQueue;
     final serving   = appt.currentServing;
     final isMyTurn  = appt.isMyTurn ?? false;
+    // Show queue section only for today's appointments that have a token
     final showQueue = widget.isToday && myToken != null;
 
     return AnimatedBuilder(
@@ -1717,9 +1878,9 @@ class _ApptCardState extends State<_ApptCard>
               color: isMyTurn
                   ? kPrimary
                   : (widget.isToday
-                      ? kPrimary.withOpacity(0.2)
+                      ? kPrimary.withOpacity(0.6)
                       : kBorder),
-              width: isMyTurn ? 1.5 : 1,
+              width: isMyTurn ? 2 : (widget.isToday ? 1.5 : 1),
             ),
             boxShadow: [
               BoxShadow(
@@ -1731,10 +1892,92 @@ class _ApptCardState extends State<_ApptCard>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ── TOP ROW: Queue chip + Today/Turn badge ──────────
+              if (showQueue)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 9, 12, 0),
+                  child: Row(
+                    children: [
+                      // Queue number chip
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: kPrimaryLight,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                              color: kPrimary.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('QUEUE NO.',
+                                style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w700,
+                                    color: kPrimaryDark,
+                                    letterSpacing: 0.5)),
+                            const SizedBox(width: 6),
+                            Text(
+                              myToken.toString().padLeft(2, '0'),
+                              style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: kPurple),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      // Today / Your Turn badge
+                      if (isMyTurn)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: kPrimary,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.notifications_active_rounded,
+                                  color: Colors.white, size: 9),
+                              SizedBox(width: 3),
+                              Text('Your Turn!',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        )
+                      else
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: kPrimaryLight,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                                color: kPrimary.withOpacity(0.25)),
+                          ),
+                          child: const Text('Today',
+                              style: TextStyle(
+                                  color: kPrimaryDark,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                    ],
+                  ),
+                ),
+
+              // ── MAIN ROW: Avatar + Info + NOW badge ─────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(12, 11, 12, 9),
+                padding: EdgeInsets.fromLTRB(
+                    12, showQueue ? 8 : 11, 12, 10),
                 child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     _doctorAvatar(spec, size: 40),
                     const SizedBox(width: 10),
@@ -1748,12 +1991,15 @@ class _ApptCardState extends State<_ApptCard>
                                   fontWeight: FontWeight.w700,
                                   color: kTextPrimary),
                               overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 2),
-                          Text(spec,
-                              style: const TextStyle(
-                                  fontSize: 11, color: kTextSecondary)),
-                          const SizedBox(height: 2),
-                          if ((appt.patientName ?? '').isNotEmpty)
+                          if (spec.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(spec,
+                                style: const TextStyle(
+                                    fontSize: 11,
+                                    color: kTextSecondary)),
+                          ],
+                          if ((appt.patientName ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 2),
                             Row(mainAxisSize: MainAxisSize.min, children: [
                               const Icon(Icons.person_outline_rounded,
                                   size: 10, color: kTextMuted),
@@ -1767,6 +2013,8 @@ class _ApptCardState extends State<_ApptCard>
                                     overflow: TextOverflow.ellipsis),
                               ),
                             ]),
+                          ],
+                          const SizedBox(height: 3),
                           Row(children: [
                             const Icon(Icons.calendar_today_rounded,
                                 size: 10, color: kPrimary),
@@ -1789,13 +2037,17 @@ class _ApptCardState extends State<_ApptCard>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    if (showQueue)
-                      Column(children: [
-                        SizedBox(
-                          width: 42,
-                          height: 42,
-                          child: Stack(
+
+                    // NOW badge (queue live indicator)
+                    if (showQueue) ...[
+                      const SizedBox(width: 8),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 42,
+                            height: 42,
+                            child: Stack(
                               alignment: Alignment.center,
                               children: [
                                 ...[0.0, 0.4, 0.8].map((phase) {
@@ -1808,8 +2060,7 @@ class _ApptCardState extends State<_ApptCard>
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                          color:
-                                              kPrimary.withOpacity(op),
+                                          color: kPrimary.withOpacity(op),
                                           width: 1.5),
                                     ),
                                   );
@@ -1837,108 +2088,43 @@ class _ApptCardState extends State<_ApptCard>
                                                   .withOpacity(0.85),
                                               letterSpacing: 0.4)),
                                       Text(
-                                          (serving != null && serving > 0)
-                                              ? serving
-                                                  .toString()
-                                                  .padLeft(2, '0')
-                                              : '--',
-                                          style: const TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                              height: 1)),
+                                        '${serving ?? 0}/${totalQ ?? 0}',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            height: 1.1),
+                                      ),
                                     ],
                                   ),
                                 ),
-                              ]),
-                        ),
-                        const SizedBox(height: 3),
-                        Row(mainAxisSize: MainAxisSize.min, children: [
-                          Opacity(
-                            opacity: _dotBlink.value,
-                            child: Container(
-                                width: 5,
-                                height: 5,
-                                decoration: const BoxDecoration(
-                                    color: kPrimary,
-                                    shape: BoxShape.circle)),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 3),
-                          const Text('live',
-                              style: TextStyle(
-                                  fontSize: 8,
-                                  color: kTextMuted,
-                                  fontWeight: FontWeight.w500)),
-                        ]),
-                      ]),
+                          const SizedBox(height: 3),
+                          Row(mainAxisSize: MainAxisSize.min, children: [
+                            Opacity(
+                              opacity: _dotBlink.value,
+                              child: Container(
+                                  width: 5,
+                                  height: 5,
+                                  decoration: const BoxDecoration(
+                                      color: kPrimary,
+                                      shape: BoxShape.circle)),
+                            ),
+                            const SizedBox(width: 3),
+                            const Text('live',
+                                style: TextStyle(
+                                    fontSize: 8,
+                                    color: kTextMuted,
+                                    fontWeight: FontWeight.w500)),
+                          ]),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (showQueue) ...[
-                Divider(color: kBorder, height: 1, indent: 12, endIndent: 12),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 7, 12, 9),
-                  child: Row(children: [
-                    Text(myToken.toString().padLeft(2, '0'),
-                        style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF9F7AEA))),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6),
-                      child: Text('·',
-                          style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: kTextMuted)),
-                    ),
-                    const Text('Total :',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: kTextSecondary,
-                            fontWeight: FontWeight.w500)),
-                    const SizedBox(width: 3),
-                    Text(
-                        totalQ != null
-                            ? totalQ.toString().padLeft(2, '0')
-                            : '--',
-                        style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF3B82F6))),
-                    const Spacer(),
-                    if (isMyTurn)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                            color: kPrimary,
-                            borderRadius: BorderRadius.circular(6)),
-                        child: const Text('Your Turn!',
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700)),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: kPrimaryLight,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: kPrimary.withOpacity(0.25)),
-                        ),
-                        child: const Text('Today',
-                            style: TextStyle(
-                                color: kPrimaryDark,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700)),
-                      ),
-                  ]),
-                ),
-              ],
             ],
           ),
         );
@@ -1947,15 +2133,8 @@ class _ApptCardState extends State<_ApptCard>
   }
 }
 
-// ── Small dot widget ───────────────────────────────────────────────
-class _Dot extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-    Container(width: 3, height: 3, decoration: const BoxDecoration(color: kBorder, shape: BoxShape.circle));
-}
-
 // ════════════════════════════════════════════════════════════════════
-//  SPECIALTY CHIP  — dynamic, tappable
+//  SPECIALTY CHIP
 // ════════════════════════════════════════════════════════════════════
 class _SpecialtyChip extends StatelessWidget {
   final IconData icon;
@@ -2004,7 +2183,7 @@ class _SpecialtyChip extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  SPECIALTY CHIP SKELETON  — shown while loading
+//  SPECIALTY CHIP SKELETON
 // ════════════════════════════════════════════════════════════════════
 class _SpecialtyChipSkeleton extends StatefulWidget {
   @override
@@ -2161,8 +2340,6 @@ class _ApptSkeletonCardState extends State<_ApptSkeletonCard>
       );
 }
 
-
-
 // ════════════════════════════════════════════════════════════════════
 //  TODAY APPOINTMENT POPUP
 // ════════════════════════════════════════════════════════════════════
@@ -2172,16 +2349,12 @@ class _TodayAppointmentPopup extends StatelessWidget {
 
   String _fmtTime(String? raw) {
     if (raw == null || raw.isEmpty) return '—';
-    // ISO 8601 with dummy date (e.g. "1970-01-01T10:40:00.000Z") — read UTC hours/minutes directly
     final parsed = _timeTodayFromRaw(raw);
     if (parsed != null) return DateFormat('h:mm a').format(parsed);
-    // Fallback: plain HH:mm
     final parts = raw.split(':');
     if (parts.length < 2) return raw;
     final dt = DateTime(
-      2000,
-      1,
-      1,
+      2000, 1, 1,
       int.tryParse(parts[0]) ?? 0,
       int.tryParse(parts[1]) ?? 0,
     );
@@ -2223,12 +2396,10 @@ class _TodayAppointmentPopup extends StatelessWidget {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          // ── Main content ──────────────────────────────────────
           Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Header gradient banner
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 20, 48, 16),
                 decoration: const BoxDecoration(
@@ -2281,14 +2452,11 @@ class _TodayAppointmentPopup extends StatelessWidget {
                   ],
                 ),
               ),
-
-              // Body
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Doctor row
                     Row(
                       children: [
                         _doctorAvatar('cardio', size: 48),
@@ -2342,7 +2510,6 @@ class _TodayAppointmentPopup extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // Booking type badge
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 9,
@@ -2366,12 +2533,9 @@ class _TodayAppointmentPopup extends StatelessWidget {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 14),
                     Divider(color: kBorder, height: 1),
                     const SizedBox(height: 14),
-
-                    // Time row
                     Row(
                       children: [
                         _InfoChip(
@@ -2405,7 +2569,6 @@ class _TodayAppointmentPopup extends StatelessWidget {
                         ],
                       ],
                     ),
-
                     if (isMyTurn) ...[
                       const SizedBox(height: 12),
                       Container(
@@ -2436,7 +2599,6 @@ class _TodayAppointmentPopup extends StatelessWidget {
                         ),
                       ),
                     ],
-
                     if ((appt.patientName ?? '').isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Row(
@@ -2463,8 +2625,6 @@ class _TodayAppointmentPopup extends StatelessWidget {
               ),
             ],
           ),
-
-          // ── Close (X) button — top-right ──────────────────────
           Positioned(
             top: 10,
             right: 10,
@@ -2490,7 +2650,6 @@ class _TodayAppointmentPopup extends StatelessWidget {
     );
   }
 }
-
 
 // ── Info chip used inside today popup ─────────────────────────────
 class _InfoChip extends StatelessWidget {
@@ -2544,4 +2703,3 @@ class _InfoChip extends StatelessWidget {
     ),
   );
 }
-

@@ -10,6 +10,8 @@ import 'package:qless/presentation/patient/screens/patient_prescription_list.dar
 import 'package:qless/presentation/patient/screens/patient_edit_profile.dart'
     show PatientEditProfilePage;
 import 'package:qless/presentation/shared/screens/continue_as.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart'
+    show prescriptionViewModelProvider;
 
 // ── Colour palette (mirrors doctor_explore_screen.dart exactly) ───────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -54,6 +56,7 @@ class PatientProfilePage extends ConsumerStatefulWidget {
 class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   late final ProviderSubscription<PatientLoginState> _sub;
   bool _didFetchProfile = false;
+  bool _didFetchStats   = false;
 
   @override
   void initState() {
@@ -74,11 +77,25 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   }
 
   void _maybeFetchProfile(PatientLoginState state) {
-    if (_didFetchProfile) return;
-    final mobile = state.mobileNo;
-    if (mobile != null && mobile.trim().isNotEmpty) {
-      _didFetchProfile = true;
-      ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+    if (!_didFetchProfile) {
+      final mobile = state.mobileNo;
+      if (mobile != null && mobile.trim().isNotEmpty) {
+        _didFetchProfile = true;
+        ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+      }
+    }
+
+    if (!_didFetchStats) {
+      final patientId = state.patientPhoneCheck.maybeWhen(
+        data: (list) => list.isNotEmpty ? list.first.patientId : null,
+        orElse: () => null,
+      );
+      if (patientId != null) {
+        _didFetchStats = true;
+        ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(patientId);
+        ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(patientId);
+        ref.read(prescriptionViewModelProvider.notifier).patientPrescriptionList(patientId);
+      }
     }
   }
 
@@ -93,7 +110,9 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
       orElse: () => null,
     );
 
-    final isLoading = state.patientPhoneCheck.maybeWhen(
+    // Show skeleton until checkPhonePatient has been called at least once
+    // (token-storage data has no DOB / weight, so partial data = blank fields).
+    final isLoading = !_didFetchProfile || state.patientPhoneCheck.maybeWhen(
       loading: () => true,
       orElse: () => false,
     );
@@ -138,6 +157,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
         strokeWidth: 2,
         onRefresh: () async {
           _didFetchProfile = false;
+          _didFetchStats   = false;
           _maybeFetchProfile(ref.read(patientLoginViewModelProvider));
         },
         child: isLoading
@@ -292,7 +312,9 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                       const Color(0xFF38A169),
                       kGreenLight,
                       'Location',
-                      'Maharashtra',
+                      details?.address?.trim().isNotEmpty == true
+                          ? details!.address!
+                          : '—',
                     ),
                   ),
                 ]),
@@ -375,17 +397,29 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   //  STATS ROW
   // ---------------------------------------------------------------------------
   Widget _buildStatsRow(Patients? details) {
-    final blood = details?.bloodGroup;
+    final visitCount = ref.watch(appointmentViewModelProvider)
+        .patientAppointmentsList
+        ?.maybeWhen(
+          data: (l) => l
+              .where((a) {
+                final s = a.status?.toLowerCase().trim() ?? '';
+                return s == 'completed' || s == 'done' || s == 'closed';
+              })
+              .length,
+          orElse: () => null,
+        );
+
+    final familyCount = ref.watch(familyViewModelProvider)
+        .allfamilyMembers
+        .maybeWhen(data: (l) => l.length, orElse: () => null);
+
+    final recordCount =
+        ref.watch(prescriptionViewModelProvider).prescriptionsListPatient?.length;
+
     final stats = [
-      _StatItem('12', 'Visits',  Icons.medical_services_rounded, kPrimary,  kPrimaryLight),
-      _StatItem('3',  'Family',  Icons.group_rounded,            kPurple,   kPurpleLight),
-      _StatItem(
-        blood?.trim().isNotEmpty == true ? blood! : '5',
-        'Records',
-        Icons.description_rounded,
-        kInfo,
-        kInfoLight,
-      ),
+      _StatItem(visitCount?.toString()  ?? '—', 'Visits',  Icons.medical_services_rounded, kPrimary, kPrimaryLight),
+      _StatItem(familyCount?.toString() ?? '—', 'Family',  Icons.group_rounded,            kPurple,  kPurpleLight),
+      _StatItem(recordCount?.toString() ?? '—', 'Records', Icons.description_rounded,      kInfo,    kInfoLight),
     ];
 
     return Padding(
@@ -465,6 +499,16 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     PatientLoginState state,
     Patients? details,
   ) {
+    final familyCount = ref.watch(familyViewModelProvider)
+        .allfamilyMembers
+        .maybeWhen(data: (l) => l.length, orElse: () => null);
+
+    final familySubtitle = familyCount == null
+        ? 'Loading…'
+        : familyCount == 0
+            ? 'No members added'
+            : '$familyCount member${familyCount == 1 ? '' : 's'} added';
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
@@ -501,7 +545,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
           icon: Icons.group_outlined,
           iconFg: kPurple, iconBg: kPurpleLight,
           title: 'Family Members',
-          subtitle: '3 members added',
+          subtitle: familySubtitle,
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const FamilyMembersScreen()),

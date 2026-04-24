@@ -58,6 +58,20 @@ const _typeStyles = <String, _TypeStyle>{
   'Injection': _TypeStyle(bg: kAmberLight,   fg: kWarning,   icon: Icons.colorize_outlined),
   'Drops':     _TypeStyle(bg: kInfoLight,    fg: kInfo,      icon: Icons.water_drop_outlined),
   'Spray':     _TypeStyle(bg: kGreenLight,   fg: kSuccess,   icon: Icons.air_outlined),
+ 
+  // FIXED Inhalers icon
+  'Inhalers': _TypeStyle(
+    bg: kAmberLight,
+    fg: kWarning,
+    icon: Icons.air, // best available alternative
+  ),
+
+  // NEW Powders
+  'Powders': _TypeStyle(
+    bg: kPurpleLight,
+    fg: kPurple,
+    icon: Icons.grain_outlined, // looks like powder/granules
+  ),
 };
 
 const _defaultStyle = _TypeStyle(
@@ -84,7 +98,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   bool _fabVisible   = true;
 
   static const _types = [
-    'All', 'Tablet', 'Lotion', 'Syrup', 'Injection', 'Drops', 'Spray',
+    'All', 'Tablet', 'Lotion', 'Syrup', 'Injection', 'Drops', 'Spray', 'Inhalers', 'Powders'
   ];
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────

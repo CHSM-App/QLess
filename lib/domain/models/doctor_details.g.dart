@@ -42,6 +42,7 @@ DoctorDetails _$DoctorDetailsFromJson(Map<String, dynamic> json) =>
       isQueueFull: _intFromJson(json['is_queue_full']),
       bookingStartTime: json['booking_start_time'] as String?,
       isRecentlyVisited: _intFromJson(json['is_recently_visited']),
+      rating: _doubleFromJson(json['rating']),
     );
 
 Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
@@ -80,4 +81,5 @@ Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
       'is_queue_full': instance.isQueueFull,
       'booking_start_time': instance.bookingStartTime,
       'is_recently_visited': instance.isRecentlyVisited,
+      'rating': instance.rating,
     };

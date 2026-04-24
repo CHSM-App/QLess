@@ -100,6 +100,9 @@ class DoctorDetails {
   @JsonKey(name: 'is_recently_visited', fromJson: _intFromJson)
   final int? isRecentlyVisited;
 
+  @JsonKey(fromJson: _doubleFromJson)
+  final double? rating;
+
   DoctorDetails({
     this.doctorId,
     this.name,
@@ -135,6 +138,7 @@ class DoctorDetails {
     this.isQueueFull,
     this.bookingStartTime,
     this.isRecentlyVisited,
+    this.rating,
   });
 
   factory DoctorDetails.fromJson(Map<String, dynamic> json) =>

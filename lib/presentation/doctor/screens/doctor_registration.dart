@@ -149,6 +149,9 @@ class _DoctorProfileSetupScreenState
   double? _longitude;
   StreamSubscription<String>? _tokenRefreshSub;
 
+  Timer?  _mobileDebounce;
+  String? _mobileExistsError;
+
   final ImagePicker _picker = ImagePicker();
 
   // IDs returned from Step 2 API (clinic registration response)
@@ -156,7 +159,7 @@ class _DoctorProfileSetupScreenState
   String? _savedClinicId;
 
   final List<Map<String, String>> _specializations = [
-    {'value': 'general',     'label': 'General Physician'},
+    {'value': 'general physician',     'label': 'General Physician'},
     {'value': 'cardiology',  'label': 'Cardiology'},
     {'value': 'dermatology', 'label': 'Dermatology'},
     {'value': 'pediatrics',  'label': 'Pediatrics'},
@@ -218,6 +221,7 @@ final List<Map<String, dynamic>> _genderOptions = const [
   void dispose() {
     _animController.dispose();
     _tokenRefreshSub?.cancel();
+    _mobileDebounce?.cancel();
     _fullNameController.dispose();
     _contactController.dispose();
     _emailController.dispose();
@@ -236,6 +240,26 @@ final List<Map<String, dynamic>> _genderOptions = const [
   void _animateStep() {
     _animController.reset();
     _animController.forward();
+  }
+
+  // ── Mobile existence check ────────────────────────────────────────────────
+  void _onContactChanged(String value) {
+    _mobileDebounce?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.length < 10) {
+      if (_mobileExistsError != null) setState(() => _mobileExistsError = null);
+      return;
+    }
+    _mobileDebounce = Timer(const Duration(milliseconds: 800), () async {
+      final result = await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .mobileExistDoctor(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _mobileExistsError =
+            result.isNotEmpty ? 'Mobile number already registered.' : null;
+      });
+    });
   }
 
   // ── Image Picker – Camera + Gallery bottom sheet ──────────────────────────
@@ -423,8 +447,11 @@ Future<void> _selectFromMap() async {
         return _showError('Full Name is required');
       if (_isBlank(_contactController))
         return _showError('Contact No is required');
-      if (_isBlank(_emailController))
-        return _showError('Email is required');
+      if (_contactController.text.trim().length != 10)
+        return _showError('Contact No must be 10 digits');
+      if (_mobileExistsError != null)
+        return _showError(_mobileExistsError!);
+    
       if (_selectedGenderId == null || _selectedGenderId! <= 0)
         return _showError('Gender is required');
       if (_selectedSpecialization.isEmpty)
@@ -450,8 +477,7 @@ Future<void> _selectFromMap() async {
         return _showError('Clinic Address is required');
       if (_isBlank(_clinicContactController))
         return _showError('Clinic Contact is required');
-      if (_isBlank(_clinicEmailController))
-        return _showError('Clinic Email is required');
+    
 
       // Fetch FCM token once
       if (_fcmToken == null) {
@@ -748,11 +774,16 @@ Widget _buildStep1() {
           _buildField('Contact No', _contactController,
               hint: '+91 98765 43210',
               keyboard: TextInputType.phone,
-              required: true),
+              required: true,
+              onChanged: _onContactChanged,
+              errorText: _mobileExistsError,
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(10),
+              ]),
           _buildField('Email Address', _emailController,
               hint: 'doctor@email.com',
-              keyboard: TextInputType.emailAddress,
-              required: true),
+              keyboard: TextInputType.emailAddress),
           _buildGenderSection(),
         ]),
         const SizedBox(height: 16),
@@ -808,14 +839,17 @@ Widget _buildStep1() {
                     _clinicContactController,
                     hint: '+91...',
                     keyboard: TextInputType.phone,
-                    required: true)),
+                    required: true,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ])),
             const SizedBox(width: 12),
             Expanded(
                 child: _buildField(
                     'Clinic Email', _clinicEmailController,
                     hint: 'clinic@...',
-                    keyboard: TextInputType.emailAddress,
-                    required: true)),
+                    keyboard: TextInputType.emailAddress)),
           ]),
           Row(children: [
             Expanded(
@@ -1050,6 +1084,9 @@ Widget _buildStep1() {
     String hint = '',
     TextInputType keyboard = TextInputType.text,
     bool required = false,
+    ValueChanged<String>? onChanged,
+    String? errorText,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1061,6 +1098,8 @@ Widget _buildStep1() {
           TextField(
             controller: controller,
             keyboardType: keyboard,
+            onChanged: onChanged,
+            inputFormatters: inputFormatters,
             style:
                 const TextStyle(fontSize: 14, color: kTextDark),
             decoration: InputDecoration(
@@ -1077,14 +1116,29 @@ Widget _buildStep1() {
                       const BorderSide(color: kDivider)),
               enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: kDivider)),
+                  borderSide: errorText != null
+                      ? const BorderSide(color: kRedAccent)
+                      : const BorderSide(color: kDivider)),
               focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                      color: kPrimaryBlue, width: 1.5)),
+                  borderSide: errorText != null
+                      ? const BorderSide(color: kRedAccent, width: 1.5)
+                      : const BorderSide(color: kPrimaryBlue, width: 1.5)),
             ),
           ),
+          if (errorText != null) ...[
+            const SizedBox(height: 4),
+            Row(children: [
+              const Icon(Icons.error_outline_rounded,
+                  size: 13, color: kRedAccent),
+              const SizedBox(width: 4),
+              Text(errorText,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: kRedAccent,
+                      fontWeight: FontWeight.w500)),
+            ]),
+          ],
         ],
       ),
     );

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -54,6 +55,9 @@ class _PatientRegistrationScreenState
   File?               _patientImage;
   final ImagePicker   _picker = ImagePicker();
 
+  Timer?  _mobileDebounce;
+  String? _mobileExistsError;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +86,7 @@ final List<_Option> _bloodGroupOptions = const [
 
   @override
   void dispose() {
+    _mobileDebounce?.cancel();
     _fullNameController.dispose();
     _mobileController.dispose();
     _emailController.dispose();
@@ -89,6 +94,26 @@ final List<_Option> _bloodGroupOptions = const [
     _dobController.dispose();
     _weightController.dispose();
     super.dispose();
+  }
+
+  // ── Mobile existence check ────────────────────────────────────────────────
+  void _onMobileChanged(String value) {
+    _mobileDebounce?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.length < 10) {
+      if (_mobileExistsError != null) setState(() => _mobileExistsError = null);
+      return;
+    }
+    _mobileDebounce = Timer(const Duration(milliseconds: 800), () async {
+      final result = await ref
+          .read(patientLoginViewModelProvider.notifier)
+          .mobileExistPatient(trimmed);
+      if (!mounted) return;
+      setState(() {
+        _mobileExistsError =
+            result.isNotEmpty ? 'Mobile number already registered.' : null;
+      });
+    });
   }
 
   // ── Image picker ─────────────────────────────────────────────────────────
@@ -260,6 +285,11 @@ final List<_Option> _bloodGroupOptions = const [
   // ── Submit ───────────────────────────────────────────────────────────────
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    if (_mobileExistsError != null) {
+      _snack(_mobileExistsError!, isError: true);
+      return;
+    }
 
     if (_selectedGenderId == null) {
       _snack('Please select your gender', isError: true);
@@ -441,6 +471,7 @@ final List<_Option> _bloodGroupOptions = const [
                 maxLength: 10,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 style: _inputStyle,
+                onChanged: _onMobileChanged,
                 decoration: _decor(
                   hint: '9876543210',
                   icon: Icons.phone_outlined,
@@ -449,6 +480,22 @@ final List<_Option> _bloodGroupOptions = const [
                 ),
                 validator: _validateMobile,
               ),
+              if (_mobileExistsError != null) ...[
+                const SizedBox(height: 4),
+                Row(children: [
+                  const SizedBox(width: 4),
+                  const Icon(Icons.error_outline_rounded,
+                      size: 13, color: kRed),
+                  const SizedBox(width: 4),
+                  Text(
+                    _mobileExistsError!,
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        color: kRed,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ]),
+              ],
 
               const SizedBox(height: 16),
 
