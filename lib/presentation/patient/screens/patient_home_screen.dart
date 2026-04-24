@@ -564,6 +564,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  Widget _buildTopRatedDoctorsSection(
+      List<DoctorDetails> doctors, bool isLoading) {
+    final shownDoctors = doctors.take(4).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(
+          'Top Rated Doctors',
+          action: doctors.isNotEmpty ? 'Show all' : null,
+          onAction: doctors.isNotEmpty ? () => _goToSearch() : null,
+        ),
+        const SizedBox(height: 10),
+        if (isLoading && shownDoctors.isEmpty) ...[
+          const _TopDoctorSkeletonCard(),
+          const SizedBox(height: 8),
+          const _TopDoctorSkeletonCard(),
+        ] else if (shownDoctors.isEmpty)
+          const _EmptyNote('No doctors available right now')
+        else
+          ...shownDoctors.map(
+            (doctor) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _TopDoctorCard(
+                doctor: doctor,
+                onTap: () => _goToSearch(specialty: doctor.specialization),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   // ════════════════════════════════════════════════════════════════
   //  BUILD
   // ════════════════════════════════════════════════════════════════
@@ -779,16 +812,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       doctorsState.doctors, doctorsState.isLoading)),
                   const SizedBox(height: 22),
 
-                  // ── Top Rated Doctors header ────────────────────
-                  _fade(5, Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _SectionTitle('Top Rated Doctors',
-                          action: 'View All',
-                          onAction: () => widget.onTabChange(1)),
-                      const SizedBox(height: 10),
-                    ],
-                  )),
+                  // ── Top Rated Doctors ───────────────────────────
+                  _fade(5, _buildTopRatedDoctorsSection(
+                      doctorsState.doctors, doctorsState.isLoading)),
 
                 ]),
               ),
@@ -1496,6 +1522,142 @@ class _EmptyNote extends StatelessWidget {
           Text(message,
               style: const TextStyle(fontSize: 12, color: kTextSecondary)),
         ]),
+      );
+}
+
+class _TopDoctorCard extends StatelessWidget {
+  final DoctorDetails doctor;
+  final VoidCallback onTap;
+  const _TopDoctorCard({required this.doctor, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = doctor.name?.trim();
+    final spec = doctor.specialization?.trim();
+    final clinic = doctor.clinicName?.trim();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            _doctorAvatar(spec, size: 42),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dr. ${name?.isNotEmpty == true ? name : 'Doctor'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  if (spec != null && spec.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      spec,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: kTextSecondary,
+                      ),
+                    ),
+                  ],
+                  if (clinic != null && clinic.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      clinic,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: kTextMuted,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: kAmberLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: kWarning.withOpacity(0.25)),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.star_rounded, size: 12, color: kWarning),
+                  SizedBox(width: 4),
+                  Text(
+                    '4.8',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: kWarning,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopDoctorSkeletonCard extends StatelessWidget {
+  const _TopDoctorSkeletonCard();
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kBorder),
+        ),
+        child: Row(
+          children: const [
+            _Shimmer(width: 42, height: 42),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Shimmer(width: 140, height: 11),
+                  SizedBox(height: 5),
+                  _Shimmer(width: 100, height: 10),
+                  SizedBox(height: 5),
+                  _Shimmer(width: 120, height: 9),
+                ],
+              ),
+            ),
+            SizedBox(width: 8),
+            _Shimmer(width: 32, height: 22),
+          ],
+        ),
       );
 }
 
