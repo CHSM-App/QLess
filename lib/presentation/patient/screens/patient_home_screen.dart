@@ -1834,15 +1834,12 @@ class _ApptCardState extends State<_ApptCard>
     return dt == null ? raw : DateFormat('d MMM yyyy').format(dt);
   }
 
-  String _fmtTime(String? raw) {
-    if (raw == null || raw.isEmpty) return '—';
-    final parts = raw.split(':');
-    if (parts.length < 2) return raw;
-    final dt = DateTime(2000, 1, 1,
-        int.tryParse(parts[0]) ?? 0, int.tryParse(parts[1]) ?? 0);
-    return DateFormat('h:mm a').format(dt);
-  }
-
+String _fmtClockTime(String? raw) {
+  final parsed = _timeTodayFromRaw(raw);
+  if (parsed != null) return DateFormat('h:mm a').format(parsed);
+  final value = raw?.trim();
+  return value == null || value.isEmpty ? '--' : value;
+}
   @override
   Widget build(BuildContext context) {
     final appt      = widget.appointment;

@@ -103,6 +103,7 @@ class DoctorDetails {
   @JsonKey(fromJson: _doubleFromJson)
   final double? rating;
 
+
   DoctorDetails({
     this.doctorId,
     this.name,
