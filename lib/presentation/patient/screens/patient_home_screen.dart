@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geocoding/geocoding.dart' as geocoding;
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -12,7 +16,6 @@ import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
-import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour Palette ─────────────────────────────────────────────────
 const kPrimary = Color(0xFF26C6B0);
@@ -136,12 +139,6 @@ DateTime? _timeTodayFromRaw(String? raw) {
   return DateTime(now.year, now.month, now.day, hour, minute);
 }
 
-String _fmtClockTime(String? raw) {
-  final parsed = _timeTodayFromRaw(raw);
-  if (parsed != null) return DateFormat('h:mm a').format(parsed);
-  final value = raw?.trim();
-  return value == null || value.isEmpty ? '--' : value;
-}
 
 class _Shimmer extends StatefulWidget {
   final double width, height;
@@ -295,6 +292,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _location = saved;
             _locationLoaded = true;
           });
+        _geocodeAndStore(saved);
         return;
       }
     }
@@ -305,9 +303,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           _location = saved;
           _locationLoaded = true;
         });
+      _geocodeAndStore(saved);
       return;
     }
-    final current = await LocationService.getCurrentAddress();
+    final pos = await LocationService.getCurrentPosition();
+    final current = pos != null
+        ? await LocationService.getCurrentAddress()
+        : await LocationService.getCurrentAddress();
     if (mounted) {
       setState(() {
         _location = current;
@@ -315,6 +317,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       });
       await LocationStorage.saveLocation(current, isManual: false);
       if (_isPermIssue(current)) _showLocationSnack();
+      if (pos != null) {
+        ref.read(selectedPositionProvider.notifier).state = pos;
+      }
+    }
+  }
+
+  /// Geocodes a city/address string to coordinates and stores in shared provider.
+  Future<void> _geocodeAndStore(String address) async {
+    try {
+      final locations = await geocoding.locationFromAddress(address);
+      if (locations.isNotEmpty && mounted) {
+        final loc = locations.first;
+        ref.read(selectedPositionProvider.notifier).state = Position(
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          headingAccuracy: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        );
+      }
+    } catch (_) {
+      // Geocoding failed — nearby filter will stay at last known position
     }
   }
 
@@ -332,6 +361,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           });
           await LocationStorage.saveLocation(loc, isManual: true);
           if (_isPermIssue(loc)) _showLocationSnack();
+          _geocodeAndStore(loc);
         },
       ),
     );
@@ -825,10 +855,19 @@ class _LocationSheet extends StatefulWidget {
 }
 
 class _LocationSheetState extends State<_LocationSheet> {
-  final _ctrl = TextEditingController();
-  final _focus = FocusNode();
-  List<String> _suggestions = _allCities;
-  bool _isLoadingGPS = false;
+  final _ctrl         = TextEditingController();
+  final _focus        = FocusNode();
+  bool  _isLoadingGPS = false;
+  bool  _isSearching  = false;
+
+  static const _apiKey = 'AIzaSyDTRL5VzQ9UAwsCB9uCbSNj5wZasYHjFKA';
+
+  // predictions from Google Places
+  List<Map<String, dynamic>> _predictions = [];
+  // fallback static list when search is empty
+  List<String> _staticSuggestions = _allCities;
+
+  bool get _hasQuery => _ctrl.text.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -845,12 +884,50 @@ class _LocationSheetState extends State<_LocationSheet> {
   }
 
   void _onType() {
-    final q = _ctrl.text.trim().toLowerCase();
+    final q = _ctrl.text.trim();
+    if (q.isEmpty) {
+      setState(() {
+        _predictions      = [];
+        _staticSuggestions = _allCities;
+      });
+      return;
+    }
+    // also filter static list as fallback
     setState(() {
-      _suggestions = q.isEmpty
-          ? _allCities
-          : _allCities.where((c) => c.toLowerCase().contains(q)).toList();
+      _staticSuggestions = _allCities
+          .where((c) => c.toLowerCase().contains(q.toLowerCase()))
+          .toList();
     });
+    _fetchPredictions(q);
+  }
+
+  Future<void> _fetchPredictions(String query) async {
+    setState(() => _isSearching = true);
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=${Uri.encodeComponent(query)}'
+        '&components=country:in'
+        '&language=en'
+        '&types=(cities)'   // only city-level results
+        '&key=$_apiKey',
+      );
+      final response = await http.get(url);
+      final data     = jsonDecode(response.body);
+      if (data['status'] == 'OK') {
+        setState(() {
+          _predictions = List<Map<String, dynamic>>.from(data['predictions']);
+        });
+      } else {
+        debugPrint('Places status: ${data['status']}');
+        setState(() => _predictions = []);
+      }
+    } catch (e) {
+      debugPrint('Places error: $e');
+      setState(() => _predictions = []);
+    } finally {
+      setState(() => _isSearching = false);
+    }
   }
 
   void _pick(String loc) {
@@ -882,8 +959,7 @@ class _LocationSheetState extends State<_LocationSheet> {
   }
 
   void _snack() {
-    final isWindows =
-        !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+    final isWindows = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(isWindows
           ? 'Enable Windows location services'
@@ -897,8 +973,7 @@ class _LocationSheetState extends State<_LocationSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding:
-          EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
         constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.85),
@@ -909,17 +984,17 @@ class _LocationSheetState extends State<_LocationSheet> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const SizedBox(height: 10),
           Container(
-              width: 36,
-              height: 4,
+              width: 36, height: 4,
               decoration: BoxDecoration(
                   color: kBorder, borderRadius: BorderRadius.circular(2))),
           const SizedBox(height: 14),
+
+          // ── Header ──────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
               Container(
-                  width: 34,
-                  height: 34,
+                  width: 34, height: 34,
                   decoration: BoxDecoration(
                       color: kPrimaryLight,
                       borderRadius: BorderRadius.circular(10)),
@@ -927,26 +1002,21 @@ class _LocationSheetState extends State<_LocationSheet> {
                       color: kPrimary, size: 17)),
               const SizedBox(width: 10),
               Expanded(
-                child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Choose Location',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: kTextPrimary)),
-                      if (widget.currentLocation.isNotEmpty)
-                        Text('Current: ${widget.currentLocation}',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                                fontSize: 11, color: kTextMuted)),
-                    ]),
+                  const Text('Choose Location',
+                      style: TextStyle(fontSize: 15,
+                          fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  if (widget.currentLocation.isNotEmpty)
+                    Text('Current: ${widget.currentLocation}',
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                ]),
               ),
               GestureDetector(
                 onTap: () => Navigator.pop(context),
                 child: Container(
-                    width: 28,
-                    height: 28,
+                    width: 28, height: 28,
                     decoration: BoxDecoration(
                       color: const Color(0xFFF7F8FA),
                       borderRadius: BorderRadius.circular(8),
@@ -958,6 +1028,8 @@ class _LocationSheetState extends State<_LocationSheet> {
             ]),
           ),
           const SizedBox(height: 10),
+
+          // ── Search field ─────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Container(
@@ -968,18 +1040,23 @@ class _LocationSheetState extends State<_LocationSheet> {
               ),
               child: TextField(
                 controller: _ctrl,
-                focusNode: _focus,
+                focusNode:  _focus,
                 textInputAction: TextInputAction.done,
                 style: const TextStyle(
-                    color: kTextPrimary,
-                    fontSize: 13,
+                    color: kTextPrimary, fontSize: 13,
                     fontWeight: FontWeight.w500),
                 decoration: InputDecoration(
-                  hintText: 'Search city…',
-                  hintStyle:
-                      const TextStyle(color: kTextMuted, fontSize: 13),
-                  prefixIcon: const Icon(Icons.search_rounded,
-                      color: kTextMuted, size: 17),
+                  hintText: 'Search city or place…',
+                  hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+                  prefixIcon: _isSearching
+                      ? const Padding(
+                          padding: EdgeInsets.all(11),
+                          child: SizedBox(width: 15, height: 15,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: kPrimary)),
+                        )
+                      : const Icon(Icons.search_rounded,
+                          color: kTextMuted, size: 17),
                   suffixIcon: _ctrl.text.isNotEmpty
                       ? GestureDetector(
                           onTap: () {
@@ -996,12 +1073,20 @@ class _LocationSheetState extends State<_LocationSheet> {
                 onSubmitted: (val) {
                   final v = val.trim();
                   if (v.isEmpty) return;
-                  _pick(_suggestions.isNotEmpty ? _suggestions.first : v);
+                  if (_predictions.isNotEmpty) {
+                    _pick(_predictions.first['description'] ?? v);
+                  } else if (_staticSuggestions.isNotEmpty) {
+                    _pick(_staticSuggestions.first);
+                  } else {
+                    _pick(v);
+                  }
                 },
               ),
             ),
           ),
           const SizedBox(height: 8),
+
+          // ── GPS button ───────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GestureDetector(
@@ -1016,8 +1101,7 @@ class _LocationSheetState extends State<_LocationSheet> {
                 ),
                 child: Row(children: [
                   Container(
-                    width: 30,
-                    height: 30,
+                    width: 30, height: 30,
                     decoration: BoxDecoration(
                         color: kPrimary,
                         borderRadius: BorderRadius.circular(8)),
@@ -1031,21 +1115,14 @@ class _LocationSheetState extends State<_LocationSheet> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                              _isLoadingGPS
-                                  ? 'Detecting…'
-                                  : 'Use Current Location',
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: kTextPrimary)),
-                          const Text('Auto-detect via GPS',
-                              style: TextStyle(
-                                  fontSize: 10, color: kTextMuted)),
-                        ]),
+                      Text(_isLoadingGPS ? 'Detecting…' : 'Use Current Location',
+                          style: const TextStyle(fontSize: 12,
+                              fontWeight: FontWeight.w700, color: kTextPrimary)),
+                      const Text('Auto-detect via GPS',
+                          style: TextStyle(fontSize: 10, color: kTextMuted)),
+                    ]),
                   ),
                   if (!_isLoadingGPS)
                     const Icon(Icons.chevron_right_rounded,
@@ -1055,6 +1132,8 @@ class _LocationSheetState extends State<_LocationSheet> {
             ),
           ),
           const SizedBox(height: 8),
+
+          // ── Clear location ───────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: GestureDetector(
@@ -1062,8 +1141,8 @@ class _LocationSheetState extends State<_LocationSheet> {
                 await LocationStorage.clearLocation();
                 if (!mounted) return;
                 widget.onSelected('');
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Location cache cleared')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Location cache cleared')));
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -1078,15 +1157,15 @@ class _LocationSheetState extends State<_LocationSheet> {
                       size: 15, color: kTextMuted),
                   SizedBox(width: 8),
                   Text('Clear Saved Location',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kTextPrimary)),
+                      style: TextStyle(fontSize: 12,
+                          fontWeight: FontWeight.w600, color: kTextPrimary)),
                 ]),
               ),
             ),
           ),
           const SizedBox(height: 8),
+
+          // ── Section label ────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(children: [
@@ -1094,98 +1173,164 @@ class _LocationSheetState extends State<_LocationSheet> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Text(
-                    _ctrl.text.isEmpty ? 'POPULAR CITIES' : 'RESULTS',
-                    style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.0,
-                        color: kTextMuted)),
+                  !_hasQuery
+                      ? 'POPULAR CITIES'
+                      : _predictions.isNotEmpty
+                          ? 'SUGGESTIONS'
+                          : 'RESULTS',
+                  style: const TextStyle(fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.0, color: kTextMuted),
+                ),
               ),
               const Expanded(child: Divider(color: kBorder, height: 1)),
             ]),
           ),
           const SizedBox(height: 4),
+
+          // ── Results list ─────────────────────────────────────────
           Flexible(
-            child: _suggestions.isEmpty
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.search_off_rounded,
-                          size: 28, color: kTextMuted),
-                      SizedBox(height: 6),
-                      Text('No cities found',
-                          style: TextStyle(color: kTextMuted, fontSize: 12)),
-                    ]),
-                  )
-                : ListView.separated(
+            child: _hasQuery && _predictions.isNotEmpty
+                // Google Places predictions
+                ? ListView.separated(
                     shrinkWrap: true,
                     padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
-                    itemCount: _suggestions.length,
+                    itemCount: _predictions.length,
                     separatorBuilder: (_, __) =>
                         const Divider(color: kBorder, height: 1),
                     itemBuilder: (_, i) {
-                      final loc      = _suggestions[i];
-                      final isActive = loc == widget.currentLocation;
+                      final p          = _predictions[i];
+                      final mainText   = p['structured_formatting']
+                              ?['main_text'] ??
+                          p['description'] ?? '';
+                      final secondText = p['structured_formatting']
+                              ?['secondary_text'] ?? '';
+                      final fullDesc   = p['description'] ?? mainText;
                       return GestureDetector(
-                        onTap: () => _pick(loc),
+                        onTap: () => _pick(fullDesc),
                         child: Container(
                           color: Colors.transparent,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 9),
+                          padding: const EdgeInsets.symmetric(vertical: 9),
                           child: Row(children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              width: 28,
-                              height: 28,
+                            Container(
+                              width: 28, height: 28,
                               decoration: BoxDecoration(
-                                color: isActive
-                                    ? kPrimary
-                                    : const Color(0xFFF7F8FA),
+                                color: kPrimaryLight,
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: Icon(
-                                  isActive
-                                      ? Icons.location_on_rounded
-                                      : Icons.location_city_rounded,
-                                  color: isActive
-                                      ? Colors.white
-                                      : kTextMuted,
-                                  size: 14),
+                              child: const Icon(Icons.location_on_rounded,
+                                  color: kPrimary, size: 14),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
-                                child: Text(loc,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isActive
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      color: isActive
-                                          ? kPrimary
-                                          : kTextPrimary,
-                                    ))),
-                            if (isActive)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                    color: kPrimaryLight,
-                                    borderRadius:
-                                        BorderRadius.circular(6)),
-                                child: const Text('Active',
-                                    style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        color: kPrimary)),
-                              )
-                            else
-                              const Icon(Icons.chevron_right_rounded,
-                                  color: kBorder, size: 15),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(mainText,
+                                      style: const TextStyle(fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: kTextPrimary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  if (secondText.isNotEmpty) ...[
+                                    const SizedBox(height: 1),
+                                    Text(secondText,
+                                        style: const TextStyle(
+                                            fontSize: 11, color: kTextMuted),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.north_west_rounded,
+                                color: kBorder, size: 14),
                           ]),
                         ),
                       );
                     },
-                  ),
+                  )
+                // Static / filtered city list
+                : _staticSuggestions.isEmpty
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(Icons.search_off_rounded,
+                              size: 28, color: kTextMuted),
+                          SizedBox(height: 6),
+                          Text('No cities found',
+                              style: TextStyle(
+                                  color: kTextMuted, fontSize: 12)),
+                        ]),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.fromLTRB(16, 2, 16, 0),
+                        itemCount: _staticSuggestions.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(color: kBorder, height: 1),
+                        itemBuilder: (_, i) {
+                          final loc      = _staticSuggestions[i];
+                          final isActive = loc == widget.currentLocation;
+                          return GestureDetector(
+                            onTap: () => _pick(loc),
+                            child: Container(
+                              color: Colors.transparent,
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              child: Row(children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  width: 28, height: 28,
+                                  decoration: BoxDecoration(
+                                    color: isActive
+                                        ? kPrimary
+                                        : const Color(0xFFF7F8FA),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                      isActive
+                                          ? Icons.location_on_rounded
+                                          : Icons.location_city_rounded,
+                                      color: isActive
+                                          ? Colors.white
+                                          : kTextMuted,
+                                      size: 14),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(loc,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isActive
+                                            ? FontWeight.w700
+                                            : FontWeight.w500,
+                                        color: isActive
+                                            ? kPrimary
+                                            : kTextPrimary,
+                                      )),
+                                ),
+                                if (isActive)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                        color: kPrimaryLight,
+                                        borderRadius:
+                                            BorderRadius.circular(6)),
+                                    child: const Text('Active',
+                                        style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                            color: kPrimary)),
+                                  )
+                                else
+                                  const Icon(Icons.chevron_right_rounded,
+                                      color: kBorder, size: 15),
+                              ]),
+                            ),
+                          );
+                        },
+                      ),
           ),
           SizedBox(height: MediaQuery.of(context).padding.bottom),
         ]),
@@ -1193,7 +1338,6 @@ class _LocationSheetState extends State<_LocationSheet> {
     );
   }
 }
-
 // ════════════════════════════════════════════════════════════════════
 //  HEADER BUTTON
 // ════════════════════════════════════════════════════════════════════

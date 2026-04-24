@@ -165,7 +165,6 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
     try {
       final result = await usecase.checkPhoneDoctor(mobile);
-      if (result.isNotEmpty) {
         final d = result.first;
         state = state.copyWith(
           doctorId: d.doctorId,
@@ -179,9 +178,6 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           leadTimeMinutes: d.leadTime,
           phoneCheckResult: AsyncValue.data(result),
         );
-      } else {
-        state = state.copyWith(phoneCheckResult: AsyncValue.data(result));
-      }
     } catch (e, st) {
       state = state.copyWith(
         phoneCheckResult: AsyncValue.error(e, st),

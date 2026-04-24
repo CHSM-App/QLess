@@ -110,7 +110,6 @@ class DoctorExploreScreen extends ConsumerStatefulWidget {
 
 class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
     with SingleTickerProviderStateMixin {
-  Position? _position;
   late AnimationController _animCtrl;
   late List<Animation<double>> _anims;
 
@@ -138,8 +137,13 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   Future<void> _loadData() async {
     final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     await ref.read(doctorsViewModelProvider.notifier).fetchDoctors(patientId);
-    final pos = await LocationService.getCurrentPosition();
-    if (mounted) setState(() => _position = pos);
+    // If no location has been set yet, fall back to device GPS
+    if (ref.read(selectedPositionProvider) == null) {
+      final pos = await LocationService.getCurrentPosition();
+      if (pos != null && mounted) {
+        ref.read(selectedPositionProvider.notifier).state = pos;
+      }
+    }
   }
 
   void _goToSearch(BuildContext context, {String? specialty}) {
@@ -156,13 +160,13 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   List<DoctorDetails> _recentDoctors(List<DoctorDetails> all) =>
       all.where((d) => d.isRecentlyVisited == 1).take(10).toList();
 
-  List<DoctorDetails> _nearbyDoctors(List<DoctorDetails> all) {
-    if (_position == null) return [];
+  List<DoctorDetails> _nearbyDoctors(List<DoctorDetails> all, Position? position) {
+    if (position == null) return [];
     final withDist = all
         .where((d) => d.latitude != null && d.longitude != null)
         .map((d) => MapEntry(
               d,
-              _haversineKm(_position!.latitude, _position!.longitude,
+              _haversineKm(position.latitude, position.longitude,
                   d.latitude!, d.longitude!),
             ))
         .toList()
@@ -198,10 +202,11 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   @override
   Widget build(BuildContext context) {
     final state       = ref.watch(doctorsViewModelProvider);
+    final position    = ref.watch(selectedPositionProvider);
     final doctors     = state.doctors;
     final isLoading   = state.isLoading;
     final recent      = _recentDoctors(doctors);
-    final nearby      = _nearbyDoctors(doctors);
+    final nearby      = _nearbyDoctors(doctors, position);
     final specialties = _uniqueSpecialties(doctors);
 
     return Scaffold(
@@ -238,7 +243,7 @@ if (isLoading || recent.isNotEmpty) ...[
 ],
 
 // Nearby Doctors
-if (_position != null && (isLoading || nearby.isNotEmpty)) ...[
+if (position != null && (isLoading || nearby.isNotEmpty)) ...[
   _fade(2, _SectionTitle(
     'Nearby Doctors',
     subtitle: 'Doctors close to you',
@@ -248,7 +253,7 @@ if (_position != null && (isLoading || nearby.isNotEmpty)) ...[
   const SizedBox(height: 10),
   _fade(2, isLoading
       ? const _HorizontalShimmer(height: 148, isRecent: false)
-      : _buildNearbyDoctors(context, nearby)),
+      : _buildNearbyDoctors(context, nearby, position)),
   const SizedBox(height: 22),
 ],
 
@@ -358,7 +363,7 @@ if (_position != null && (isLoading || nearby.isNotEmpty)) ...[
 
   // ── Nearby Doctors horizontal list ──────────────────────────────────
   Widget _buildNearbyDoctors(
-      BuildContext context, List<DoctorDetails> docs) {
+      BuildContext context, List<DoctorDetails> docs, Position? position) {
     return SizedBox(
       height: 148,
       child: ListView.separated(
@@ -368,11 +373,11 @@ if (_position != null && (isLoading || nearby.isNotEmpty)) ...[
         itemBuilder: (_, i) {
           final d = docs[i];
           double? distKm;
-          if (_position != null &&
+          if (position != null &&
               d.latitude != null &&
               d.longitude != null) {
-            distKm = _haversineKm(_position!.latitude,
-                _position!.longitude, d.latitude!, d.longitude!);
+            distKm = _haversineKm(position.latitude,
+                position.longitude, d.latitude!, d.longitude!);
           }
           return _NearbyDoctorCard(
             doctor: d,

@@ -1,20 +1,25 @@
+
+
+// ─── Color Palette ───────────────────────────────────────────────────────────
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart' as gmap;
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
-import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
-import 'package:qless/presentation/shared/view_models/master_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
-// ─── Color Palette ───────────────────────────────────────────────────────────
 const kPrimaryBlue  = Color(0xFF1A73E8);
 const kLightBlue    = Color(0xFFE8F0FE);
 const kAccentGreen  = Color(0xFF34A853);
@@ -38,6 +43,34 @@ const kSchedTextPrimary   = Color(0xFF2D3748);
 const kSchedTextSecondary = Color(0xFF718096);
 const kSchedTextMuted     = Color(0xFFA0AEC0);
 
+const kPrimary = Color(0xFF26C6B0);
+const kPrimaryDark = Color(0xFF2BB5A0);
+const kPrimaryLight = Color(0xFFD9F5F1);
+const kPrimaryLighter = Color(0xFFF2FCFA);
+
+const kTextPrimary = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+
+const kBorder = Color(0xFFEDF2F7);
+const kBg = Color(0xFFF7F8FA);
+
+const kSuccess = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+const kGreenDark = Color(0xFF276749);
+
+const kError = Color(0xFFFC8181);
+const kRedLight = Color(0xFFFEE2E2);
+const kRedDark = Color(0xFFC53030);
+
+const kWarning = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+const kAmberDark = Color(0xFF975A16);
+
+// ════════════════════════════════════════════════════════════════════
+//  BREAKPOINTS
+// ════════════════════════════════════════════════════════════════════
+const _kTabletBreak = 650.0;
+const _kDesktopBreak = 1050.0;
 // ─── Schedule UI Models ──────────────────────────────────────────────────────
 enum BookingMode { queue, slots, both }
 
@@ -269,24 +302,24 @@ final List<Map<String, dynamic>> _genderOptions = const [
     }
   }
 
-  Future<void> _selectFromMap() async {
-    final result = await Navigator.push<LatLng>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _MapPickerScreen(
-          initialLatLng: _latitude != null && _longitude != null
-              ? LatLng(_latitude!, _longitude!)
-              : const LatLng(15.9073, 73.6990),
-        ),
+Future<void> _selectFromMap() async {
+  final result = await Navigator.push<gmap.LatLng>(  // ← gmap.LatLng
+    context,
+    MaterialPageRoute(
+      builder: (_) => _MapPickerScreen(
+        initialLatLng: (_latitude != null && _longitude != null)
+            ? gmap.LatLng(_latitude!, _longitude!)        // ← gmap.LatLng
+            : const gmap.LatLng(15.9073, 73.6990),
       ),
-    );
-    if (result != null) {
-      setState(() {
-        _latitude  = result.latitude;
-        _longitude = result.longitude;
-      });
-    }
+    ),
+  );
+  if (result != null) {
+    setState(() {
+      _latitude  = result.latitude;
+      _longitude = result.longitude;
+    });
   }
+}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   bool _isBlank(TextEditingController c) => c.text.trim().isEmpty;
@@ -2450,17 +2483,27 @@ class _InlineError extends StatelessWidget {
 // ═════════════════════════════════════════════════════════════════════════════
 // MAP PICKER SCREEN
 // ═════════════════════════════════════════════════════════════════════════════
+
 class _MapPickerScreen extends StatefulWidget {
-  final LatLng initialLatLng;
+  final gmap.LatLng initialLatLng;
   const _MapPickerScreen({required this.initialLatLng});
 
   @override
-  State<_MapPickerScreen> createState() =>
-      _MapPickerScreenState();
+  State<_MapPickerScreen> createState() => _MapPickerScreenState();
 }
 
 class _MapPickerScreenState extends State<_MapPickerScreen> {
-  late LatLng _selected;
+  late gmap.LatLng _selected;
+  gmap.GoogleMapController? _mapController;
+
+  final _searchCtrl = TextEditingController();
+  final _focusNode  = FocusNode();
+
+  static const _apiKey = 'AIzaSyDTRL5VzQ9UAwsCB9uCbSNj5wZasYHjFKA';
+
+  List<Map<String, dynamic>> _predictions = [];
+  bool _showSuggestions = false;
+  bool _isSearching     = false;
 
   @override
   void initState() {
@@ -2469,111 +2512,322 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
   }
 
   @override
+  void dispose() {
+    _searchCtrl.dispose();
+    _focusNode.dispose();
+    _mapController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onSearchChanged(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() { _predictions = []; _showSuggestions = false; });
+      return;
+    }
+    setState(() => _isSearching = true);
+    try {
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json'
+        '?input=${Uri.encodeComponent(query)}'
+        '&components=country:in'
+        '&language=en'
+        '&key=$_apiKey',
+      );
+      final response = await http.get(url);
+      final data     = jsonDecode(response.body);
+      if (data['status'] == 'OK') {
+        setState(() {
+          _predictions     = List<Map<String, dynamic>>.from(data['predictions']);
+          _showSuggestions = _predictions.isNotEmpty;
+        });
+      } else {
+        debugPrint('Places API status: ${data['status']}');
+        setState(() { _predictions = []; _showSuggestions = false; });
+      }
+    } catch (e) {
+      debugPrint('Places search error: $e');
+    } finally {
+      setState(() => _isSearching = false);
+    }
+  }
+
+  Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
+    _focusNode.unfocus();
+    setState(() { _showSuggestions = false; });
+    _searchCtrl.text = prediction['description'] ?? '';
+
+    try {
+      final placeId = prediction['place_id'];
+      final url = Uri.parse(
+        'https://maps.googleapis.com/maps/api/place/details/json'
+        '?place_id=$placeId'
+        '&fields=geometry'
+        '&key=$_apiKey',
+      );
+      final response = await http.get(url);
+      final data     = jsonDecode(response.body);
+      if (data['status'] == 'OK') {
+        final loc    = data['result']['geometry']['location'];
+        final latLng = gmap.LatLng(loc['lat'], loc['lng']);
+        setState(() => _selected = latLng);
+        _mapController?.animateCamera(
+          gmap.CameraUpdate.newCameraPosition(
+            gmap.CameraPosition(target: latLng, zoom: 15),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Place detail error: $e');
+    }
+  }
+
+  void _clearSearch() {
+    _searchCtrl.clear();
+    setState(() { _predictions = []; _showSuggestions = false; });
+    _focusNode.unfocus();
+  }
+
+  @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: kSurface,
-        appBar: AppBar(
-          backgroundColor: kCardBg,
-          elevation: 0,
-          surfaceTintColor: kCardBg,
-          bottom: PreferredSize(
-            preferredSize: const Size.fromHeight(0.5),
-            child: Container(height: 0.5, color: kDivider),
+    backgroundColor: kBg,
+    appBar: AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      surfaceTintColor: Colors.white,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(0.5),
+        child: Container(height: 0.5, color: kBorder),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios_new_rounded,
+            size: 18, color: kTextPrimary),
+        onPressed: () => Navigator.pop(context),
+      ),
+      title: const Text('Select Location',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600,
+              color: kTextPrimary)),
+      centerTitle: true,
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: TextButton(
+            onPressed: () => Navigator.pop(context, _selected),
+            style: TextButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            ),
+            child: const Text('Confirm',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
           ),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                size: 18, color: kTextDark),
-            onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    ),
+    body: Stack(children: [
+
+      // ── Google Map ──────────────────────────────────────────────
+      gmap.GoogleMap(
+        initialCameraPosition:
+            gmap.CameraPosition(target: _selected, zoom: 14),
+        onMapCreated: (ctrl) => _mapController = ctrl,
+        onTap: (gmap.LatLng latLng) {
+          _focusNode.unfocus();
+          setState(() {
+            _selected        = latLng;
+            _showSuggestions = false;
+          });
+        },
+        markers: {
+          gmap.Marker(
+            markerId: const gmap.MarkerId('selected'),
+            position: _selected,
           ),
-          title: const Text('Select Location',
-              style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w600,
-                  color: kTextDark)),
-          centerTitle: true,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: TextButton(
-                onPressed: () =>
-                    Navigator.pop(context, _selected),
-                style: TextButton.styleFrom(
-                  backgroundColor: kPrimaryBlue,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 6),
-                ),
-                child: const Text('Confirm',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13)),
+        },
+        myLocationEnabled: true,
+        myLocationButtonEnabled: true,
+        zoomControlsEnabled: true,
+      ),
+
+      // ── Search bar + suggestions ────────────────────────────────
+      Positioned(
+        top: 12, left: 12, right: 12,
+        child: Column(children: [
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(color: Color(0x18000000),
+                    blurRadius: 12, offset: Offset(0, 3)),
+              ],
+            ),
+            child: TextField(
+              controller: _searchCtrl,
+              focusNode:  _focusNode,
+              onChanged:  _onSearchChanged,
+              style: const TextStyle(fontSize: 14, color: kTextPrimary),
+              decoration: InputDecoration(
+                hintText: 'Search for a place...',
+                hintStyle: const TextStyle(fontSize: 14, color: kTextMuted),
+                prefixIcon: _isSearching
+                    ? const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: SizedBox(width: 18, height: 18,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: kPrimary)),
+                      )
+                    : const Icon(Icons.search_rounded, color: kPrimary, size: 20),
+                suffixIcon: _searchCtrl.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.close_rounded,
+                            color: kTextMuted, size: 18),
+                        onPressed: _clearSearch,
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
               ),
             ),
-          ],
-        ),
-        body: Stack(children: [
-          GoogleMap(
-            initialCameraPosition:
-                CameraPosition(target: _selected, zoom: 14),
-            onTap: (latLng) =>
-                setState(() => _selected = latLng),
-            markers: {
-              Marker(
-                  markerId: const MarkerId('selected'),
-                  position: _selected),
-            },
           ),
-          Positioned(
-            bottom: 24, left: 24, right: 24,
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 14),
+
+          if (_showSuggestions)
+            Container(
+              margin: const EdgeInsets.only(top: 6),
               decoration: BoxDecoration(
-                color: kCardBg,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                    color: kPrimaryBlue.withOpacity(0.3)),
-                boxShadow: [
-                  BoxShadow(
-                      color:
-                          Colors.black.withOpacity(0.08),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4))
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x18000000),
+                      blurRadius: 12, offset: Offset(0, 3)),
                 ],
               ),
-              child: Row(children: [
-                Container(
-                  width: 36, height: 36,
-                  decoration: const BoxDecoration(
-                      color: kLightBlue,
-                      shape: BoxShape.circle),
-                  child: const Icon(
-                      Icons.location_on_rounded,
-                      color: kPrimaryBlue, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      const Text('Selected coordinates',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: kTextMuted)),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${_selected.latitude.toStringAsFixed(4)}, '
-                        '${_selected.longitude.toStringAsFixed(4)}',
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: kTextDark),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: _predictions.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, color: kBorder),
+                  itemBuilder: (_, i) {
+                    final p           = _predictions[i];
+                    final mainText    = p['structured_formatting']?['main_text'] ?? p['description'] ?? '';
+                    final secondText  = p['structured_formatting']?['secondary_text'] ?? '';
+                    return InkWell(
+                      onTap: () => _selectPrediction(p),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 12),
+                        child: Row(children: [
+                          Container(
+                            width: 32, height: 32,
+                            decoration: BoxDecoration(
+                              color: kPrimaryLight,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.location_on_rounded,
+                                color: kPrimary, size: 16),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(mainText,
+                                    style: const TextStyle(fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: kTextPrimary),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis),
+                                if (secondText.isNotEmpty) ...[
+                                  const SizedBox(height: 2),
+                                  Text(secondText,
+                                      style: const TextStyle(
+                                          fontSize: 11, color: kTextSecondary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.north_west_rounded,
+                              size: 14, color: kTextMuted),
+                        ]),
                       ),
-                    ]),
-              ]),
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
         ]),
-      );
-}
+      ),
+
+      // ── Bottom coordinates card ─────────────────────────────────
+      Positioned(
+        bottom: 24, left: 16, right: 16,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kPrimary.withOpacity(0.3)),
+            boxShadow: const [
+              BoxShadow(color: Color(0x14000000),
+                  blurRadius: 16, offset: Offset(0, 4)),
+            ],
+          ),
+          child: Row(children: [
+            Container(
+              width: 36, height: 36,
+              decoration: const BoxDecoration(
+                  color: kPrimaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.location_on_rounded,
+                  color: kPrimary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Selected coordinates',
+                      style: TextStyle(fontSize: 11, color: kTextSecondary)),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_selected.latitude.toStringAsFixed(6)}, '
+                    '${_selected.longitude.toStringAsFixed(6)}',
+                    style: const TextStyle(fontSize: 13,
+                        fontWeight: FontWeight.w600, color: kTextPrimary),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => _mapController?.animateCamera(
+                gmap.CameraUpdate.newCameraPosition(
+                  gmap.CameraPosition(target: _selected, zoom: 15),
+                ),
+              ),
+              child: Container(
+                width: 34, height: 34,
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.center_focus_strong_rounded,
+                    color: kPrimary, size: 17),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    ]),
+  );
+} 

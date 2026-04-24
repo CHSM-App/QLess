@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/doctors_viewmodel.dart';
@@ -6,6 +7,10 @@ import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
+
+/// Shared position used for nearby-doctor filtering across screens.
+/// Updated by HomeScreen whenever the user changes their location.
+final selectedPositionProvider = StateProvider<Position?>((ref) => null);
 
 final patientLoginViewModelProvider =
     StateNotifierProvider<PatientLoginViewmodel, PatientLoginState>((ref) {

@@ -1589,38 +1589,54 @@ class _PillTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    color: Colors.white,
-    padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
-    child: Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F5F3),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: TabBar(
-        controller: controller,
-        labelColor: kPrimaryDark,
-        unselectedLabelColor: kTextSecondary,
-        indicator: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.07), blurRadius: 6, offset: const Offset(0, 1)),
-          ],
+        color: Colors.white,
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF0F5F3),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: TabBar(
+            controller: controller,
+            labelColor: kPrimaryDark,
+            unselectedLabelColor: kTextSecondary,
+            // Each tab takes exactly 1/3 — indicator fills the full tab cell
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: Colors.white,
+              // Must be (outerRadius - padding) so it sits flush inside
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 6,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            // 4px inset on all sides keeps a visible outer pill gap
+            indicatorPadding: const EdgeInsets.all(4),
+            labelStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+            dividerColor: Colors.transparent,
+            // Removes ripple that bleeds outside the pill shape
+            splashFactory: NoSplash.splashFactory,
+            overlayColor: WidgetStateProperty.all(Colors.transparent),
+            tabs: [
+              Tab(text: 'Today ($todayCount)'),
+              Tab(text: 'Upcoming ($upcomingCount)'),
+              Tab(text: 'Done ($completedCount)'),
+            ],
+          ),
         ),
-        indicatorPadding: const EdgeInsets.all(3),
-        labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-        dividerColor: Colors.transparent,
-        tabs: [
-          Tab(text: 'Today ($todayCount)'),
-          Tab(text: 'Upcoming ($upcomingCount)'),
-          Tab(text: 'Done ($completedCount)'),
-        ],
-      ),
-    ),
-  );
+      );
 }
-
 // ── Desktop Sidebar ────────────────────────────────────────────────────────────
 class _DesktopSidebar extends StatelessWidget {
   final _Tab activeTab;
@@ -2339,30 +2355,6 @@ class _ActionBtn extends StatelessWidget {
   );
 }
 
-class _QueueStateBadge extends StatelessWidget {
-  final QueueState state;
-  const _QueueStateBadge({required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    final (String label, Color bg, Color fg, Color dot) = switch (state) {
-      QueueState.running => ('Running', kPrimaryLighter, kPrimaryDark, kPrimary),
-      QueueState.paused  => ('Paused',  kAmberLight,    kAmberDark,   kWarning),
-      QueueState.stopped => ('Closed',
-          const Color(0xFFF3F4F6), const Color(0xFF6B7280), const Color(0xFF9CA3AF)),
-      QueueState.idle    => ('Idle', kRedLight, kRedDark, kError),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
-      ]),
-    );
-  }
-}
 
 class _PulseDot extends StatefulWidget {
   @override
