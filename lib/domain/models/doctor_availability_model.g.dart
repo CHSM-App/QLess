@@ -11,7 +11,7 @@ DoctorAvailabilityModel _$DoctorAvailabilityModelFromJson(
 ) => DoctorAvailabilityModel(
   doctorId: (json['doctor_id'] as num?)?.toInt(),
   dayOfWeek: json['day_of_week'] as String?,
-  isEnabled: (json['is_enabled'] as num?)?.toInt(),
+  isEnabled: json['is_enabled'] as bool?,
   createdAt: json['created_at'] as String?,
   slotId: (json['slot_id'] as num?)?.toInt(),
   availabilityId: (json['availability_id'] as num?)?.toInt(),

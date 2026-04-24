@@ -11,7 +11,7 @@ class DoctorAvailabilityModel {
   String? dayOfWeek;
 
   @JsonKey(name: 'is_enabled')
-  int? isEnabled;
+  bool? isEnabled;
 
   @JsonKey(name: 'created_at')
   String? createdAt;
