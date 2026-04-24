@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
@@ -217,6 +218,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   List<Map<String, dynamic>> _cachedSpecialties = [];
   bool _popupShown = false;
+  final Map<int, double> _homeRatings = {};
 
   @override
   void initState() {
@@ -261,9 +263,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(pid),
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
       ]);
+      final doctorIds = ref
+          .read(doctorsViewModelProvider)
+          .doctors
+          .map((d) => d.doctorId)
+          .whereType<int>()
+          .toList();
+      _loadRatings(doctorIds);
     } finally {
       _isFetching = false;
     }
+  }
+
+  Future<void> _loadRatings(List<int> doctorIds) async {
+    final toFetch = doctorIds.where((id) => !_homeRatings.containsKey(id)).toList();
+    if (toFetch.isEmpty) return;
+    final usecase = ref.read(reviewUsecaseProvider);
+    final results = await Future.wait(
+      toFetch.map((id) async {
+        try {
+          final reviews = await usecase.getDoctorReviews(id);
+          if (reviews.isEmpty) return MapEntry(id, 0.0);
+          final avg = reviews.fold<double>(
+                  0, (a, r) => a + (r.rating?.toDouble() ?? 0)) /
+              reviews.length;
+          return MapEntry(id, avg);
+        } catch (_) {
+          return MapEntry(id, 0.0);
+        }
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      for (final e in results) { _homeRatings[e.key] = e.value; }
+    });
   }
 
   Future<void> _ensureLocationPermission() async {
@@ -606,10 +639,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildTopRatedDoctorsSection(
       List<DoctorDetails> doctors, bool isLoading) {
+    // Use fetched ratings; only doctors with rating > 0, sorted descending
     final rated = doctors
-        .where((d) => d.rating != null)
+        .where((d) => d.doctorId != null &&
+            (_homeRatings[d.doctorId!] ?? 0) > 0)
         .toList()
-      ..sort((a, b) => b.rating!.compareTo(a.rating!));
+      ..sort((a, b) =>
+          (_homeRatings[b.doctorId!] ?? 0)
+              .compareTo(_homeRatings[a.doctorId!] ?? 0));
     final shownDoctors = rated.take(4).toList();
 
     return Column(
@@ -621,7 +658,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           onAction: shownDoctors.isNotEmpty ? () => _goToSearch() : null,
         ),
         const SizedBox(height: 10),
-        if (isLoading && shownDoctors.isEmpty) ...[
+        if (isLoading && _homeRatings.isEmpty) ...[
           const _TopDoctorSkeletonCard(),
           const SizedBox(height: 8),
           const _TopDoctorSkeletonCard(),
@@ -633,6 +670,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               padding: const EdgeInsets.only(bottom: 8),
               child: _TopDoctorCard(
                 doctor: doctor,
+                cardRating: _homeRatings[doctor.doctorId!],
                 onTap: () => _goToSearch(specialty: doctor.specialization),
               ),
             ),
@@ -1656,15 +1694,16 @@ class _EmptyNote extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════════
 class _TopDoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
+  final double? cardRating;
   final VoidCallback onTap;
-  const _TopDoctorCard({required this.doctor, required this.onTap});
+  const _TopDoctorCard({required this.doctor, required this.onTap, this.cardRating});
 
   @override
   Widget build(BuildContext context) {
     final name = doctor.name?.trim();
     final spec = doctor.specialization?.trim();
     final clinic = doctor.clinicName?.trim();
-    final rating = doctor.rating;
+    final rating = (cardRating != null && cardRating! > 0) ? cardRating : null;
 
     return GestureDetector(
       onTap: onTap,
