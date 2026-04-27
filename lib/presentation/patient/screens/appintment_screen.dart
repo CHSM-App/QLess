@@ -1022,7 +1022,46 @@ class _AppointmentCard extends StatelessWidget {
                               () => openMap(a.latitude!, a.longitude!, a.clinicName)),
                           const SizedBox(width: 6),
                         ],
-                        _iconBtn(Icons.call_rounded, kPrimaryLight, kPrimary, () {}),
+                        _iconBtn(Icons.call_rounded, kPrimaryLight, kPrimary,
+                            () => showDialog(
+                              context: context,
+                              builder: (ctx) => Dialog(
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(20),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 44, height: 44,
+                                        decoration: const BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle),
+                                        child: const Icon(Icons.call_rounded, color: kPrimary, size: 22),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      const Text('Contact',
+                                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                                      const SizedBox(height: 16),
+                                      if (a.mobile?.isNotEmpty == true)
+                                        _callOption(ctx, 'Call Doctor', a.doctorName ?? 'Doctor', a.mobile!, Icons.person_rounded, kPrimary, kPrimaryLight),
+                                      if (a.mobile?.isNotEmpty == true && a.clinicContact?.isNotEmpty == true)
+                                        const SizedBox(height: 10),
+                                      if (a.clinicContact?.isNotEmpty == true)
+                                        _callOption(ctx, 'Call Clinic', a.clinicName ?? 'Clinic', a.clinicContact!, Icons.local_hospital_rounded, kWarning, kAmberLight),
+                                      if (a.mobile?.isEmpty != false && a.clinicContact?.isEmpty != false)
+                                        const Text('No contact available', style: TextStyle(fontSize: 13, color: kTextMuted)),
+                                      const SizedBox(height: 14),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: TextButton(
+                                          onPressed: () => Navigator.pop(ctx),
+                                          child: const Text('Cancel', style: TextStyle(color: kTextSecondary, fontSize: 13)),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )),
                       ],
                     ),
                   ],
@@ -1102,6 +1141,47 @@ class _AppointmentCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10)),
           ),
           child: Icon(icon, color: fg, size: 16),
+        ),
+      );
+
+  Widget _callOption(BuildContext ctx, String title, String subtitle,
+      String number, IconData icon, Color fg, Color bg) =>
+      GestureDetector(
+        onTap: () async {
+          Navigator.pop(ctx);
+          final uri = Uri(scheme: 'tel', path: number);
+          if (await canLaunchUrl(uri)) await launchUrl(uri);
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: bg.withOpacity(0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: fg.withOpacity(0.2)),
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+              child: Icon(icon, size: 16, color: fg),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
+                  Text(subtitle,
+                      style: const TextStyle(fontSize: 11, color: kTextSecondary),
+                      overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            Icon(Icons.call_rounded, size: 16, color: fg),
+          ]),
         ),
       );
 }

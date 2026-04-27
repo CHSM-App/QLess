@@ -26,6 +26,12 @@ PrescriptionMedicineModel _$PrescriptionMedicineModelFromJson(
   sprayPuffs: json['spray_puffs'] as String?,
   sprayUsage: json['spray_usage'] as String?,
   lotionUsage: json['lotion_usage'] as String?,
+  powderDosage: json['powder_dosage'] as String?,
+  powderForm: json['powder_form'] as String?,
+  inhalerPuffs: json['inhaler_puffs'] as String?,
+  inhalerType: json['inhaler_type'] as String?,
+  inhalerTechnique: json['inhaler_technique'] as String?,
+  inhalerUsage: json['inhaler_usage'] as String?,
 );
 
 Map<String, dynamic> _$PrescriptionMedicineModelToJson(
@@ -48,6 +54,12 @@ Map<String, dynamic> _$PrescriptionMedicineModelToJson(
   'spray_puffs': instance.sprayPuffs,
   'spray_usage': instance.sprayUsage,
   'lotion_usage': instance.lotionUsage,
+  'powder_dosage': instance.powderDosage,
+  'powder_form': instance.powderForm,
+  'inhaler_puffs': instance.inhalerPuffs,
+  'inhaler_type': instance.inhalerType,
+  'inhaler_technique': instance.inhalerTechnique,
+  'inhaler_usage': instance.inhalerUsage,
 };
 
 PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
@@ -77,7 +89,13 @@ PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
       lotionApplyArea: json['lotion_apply_area'] as String?,
       sprayPuffs: json['spray_puffs'] as String?,
       sprayUsage: json['spray_usage'] as String?,
+      powderDosage: json['powder_dosage'] as String?,
+      powderForm: json['powder_form'] as String?,
       lotionUsage: json['lotion_usage'] as String?,
+      inhalerPuffs: json['inhaler_puffs'] as String?,
+      inhalerType: json['inhaler_type'] as String?,
+      inhalerTechnique: json['inhaler_technique'] as String?,
+      inhalerUsage: json['inhaler_usage'] as String?,
       prescriptionId: (json['prescription_id'] as num?)?.toInt(),
       patientId: (json['patient_id'] as num?)?.toInt(),
       doctorId: (json['doctor_id'] as num?)?.toInt(),
@@ -126,6 +144,12 @@ Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
       'spray_puffs': instance.sprayPuffs,
       'spray_usage': instance.sprayUsage,
       'lotion_usage': instance.lotionUsage,
+      'powder_dosage': instance.powderDosage,
+      'powder_form': instance.powderForm,
+      'inhaler_puffs': instance.inhalerPuffs,
+      'inhaler_type': instance.inhalerType,
+      'inhaler_technique': instance.inhalerTechnique,
+      'inhaler_usage': instance.inhalerUsage,
       'prescription_id': instance.prescriptionId,
       'patient_id': instance.patientId,
       'doctor_id': instance.doctorId,

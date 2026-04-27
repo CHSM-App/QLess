@@ -333,7 +333,14 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                   MaterialPageRoute(
                     builder: (_) => const PatientEditProfilePage(),
                   ),
-                );
+                ).then((_) {
+                  if (!mounted) return;
+                  setState(() {
+                    _didFetchProfile = false;
+                    _didFetchStats   = false;
+                  });
+                  _maybeFetchProfile(ref.read(patientLoginViewModelProvider));
+                });
               },
               child: Container(
                 width: 34,

@@ -178,6 +178,8 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           leadTimeMinutes: d.leadTime,
           phoneCheckResult: AsyncValue.data(result),
         );
+        if (d.name != null) await TokenStorage.saveValue('name', d.name!);
+        if (d.clinicName != null) await TokenStorage.saveValue('clinic_name', d.clinicName!);
     } catch (e, st) {
       state = state.copyWith(
         phoneCheckResult: AsyncValue.error(e, st),

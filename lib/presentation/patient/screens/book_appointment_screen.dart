@@ -497,26 +497,43 @@ void dispose() {
     String? queueOpenTimeStr;
     bool isQueueOpen = true;
     if (isQueue && dayIsToday && selAvail != null) {
-      final leadMin = widget.doctor.qStartSection ?? widget.doctor.leadTime ?? 0;
-      if (leadMin > 0) {
-        final sessionStart = _parseTime(selAvail.startTime);
-        final openMin      = sessionStart.hour * 60 + sessionStart.minute - leadMin;
-        if (openMin >= 0) {
-          final openH = openMin ~/ 60;
-          final openM = openMin % 60;
-          final sf    = openH < 12 ? 'AM' : 'PM';
-          final dh    = openH == 0 ? 12 : (openH > 12 ? openH - 12 : openH);
-          queueOpenTimeStr =
-              '${dh.toString().padLeft(2, '0')}:${openM.toString().padLeft(2, '0')} $sf';
-          final nowMin = DateTime.now().hour * 60 + DateTime.now().minute;
-          isQueueOpen  = nowMin >= openMin;
+      final nowMin     = DateTime.now().hour * 60 + DateTime.now().minute;
+      final sessionEnd = _parseTime(selAvail.endTime);
+      final endMin     = sessionEnd.hour * 60 + sessionEnd.minute;
+
+      if (nowMin >= endMin) {
+        // Past the session end time — queue is closed, no open-time hint
+        isQueueOpen = false;
+      } else {
+        final leadMin = widget.doctor.qStartSection ?? widget.doctor.leadTime ?? 0;
+        if (leadMin > 0) {
+          final sessionStart = _parseTime(selAvail.startTime);
+          final openMin      = sessionStart.hour * 60 + sessionStart.minute - leadMin;
+          if (openMin >= 0) {
+            final openH = openMin ~/ 60;
+            final openM = openMin % 60;
+            final sf    = openH < 12 ? 'AM' : 'PM';
+            final dh    = openH == 0 ? 12 : (openH > 12 ? openH - 12 : openH);
+            queueOpenTimeStr =
+                '${dh.toString().padLeft(2, '0')}:${openM.toString().padLeft(2, '0')} $sf';
+            isQueueOpen = nowMin >= openMin;
+          }
         }
       }
     }
 
+    // Slot session end-time check (today only)
+    bool isSlotSessionEnded = false;
+    if (!isQueue && dayIsToday && selAvail != null) {
+      final nowMin     = DateTime.now().hour * 60 + DateTime.now().minute;
+      final sessionEnd = _parseTime(selAvail.endTime);
+      final endMin     = sessionEnd.hour * 60 + sessionEnd.minute;
+      isSlotSessionEnded = nowMin >= endMin;
+    }
+
     final canConfirm = selAvail != null &&
         _bookable(mode, dayIsToday) &&
-        (isQueue || _selectedTime != null) &&
+        (isQueue || (_selectedTime != null && !isSlotSessionEnded)) &&
         (!isQueue || !dayIsToday || isQueueOpen);
 
     return Scaffold(
@@ -572,7 +589,8 @@ void dispose() {
                 onPickTime: (t) => setState(() => _selectedTime = t),
                 buildSlots:        _buildSlots,
                 fmtTime:           _fmtTime,
-                  symptomsController: _symptomsController,   // ← ADD
+                  symptomsController: _symptomsController,
+                  isSlotSessionEnded: isSlotSessionEnded,
               ),
             ),
         ],
@@ -1249,6 +1267,7 @@ class _Body extends StatelessWidget {
   final bool         isQueueOpen;
   final String?      estimatedWaitTime;
   final bool         isEstimateLoading;
+  final bool         isSlotSessionEnded;
 
   final void Function(DateTime, List<DoctorAvailabilityModel>) onPickDate;
   final ValueChanged<int?>    onPickSession;
@@ -1264,9 +1283,10 @@ class _Body extends StatelessWidget {
     required this.dayIsToday, required this.bookedTimes,
     required this.onPickDate, required this.onPickSession,
     required this.onPickTime, required this.buildSlots, required this.fmtTime,
-      required this.symptomsController,   // ← ADD
+      required this.symptomsController,
     this.queueOpenTimeStr, this.isQueueOpen = true,
     this.estimatedWaitTime, this.isEstimateLoading = false,
+    this.isSlotSessionEnded = false,
   });
 
   String _dayName(int w) {
@@ -1319,7 +1339,28 @@ class _Body extends StatelessWidget {
               isEstimateLoading: isEstimateLoading,
             )
          
-          else ...[
+          else if (isSlotSessionEnded) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: kRedLight.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kError.withOpacity(0.3)),
+              ),
+              child: const Row(children: [
+                Icon(Icons.event_busy_rounded, size: 15, color: kError),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Slot booking has ended for this session',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: kError)),
+                ),
+              ]),
+            ),
+          ] else ...[
             _SlotPicker(
               slots:       buildSlots(selectedAvail!),
               selected:    selectedTime,
@@ -1656,9 +1697,11 @@ class _QueueCard extends StatelessWidget {
     final noteIcon  = isQueueOpen
         ? Icons.check_circle_rounded
         : Icons.access_time_rounded;
-    final noteText  = !isQueueOpen && queueOpenTimeStr != null
-        ? 'Queue opens at $queueOpenTimeStr'
-        : 'Queue booking is open';
+    final noteText = isQueueOpen
+        ? 'Queue booking is open'
+        : (queueOpenTimeStr != null
+            ? 'Queue opens at $queueOpenTimeStr'
+            : 'Queue booking has ended');
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _sectionLabel('Queue Booking'),
@@ -1688,21 +1731,23 @@ class _QueueCard extends StatelessWidget {
       const SizedBox(height: 8),
 
       // ── Estimated wait banner ───────────────────────────────────
-      AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        transitionBuilder: (child, anim) =>
-            FadeTransition(opacity: anim, child: child),
-        child: isEstimateLoading
-            ? _EstimateBanner.loading(key: const ValueKey('loading'))
-            : (estimatedWaitTime?.isNotEmpty == true)
-                ? _EstimateBanner.value(
-                    key: const ValueKey('value'),
-                    text: estimatedWaitTime!)
-                : const SizedBox.shrink(key: ValueKey('empty')),
-      ),
+      if (!(!isQueueOpen && queueOpenTimeStr == null)) ...[
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          transitionBuilder: (child, anim) =>
+              FadeTransition(opacity: anim, child: child),
+          child: isEstimateLoading
+              ? _EstimateBanner.loading(key: const ValueKey('loading'))
+              : (estimatedWaitTime?.isNotEmpty == true)
+                  ? _EstimateBanner.value(
+                      key: const ValueKey('value'),
+                      text: estimatedWaitTime!)
+                  : const SizedBox.shrink(key: ValueKey('empty')),
+        ),
 
-      if (estimatedWaitTime?.isNotEmpty == true || isEstimateLoading)
-        const SizedBox(height: 8),
+        if (estimatedWaitTime?.isNotEmpty == true || isEstimateLoading)
+          const SizedBox(height: 8),
+      ],
 
       // ── Walk-in card ────────────────────────────────────────────
       // Container(

@@ -97,6 +97,9 @@ class DoctorDetails {
   @JsonKey(name: 'booking_start_time')
   final String? bookingStartTime;
 
+  @JsonKey(name: 'booking_end_time')
+  final String? bookingEndTime;
+
   @JsonKey(name: 'is_recently_visited', fromJson: _intFromJson)
   final int? isRecentlyVisited;
 
@@ -138,6 +141,7 @@ class DoctorDetails {
     this.maxQueueLength,
     this.isQueueFull,
     this.bookingStartTime,
+    this.bookingEndTime,
     this.isRecentlyVisited,
     this.rating,
   });

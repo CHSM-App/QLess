@@ -203,6 +203,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         fee:            d?.consultationFee != null
             ? '₹${d!.consultationFee!.toStringAsFixed(0)}'
             : '—',
+        onProfileEdited: _refreshProfile,
       ),
     );
   }
@@ -518,7 +519,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           MaterialPageRoute(
                               builder: (_) =>
                                   const DoctorEditProfilePage()),
-                        ),
+                        ).then((_) {
+                          if (mounted) _refreshProfile();
+                        }),
                     icon: const Icon(Icons.edit_outlined, size: 14),
                     label: const Text('Edit Profile',
                         style: TextStyle(
@@ -1578,6 +1581,7 @@ class _ProfessionalDetailsSheet extends StatelessWidget {
 class _PersonalInfoSheet extends StatelessWidget {
   final String initials, name, mobile, specialization,
       qualification, clinicName, experience, fee;
+  final Future<void> Function()? onProfileEdited;
 
   const _PersonalInfoSheet({
     required this.initials,
@@ -1588,6 +1592,7 @@ class _PersonalInfoSheet extends StatelessWidget {
     required this.clinicName,
     required this.experience,
     required this.fee,
+    this.onProfileEdited,
   });
 
   @override
@@ -1716,7 +1721,7 @@ class _PersonalInfoSheet extends StatelessWidget {
                             MaterialPageRoute(
                                 builder: (_) =>
                                     const DoctorEditProfilePage()),
-                          );
+                          ).then((_) => onProfileEdited?.call());
                         },
                         icon: const Icon(Icons.edit_outlined, size: 14),
                         label: const Text('Edit Profile',

@@ -61,11 +61,29 @@ String _cap(String s) =>
 
 
 // ── Queue State ───────────────────────────────────────────────────────────────
-enum _QueueState { noQueue, unavailable, opensSoon, full, open, hasQueue }
+enum _QueueState { noQueue, unavailable, ended, opensSoon, full, open, hasQueue }
+
+int _timeMins(String? t) {
+  if (t == null || t.isEmpty) return -1;
+  final parts = t.split(':');
+  if (parts.length < 2) return -1;
+  final h = int.tryParse(parts[0]) ?? -1;
+  final m = int.tryParse(parts[1]) ?? 0;
+  if (h < 0) return -1;
+  return h * 60 + m;
+}
 
 _QueueState _queueStateFor(DoctorDetails d) {
   if (d.isQueueAvailable == null) return _QueueState.noQueue;
   if (d.isQueueAvailable == 0)    return _QueueState.unavailable;
+
+  // If session end time has passed, session is over — hide queue count
+  final endMins = _timeMins(d.bookingEndTime);
+  if (endMins >= 0) {
+    final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+    if (nowMins >= endMins) return _QueueState.ended;
+  }
+
   if (d.isBookingStarted != 1)    return _QueueState.opensSoon;
   if (d.isQueueFull == 1)         return _QueueState.full;
   final cur = d.currentQueueLength ?? 0;
@@ -101,6 +119,11 @@ class _QueueStatus {
             isVisible: true, canBook: false, tintCard: true,
             label: 'Unavailable', btnLabel: 'N/A',
             color: kError, icon: Icons.block_rounded);
+      case _QueueState.ended:
+        return const _QueueStatus(
+            isVisible: true, canBook: false, tintCard: false,
+            label: 'Queue ended', btnLabel: 'Ended',
+            color: kError, icon: Icons.event_busy_rounded);
       case _QueueState.opensSoon:
         final t = d.bookingStartTime;
         final lbl = t != null ? 'Opens $t' : 'Opens soon';

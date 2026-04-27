@@ -348,6 +348,10 @@ Future<void> _selectFromMap() async {
   // ── Helpers ───────────────────────────────────────────────────────────────
   bool _isBlank(TextEditingController c) => c.text.trim().isEmpty;
 
+  bool _isValidEmail(String email) =>
+      RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
+          .hasMatch(email.trim());
+
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -449,9 +453,22 @@ Future<void> _selectFromMap() async {
         return _showError('Contact No is required');
       if (_contactController.text.trim().length != 10)
         return _showError('Contact No must be 10 digits');
-      if (_mobileExistsError != null)
-        return _showError(_mobileExistsError!);
-    
+
+      // Cancel pending debounce and do an explicit check on Continue press
+      _mobileDebounce?.cancel();
+      final mobileCheck = await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .mobileExistDoctor(_contactController.text.trim());
+      if (!mounted) return;
+      if (mobileCheck.isNotEmpty) {
+        setState(() => _mobileExistsError = 'Mobile number already registered.');
+        return _showError('Mobile number already registered.');
+      }
+      setState(() => _mobileExistsError = null);
+
+      if (_emailController.text.trim().isNotEmpty &&
+          !_isValidEmail(_emailController.text))
+        return _showError('Please enter a valid Email Address');
       if (_selectedGenderId == null || _selectedGenderId! <= 0)
         return _showError('Gender is required');
       if (_selectedSpecialization.isEmpty)
@@ -477,7 +494,9 @@ Future<void> _selectFromMap() async {
         return _showError('Clinic Address is required');
       if (_isBlank(_clinicContactController))
         return _showError('Clinic Contact is required');
-    
+      if (_clinicEmailController.text.trim().isNotEmpty &&
+          !_isValidEmail(_clinicEmailController.text))
+        return _showError('Please enter a valid Clinic Email Address');
 
       // Fetch FCM token once
       if (_fcmToken == null) {
