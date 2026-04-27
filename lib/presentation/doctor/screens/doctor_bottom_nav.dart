@@ -176,11 +176,15 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
     // Profile page hides the shared app bar (manages its own header)
 final showAppBar = false;
 
-    if (isWide) {
-      return _buildWideLayout(showAppBar);
-    } else {
-      return _buildMobileLayout(showAppBar);
-    }
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onTabTap(0);
+      },
+      child: isWide
+          ? _buildWideLayout(showAppBar)
+          : _buildMobileLayout(showAppBar),
+    );
   }
 
   // ── WIDE layout (tablet / desktop): sidebar rail + content ────────────────

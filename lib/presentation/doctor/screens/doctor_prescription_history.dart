@@ -45,6 +45,8 @@ const _typeColor = {
   4: Color(0xFF3B82F6), // Drops   → blue
   5: Color(0xFF68D391), // Lotion  → green
   6: Color(0xFFF6AD55), // Spray   → amber
+  7: Color(0xFF975A16), // Powder  → amber dark
+  8: Color(0xFF1E40AF), // Inhaler → blue dark
 };
 const _typeColorLight = {
   1: Color(0xFFD9F5F1),
@@ -53,6 +55,8 @@ const _typeColorLight = {
   4: Color(0xFFDBEAFE),
   5: Color(0xFFDCFCE7),
   6: Color(0xFFFEF3C7),
+  7: Color(0xFFFEF3C7),
+  8: Color(0xFFDBEAFE),
 };
 const _typeColorDark = {
   1: Color(0xFF2BB5A0),
@@ -61,10 +65,13 @@ const _typeColorDark = {
   4: Color(0xFF1E40AF),
   5: Color(0xFF276749),
   6: Color(0xFF975A16),
+  7: Color(0xFF975A16),
+  8: Color(0xFF1E40AF),
 };
 const _typeLabel = {
-  1: 'Tablet', 2: 'Syrup', 3: 'Injection',
-  4: 'Drops',  5: 'Lotion', 6: 'Spray',
+  1: 'Tablet', 2: 'Syrups', 3: 'Injections',
+  4: 'Drops',  5: 'Lotions', 6: 'Sprays',
+  7: 'Powders', 8: 'Inhalers'
 };
 const _typeIcon = {
   1: Icons.medication_rounded,
@@ -73,6 +80,8 @@ const _typeIcon = {
   4: Icons.water_drop_rounded,
   5: Icons.soap_rounded,
   6: Icons.air_rounded,
+  7: Icons.grain_rounded,
+  8: Icons.air_rounded,
 };
 
 // ── Avatar palette (same as PatientListScreen) ─────────────────────
@@ -83,6 +92,7 @@ const _avatarPalette = [
   (bg: Color(0xFFDBEAFE), fg: Color(0xFF1E40AF)),
   (bg: Color(0xFFFEE2E2), fg: Color(0xFFC53030)),
   (bg: Color(0xFFDCFCE7), fg: Color(0xFF276749)),
+  
 ];
 
 // ════════════════════════════════════════════════════════════════════

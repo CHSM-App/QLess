@@ -1325,15 +1325,19 @@ class _PatientPrescriptionViewScreenState
   static const _typeColor = {
     1: kInfo, 2: kPurple, 3: kError,
     4: kPrimary, 5: kSuccess, 6: kWarning,
+     7: Color(0xFF4DD9C8),   // powders — teal
+  8: Color(0xFF1E40AF),  
   };
   static const _typeLabel = {
     1: 'Tablet', 2: 'Syrup', 3: 'Injection',
     4: 'Drops',  5: 'Lotion', 6: 'Spray',
+     7: 'Powder', 8: 'Inhaler',
   };
   static const _typeIcon = {
     1: Icons.medication_rounded,  2: Icons.local_drink_rounded,
     3: Icons.vaccines_rounded,    4: Icons.water_drop_rounded,
     5: Icons.soap_rounded,        6: Icons.air_rounded,
+      7: Icons.grain_rounded,       8: Icons.air_rounded,
   };
 
   @override
@@ -2090,7 +2094,9 @@ class PrescriptionMedicineItem {
   final int medicineTypeId;
   final String? mediTypeName, medicineName, frequency, duration, timing,
       tabletDosage, syrupDosageMl, injDosage, injRoute, dropsCount,
-      dropsApplication, lotionApplyArea, sprayPuffs, sprayUsage, lotionUsage;
+      dropsApplication, lotionApplyArea, sprayPuffs, sprayUsage, lotionUsage,
+         powderDosage, powderForm,
+      inhalerPuffs, inhalerType, inhalerTechnique, inhalerUsage;
 
   const PrescriptionMedicineItem({
     required this.medicineId, required this.medicineTypeId,
@@ -2100,6 +2106,9 @@ class PrescriptionMedicineItem {
     required this.injDosage, required this.injRoute, required this.dropsCount,
     required this.dropsApplication, required this.lotionApplyArea,
     required this.sprayPuffs, required this.sprayUsage, required this.lotionUsage,
+     this.powderDosage, this.powderForm,
+    this.inhalerPuffs, this.inhalerType,
+    this.inhalerTechnique, this.inhalerUsage,
   });
 
   String? get extraInfo {
@@ -2107,6 +2116,9 @@ class PrescriptionMedicineItem {
     if (dropsApplication?.trim().isNotEmpty == true) return dropsApplication;
     if (lotionApplyArea?.trim().isNotEmpty == true) return lotionApplyArea;
     if (sprayUsage?.trim().isNotEmpty == true) return sprayUsage;
+    if (powderForm?.trim().isNotEmpty == true)       return powderForm;        // NEW
+    if (inhalerType?.trim().isNotEmpty == true)      return inhalerType;       // NEW
+    if (inhalerTechnique?.trim().isNotEmpty == true) return inhalerTechnique; 
     return null;
   }
 
@@ -2117,6 +2129,8 @@ class PrescriptionMedicineItem {
     if (dropsCount?.trim().isNotEmpty == true) return dropsCount!;
     if (sprayPuffs?.trim().isNotEmpty == true) return sprayPuffs!;
     if (lotionUsage?.trim().isNotEmpty == true) return lotionUsage!;
+       if (powderDosage?.trim().isNotEmpty == true)  return powderDosage!;  // NEW
+    if (inhalerPuffs?.trim().isNotEmpty == true)  return inhalerPuffs!;  
     return '-';
   }
 
@@ -2130,6 +2144,9 @@ class PrescriptionMedicineItem {
         dropsCount: model.dropsCount, dropsApplication: model.dropsApplication,
         lotionApplyArea: model.lotionApplyArea, sprayPuffs: model.sprayPuffs,
         sprayUsage: model.sprayUsage, lotionUsage: model.lotionUsage,
+          powderDosage: model.powderDosage, powderForm: model.powderForm,
+        inhalerPuffs: model.inhalerPuffs, inhalerType: model.inhalerType,
+        inhalerTechnique: model.inhalerTechnique, inhalerUsage: model.inhalerUsage,
       );
 
   factory PrescriptionMedicineItem.fromFlatModel(PrescriptionModel model) =>
@@ -2142,6 +2159,9 @@ class PrescriptionMedicineItem {
         dropsCount: model.dropsCount, dropsApplication: model.dropsApplication,
         lotionApplyArea: model.lotionApplyArea, sprayPuffs: model.sprayPuffs,
         sprayUsage: model.sprayUsage, lotionUsage: model.lotionUsage,
+         powderDosage: model.powderDosage, powderForm: model.powderForm,
+        inhalerPuffs: model.inhalerPuffs, inhalerType: model.inhalerType,
+        inhalerTechnique: model.inhalerTechnique, inhalerUsage: model.inhalerUsage,
       );
 }
 

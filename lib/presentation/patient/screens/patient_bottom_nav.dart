@@ -131,22 +131,28 @@ static const _regularNavHeight = 56.0;
 
   @override
 Widget build(BuildContext context) {
-  return Scaffold(
-    extendBody: true,
-    extendBodyBehindAppBar: true,
-    backgroundColor: const Color(0xFFEEF2FF), // ← real bg, not transparent
-    body: Stack(
-      children: [
-        Positioned.fill(
-          child: IndexedStack(index: _tab, children: _screens),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: _buildBottomNav(),
-        ),
-      ],
+  return PopScope(
+    canPop: _tab == 0,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _setTab(0);
+    },
+    child: Scaffold(
+      extendBody: true,
+      extendBodyBehindAppBar: true,
+      backgroundColor: const Color(0xFFEEF2FF), // ← real bg, not transparent
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: IndexedStack(index: _tab, children: _screens),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomNav(),
+          ),
+        ],
+      ),
     ),
   );
 }

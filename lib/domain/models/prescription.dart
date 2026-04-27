@@ -49,6 +49,27 @@ class PrescriptionMedicineModel {
   @JsonKey(name: 'lotion_usage')
   final String? lotionUsage;
 
+  // ── Powders ──────────────────────────────────────────────────────
+  @JsonKey(name: 'powder_dosage')
+  final String? powderDosage;
+
+  @JsonKey(name: 'powder_form')
+  final String? powderForm;
+
+  // ── Inhalers ─────────────────────────────────────────────────────
+  @JsonKey(name: 'inhaler_puffs')
+  final String? inhalerPuffs;
+
+  @JsonKey(name: 'inhaler_type')
+  final String? inhalerType;
+
+  @JsonKey(name: 'inhaler_technique')
+  final String? inhalerTechnique;
+
+  @JsonKey(name: 'inhaler_usage')
+  final String? inhalerUsage;
+
+
   const PrescriptionMedicineModel({
     this.prescMedId,
     this.prescriptionId,
@@ -67,6 +88,13 @@ class PrescriptionMedicineModel {
     this.sprayPuffs,
     this.sprayUsage,
     this.lotionUsage,
+    this.powderDosage,
+    this.powderForm,
+    this.inhalerPuffs,
+    this.inhalerType, 
+    this.inhalerTechnique,
+    this.inhalerUsage,
+
   });
   factory PrescriptionMedicineModel.fromJson(Map<String, dynamic> json) =>
    _$PrescriptionMedicineModelFromJson(json);
@@ -150,6 +178,27 @@ class PrescriptionModel {
   
   @JsonKey(name: 'lotion_usage')
   final String? lotionUsage;
+
+
+  @JsonKey(name: 'powder_dosage')
+  final String? powderDosage;
+
+  @JsonKey(name: 'powder_form')
+  final String? powderForm;
+
+  // ── Inhalers ─────────────────────────────────────────────────────
+  @JsonKey(name: 'inhaler_puffs')
+  final String? inhalerPuffs;
+
+  @JsonKey(name: 'inhaler_type')
+  final String? inhalerType;
+
+  @JsonKey(name: 'inhaler_technique')
+  final String? inhalerTechnique;
+
+  @JsonKey(name: 'inhaler_usage')
+  final String? inhalerUsage;
+
   @JsonKey(name: 'prescription_id')
   final int? prescriptionId;
 
@@ -211,7 +260,13 @@ class PrescriptionModel {
     this.lotionApplyArea,
     this.sprayPuffs,
     this.sprayUsage,
+    this.powderDosage,
+    this.powderForm,
       this.lotionUsage,
+      this.inhalerPuffs,
+      this.inhalerType,
+      this.inhalerTechnique,  
+      this.inhalerUsage,
     this.prescriptionId,
     this.patientId,
     this.doctorId,

@@ -58,52 +58,63 @@ const _kDesktopBreak = 1050.0;
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE TYPE
 // ════════════════════════════════════════════════════════════════════
-enum MedicineType { tablet, syrup, injection, drops, lotion, spray }
+enum MedicineType { tablet, syrups, injections, drops, lotions,sprays,powders,inhalers }
 
 extension MedTypeX on MedicineType {
   String get label => const {
     MedicineType.tablet:    'Tablet',
-    MedicineType.syrup:     'Syrup',
-    MedicineType.injection: 'Injection',
+    MedicineType.syrups:     'Syrups',
+    MedicineType.injections: 'Injections',
     MedicineType.drops:     'Drops',
-    MedicineType.lotion:    'Lotion',
-    MedicineType.spray:     'Spray',
+    MedicineType.lotions:    'Lotions',
+    MedicineType.sprays:     'Sprays',
+    MedicineType.powders:   'Powders',
+    MedicineType.inhalers:  'Inhalers',
+
   }[this]!;
 
   IconData get icon => const {
     MedicineType.tablet:    Icons.medication_rounded,
-    MedicineType.syrup:     Icons.local_drink_rounded,
-    MedicineType.injection: Icons.vaccines_rounded,
+    MedicineType.syrups:     Icons.local_drink_rounded,
+    MedicineType.injections: Icons.vaccines_rounded,
     MedicineType.drops:     Icons.water_drop_rounded,
-    MedicineType.lotion:    Icons.soap_rounded,
-    MedicineType.spray:     Icons.air_rounded,
+    MedicineType.lotions:    Icons.soap_rounded,
+    MedicineType.sprays:     Icons.air_rounded,
+    MedicineType.powders:   Icons.grain_rounded,
+    MedicineType.inhalers:  Icons.air_rounded,
   }[this]!;
 
   Color get color => const {
     MedicineType.tablet:    Color(0xFF26C6B0),
-    MedicineType.syrup:     Color(0xFF9F7AEA),
-    MedicineType.injection: Color(0xFFFC8181),
+    MedicineType.syrups:     Color(0xFF9F7AEA),
+    MedicineType.injections: Color(0xFFFC8181),
     MedicineType.drops:     Color(0xFF3B82F6),
-    MedicineType.lotion:    Color(0xFF68D391),
-    MedicineType.spray:     Color(0xFFF6AD55),
+    MedicineType.lotions:    Color(0xFF68D391),
+    MedicineType.sprays:     Color(0xFFF6AD55),
+    MedicineType.powders:   Color(0xFF4DD9C8),
+    MedicineType.inhalers:  Color(0xFF1E40AF),
   }[this]!;
 
   Color get colorLight => const {
     MedicineType.tablet:    Color(0xFFD9F5F1),
-    MedicineType.syrup:     Color(0xFFEDE9FE),
-    MedicineType.injection: Color(0xFFFEE2E2),
+    MedicineType.syrups:     Color(0xFFEDE9FE),
+    MedicineType.injections: Color(0xFFFEE2E2),
     MedicineType.drops:     Color(0xFFDBEAFE),
-    MedicineType.lotion:    Color(0xFFDCFCE7),
-    MedicineType.spray:     Color(0xFFFEF3C7),
+    MedicineType.lotions:    Color(0xFFDCFCE7),
+    MedicineType.sprays:     Color(0xFFFEF3C7),
+    MedicineType.powders:   Color(0xFFE0F2F1),
+    MedicineType.inhalers:  Color(0xFFEBF8FF),
   }[this]!;
 
   Color get colorDark => const {
     MedicineType.tablet:    Color(0xFF2BB5A0),
-    MedicineType.syrup:     Color(0xFF6B46C1),
-    MedicineType.injection: Color(0xFFC53030),
+    MedicineType.syrups:     Color(0xFF6B46C1),
+    MedicineType.injections: Color(0xFFC53030),
     MedicineType.drops:     Color(0xFF1E40AF),
-    MedicineType.lotion:    Color(0xFF276749),
-    MedicineType.spray:     Color(0xFF975A16),
+    MedicineType.lotions:    Color(0xFF276749),
+    MedicineType.sprays:     Color(0xFF975A16),
+    MedicineType.powders:   Color(0xFF1A5643),
+    MedicineType.inhalers:  Color(0xFF2D3748),
   }[this]!;
 
   int get typeId => index + 1;
@@ -114,11 +125,13 @@ extension MedTypeX on MedicineType {
 // ════════════════════════════════════════════════════════════════════
 const _kDosageOpts = {
   'tablet':    ['0', '¼', '½', '¾', '1', '1½', '2', '3'],
-  'syrup':     ['0', '2.5ml', '5ml', '7.5ml', '10ml', '15ml', '20ml'],
-  'injection': ['0', '0.5', '1', '2', '4', '5', '10'],
+  'syrups':     ['0', '2.5ml', '5ml', '7.5ml', '10ml', '15ml', '20ml'],
+  'injections': ['0', '0.5', '1', '2', '4', '5', '10'],
   'drops':     ['0', '1', '2', '3', '4', '5', '6'],
-  'lotion':    ['0', 'Apply', 'Thin layer', 'Thick layer'],
-  'spray':     ['0', '1 puff', '2 puffs', '3 puffs', '4 puffs'],
+  'lotions':    ['0', 'Apply', 'Thin layer', 'Thick layer'],
+  'sprays':     ['0', '1 puff', '2 puffs', '3 puffs', '4 puffs'],
+    'powders':   ['0', '½ tsp', '1 tsp', '1½ tsp', '2 tsp', '1 sachet', '2 sachets'],
+  'inhalers':  ['0', '1 puff', '2 puffs', '3 puffs', '4 puffs', '5 puffs'],
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -137,6 +150,9 @@ class MedicineEntry {
   String  dropsApplication;
   String  lotionApplyArea;
   String  sprayUsage;
+   String powderForm;
+  String inhalerType;
+  String inhalerTechnique;
 
   MedicineEntry()
       : type             = MedicineType.tablet,
@@ -150,7 +166,10 @@ class MedicineEntry {
         injRoute         = 'IV',
         dropsApplication = 'Eyes',
         lotionApplyArea  = '',
-        sprayUsage       = 'Nasal';
+        sprayUsage       = 'Nasal',
+        powderForm       = 'Loose Powder',    // NEW
+        inhalerType      = 'MDI',              // NEW
+        inhalerTechnique = 'Shake & Inhale';   // NEW
 
   PrescriptionMedicineModel toApiModel() => PrescriptionMedicineModel(
     medicineId:       medicineId,
@@ -159,15 +178,23 @@ class MedicineEntry {
     duration:         duration.isEmpty  ? null : duration,
     timing:           timing.isEmpty    ? null : timing,
     tabletDosage:     type == MedicineType.tablet    ? (dosage.isEmpty ? null : dosage) : null,
-    syrupDosageMl:    type == MedicineType.syrup     ? (dosage.isEmpty ? null : dosage) : null,
-    injDosage:        type == MedicineType.injection ? (dosage.isEmpty ? null : dosage) : null,
-    injRoute:         type == MedicineType.injection ? (injRoute.isEmpty ? null : injRoute) : null,
+    syrupDosageMl:    type == MedicineType.syrups     ? (dosage.isEmpty ? null : dosage) : null,
+    injDosage:        type == MedicineType.injections ? (dosage.isEmpty ? null : dosage) : null,
+    injRoute:         type == MedicineType.injections ? (injRoute.isEmpty ? null : injRoute) : null,
     dropsCount:       type == MedicineType.drops     ? (dosage.isEmpty ? null : dosage) : null,
     dropsApplication: type == MedicineType.drops     ? (dropsApplication.isEmpty ? null : dropsApplication) : null,
-    lotionApplyArea:  type == MedicineType.lotion    ? (lotionApplyArea.isEmpty ? null : lotionApplyArea) : null,
-    sprayPuffs:       type == MedicineType.spray     ? (dosage.isEmpty ? null : dosage) : null,
-    sprayUsage:       type == MedicineType.spray     ? (sprayUsage.isEmpty ? null : sprayUsage) : null,
-    lotionUsage:      type == MedicineType.lotion    ? (dosage.isEmpty ? null : dosage) : null,
+    lotionApplyArea:  type == MedicineType.lotions    ? (lotionApplyArea.isEmpty ? null : lotionApplyArea) : null,
+    sprayPuffs:       type == MedicineType.sprays     ? (dosage.isEmpty ? null : dosage) : null,
+    sprayUsage:       type == MedicineType.sprays     ? (sprayUsage.isEmpty ? null : sprayUsage) : null,
+    lotionUsage:      type == MedicineType.lotions    ? (dosage.isEmpty ? null : dosage) : null,
+ 
+   powderDosage: type == MedicineType.powders ? (dosage.isEmpty ? null : dosage) : null,
+  powderForm:   type == MedicineType.powders ? (powderForm.isEmpty ? null : powderForm) : null,
+  // Inhalers
+  inhalerPuffs:     type == MedicineType.inhalers ? (dosage.isEmpty ? null : dosage) : null,
+  inhalerType:      type == MedicineType.inhalers ? (inhalerType.isEmpty ? null : inhalerType) : null,
+  inhalerTechnique: type == MedicineType.inhalers ? (inhalerTechnique.isEmpty ? null : inhalerTechnique) : null,
+ 
   );
 }
 
@@ -1317,6 +1344,9 @@ class _MedCardState extends State<_MedCard> {
     e.type = t;
     e.medicineId = null; e.selectedName = null; e.searchText = '';
     e.dosage = '1-0-1'; e.frequency = '1-0-1'; e.duration = '';
+      e.powderForm       = 'Loose Powder';   // NEW
+  e.inhalerType      = 'MDI';            // NEW
+  e.inhalerTechnique = 'Shake & Inhale'; // NEW
     _initControllers();
     setState(() {});
     widget.rebuild();
@@ -1380,13 +1410,48 @@ class _MedCardState extends State<_MedCard> {
   Widget _body() {
     switch (e.type) {
       case MedicineType.tablet:    return _commonBody();
-      case MedicineType.syrup:     return _commonBody();
-      case MedicineType.injection: return _injBody();
+      case MedicineType.syrups:     return _commonBody();
+        case MedicineType.injections: return _injBody();
       case MedicineType.drops:     return _dropsBody();
-      case MedicineType.lotion:    return _lotionBody();
-      case MedicineType.spray:     return _sprayBody();
+      case MedicineType.lotions:    return _lotionBody();
+      case MedicineType.sprays:     return _sprayBody();
+       case MedicineType.powders:   return _powdersBody();
+    case MedicineType.inhalers:  return _inhalersBody();
     }
   }
+  Widget _powdersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  _nameSearch(), _gap(10),
+  _dropField('Form', e.powderForm, ['Loose Powder', 'Sachet', 'Dusting Powder', 'Oral Powder'],
+      (v) => setState(() => e.powderForm = v!)),
+  _gap(10),
+  _dosagePicker(label: 'Dose per slot'), _gap(10),
+  _r2([
+    _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: (v) => e.duration = v),
+    _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
+  ]),
+]);
+
+Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  _nameSearch(), _gap(10),
+  _r2([
+    _dropField('Inhaler Type', e.inhalerType,
+        ['MDI', 'DPI', 'Nebulizer', 'Soft Mist', 'BAI'],
+        (v) => setState(() => e.inhalerType = v!)),
+    _dropField('Usage', e.sprayUsage,
+        ['Bronchodilator', 'Steroid', 'Combination', 'Rescue', 'Preventer'],
+        (v) => setState(() => e.sprayUsage = v!)),
+  ]),
+  _gap(10),
+  _dosagePicker(label: 'Puffs per slot'), _gap(10),
+  _r2([
+    _txtField('Duration', 'e.g. 30 days', _durCtrl, onChanged: (v) => e.duration = v),
+    _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
+  ]),
+  _gap(10),
+  _dropField('Device Technique', e.inhalerTechnique,
+      ['Shake & Inhale', 'Slow Deep Breath', 'Breath-Actuated', 'Spacer Required'],
+      (v) => setState(() => e.inhalerTechnique = v!)),
+]);
 
   Widget _dosagePicker({String? label}) => SlotPickerField(
     key: ValueKey('dosage_${e.type.name}'),

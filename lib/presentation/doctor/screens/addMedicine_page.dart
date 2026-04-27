@@ -107,8 +107,6 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       _nameCtrl.clear();
       setState(() => _selectedType = null);
       _snack('Medicine added successfully');
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (mounted) Navigator.pop(context, true);
     } else {
       _snack(response['message'] ?? 'Failed to add medicine', isError: true);
     }

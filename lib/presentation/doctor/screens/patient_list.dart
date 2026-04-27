@@ -997,7 +997,7 @@ class _SessionAccordion extends StatelessWidget {
                             ...allWaiting.map((p) {
                               final status     = p.status?.toLowerCase() ?? '';
                               final isIP       = status == 'in_progress';
-                              final isQActive  = globalQs == QueueState.running || globalQs == QueueState.paused;
+                              final isQActive  = queueState == QueueState.running || queueState == QueueState.paused;
                               final hasIP      = sessionPatients.any(
                                   (x) => (x.status?.toLowerCase() ?? '') == 'in_progress');
                               final nextBooked = allWaiting
