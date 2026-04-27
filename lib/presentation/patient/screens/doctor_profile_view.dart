@@ -675,24 +675,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun',
     };
 
-    final byDay = <String, (String, String)>{};
-    for (final a in avail) {
-      if ((a.isEnabled ?? 1) == 0 || a.dayOfWeek == null) continue;
-      final day = a.dayOfWeek!;
-      final s   = a.startTime ?? '';
-      final e   = a.endTime   ?? '';
-      if (!byDay.containsKey(day)) {
-        byDay[day] = (s, e);
-      } else {
-        final cur = byDay[day]!;
-        byDay[day] = (
-          s.compareTo(cur.$1) < 0 ? s : cur.$1,
-          e.compareTo(cur.$2) > 0 ? e : cur.$2,
-        );
-      }
-    }
-
-    if (byDay.isEmpty) {
+    if (avail.isEmpty) {
       return _InfoRow(
         icon: Icons.access_time_rounded,
         iconColor: kPrimary,
@@ -702,28 +685,40 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       );
     }
 
-    final byTime = <String, List<String>>{};
-    for (final day in dayOrder) {
-      if (!byDay.containsKey(day)) continue;
-      final r   = byDay[day]!;
-      final key = '${r.$1}|${r.$2}';
-      byTime.putIfAbsent(key, () => []).add(day);
+    // Group enabled slots by day (disabled / missing days = Closed)
+    final byDay = <String, List<DoctorAvailabilityModel>>{};
+    for (final a in avail) {
+      if (a.isEnabled != true || a.dayOfWeek == null) continue;
+      byDay.putIfAbsent(a.dayOfWeek!, () => []).add(a);
     }
 
     final rows = <Widget>[];
     bool first = true;
-    for (final entry in byTime.entries) {
-      final parts   = entry.key.split('|');
-      final timeStr = '${_fmtTime(parts[0])} – ${_fmtTime(parts[1])}';
-      final dayLbl  =
-          entry.value.map((d) => shortDay[d] ?? d).join(', ');
-      if (!first) rows.add(const SizedBox(height: 10));
-      rows.add(_InfoRow(
-        icon: Icons.access_time_rounded,
-        iconColor: kPrimary,
-        iconBg: kPrimaryLight,
-        title: dayLbl,
-        subtitle: timeStr,
+    for (final day in dayOrder) {
+      final slots = byDay[day];
+      final isOpen = slots != null && slots.isNotEmpty;
+
+      String subtitle = '';
+      if (isOpen) {
+        slots!.sort((a, b) => (a.startTime ?? '').compareTo(b.startTime ?? ''));
+        final parts = <String>[];
+        for (final s in slots) {
+          final timeStr = '${_fmtTime(s.startTime)} – ${_fmtTime(s.endTime)}';
+          if (s.bookingMode == 2 && s.slotDuration != null) {
+            final count = _calcSlots(s.startTime ?? '', s.endTime ?? '', s.slotDuration);
+            parts.add('$timeStr · $count slots');
+          } else {
+            parts.add('$timeStr · Queue');
+          }
+        }
+        subtitle = parts.join('\n');
+      }
+
+      if (!first) rows.add(const SizedBox(height: 8));
+      rows.add(_DayRow(
+        day: shortDay[day] ?? day,
+        subtitle: subtitle,
+        isOpen: isOpen,
       ));
       first = false;
     }
@@ -885,6 +880,64 @@ class _InfoRow extends StatelessWidget {
                           color: kTextSecondary,
                           height: 1.4)),
               ],
+            ),
+          ),
+        ],
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  DAY ROW  — working hours row with Open/Closed badge on right
+// ════════════════════════════════════════════════════════════════════
+class _DayRow extends StatelessWidget {
+  final String day;
+  final String subtitle;
+  final bool   isOpen;
+  const _DayRow({required this.day, required this.subtitle, required this.isOpen});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+              color: isOpen ? kPrimaryLight : kBorder,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(Icons.access_time_rounded,
+                color: isOpen ? kPrimary : kTextMuted, size: 15),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(day,
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kTextPrimary)),
+                if (subtitle.isNotEmpty)
+                  Text(subtitle,
+                      style: const TextStyle(
+                          fontSize: 11, color: kTextSecondary, height: 1.4)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: isOpen ? kGreenLight : kRedLight,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              isOpen ? 'Open' : 'Closed',
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: isOpen ? kSuccess : kError),
             ),
           ),
         ],
@@ -1140,13 +1193,40 @@ class _BookingBar extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════════
 //  HELPERS
 // ════════════════════════════════════════════════════════════════════
-String _fmtTime(String? t) {
+// Extracts "HH:MM" from either "HH:MM:SS", "HH:MM" or ISO "1970-01-01T09:00:00.000Z"
+String _extractHHMM(String? t) {
   if (t == null || t.isEmpty) return '';
-  final parts = t.split(':');
-  if (parts.length < 2) return t;
+  final s = t.contains('T') ? t.split('T')[1].split('.')[0] : t;
+  final p = s.split(':');
+  if (p.length < 2) return s;
+  return '${p[0]}:${p[1]}';
+}
+
+String _fmtTime(String? t) {
+  final hhmm = _extractHHMM(t);
+  if (hhmm.isEmpty) return '';
+  final parts = hhmm.split(':');
   final h      = int.tryParse(parts[0]) ?? 0;
   final m      = int.tryParse(parts[1]) ?? 0;
   final period = h >= 12 ? 'PM' : 'AM';
   final h12    = h == 0 ? 12 : (h > 12 ? h - 12 : h);
   return '${h12.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')} $period';
+}
+
+int _toMinutes(String t) {
+  final hhmm = _extractHHMM(t);
+  if (hhmm.isEmpty) return -1;
+  final p = hhmm.split(':');
+  if (p.length < 2) return -1;
+  final h = int.tryParse(p[0]) ?? -1;
+  final m = int.tryParse(p[1]) ?? -1;
+  return (h < 0 || m < 0) ? -1 : h * 60 + m;
+}
+
+int _calcSlots(String start, String end, int? duration) {
+  if (duration == null || duration <= 0) return 0;
+  final s = _toMinutes(start);
+  final e = _toMinutes(end);
+  if (s < 0 || e <= s) return 0;
+  return (e - s) ~/ duration;
 }
