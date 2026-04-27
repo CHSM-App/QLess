@@ -1339,19 +1339,55 @@ class _MedCardState extends State<_MedCard> {
     return parts.map((p) => p == '0' ? '0' : '1').join('-');
   }
 
-  void _onTypeChange(MedicineType t) {
-    _disposeControllers();
-    e.type = t;
-    e.medicineId = null; e.selectedName = null; e.searchText = '';
-    e.dosage = '1-0-1'; e.frequency = '1-0-1'; e.duration = '';
-      e.powderForm       = 'Loose Powder';   // NEW
-  e.inhalerType      = 'MDI';            // NEW
-  e.inhalerTechnique = 'Shake & Inhale'; // NEW
-    _initControllers();
-    setState(() {});
-    widget.rebuild();
+  // void _onTypeChange(MedicineType t) {
+  //   _disposeControllers();
+  //   e.type = t;
+  //   e.medicineId = null; e.selectedName = null; e.searchText = '';
+  //   e.dosage = '1-0-1'; e.frequency = '1-0-1'; e.duration = '';
+  //     e.powderForm       = 'Loose Powder';   // NEW
+  // e.inhalerType      = 'MDI';            // NEW
+  // e.inhalerTechnique = 'Shake & Inhale'; // NEW
+  //   _initControllers();
+  //   setState(() {});
+  //   widget.rebuild();
+  // }
+void _onTypeChange(MedicineType t) {
+  _disposeControllers();
+  e.type = t;
+  e.medicineId = null; e.selectedName = null; e.searchText = '';
+  
+  // ← Type-specific default dosage
+  switch (t) {
+    case MedicineType.powders:
+      e.dosage = '½ tsp-0-½ tsp';
+      e.frequency = '1-0-1';
+      break;
+    case MedicineType.inhalers:
+    case MedicineType.sprays:
+      e.dosage = '1 puff-0-1 puff';
+      e.frequency = '1-0-1';
+      break;
+    case MedicineType.drops:
+      e.dosage = '2-0-2';
+      e.frequency = '1-0-1';
+      break;
+    case MedicineType.syrups:
+      e.dosage = '5ml-0-5ml';
+      e.frequency = '1-0-1';
+      break;
+    default:
+      e.dosage = '1-0-1';
+      e.frequency = '1-0-1';
   }
-
+  
+  e.duration = '';
+  e.powderForm = 'Loose Powder';
+  e.inhalerType = 'MDI';
+  e.inhalerTechnique = 'Shake & Inhale';
+  _initControllers();
+  setState(() {});
+  widget.rebuild();
+}
   @override
   void dispose() { _disposeControllers(); super.dispose(); }
 

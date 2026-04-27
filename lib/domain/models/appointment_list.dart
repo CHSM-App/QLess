@@ -116,6 +116,10 @@ class AppointmentList {
   @JsonKey(name: 'is_reviewed')
   bool? isReviewed;
 
+  @JsonKey(name: 'mobile')
+  String? mobile;
+
+
   AppointmentList({
     this.queueId,
     this.queueState,
@@ -155,6 +159,7 @@ class AppointmentList {
     this.currentServing,
     this.symptoms,
     this.isReviewed,
+    this.mobile,
   });
 
   factory AppointmentList.fromJson(Map<String, dynamic> json) =>

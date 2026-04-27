@@ -146,10 +146,12 @@ String? _networkImageUrl;   // ← add this
       _didSubmit = false;
       _snack('Profile updated successfully', success: true);
       final mobile = next.mobileNo;
-      if (mobile != null && mobile.trim().isNotEmpty) {
-        ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
-      }
-      Future.delayed(const Duration(milliseconds: 300), () {
+      Future<void>(() async {
+        if (mobile != null && mobile.trim().isNotEmpty) {
+          await ref
+              .read(patientLoginViewModelProvider.notifier)
+              .checkPhonePatient(mobile);
+        }
         if (!mounted) return;
         Navigator.pop(context, true);
       });

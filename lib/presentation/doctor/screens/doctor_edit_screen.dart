@@ -616,8 +616,9 @@ Future<void> _selectFromMap() async {
     _showSnack('Profile updated successfully');
     final m = after.mobile;
     if (m != null && m.trim().isNotEmpty) {
-      ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(m);
+      await ref.read(doctorLoginViewModelProvider.notifier).checkPhoneDoctor(m);
     }
+    if (!mounted) return;
     Navigator.pop(context, true);
   }
 

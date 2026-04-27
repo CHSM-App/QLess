@@ -123,7 +123,20 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     );
     try {
       final result = await usecase.checkPhonePatient(mobileNo);
-      state = state.copyWith(patientPhoneCheck: AsyncValue.data(result));
+      if (result.isNotEmpty) {
+        final p = result.first;
+        state = state.copyWith(
+          patientPhoneCheck: AsyncValue.data(result),
+          name:     p.name     ?? state.name,
+          mobileNo: p.mobileNo ?? state.mobileNo,
+          email:    p.email    ?? state.email,
+        );
+        if (p.name     != null) await TokenStorage.saveValue('name',      p.name!);
+        if (p.mobileNo != null) await TokenStorage.saveValue('mobile_no', p.mobileNo!);
+        if (p.email    != null) await TokenStorage.saveValue('email',     p.email!);
+      } else {
+        state = state.copyWith(patientPhoneCheck: AsyncValue.data(result));
+      }
     } catch (e, st) {
       state = state.copyWith(
         patientPhoneCheck: AsyncValue.error(e, st),
