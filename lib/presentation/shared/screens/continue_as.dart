@@ -178,12 +178,15 @@ class _LandscapeLayout extends StatelessWidget {
                               _ButtonStethoPainter(color: Colors.white),
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          'Continue as Doctor',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        const Flexible(
+                          child: Text(
+                            'Continue as Doctor',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -217,12 +220,15 @@ class _LandscapeLayout extends StatelessWidget {
                               color: const Color(0xFF0F172A)),
                         ),
                         const SizedBox(width: 10),
-                        const Text(
-                          'Continue as Patient',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF0F172A),
+                        const Flexible(
+                          child: Text(
+                            'Continue as Patient',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF0F172A),
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -335,12 +341,15 @@ class _PortraitLayout extends StatelessWidget {
                     painter: _ButtonStethoPainter(color: Colors.white),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'Continue as Doctor',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                  const Flexible(
+                    child: Text(
+                      'Continue as Doctor',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -375,12 +384,15 @@ class _PortraitLayout extends StatelessWidget {
                         color: const Color(0xFF0F172A)),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
-                    'Continue as Patient',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF0F172A),
+                  const Flexible(
+                    child: Text(
+                      'Continue as Patient',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0F172A),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],

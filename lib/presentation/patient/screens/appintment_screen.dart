@@ -288,7 +288,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool _canReview(AppointmentList a) {
     final s = a.status?.toLowerCase();
     return (s == 'completed' || s == 'complete') &&
-        a.appointmentId != null && a.doctorId != null && a.patientId != null;
+        a.appointmentId != null && a.doctorId != null && a.patientId != null &&
+        (a.isReviewed != true);
   }
 
   bool _canCancel(AppointmentList a) {
@@ -425,6 +426,10 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       }
       if (next.isSuccess && next.isSuccess != prev?.isSuccess) {
         _snack('Thanks for your review!');
+        final id = ref.read(patientLoginViewModelProvider).patientId;
+        if (id != null && id != 0) {
+          ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(id);
+        }
       }
     });
 

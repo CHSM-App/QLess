@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
@@ -154,6 +155,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   String? _specialty;
   int?    _selectedMemberId;
   bool    _favOnly = false;
+  final Map<int, double> _ratings = {};
 
   @override
   void initState() {
@@ -173,10 +175,33 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
         ref
             .read(favoriteViewModelProvider.notifier)
             .fetchFavoritesForDoctors(pid, doctorIds);
+        _loadRatings(doctorIds);
       }
       if (widget.initialSpecialty != null) {
         setState(() => _specialty = widget.initialSpecialty);
       }
+    });
+  }
+
+  Future<void> _loadRatings(List<int> doctorIds) async {
+    final toFetch = doctorIds.where((id) => !_ratings.containsKey(id)).toList();
+    if (toFetch.isEmpty) return;
+    final usecase = ref.read(reviewUsecaseProvider);
+    final results = await Future.wait(
+      toFetch.map((id) async {
+        try {
+          final reviews = await usecase.getDoctorReviews(id);
+          if (reviews.isEmpty) return MapEntry(id, 0.0);
+          final avg = reviews.fold<double>(0, (a, r) => a + (r.rating?.toDouble() ?? 0)) / reviews.length;
+          return MapEntry(id, avg);
+        } catch (_) {
+          return MapEntry(id, 0.0);
+        }
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      for (final e in results) { _ratings[e.key] = e.value; }
     });
   }
 
@@ -223,6 +248,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     ref
         .read(favoriteViewModelProvider.notifier)
         .fetchFavoritesForDoctors(pid, doctorIds);
+    _loadRatings(doctorIds);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -265,12 +291,12 @@ Widget build(BuildContext context) {
       ),
       title: SizedBox(
         height: 40,
-        child: AppExpandableHeaderSearch( // from your widget :contentReference[oaicite:0]{index=0}
-          // leadingIcon: Icons.search_rounded,
+        child: AppExpandableHeaderSearch(
+          controller: _searchCtrl,
           title: 'Find Doctor',
           subtitle: 'Search doctors, specialties',
           hintText: 'Search doctor...',
-           onChanged: (_) => setState(() {}),
+          onChanged: (_) => setState(() {}),
         ),
       ),
       // actions: [
@@ -591,6 +617,7 @@ Widget build(BuildContext context) {
         itemBuilder: (_, i) => _DoctorCard(
           doctor: docs[i],
           selectedMemberId: _selectedMemberId,
+          cardRating: _ratings[docs[i].doctorId],
           // Tapping the card → Book Appointment
           onTap: (d) => Navigator.push(
             context,
@@ -714,6 +741,7 @@ class _SpecChip extends StatelessWidget {
 class _DoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
   final int?          selectedMemberId;
+  final double?       cardRating;
   final void Function(DoctorDetails) onTap;   // whole card → BookAppointment
   final void Function(DoctorDetails) onInfo;  // info icon  → DoctorProfile
 
@@ -722,6 +750,7 @@ class _DoctorCard extends StatelessWidget {
     required this.selectedMemberId,
     required this.onTap,
     required this.onInfo,
+    this.cardRating,
   });
 
   @override
@@ -819,7 +848,7 @@ class _DoctorCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
 
-                  // Specialty + exp
+                  // Specialty + exp + rating
                   Wrap(
                     spacing: 5,
                     runSpacing: 4,
@@ -831,6 +860,8 @@ class _DoctorCard extends StatelessWidget {
                             bg: specBg),
                       if (d.experience != null)
                         _ExpTag(years: d.experience!),
+                      if (cardRating != null && cardRating! > 0)
+                        _RatingTag(rating: cardRating!),
                     ],
                   ),
 
@@ -924,6 +955,29 @@ class _ExpTag extends StatelessWidget {
       );
 }
 
+
+class _RatingTag extends StatelessWidget {
+  final double rating;
+  const _RatingTag({required this.rating});
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+            color: kAmberLight, borderRadius: BorderRadius.circular(6)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.star_rounded, size: 11, color: kWarning),
+            const SizedBox(width: 3),
+            Text(rating.toStringAsFixed(1),
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kWarning)),
+          ],
+        ),
+      );
+}
 
 class _QueuePill extends StatelessWidget {
   final _QueueStatus status;
