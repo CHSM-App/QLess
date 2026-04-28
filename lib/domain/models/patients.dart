@@ -26,7 +26,7 @@ class Patients {
   @JsonKey(name: 'DOB')
   final DateTime? DOB;
 
-  @JsonKey(name: 'blood_group')
+  @JsonKey(name: 'blood_group_name')
   final String? bloodGroup;
 
   @JsonKey(name: 'weight')
