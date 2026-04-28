@@ -49,35 +49,7 @@ class ReviewViewmodel extends StateNotifier<ReviewState> {
       state = state.copyWith(isLoading: false, error: _extractMessage(e));
     }
   }
-
-  Future<bool> addAppointmentReview({
-    required int appointmentId,
-    required int doctorId,
-    required int patientId,
-    required int rating,
-    required int reviewedByUserId,
-    String? comment,
-  }) async {
-    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
-    try {
-      final request = ReviewRequestModel(
-        appointmentId: appointmentId,
-        doctorId: doctorId,
-        patientId: patientId,
-        rating: rating,
-        comment: comment,
-        reviewedByUserId: reviewedByUserId,
-      );
-      final result = await usecase.addAppointmentReview(request);
-      final ok = _asBool(result['success'], defaultValue: true);
-      state = state.copyWith(isLoading: false, isSuccess: ok);
-      return ok;
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: _extractMessage(e));
-      return false;
-    }
-  }
-
+  
   Future<void> fetchAppointmentReviews(int appointmentId) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
