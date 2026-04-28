@@ -369,6 +369,79 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     ),
   );
 
+  void _viewPatientInfo(AppointmentList p) {
+    final av = _avatarPalette[(p.appointmentId ?? 0) % _avatarPalette.length];
+    final name = p.patientName ?? 'Patient';
+    final inits = name.trim().split(' ').take(2)
+        .map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
+    final isSlot = _isSlotBooking(p);
+    final slotMeta = isSlot
+        ? _slotAppointmentMetaLabel(p.appointmentDate, p.startTime, includeYear: true)
+        : null;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 60, height: 60,
+              decoration: BoxDecoration(color: av.bg, shape: BoxShape.circle),
+              alignment: Alignment.center,
+              child: Text(inits,
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: av.fg)),
+            ),
+            const SizedBox(height: 10),
+            Text(name,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary),
+                textAlign: TextAlign.center),
+            if (p.gender != null || p.dob != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                [if (p.gender != null) p.gender!, if (_ageStr(p.dob) != null) _ageStr(p.dob)!]
+                    .join(' | '),
+                style: const TextStyle(fontSize: 12, color: kTextSecondary),
+              ),
+            ],
+            const SizedBox(height: 14),
+            const Divider(height: 1, color: kDivider),
+            _DetailRow('Status',
+                (p.status ?? 'Unknown')[0].toUpperCase() +
+                    (p.status ?? 'unknown').substring(1).replaceAll('_', ' ')),
+            if (p.specialization != null) _DetailRow('Specialty', p.specialization!),
+            _DetailRow(
+              'Date',
+              isSlot && slotMeta != null
+                  ? slotMeta
+                  : _fmtDateLabel(p.appointmentDate, includeYear: true),
+            ),
+            if (!isSlot)
+              _DetailRow('Token', (p.queueNumber ?? 0).toString().padLeft(2, '0')),
+            _DetailRow('Appointment ID', '${p.appointmentId ?? '--'}'),
+            if (p.symptoms != null && p.symptoms!.isNotEmpty)
+              _DetailRow('Symptoms', p.symptoms!),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary, foregroundColor: Colors.white, elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                ),
+                child: const Text('Close', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
   String? _ageStr(String? dob) {
     if (dob == null) return null;
     final d = DateTime.tryParse(dob);
@@ -571,6 +644,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
               patients: upcoming, tab: _Tab.upcoming, qs: qs,
               onStart: _startSession, onSkip: _skipPatient,
               onPrescription: _viewPrescription, onCancel: _cancelConfirm,
+              onView: _viewPatientInfo,
               extraBottom: _kBottomClear,
             ),
             _PatientListBody(
@@ -639,6 +713,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
                 patients: list, tab: _activeTab, qs: qs,
                 onStart: _startSession, onSkip: _skipPatient,
                 onPrescription: _viewPrescription, onCancel: _cancelConfirm,
+                onView: _activeTab == _Tab.upcoming ? _viewPatientInfo : null,
                 extraBottom: 0,
                 selected: _selected,
                 onSelect: (p) => setState(() => _selected = p),
@@ -1465,6 +1540,7 @@ class _PatientListBody extends ConsumerWidget {
   final QueueState qs;
   final Future<void> Function(AppointmentList) onStart, onSkip;
   final void Function(AppointmentList) onPrescription, onCancel;
+  final void Function(AppointmentList)? onView;
   final double extraBottom;
   final AppointmentList? selected;
   final void Function(AppointmentList)? onSelect;
@@ -1474,6 +1550,7 @@ class _PatientListBody extends ConsumerWidget {
     required this.onStart, required this.onSkip,
     required this.onPrescription, required this.onCancel,
     required this.extraBottom,
+    this.onView,
     this.selected, this.onSelect,
   });
 
@@ -1569,6 +1646,7 @@ class _PatientListBody extends ConsumerWidget {
             onSkip: accessible && tab == _Tab.today && status == 'booked' ? () => onSkip(p) : null,
             onPrescription: () => onPrescription(p),
             onCancel: () => onCancel(p),
+            onView: onView != null ? () => onView!(p) : null,
           );
         },
       ),
@@ -1845,7 +1923,7 @@ class _PatientCard extends StatelessWidget {
   final _Tab tab;
   final bool accessible, selected;
   final bool highlightBorder;
-  final VoidCallback? onTap, onSkip;
+  final VoidCallback? onTap, onSkip, onView;
   final VoidCallback onStart, onPrescription, onCancel;
 
   const _PatientCard({
@@ -1860,6 +1938,7 @@ class _PatientCard extends StatelessWidget {
     required this.onPrescription,
     required this.onCancel,
     this.highlightBorder = false,
+    this.onView,
   });
 
   ({Color bg, Color fg}) get _av =>
@@ -2032,7 +2111,7 @@ class _PatientCard extends StatelessWidget {
                       bg: kPrimaryLighter,
                       fg: kPrimaryDark,
                       border: kPrimaryLight,
-                      onTap: () {},
+                      onTap: onView,
                     ),
                   ),
                   const SizedBox(width: 7),

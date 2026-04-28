@@ -5,8 +5,10 @@ import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/review_request_model.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart' show prescriptionViewModelProvider;
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
@@ -396,6 +398,55 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     }
   }
 
+  Future<void> _handleViewPrescription(AppointmentList a) async {
+    if (a.appointmentId == null || a.patientId == null) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5),
+      ),
+    );
+    try {
+      await ref
+          .read(prescriptionViewModelProvider.notifier)
+          .appointmentWisePrescription(a.appointmentId!);
+      if (!mounted) return;
+      Navigator.pop(context);
+      final details =
+          ref.read(prescriptionViewModelProvider).appointmentWisePrescriptions;
+      if (details == null || details.isEmpty) {
+        _snack('No prescription found for this appointment', isError: true);
+        return;
+      }
+      final prescriptionId = details.first.prescriptionId;
+      if (prescriptionId == null) {
+        _snack('Prescription not available', isError: true);
+        return;
+      }
+      final rx = PatientPrescription.fromFlatList(
+        details,
+        fallbackPatientId: a.patientId!,
+        fallbackPatientName: a.patientName ?? 'Patient',
+      );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PatientPrescriptionViewScreen(
+            prescriptionId: prescriptionId,
+            fallback: rx,
+            patientId: a.patientId!,
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      _snack('Failed to load prescription', isError: true);
+    }
+  }
+
   Future<void> _handleReview(BuildContext ctx, AppointmentList a) async {
     final input = await showAppointmentReviewDialog(ctx, doctorName: a.doctorName ?? 'Doctor');
     if (input == null) return;
@@ -642,6 +693,7 @@ Widget _buildTabContent(List<AppointmentList> appointments) {
             return _AppointmentCard(
               appointment:          a,
               onViewDetails:        () => _openDetail(a),
+              onViewPrescription:   _isCompleted(a) && a.appointmentId != null ? () => _handleViewPrescription(a) : null,
               onReview:             _canReview(a) ? () => _handleReview(context, a) : null,
               onCancel:             _canCancel(a) ? () => _handleCancel(a) : null,
               onReschedule:         _canReschedule(a) ? () => _handleReschedule(a) : null,
@@ -792,6 +844,7 @@ Widget _buildLoading(String msg) {
 class _AppointmentCard extends StatelessWidget {
   final AppointmentList appointment;
   final VoidCallback  onViewDetails;
+  final VoidCallback? onViewPrescription;
   final VoidCallback? onReview, onCancel, onReschedule;
   final int?    queueNumber;
   final bool    isLiveQueue, queueStarted, isMyTurn;
@@ -802,6 +855,7 @@ class _AppointmentCard extends StatelessWidget {
   const _AppointmentCard({
     required this.appointment,
     required this.onViewDetails,
+    this.onViewPrescription,
     this.onReview, this.onCancel, this.onReschedule,
     this.queueNumber,
     this.isLiveQueue    = false,
@@ -810,7 +864,6 @@ class _AppointmentCard extends StatelessWidget {
     this.patientsAhead,
     this.estimatedArrivalTime,
     this.queueState,
-
   });
 
   @override
@@ -973,7 +1026,7 @@ class _AppointmentCard extends StatelessWidget {
                           child: SizedBox(
                             height: 36,
                             child: ElevatedButton(
-                              onPressed: onViewDetails,
+                              onPressed: onViewPrescription ?? onViewDetails,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: kPrimary,
                                 foregroundColor: Colors.white,
@@ -981,8 +1034,9 @@ class _AppointmentCard extends StatelessWidget {
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10)),
                               ),
-                              child: const Text('View Details',
-                                  style: TextStyle(
+                              child: Text(
+                                  onViewPrescription != null ? 'View Prescription' : 'View Details',
+                                  style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600)),
                             ),
@@ -1042,13 +1096,9 @@ class _AppointmentCard extends StatelessWidget {
                                       const Text('Contact',
                                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
                                       const SizedBox(height: 16),
-                                      if (a.mobile?.isNotEmpty == true)
-                                        _callOption(ctx, 'Call Doctor', a.doctorName ?? 'Doctor', a.mobile!, Icons.person_rounded, kPrimary, kPrimaryLight),
-                                      if (a.mobile?.isNotEmpty == true && a.clinicContact?.isNotEmpty == true)
-                                        const SizedBox(height: 10),
                                       if (a.clinicContact?.isNotEmpty == true)
-                                        _callOption(ctx, 'Call Clinic', a.clinicName ?? 'Clinic', a.clinicContact!, Icons.local_hospital_rounded, kWarning, kAmberLight),
-                                      if (a.mobile?.isEmpty != false && a.clinicContact?.isEmpty != false)
+                                        _callOption(ctx, 'Call Clinic', a.clinicName ?? 'Clinic', a.clinicContact!, Icons.local_hospital_rounded, kWarning, kAmberLight)
+                                      else
                                         const Text('No contact available', style: TextStyle(fontSize: 13, color: kTextMuted)),
                                       const SizedBox(height: 14),
                                       SizedBox(
