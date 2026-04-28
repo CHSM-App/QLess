@@ -92,4 +92,5 @@ jobs:
         with:
           artifacts: "build/app/outputs/apk/release/*"
           tag: ${{ github.ref_name }}
+          allowUpdates: true
           token: ${{ secrets.TOKEN }}
