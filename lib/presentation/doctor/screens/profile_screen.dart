@@ -540,6 +540,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
               child: Column(children: [
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   Text(name,
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -562,12 +563,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                 const SizedBox(height: 2),
                 Text(
                   [spec, if (qual.isNotEmpty) qual].join('  ·  '),
+                  textAlign: TextAlign.center,
                   style: const TextStyle(
                       fontSize: 12, color: kTextSecondary),
                 ),
                 if (clinic.isNotEmpty) ...[
                   const SizedBox(height: 2),
                   Text(clinic,
+                      textAlign: TextAlign.center,
                       style: const TextStyle(
                           fontSize: 11, color: kTextMuted)),
                 ],
@@ -1185,9 +1188,7 @@ Widget _buildSupportCard() => _tileCard([
     _Item(Icons.chat_bubble_outline_rounded, 'Contact Support', 'Chat, Email, Phone'),
     _Item(Icons.privacy_tip_outlined, 'Privacy Policy', null, onTap: () async {
       final uri = Uri.parse('https://qless.vengurlatech.com/login/privacy');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }),
     _Item(Icons.description_outlined, 'Terms of Service', null),
     _Item(Icons.info_outline_rounded, 'App Version', 'v2.4.1 (Build 204)'),
