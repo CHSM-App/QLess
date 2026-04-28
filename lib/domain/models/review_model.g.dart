@@ -13,7 +13,7 @@ ReviewModel _$ReviewModelFromJson(Map<String, dynamic> json) => ReviewModel(
   patientId: (json['patient_id'] as num?)?.toInt(),
   patientName: json['patient_name'] as String?,
   name: json['name'] as String?,
-  rating: json['rating'] as num?,
+  rating: _numFromJson(json['rating']),
   comment: json['comment'] as String?,
   createdAt: json['created_at'] as String?,
   reviewedByUserId: (json['reviewed_by_user_id'] as num?)?.toInt(),

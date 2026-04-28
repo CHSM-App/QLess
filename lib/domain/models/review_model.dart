@@ -2,6 +2,12 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'review_model.g.dart';
 
+num? _numFromJson(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value;
+  return num.tryParse(value.toString());
+}
+
 @JsonSerializable()
 class ReviewModel {
   @JsonKey(name: 'review_id')
@@ -22,7 +28,7 @@ class ReviewModel {
   @JsonKey(name: 'name')
   String? name;
 
-  @JsonKey(name: 'rating')
+  @JsonKey(name: 'rating', fromJson: _numFromJson)
   num? rating;
 
   @JsonKey(name: 'comment')
