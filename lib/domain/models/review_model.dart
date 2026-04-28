@@ -30,6 +30,9 @@ class ReviewModel {
 
   @JsonKey(name: 'created_at')
   String? createdAt;
+    @JsonKey(name: 'reviewed_by_user_id')
+  int? reviewedByUserId;
+
 
   ReviewModel({
     this.reviewId,
@@ -41,6 +44,7 @@ class ReviewModel {
     this.rating,
     this.comment,
     this.createdAt,
+    this.reviewedByUserId,
   });
 
   factory ReviewModel.fromJson(Map<String, dynamic> json) =>
