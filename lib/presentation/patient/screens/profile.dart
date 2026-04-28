@@ -57,6 +57,8 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   late final ProviderSubscription<PatientLoginState> _sub;
   bool _didFetchProfile = false;
   bool _didFetchStats   = false;
+  int  _fetchRetries    = 0;
+  static const _maxRetries = 3;
 
   @override
   void initState() {
@@ -77,10 +79,21 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   }
 
   void _maybeFetchProfile(PatientLoginState state) {
+    // Allow retry when previous fetch returned error or empty list
+    if (_didFetchProfile && _fetchRetries < _maxRetries) {
+      final shouldRetry = state.patientPhoneCheck.maybeWhen(
+        error: (_, __) => true,
+        data: (list) => list.isEmpty,
+        orElse: () => false,
+      );
+      if (shouldRetry) _didFetchProfile = false;
+    }
+
     if (!_didFetchProfile) {
       final mobile = state.mobileNo;
       if (mobile != null && mobile.trim().isNotEmpty) {
         _didFetchProfile = true;
+        _fetchRetries++;
         ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
       }
     }
@@ -158,6 +171,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
         onRefresh: () async {
           _didFetchProfile = false;
           _didFetchStats   = false;
+          _fetchRetries    = 0;
           _maybeFetchProfile(ref.read(patientLoginViewModelProvider));
         },
         child: isLoading
@@ -338,6 +352,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                   setState(() {
                     _didFetchProfile = false;
                     _didFetchStats   = false;
+                    _fetchRetries    = 0;
                   });
                   _maybeFetchProfile(ref.read(patientLoginViewModelProvider));
                 });
