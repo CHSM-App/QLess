@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
+import 'package:qless/presentation/patient/screens/print_prescription_screen.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — exact match with PatientListScreen
@@ -191,68 +192,149 @@ class _DoctorPrescriptionDetailScreenState
     ]),
   );
 
-  // ── Header — PatientListScreen style ─────────────────────────────
-  Widget _buildHeader() => Container(
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(bottom: BorderSide(color: kBorder, width: 1)),
-    ),
-    child: SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-        child: Row(children: [
+  // // ── Header — PatientListScreen style ─────────────────────────────
+  // Widget _buildHeader() => Container(
+  //   decoration: const BoxDecoration(
+  //     color: Colors.white,
+  //     border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+  //   ),
+  //   child: SafeArea(
+  //     bottom: false,
+  //     child: Padding(
+  //       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+  //       child: Row(children: [
+  //         GestureDetector(
+  //           onTap: () => Navigator.pop(context),
+  //           child: Container(
+  //             width: 34, height: 34,
+  //             decoration: BoxDecoration(
+  //               color: kBg,
+  //               borderRadius: BorderRadius.circular(10),
+  //               border: Border.all(color: kBorder),
+  //             ),
+  //             child: const Icon(Icons.arrow_back_ios_new_rounded,
+  //                 color: kTextPrimary, size: 15),
+  //           ),
+  //         ),
+  //         const SizedBox(width: 10),
+  //         Container(
+  //           width: 34, height: 34,
+  //           decoration: BoxDecoration(
+  //             color: kPrimaryLight,
+  //             borderRadius: BorderRadius.circular(10),
+  //             border: Border.all(color: kPrimary.withOpacity(0.2)),
+  //           ),
+  //           child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
+  //         ),
+  //         const SizedBox(width: 8),
+  //         const Expanded(
+  //           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  //             Text('Prescription Details',
+  //                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+  //                     color: kTextPrimary)),
+  //             SizedBox(height: 1),
+  //             Text('View consultation summary',
+  //                 style: TextStyle(fontSize: 11, color: kTextSecondary)),
+  //           ]),
+  //         ),
+  //         // Completed badge
+  //         Container(
+  //           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+  //           decoration: BoxDecoration(color: kGreenLight, borderRadius: BorderRadius.circular(8)),
+  //           child: Row(mainAxisSize: MainAxisSize.min, children: [
+  //             Container(width: 6, height: 6,
+  //                 decoration: const BoxDecoration(color: kSuccess, shape: BoxShape.circle)),
+  //             const SizedBox(width: 4),
+  //             const Text('Completed', style: TextStyle(
+  //                 fontSize: 10, fontWeight: FontWeight.w700, color: kGreenDark)),
+  //           ]),
+  //         ),
+  //       ]),
+  //     ),
+  //   ),
+  // );
+Widget _buildHeader() => Container(
+  decoration: const BoxDecoration(
+    color: Colors.white,
+    border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+  ),
+  child: SafeArea(
+    bottom: false,
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(children: [
+        GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Container(
+            width: 34, height: 34,
+            decoration: BoxDecoration(
+              color: kBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kBorder),
+            ),
+            child: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: kTextPrimary, size: 15),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          width: 34, height: 34,
+          decoration: BoxDecoration(
+            color: kPrimaryLight,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kPrimary.withOpacity(0.2)),
+          ),
+          child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Prescription Details',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
+            SizedBox(height: 1),
+            Text('View consultation summary',
+                style: TextStyle(fontSize: 11, color: kTextSecondary)),
+          ]),
+        ),
+        // ── Print button ─────────────────────────────────────────
+        if (_rx != null)
           GestureDetector(
-            onTap: () => Navigator.pop(context),
+       onTap: () => Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (_) => PatientPrescriptionPdfScreen(
+      prescription: _rx!,
+    ),
+  ),
+),
             child: Container(
               width: 34, height: 34,
               decoration: BoxDecoration(
-                color: kBg,
+                color: kPrimaryLight,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBorder),
+                border: Border.all(color: kPrimary.withOpacity(0.2)),
               ),
-              child: const Icon(Icons.arrow_back_ios_new_rounded,
-                  color: kTextPrimary, size: 15),
+              child: const Icon(Icons.print_rounded, color: kPrimary, size: 16),
             ),
           ),
-          const SizedBox(width: 10),
-          Container(
-            width: 34, height: 34,
-            decoration: BoxDecoration(
-              color: kPrimaryLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kPrimary.withOpacity(0.2)),
-            ),
-            child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
-          ),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Prescription Details',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-                      color: kTextPrimary)),
-              SizedBox(height: 1),
-              Text('View consultation summary',
-                  style: TextStyle(fontSize: 11, color: kTextSecondary)),
-            ]),
-          ),
-          // Completed badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(color: kGreenLight, borderRadius: BorderRadius.circular(8)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 6, height: 6,
-                  decoration: const BoxDecoration(color: kSuccess, shape: BoxShape.circle)),
-              const SizedBox(width: 4),
-              const Text('Completed', style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w700, color: kGreenDark)),
-            ]),
-          ),
-        ]),
-      ),
+        const SizedBox(width: 8),
+        // Completed badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(color: kGreenLight, borderRadius: BorderRadius.circular(8)),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Container(width: 6, height: 6,
+                decoration: const BoxDecoration(color: kSuccess, shape: BoxShape.circle)),
+            const SizedBox(width: 4),
+            const Text('Completed', style: TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w700, color: kGreenDark)),
+          ]),
+        ),
+      ]),
     ),
-  );
-
+  ),
+);
   // ── Body ──────────────────────────────────────────────────────────
   Widget _buildBody() {
     if (_loading) return const Center(

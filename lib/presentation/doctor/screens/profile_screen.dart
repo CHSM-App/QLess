@@ -10,6 +10,7 @@ import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart' hide appointmentViewModelProvider;
 import 'package:url_launcher/url_launcher.dart';
 
 // ── Colour Palette (matches QueueHomePage + DoctorMedicinePage exactly) ───────
@@ -77,6 +78,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   bool _darkMode             = false;
   bool _availableForConsult  = true;
   bool _didFetchProfile      = false;
+  bool _didFetchCounts       = false;
 
   int  _savedLeadHours   = 0;
   int  _savedLeadMinutes = 0;
@@ -96,24 +98,30 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     _sub = ref.listenManual<DoctorLoginState>(
       doctorLoginViewModelProvider,
       (prev, next) {
-        if (_didFetchProfile) return;
-        final mobile = next.mobile;
-        if (mobile != null && mobile.trim().isNotEmpty) {
-          _didFetchProfile = true;
-          ref
-              .read(doctorLoginViewModelProvider.notifier)
-              .checkPhoneDoctor(mobile);
+        if (!_didFetchProfile) {
+          final mobile = next.mobile;
+          if (mobile != null && mobile.trim().isNotEmpty) {
+            _didFetchProfile = true;
+            ref
+                .read(doctorLoginViewModelProvider.notifier)
+                .checkPhoneDoctor(mobile);
+          }
         }
+        final doctorId = next.doctorId;
+        if (doctorId != null && doctorId > 0) _fetchCounts(doctorId);
       },
     );
     Future.microtask(() {
-      final mobile = ref.read(doctorLoginViewModelProvider).mobile;
+      final s = ref.read(doctorLoginViewModelProvider);
+      final mobile = s.mobile;
       if (mobile != null && mobile.trim().isNotEmpty) {
         _didFetchProfile = true;
         ref
             .read(doctorLoginViewModelProvider.notifier)
             .checkPhoneDoctor(mobile);
       }
+      final doctorId = s.doctorId;
+      if (doctorId != null && doctorId > 0) _fetchCounts(doctorId);
     });
   }
 
@@ -174,6 +182,15 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           .checkPhoneDoctor(mobile);
       await Future.delayed(const Duration(milliseconds: 600));
     }
+  }
+
+  // ── Counts fetch ──────────────────────────────────────────────────────────
+
+  void _fetchCounts(int doctorId) {
+    if (_didFetchCounts) return;
+    _didFetchCounts = true;
+    ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(doctorId);
+    ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(doctorId);
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -254,6 +271,41 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final isTablet      = w >= 600;
     final isLargeTablet = w >= 900;
 
+    // ── Real counts & rating — all derived here, passed down ────────────────
+    final apptState   = ref.watch(appointmentViewModelProvider);
+    final reviewState = ref.watch(reviewViewModelProvider);
+
+    // Completed appointments only (status = completed / done / closed)
+    final patientCount = apptState.patientAppointmentsList.maybeWhen(
+      data: (list) {
+        const done = {'completed', 'done', 'closed'};
+        return list
+            .where((a) => done.contains(a.status?.toLowerCase().trim()))
+            .map((a) => a.patientId)
+            .where((id) => id != null)
+            .toSet()
+            .length;
+      },
+      orElse: () => null,
+    );
+
+    // Rating avg + review count — both from fetchDoctorReviews
+    final reviews     = reviewState.reviews;
+    final reviewCount = reviews?.length;   // total reviews received
+
+    double? avgRating;
+    if (reviews != null && reviews.isNotEmpty) {
+      final vals = reviews
+          .map((r) => r.rating)
+          .whereType<num>()           // skip null ratings
+          .map((n) => n.toDouble())
+          .toList();
+      if (vals.isNotEmpty) {
+        avgRating = vals.fold(0.0, (sum, v) => sum + v) / vals.length;
+      }
+    }
+    avgRating ??= doctorDetails?.rating; // fallback to profile-API rating
+
     return Scaffold(
       backgroundColor: kPageBg,
       body: Column(
@@ -279,6 +331,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                                 isTablet: true,
                                 s: doctorState,
                                 d: doctorDetails,
+                                patientCount: patientCount,
+                                reviewCount: reviewCount,
+                                avgRating: avgRating,
                               ),
                             ),
                           ),
@@ -297,6 +352,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           isTablet: isTablet,
                           s: doctorState,
                           d: doctorDetails,
+                          patientCount: patientCount,
+                          reviewCount: reviewCount,
                         ),
                       ),
           ),
@@ -370,6 +427,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     required bool isTablet,
     required DoctorLoginState s,
     DoctorDetails? d,
+    int? patientCount,
+    int? reviewCount,
+    double? avgRating,
   }) {
     final hPad = isTablet ? 20.0 : 14.0;
     return SingleChildScrollView(
@@ -377,7 +437,10 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildProfileCard(isTablet, s, d),
+          _buildProfileCard(isTablet, s, d,
+              patientCount: patientCount,
+              reviewCount: reviewCount,
+              avgRating: avgRating),
           const SizedBox(height: 14),
           _sectionLabel('Account'),
           _buildAccountSection(s, d),
@@ -403,7 +466,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   // ── Profile Card ──────────────────────────────────────────────────────────
 
   Widget _buildProfileCard(
-      bool isTablet, DoctorLoginState s, DoctorDetails? d) {
+      bool isTablet, DoctorLoginState s, DoctorDetails? d,
+      {int? patientCount, int? reviewCount, double? avgRating}) {
     final initials = _initials(d?.name ?? s.name);
     final name     = d?.name ?? s.name ?? 'Doctor';
     final clinic   = d?.clinicName ?? s.clinic_name ?? '';
@@ -508,7 +572,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           fontSize: 11, color: kTextMuted)),
                 ],
                 const SizedBox(height: 10),
-                _statsRow(d, showFee: isTablet),
+                _statsRow(d,
+                    showFee: isTablet,
+                    patientCount: patientCount,
+                    reviewCount: reviewCount,
+                    avgRating: avgRating),
                 const SizedBox(height: 10),
                 SizedBox(
                   width: double.infinity,
@@ -542,20 +610,28 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  Widget _statsRow(DoctorDetails? d, {required bool showFee}) {
-    final exp  = d?.experience?.toString();
-    final expT = (exp != null && exp.isNotEmpty) ? '$exp yrs' : '—';
-    final fee  = d?.consultationFee?.toStringAsFixed(0);
-    final feeT = (fee != null && fee.isNotEmpty) ? '₹$fee' : '—';
+  Widget _statsRow(DoctorDetails? d,
+      {required bool showFee, int? patientCount, int? reviewCount, double? avgRating}) {
+    final exp      = d?.experience?.toString();
+    final expT     = (exp != null && exp.isNotEmpty) ? '$exp yrs' : '—';
+    final fee      = d?.consultationFee?.toStringAsFixed(0);
+    final feeT     = (fee != null && fee.isNotEmpty) ? '₹$fee' : '—';
+    final ratingT  = avgRating != null
+        ? '${avgRating.toStringAsFixed(1)} ★'
+        : '—';
+    final patientsT = patientCount != null ? patientCount.toString() : '—';
+    final reviewsT  = reviewCount  != null ? reviewCount.toString()  : '—';
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         _statItem(expT, 'Experience'),
         _vDiv(),
-        _statItem('4.9 ★', 'Rating'),
+        _statItem(ratingT, 'Rating'),
         _vDiv(),
-        _statItem('2,340', 'Patients'),
+        _statItem(patientsT, 'Patients'),
+        _vDiv(),
+        _statItem(reviewsT, 'Reviews'),
         if (showFee) ...[_vDiv(), _statItem(feeT, 'Fee')],
       ],
     );
