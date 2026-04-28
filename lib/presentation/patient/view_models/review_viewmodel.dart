@@ -55,6 +55,7 @@ class ReviewViewmodel extends StateNotifier<ReviewState> {
     required int doctorId,
     required int patientId,
     required int rating,
+    required int reviewedByUserId,
     String? comment,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
@@ -65,6 +66,7 @@ class ReviewViewmodel extends StateNotifier<ReviewState> {
         patientId: patientId,
         rating: rating,
         comment: comment,
+        reviewedByUserId: reviewedByUserId,
       );
       final result = await usecase.addAppointmentReview(request);
       final ok = _asBool(result['success'], defaultValue: true);

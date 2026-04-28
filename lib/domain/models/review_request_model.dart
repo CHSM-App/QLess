@@ -22,6 +22,9 @@ class ReviewRequestModel {
   @JsonKey(name: 'patient_name')
   String? patientName;
 
+  @JsonKey(name: 'reviewed_by_user_id')
+  int? reviewedByUserId;
+
   ReviewRequestModel({
     required this.appointmentId,
     required this.doctorId,
@@ -29,6 +32,7 @@ class ReviewRequestModel {
     required this.rating,
     this.comment,
     this.patientName,
+    this.reviewedByUserId,
   });
 
   factory ReviewRequestModel.fromJson(Map<String, dynamic> json) =>
