@@ -189,7 +189,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   void _fetchCounts(int doctorId) {
     if (_didFetchCounts) return;
     _didFetchCounts = true;
-    ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(doctorId);
+    ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(doctorId);
     ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(doctorId);
   }
 
@@ -247,6 +247,28 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
+  void _showReviewsSheet() {
+    final reviewState = ref.read(reviewViewModelProvider);
+    final reviews     = reviewState.reviews ?? [];
+    double? avg;
+    if (reviews.isNotEmpty) {
+      final vals = reviews
+          .map((r) => r.rating)
+          .whereType<num>()
+          .map((n) => n.toDouble())
+          .toList();
+      if (vals.isNotEmpty) {
+        avg = vals.fold(0.0, (s, v) => s + v) / vals.length;
+      }
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ReviewsSheet(reviews: reviews, avgRating: avg),
+    );
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -275,19 +297,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final apptState   = ref.watch(appointmentViewModelProvider);
     final reviewState = ref.watch(reviewViewModelProvider);
 
-    // Completed appointments only (status = completed / done / closed)
-    final patientCount = apptState.patientAppointmentsList.maybeWhen(
-      data: (list) {
-        const done = {'completed', 'done', 'closed'};
-        return list
-            .where((a) => done.contains(a.status?.toLowerCase().trim()))
-            .map((a) => a.patientId)
-            .where((id) => id != null)
-            .toSet()
-            .length;
-      },
-      orElse: () => null,
-    );
+    final patientCount = apptState.doctorPatientCount;
 
     // Rating avg + review count — both from fetchDoctorReviews
     final reviews     = reviewState.reviews;
@@ -354,6 +364,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           d: doctorDetails,
                           patientCount: patientCount,
                           reviewCount: reviewCount,
+                          avgRating: avgRating,
                         ),
                       ),
           ),
@@ -581,29 +592,55 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                     reviewCount: reviewCount,
                     avgRating: avgRating),
                 const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 36,
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        Navigator.of(context, rootNavigator: true).push(
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const DoctorEditProfilePage()),
-                        ).then((_) {
-                          if (mounted) _refreshProfile();
-                        }),
-                    icon: const Icon(Icons.edit_outlined, size: 14),
-                    label: const Text('Edit Profile',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600)),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: kPrimary,
-                      side: const BorderSide(color: kPrimary),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 36,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              Navigator.of(context, rootNavigator: true).push(
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const DoctorEditProfilePage()),
+                              ).then((_) {
+                                if (mounted) _refreshProfile();
+                              }),
+                          icon: const Icon(Icons.edit_outlined, size: 13),
+                          label: const Text('Edit Profile',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kPrimary,
+                            side: const BorderSide(color: kPrimary),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 36,
+                        child: OutlinedButton.icon(
+                          onPressed: _showReviewsSheet,
+                          icon: const Icon(Icons.star_outline_rounded, size: 13),
+                          label: const Text('Reviews',
+                              style: TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600)),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kWarning,
+                            side: const BorderSide(color: kWarning),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ]),
             ),
@@ -1824,6 +1861,220 @@ class _PersonalInfoSheet extends StatelessWidget {
     );
   }
 }
+// ════════════════════════════════════════════════════════════════════
+//  REVIEWS SHEET
+// ════════════════════════════════════════════════════════════════════
+class _ReviewsSheet extends StatelessWidget {
+  final List<dynamic> reviews;
+  final double? avgRating;
+
+  const _ReviewsSheet({required this.reviews, this.avgRating});
+
+  String _initials(String? name) {
+    if (name == null || name.trim().isEmpty) return '?';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  String _formatDate(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final dt = DateTime.parse(raw);
+      final months = ['Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+      return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final maxHeight   = MediaQuery.of(context).size.height * 0.85;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          const SizedBox(height: 10),
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+                color: kBorder, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 14),
+
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                    color: kAmberLight,
+                    borderRadius: BorderRadius.circular(10)),
+                child: const Icon(Icons.star_outline_rounded,
+                    size: 17, color: kWarning),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Reviews (${reviews.length})',
+                      style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary),
+                    ),
+                    if (avgRating != null)
+                      Text(
+                        'Avg ${avgRating!.toStringAsFixed(1)} ★',
+                        style: const TextStyle(
+                            fontSize: 11, color: kTextSecondary),
+                      ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFF7F8FA),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: kBorder)),
+                  child: const Icon(Icons.close_rounded,
+                      size: 15, color: kTextMuted),
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: kDivider),
+
+          // List
+          Flexible(
+            child: reviews.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 40),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.rate_review_outlined,
+                            size: 40, color: kTextMuted),
+                        SizedBox(height: 10),
+                        Text('No reviews yet',
+                            style: TextStyle(
+                                fontSize: 13, color: kTextSecondary)),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.only(
+                        top: 8, bottom: bottomInset + 20),
+                    shrinkWrap: true,
+                    itemCount: reviews.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, indent: 60, color: kDivider),
+                    itemBuilder: (_, i) {
+                      final r = reviews[i];
+                      final name    = r.patientName ?? r.name ?? 'Patient';
+                      final rating  = r.rating?.toDouble() ?? 0.0;
+                      final comment = r.comment ?? '';
+                      final date    = _formatDate(r.createdAt);
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: const LinearGradient(
+                                    colors: [kPrimary, kPrimaryDark],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(_initials(name),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(name,
+                                            style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w600,
+                                                color: kTextPrimary)),
+                                      ),
+                                      if (date.isNotEmpty)
+                                        Text(date,
+                                            style: const TextStyle(
+                                                fontSize: 10,
+                                                color: kTextMuted)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: List.generate(5, (idx) {
+                                      return Icon(
+                                        idx < rating.round()
+                                            ? Icons.star_rounded
+                                            : Icons.star_outline_rounded,
+                                        size: 13,
+                                        color: kWarning,
+                                      );
+                                    }),
+                                  ),
+                                  if (comment.isNotEmpty) ...[
+                                    const SizedBox(height: 5),
+                                    Text(comment,
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            color: kTextSecondary,
+                                            height: 1.4)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ── Shared info row ───────────────────────────────────────────────────────────
 class _IRow extends StatelessWidget {
   final IconData icon;

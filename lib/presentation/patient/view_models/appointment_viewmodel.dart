@@ -21,6 +21,7 @@ class AppointmentState {
   final QueuePreviewResponseModel? queuePreviewEstimateResponse;
   final List<MonthSlotData> bookedSlots;
   final AsyncValue<List<AppointmentList>>?  patientAppointmentsList;
+  final int? doctorPatientCount;
 
   const AppointmentState({
     this.isLoading = false,
@@ -35,6 +36,7 @@ class AppointmentState {
     this.queuePreviewEstimateResponse,
     this.bookedSlots = const [],
     this.patientAppointmentsList,
+    this.doctorPatientCount,
   });
 
   AppointmentState copyWith({
@@ -51,6 +53,7 @@ class AppointmentState {
     QueuePreviewResponseModel? queuePreviewEstimateResponse,
     List<MonthSlotData>? bookedSlots,
     AsyncValue<List<AppointmentList>>?  patientAppointmentsList,
+    int? doctorPatientCount,
   }) {
     return AppointmentState(
       isLoading: isLoading ?? this.isLoading,
@@ -62,11 +65,12 @@ class AppointmentState {
       cancelResponse: cancelResponse ?? this.cancelResponse,
       queueStatusResponse: queueStatusResponse ?? this.queueStatusResponse,
       queueEstimates: queueEstimates ?? this.queueEstimates,
-      
+
       queuePreviewEstimateResponse:
           queuePreviewEstimateResponse ?? this.queuePreviewEstimateResponse,
       bookedSlots: bookedSlots ?? this.bookedSlots,
       patientAppointmentsList: patientAppointmentsList ?? this.patientAppointmentsList,
+      doctorPatientCount: doctorPatientCount ?? this.doctorPatientCount,
     );
   }
 }
@@ -190,6 +194,18 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
       state = state.copyWith(bookedSlots: result);
     } catch (_) {
       // Non-critical — slots just won't be grayed out
+    }
+  }
+
+  Future<void> fetchDoctorPatientCount(int doctorId) async {
+    try {
+      final result = await usecase.fetchPatientAppointments(doctorId);
+      final count = result
+          .where((a) => a.status?.toLowerCase() == 'completed')
+          .length;
+      state = state.copyWith(doctorPatientCount: count);
+    } catch (_) {
+      // Non-critical — count just won't show
     }
   }
 
