@@ -17,6 +17,7 @@ class AppointmentListState {
   final AsyncValue<List<AppointmentList>> patientAppointmentsList;
   final AsyncValue<List<TodayQueueModel>>? todayQueueResult;
   final QueueState queueState;
+  final int? doctorPatientCount;
 
   const AppointmentListState({
     this.isLoading = false,
@@ -24,6 +25,7 @@ class AppointmentListState {
     this.patientAppointmentsList = const AsyncValue.data([]),
     this.queueState = QueueState.idle,
     this.todayQueueResult = const AsyncValue.data([]),
+    this.doctorPatientCount,
   });
 
   AppointmentListState copyWith({
@@ -32,6 +34,7 @@ class AppointmentListState {
     AsyncValue<List<AppointmentList>>? patientAppointmentsList,
     AsyncValue<List<TodayQueueModel>>? todayQueueResult,
     QueueState? queueState,
+    int? doctorPatientCount,
   }) {
     return AppointmentListState(
       isLoading: isLoading ?? this.isLoading,
@@ -39,6 +42,7 @@ class AppointmentListState {
       patientAppointmentsList: patientAppointmentsList ?? this.patientAppointmentsList,
       queueState: queueState ?? this.queueState,
       todayQueueResult: todayQueueResult ?? this.todayQueueResult,
+      doctorPatientCount: doctorPatientCount ?? this.doctorPatientCount,
     );
   }
 }
@@ -84,6 +88,18 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       case 2: return QueueState.paused;   // QUEUE_PAUSE
       case 3: return QueueState.stopped;  // QUEUE_STOP
       default: return QueueState.idle;    // no queue row yet
+    }
+  }
+
+  Future<void> fetchDoctorPatientCount(int doctorId) async {
+    try {
+      final result = await usecase.fetchPatientAppointments(doctorId);
+      final count = result
+          .where((a) => a.status?.toLowerCase() == 'completed')
+          .length;
+      state = state.copyWith(doctorPatientCount: count);
+    } catch (_) {
+      // Non-critical — count just won't show
     }
   }
 

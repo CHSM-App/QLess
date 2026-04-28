@@ -241,6 +241,7 @@ class _BookAppointmentScreenState
       if (did != null) {
         ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did);
         ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did);
+        ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
       }
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {
@@ -1019,12 +1020,13 @@ class _StatsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final reviews  = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
-    final avgRating = reviews.isEmpty
+    final reviews       = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
+    final avgRating     = reviews.isEmpty
         ? 0.0
         : reviews.fold<double>(0, (acc, r) =>
               acc + (r.rating?.toDouble() ?? 0)) /
             reviews.length;
+    final patientCount  = ref.watch(appointmentViewModelProvider).doctorPatientCount;
 
     return Container(
       color: Colors.white,
@@ -1052,7 +1054,7 @@ class _StatsRow extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 8),
-          _StatBox(label: 'Patients', value: '1.2k+'),
+          _StatBox(label: 'Patients', value: patientCount == null ? '--' : '$patientCount'),
           const SizedBox(width: 8),
           Expanded(
             child: GestureDetector(
