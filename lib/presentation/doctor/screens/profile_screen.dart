@@ -189,7 +189,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   void _fetchCounts(int doctorId) {
     if (_didFetchCounts) return;
     _didFetchCounts = true;
-    ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(doctorId);
+    ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(doctorId);
     ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(doctorId);
   }
 
@@ -275,19 +275,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final apptState   = ref.watch(appointmentViewModelProvider);
     final reviewState = ref.watch(reviewViewModelProvider);
 
-    // Completed appointments only (status = completed / done / closed)
-    final patientCount = apptState.patientAppointmentsList.maybeWhen(
-      data: (list) {
-        const done = {'completed', 'done', 'closed'};
-        return list
-            .where((a) => done.contains(a.status?.toLowerCase().trim()))
-            .map((a) => a.patientId)
-            .where((id) => id != null)
-            .toSet()
-            .length;
-      },
-      orElse: () => null,
-    );
+    final patientCount = apptState.doctorPatientCount;
 
     // Rating avg + review count — both from fetchDoctorReviews
     final reviews     = reviewState.reviews;

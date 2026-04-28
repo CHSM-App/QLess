@@ -87,8 +87,9 @@ class DoctorProfileScreen extends ConsumerStatefulWidget {
 
 class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   late bool _isFav;
-  bool _didFetchReviews = false;
-  bool _didFetchAvail   = false;
+  bool _didFetchReviews      = false;
+  bool _didFetchAvail        = false;
+  bool _didFetchPatientCount = false;
   int? _favFetchedDid;
   int? _favFetchedPid;
 
@@ -104,6 +105,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       _tryFetchFav();
       _tryFetchReviews();
       _tryFetchAvail();
+      _tryFetchPatientCount();
     });
   }
 
@@ -129,6 +131,13 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     if (did <= 0 || (_didFetchAvail && !force)) return;
     _didFetchAvail = true;
     ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did);
+  }
+
+  void _tryFetchPatientCount({bool force = false}) {
+    final did = widget.doctor.doctorId ?? 0;
+    if (did <= 0 || (_didFetchPatientCount && !force)) return;
+    _didFetchPatientCount = true;
+    ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
   }
 
   Future<void> _toggleFav(bool v) async {
@@ -190,9 +199,10 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       }
     });
 
-    final reviews       = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
-    final availabilities = ref.watch(doctorsViewModelProvider).doctorAvailabilities;
-    final avgRating     = _avgRating(reviews);
+    final reviews           = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
+    final availabilities    = ref.watch(doctorsViewModelProvider).doctorAvailabilities;
+    final patientCount      = ref.watch(appointmentViewModelProvider).doctorPatientCount;
+    final avgRating         = _avgRating(reviews);
     final clinicText    = [d.clinicName, d.clinicAddress]
         .where((s) => s != null && s.isNotEmpty)
         .join(' · ');
@@ -280,7 +290,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           children: [
 
             // ── Doctor Hero Card ─────────────────────────────────
-            _buildHeroCard(init, accent, accentBg, avgRating, reviews, d),
+            _buildHeroCard(init, accent, accentBg, avgRating, reviews, d, patientCount),
             const SizedBox(height: 10),
 
             // ── Stats row ────────────────────────────────────────
@@ -333,7 +343,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
   // ── Hero Card ──────────────────────────────────────────────────────
   Widget _buildHeroCard(String init, Color accent, Color accentBg,
-      double avgRating, List<ReviewModel> reviews, DoctorDetails d) {
+      double avgRating, List<ReviewModel> reviews, DoctorDetails d, int? patientCount) {
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
       padding: const EdgeInsets.all(14),
@@ -488,7 +498,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 icon: Icons.people_outline_rounded,
                 iconColor: kSuccess,
                 iconBg: kGreenLight,
-                value: '1.2k+',
+                value: patientCount == null ? '--' : '$patientCount',
                 label: 'Patients',
               ),
               _vertDiv(),
