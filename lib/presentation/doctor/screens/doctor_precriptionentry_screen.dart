@@ -750,6 +750,15 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       return;
     }
 
+    // API explicitly says no more queue patients — go back to patient list
+    final msg = result.message?.trim() ?? '';
+    if (msg.toLowerCase().contains('no patient left')) {
+      _showSnack(msg, isError: false);
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
     final nextToken = result.data?.isNotEmpty == true ? result.data!.first.nextToken : null;
 
     await ref.read(appointmentViewModelProvider.notifier)
@@ -782,11 +791,17 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     )));
   }
 
+  // Slot patients must never be auto-opened as the "next" queue patient
+  bool _isSlotAppointment(AppointmentList a) =>
+      a.bookingType == 2 ||
+      (a.bookingType == null && a.startTime != null && a.endTime != null);
+
   AppointmentList? _pickNextAppointment(List<AppointmentList> list, {int? preferredQueue}) {
     final inProgress = list.where((a) {
       final s = a.status?.toLowerCase().trim() ?? '';
       return s == 'in_progress' && a.appointmentId != widget.appointmentId
-          && _isToday(_parseDate(a.appointmentDate));
+          && _isToday(_parseDate(a.appointmentDate))
+          && !_isSlotAppointment(a);
     }).toList();
     if (inProgress.isNotEmpty) {
       inProgress.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
@@ -795,7 +810,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     final candidates = list.where((a) {
       final s = a.status?.toLowerCase().trim() ?? '';
       return s == 'booked' && _isToday(_parseDate(a.appointmentDate))
-          && a.appointmentId != widget.appointmentId;
+          && a.appointmentId != widget.appointmentId
+          && !_isSlotAppointment(a);
     }).toList();
     if (preferredQueue != null) {
       final match = candidates.where((a) => a.queueNumber == preferredQueue).toList();
