@@ -9,6 +9,7 @@ part of 'appointment_list.dart';
 AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
     AppointmentList(
       queueId: (json['queue_id'] as num?)?.toInt(),
+      slotId: (json['slot_id'] as num?)?.toInt(),
       queueState: json['queue_state'] as String?,
       appointmentId: (json['appointment_id'] as num?)?.toInt(),
       patientId: (json['patient_id'] as num?)?.toInt(),
@@ -52,6 +53,7 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'appointment_id': instance.appointmentId,
       'patient_id': instance.patientId,
       'queue_id': instance.queueId,
+      'slot_id': instance.slotId,
       'doctor_id': instance.doctorId,
       'family_id': instance.familyId,
       'doctor_name': instance.doctorName,

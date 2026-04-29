@@ -14,7 +14,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmap;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -69,8 +68,7 @@ const kAmberDark = Color(0xFF975A16);
 // ════════════════════════════════════════════════════════════════════
 //  BREAKPOINTS
 // ════════════════════════════════════════════════════════════════════
-const _kTabletBreak = 650.0;
-const _kDesktopBreak = 1050.0;
+
 // ─── Schedule UI Models ──────────────────────────────────────────────────────
 enum BookingMode { queue, slots, both }
 

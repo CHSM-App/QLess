@@ -413,18 +413,6 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     }
   }
 
-  // ── Mobile verification ──────────────────────────────────────────
-  void _onMobileChanged(String value) {
-    final hasChanged = value.trim() != _originalMobile;
-    setState(() {
-      _isMobileChanged = hasChanged;
-      if (!hasChanged) {
-        _isOtpSent = false;
-        _otpCtrl.clear();
-        _otpError = '';
-      }
-    });
-  }
 
   Future<void> _sendOtp() async {
     final m = _contactCtrl.text.trim();

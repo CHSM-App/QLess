@@ -614,7 +614,7 @@ Widget _buildHeader() => Container(
 
   // ── Medicine card ─────────────────────────────────────────────────
   Widget _medCard(PrescriptionMedicineItem m) {
-    final tid   = m.medicineTypeId ?? 1;
+    final tid   = m.medicineTypeId;
     final tc    = _typeColor[tid]      ?? kPrimary;
     final tcL   = _typeColorLight[tid] ?? kPrimaryLight;
     final tcD   = _typeColorDark[tid]  ?? kPrimaryDark;

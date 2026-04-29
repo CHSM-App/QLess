@@ -83,18 +83,16 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   String get _doctorName =>
       ref.read(doctorLoginViewModelProvider).name ?? 'Doctor';
 
-  void _loadData() {
-    if (_hasFetched || _doctorId == 0) return;
+  Future<void> _loadData({bool force = false}) async {
+    if (_doctorId == 0) return;
+    if (_hasFetched && !force) return;
     _hasFetched = true;
-    ref
+    await ref
         .read(appointmentViewModelProvider.notifier)
         .fetchPatientAppointments(_doctorId);
   }
 
-void _refreshData() {
-  _hasFetched = false;
-  _loadData();
-}
+  Future<void> _refreshData() => _loadData(force: true);
   
 
   // ── Queue filters ─────────────────────────────────────────────────────────
@@ -162,7 +160,7 @@ void _refreshData() {
           .read(appointmentViewModelProvider.notifier)
           .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue started');
-        _refreshData(); 
+      await _refreshData();
     } catch (_) {
       _snack('Failed to start queue');
     }
@@ -174,7 +172,7 @@ void _refreshData() {
           .read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue paused');
-        _refreshData(); 
+      await _refreshData();
     } catch (_) {
       _snack('Failed to pause queue');
     }
@@ -186,7 +184,7 @@ void _refreshData() {
           .read(appointmentViewModelProvider.notifier)
           .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue closed');
-        _refreshData(); 
+      await _refreshData();
     } catch (_) {
       _snack('Failed to close queue');
     }
@@ -230,7 +228,7 @@ void _refreshData() {
           .read(appointmentViewModelProvider.notifier)
           .queuePauseEmergency(queueId);
       _snack(res.message ?? 'Queue paused (emergency)');
-        _refreshData(); 
+      await _refreshData();
     } catch (_) {
       _snack('Failed to pause queue');
     }
@@ -336,7 +334,7 @@ void _refreshData() {
               ? waiting
               : waiting.take(3).toList();
 
-          return CustomScrollView(
+          return _buildRefreshableScrollView(
             slivers: [
               // ── HEADER ──────────────────────────────────────────────
               SliverToBoxAdapter(
@@ -544,8 +542,21 @@ void _refreshData() {
   // LOADING / ERROR BODIES
   // ─────────────────────────────────────────────────────────────────────────
 
+  Widget _buildRefreshableScrollView({
+    required List<Widget> slivers,
+  }) {
+    return RefreshIndicator(
+      color: kPrimary,
+      onRefresh: _refreshData,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: slivers,
+      ),
+    );
+  }
+
   Widget _buildLoadingBody(String greeting, String doctorName) =>
-      CustomScrollView(
+      _buildRefreshableScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
           const SliverFillRemaining(
@@ -555,7 +566,7 @@ void _refreshData() {
       );
 
   Widget _buildErrorBody(Object e, String greeting, String doctorName) =>
-      CustomScrollView(
+      _buildRefreshableScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
           SliverFillRemaining(
@@ -579,10 +590,7 @@ void _refreshData() {
                           const TextStyle(color: kTextMuted, fontSize: 12)),
                   const SizedBox(height: 12),
                   TextButton(
-                    onPressed: () {
-                      _hasFetched = false;
-                      _loadData();
-                    },
+                    onPressed: _refreshData,
                     style: TextButton.styleFrom(foregroundColor: kPrimary),
                     child: const Text('Retry'),
                   ),
