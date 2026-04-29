@@ -298,8 +298,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             const SizedBox(height: 10),
 
             // ── Action pills ─────────────────────────────────────
-            _buildActionPills(),
-            const SizedBox(height: 14),
+            // _buildActionPills(),
+            // const SizedBox(height: 14),
 
             // ── About ────────────────────────────────────────────
             _buildSectionLabel('About Doctor'),
