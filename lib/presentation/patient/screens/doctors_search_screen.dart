@@ -116,8 +116,8 @@ class _QueueStatus {
             color: kPrimary, icon: Icons.calendar_today_rounded);
       case _QueueState.unavailable:
         return const _QueueStatus(
-            isVisible: true, canBook: false, tintCard: true,
-            label: 'Unavailable', btnLabel: 'N/A',
+            isVisible: false, canBook: false, tintCard: false,
+            label: '', btnLabel: 'N/A',
             color: kError, icon: Icons.block_rounded);
       case _QueueState.ended:
         return const _QueueStatus(
