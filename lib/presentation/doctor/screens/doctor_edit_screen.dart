@@ -1119,8 +1119,8 @@ Future<void> _selectFromMap() async {
               child: TextField(
                 controller: _contactCtrl,
                 keyboardType: TextInputType.phone,
-                enabled: !_isOtpSent,
-                onChanged: _onMobileChanged,
+                enabled: false,
+                readOnly: true,
                 style: const TextStyle(fontSize: 13, color: kTextPrimary),
                 decoration: const InputDecoration(
                   border: InputBorder.none,

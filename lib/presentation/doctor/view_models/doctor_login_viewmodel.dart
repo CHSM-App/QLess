@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -135,28 +136,44 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     File? doctorImage,
     File? clinicImage,
   }) async {
-  state = state.copyWith(isLoading: true, error: null);
-  try {
-    final result = await usecase.addDoctorDetails(
-      doctorLogin,
-      doctorImage: doctorImage,
-      clinicImage: clinicImage,
-    );
-    final dynamic rawDoctorId = result['doctor_id'];
-    final dynamic rawClinicId = result['clinic_id'];
-    final int? doctorId = rawDoctorId is int
-        ? rawDoctorId
-        : int.tryParse(rawDoctorId?.toString() ?? '');
-    final String? clinicId = rawClinicId?.toString();
-    state = state.copyWith(
-      isLoading: false,
-      doctorId: doctorId,   // stored on state for the screen to read
-      clinicId: clinicId,
-    );
-  } catch (e) {
-    state = state.copyWith(isLoading: false, error: e.toString());
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await usecase.addDoctorDetails(
+        doctorLogin,
+        doctorImage: doctorImage,
+        clinicImage: clinicImage,
+      );
+      final dynamic rawDoctorId = result['doctor_id'];
+      final dynamic rawClinicId = result['clinic_id'];
+      final int? doctorId = rawDoctorId is int
+          ? rawDoctorId
+          : int.tryParse(rawDoctorId?.toString() ?? '');
+      final String? clinicId = rawClinicId?.toString();
+      state = state.copyWith(
+        isLoading: false,
+        doctorId: doctorId, // stored on state for the screen to read
+        clinicId: clinicId,
+      );
+    } catch (e) {
+      if (e is DioException && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        final dynamic rawDoctorId = data['doctor_id'];
+        final int? doctorId = rawDoctorId is int
+            ? rawDoctorId
+            : int.tryParse(rawDoctorId?.toString() ?? '');
+        if (doctorId != null && doctorId > 0) {
+          final String? clinicId = data['clinic_id']?.toString();
+          state = state.copyWith(
+            isLoading: false,
+            doctorId: doctorId,
+            clinicId: clinicId,
+          );
+          return;
+        }
+      }
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
   }
-}
 
   Future<void> checkPhoneDoctor(String mobile) async {
     state = state.copyWith(
@@ -165,21 +182,22 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
     try {
       final result = await usecase.checkPhoneDoctor(mobile);
-        final d = result.first;
-        state = state.copyWith(
-          doctorId: d.doctorId,
-          name: d.name,
-          mobile: d.mobile,
-          email: d.email,
-          roleId: d.roleId?.toString(),
-          token: d.Token,
-          clinicId: d.clinicId,
-          clinic_name: d.clinicName,
-          leadTimeMinutes: d.leadTime,
-          phoneCheckResult: AsyncValue.data(result),
-        );
-        if (d.name != null) await TokenStorage.saveValue('name', d.name!);
-        if (d.clinicName != null) await TokenStorage.saveValue('clinic_name', d.clinicName!);
+      final d = result.first;
+      state = state.copyWith(
+        doctorId: d.doctorId,
+        name: d.name,
+        mobile: d.mobile,
+        email: d.email,
+        roleId: d.roleId?.toString(),
+        token: d.Token,
+        clinicId: d.clinicId,
+        clinic_name: d.clinicName,
+        leadTimeMinutes: d.leadTime,
+        phoneCheckResult: AsyncValue.data(result),
+      );
+      if (d.name != null) await TokenStorage.saveValue('name', d.name!);
+      if (d.clinicName != null)
+        await TokenStorage.saveValue('clinic_name', d.clinicName!);
     } catch (e, st) {
       state = state.copyWith(
         phoneCheckResult: AsyncValue.error(e, st),
@@ -207,30 +225,19 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
     try {
       final result = await usecase.fetchMedicineTypes();
-      state = state.copyWith(
-        medicineTypes: AsyncValue.data(result),
-      );
+      state = state.copyWith(medicineTypes: AsyncValue.data(result));
     } catch (e, st) {
-      state = state.copyWith(
-        medicineTypes: AsyncValue.error(e, st),
-      );
+      state = state.copyWith(medicineTypes: AsyncValue.error(e, st));
     }
   }
 
   Future<void> fetchAllMedicines(int doctorId) async {
-    state = state.copyWith(
-      medicines: const AsyncValue.loading(),
-      error: null,
-    );
+    state = state.copyWith(medicines: const AsyncValue.loading(), error: null);
     try {
       final result = await usecase.fetchAllMedicines(doctorId);
-      state = state.copyWith(
-        medicines: AsyncValue.data(result),
-      );
+      state = state.copyWith(medicines: AsyncValue.data(result));
     } catch (e, st) {
-      state = state.copyWith(
-        medicines: AsyncValue.error(e, st),
-      );
+      state = state.copyWith(medicines: AsyncValue.error(e, st));
     }
   }
 
@@ -238,8 +245,6 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     await TokenStorage.clear();
     state = const DoctorLoginState();
   }
-
-
 
   Future<List<DoctorDetails>> mobileExistDoctor(String mobile) async {
     try {
@@ -301,10 +306,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         phoneCheckResult: updatedPhoneCheckResult,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 }

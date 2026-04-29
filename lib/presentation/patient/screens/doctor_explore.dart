@@ -7,7 +7,6 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
-import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour palette (mirrors home_screen.dart) ─────────────────────────────────
 const _kPrimary      = Color(0xFF26C6B0);
@@ -219,7 +218,7 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
 
           // ── HEADER ─────────────────────────────────────────────────
           SliverToBoxAdapter(
-            child: _fade(0, _buildHeader(context)),
+            child: _fade(0, _buildHeader()),
           ),
 
           // ── BODY ───────────────────────────────────────────────────
@@ -308,7 +307,7 @@ if (position != null && (isLoading || nearby.isNotEmpty)) ...[
   // ════════════════════════════════════════════════════════════════════
   //  HEADER  — matches HomeScreen flat white header style
   // ════════════════════════════════════════════════════════════════════
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -319,21 +318,47 @@ if (position != null && (isLoading || nearby.isNotEmpty)) ...[
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: AppExpandableHeaderSearch(
-            leadingIcon: Icons.explore_rounded,
-            title: 'Find a Doctor',
-            subtitle: 'Book appointments near you',
-            hintText: 'Search doctors, specialties...',
-            accentColor: _kPrimary,
-            leadingBackgroundColor: _kPrimaryLight,
-            titleColor: _kTextPrimary,
-            subtitleColor: _kTextSecondary,
-            fieldColor: const Color(0xFFF7F8FA),
-            borderColor: _kBorder,
-            iconColor: _kTextMuted,
-            textColor: _kTextPrimary,
-            onSubmitted: (_) => _goToSearch(context),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: _kPrimaryLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.explore_rounded,
+                  color: _kPrimary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Find a Doctor',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: _kTextPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Book appointments near you',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _kTextSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

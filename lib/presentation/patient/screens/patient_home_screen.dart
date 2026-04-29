@@ -219,6 +219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   List<Map<String, dynamic>> _cachedSpecialties = [];
   bool _popupShown = false;
   final Map<int, double> _homeRatings = {};
+  bool _ratingsLoading = false;
 
   @override
   void initState() {
@@ -278,6 +279,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _loadRatings(List<int> doctorIds) async {
     final toFetch = doctorIds.where((id) => !_homeRatings.containsKey(id)).toList();
     if (toFetch.isEmpty) return;
+    if (mounted) setState(() => _ratingsLoading = true);
     final usecase = ref.read(reviewUsecaseProvider);
     final results = await Future.wait(
       toFetch.map((id) async {
@@ -296,6 +298,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     if (!mounted) return;
     setState(() {
       for (final e in results) { _homeRatings[e.key] = e.value; }
+      _ratingsLoading = false;
     });
   }
 
@@ -639,26 +642,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildTopRatedDoctorsSection(
       List<DoctorDetails> doctors, bool isLoading) {
-    // Use fetched ratings; only doctors with rating > 0, sorted descending
     final rated = doctors
-        .where((d) => d.doctorId != null &&
-            (_homeRatings[d.doctorId!] ?? 0) > 0)
+        .where((d) => d.doctorId != null && (_homeRatings[d.doctorId!] ?? 0) > 3.5)
         .toList()
       ..sort((a, b) =>
           (_homeRatings[b.doctorId!] ?? 0)
               .compareTo(_homeRatings[a.doctorId!] ?? 0));
-    final shownDoctors = rated.take(4).toList();
+
+    final hasMore = rated.length > 3;
+    final shownDoctors = rated.take(3).toList();
+    final stillLoading = isLoading || _ratingsLoading;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _SectionTitle(
           'Top Rated Doctors',
-          action: shownDoctors.isNotEmpty ? 'Show all' : null,
-          onAction: shownDoctors.isNotEmpty ? () => _goToSearch() : null,
+          action: hasMore ? 'Show all' : null,
+          onAction: hasMore ? () => _goToSearch() : null,
         ),
         const SizedBox(height: 10),
-        if (isLoading && _homeRatings.isEmpty) ...[
+        if (stillLoading && shownDoctors.isEmpty) ...[
           const _TopDoctorSkeletonCard(),
           const SizedBox(height: 8),
           const _TopDoctorSkeletonCard(),
