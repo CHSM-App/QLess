@@ -67,6 +67,7 @@ String? _networkImageUrl;   // ← add this
   bool _didFetchProfile = false;
   bool _didPrefill      = false;
   bool _didSubmit       = false;
+  bool _isSubmitting    = false;
 
   final _bloodGroups = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−'];
   final _genders     = ['Male', 'Female', 'Other'];
@@ -159,6 +160,8 @@ String? _networkImageUrl;   // ← add this
     }
     if (next.error != null && next.error != prev?.error) {
       _didSubmit = false;
+      _isSubmitting = false;
+      if (mounted) setState(() {});
       _snack(next.error ?? 'Failed to update profile', success: false);
     }
   }
@@ -216,8 +219,10 @@ String? _networkImageUrl;   // ← add this
   }
 
   void _save() {
+    if (_isSubmitting) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    final state     = ref.read(patientLoginViewModelProvider);
+    final state = ref.read(patientLoginViewModelProvider);
+    if (state.isLoading) return;
     final patientId = state.patientId ?? 0;
 
     final patient = Patients(
@@ -233,7 +238,11 @@ String? _networkImageUrl;   // ← add this
     );
 
     _didSubmit = true;
-ref.read(patientLoginViewModelProvider.notifier).addPatient(patient, image: _pickedImage);
+    _isSubmitting = true;
+    setState(() {});
+    ref
+        .read(patientLoginViewModelProvider.notifier)
+        .addPatient(patient, image: _pickedImage);
   }
 
   int? _genderIdFor(String g) {
@@ -289,9 +298,12 @@ ref.read(patientLoginViewModelProvider.notifier).addPatient(patient, image: _pic
 
   @override
   Widget build(BuildContext context) {
+    final loginState = ref.watch(patientLoginViewModelProvider);
+    final isSaving = _isSubmitting || loginState.isLoading;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: _buildAppBar(),
+      appBar: _buildAppBar(isSaving),
       body: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -386,7 +398,7 @@ ref.read(patientLoginViewModelProvider.notifier).addPatient(patient, image: _pic
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
+                      onPressed: isSaving ? null : () => Navigator.pop(context),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 13),
                         side: const BorderSide(color: kBorder),
@@ -403,7 +415,7 @@ ref.read(patientLoginViewModelProvider.notifier).addPatient(patient, image: _pic
                   Expanded(
                     flex: 2,
                     child: ElevatedButton(
-                      onPressed: _save,
+                      onPressed: isSaving ? null : _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kPrimary,
                         foregroundColor: Colors.white,
@@ -412,9 +424,19 @@ ref.read(patientLoginViewModelProvider.notifier).addPatient(patient, image: _pic
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text('Save Changes',
-                          style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w700)),
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('Save Changes',
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ],
@@ -431,13 +453,13 @@ ref.read(patientLoginViewModelProvider.notifier).addPatient(patient, image: _pic
   // AppBar
   // ---------------------------------------------------------------------------
 
-  PreferredSizeWidget _buildAppBar() {
+  PreferredSizeWidget _buildAppBar(bool isSaving) {
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
       leading: GestureDetector(
-        onTap: () => Navigator.pop(context),
+        onTap: isSaving ? null : () => Navigator.pop(context),
         child: Container(
           margin: const EdgeInsets.all(10),
           decoration: BoxDecoration(
