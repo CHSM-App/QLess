@@ -2,7 +2,6 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/home_screen.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
@@ -240,111 +239,7 @@ appBar: null,
   // teal notification bell. Profile page opts out via showAppBar flag.
   // ─────────────────────────────────────────────────────────────────────────
 
-  PreferredSizeWidget _buildAppBar() {
-    final doctorName = ref.watch(
-      doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'),
-    );
-    final initial =
-        doctorName.isNotEmpty ? doctorName[0].toUpperCase() : 'D';
 
-    return AppBar(
-      backgroundColor: Colors.white.withOpacity(0.88),
-      elevation: 0,
-      automaticallyImplyLeading: false,
-      systemOverlayStyle: SystemUiOverlayStyle.dark,
-      titleSpacing: 0,
-
-      // Frosted-glass background
-      flexibleSpace: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: const SizedBox.expand(),
-        ),
-      ),
-
-      title: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Row(
-          children: [
-            // ── Avatar (teal gradient) ──
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    DoctorNavTheme.gradientFrom,
-                    DoctorNavTheme.gradientTo,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: DoctorNavTheme.teal.withOpacity(0.28),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Center(
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 12),
-
-            // ── Greeting + name ──
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Good morning 👋',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: DoctorNavTheme.textSlate,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-                Text(
-                  'Dr. $doctorName',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: DoctorNavTheme.textPrimary,
-                    height: 1.2,
-                  ),
-                ),
-              ],
-            ),
-
-            const Spacer(),
-
-            // ── Notification bell (teal) ──
-            _TealNotificationBell(),
-          ],
-        ),
-      ),
-
-      // Hairline divider at the bottom of the app bar
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(
-          height: 1,
-          color: DoctorNavTheme.tealLight.withOpacity(0.6),
-        ),
-      ),
-    );
-  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // SIDE RAIL  (tablet / desktop — 76 px wide)

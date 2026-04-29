@@ -12,6 +12,9 @@ class AppointmentList {
   @JsonKey(name: 'queue_id')
   int? queueId;
 
+  @JsonKey(name: 'slot_id')
+  int? slotId;
+
   @JsonKey(name: 'doctor_id')
   int? doctorId;
 
@@ -122,6 +125,7 @@ class AppointmentList {
 
   AppointmentList({
     this.queueId,
+    this.slotId,
     this.queueState,
     this.appointmentId,
     this.patientId,

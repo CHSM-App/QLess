@@ -823,6 +823,8 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
 //  PERSONAL INFO BOTTOM SHEET
 // =============================================================================
 class _PersonalInfoSheet extends StatelessWidget {
+  final String name, mobile, email, gender, dob, age, bloodGroup, weight, address;
+
   const _PersonalInfoSheet({
     required this.name,
     required this.mobile,
@@ -835,120 +837,122 @@ class _PersonalInfoSheet extends StatelessWidget {
     required this.address,
   });
 
-  final String name, mobile, email, gender, dob, age,
-      bloodGroup, weight, address;
-
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bottomPadding = MediaQuery.of(context).viewInsets.bottom
+        + MediaQuery.of(context).padding.bottom;
+
     return Container(
+      // Cap at 90% of screen height
+      constraints: BoxConstraints(
+        maxHeight: screenHeight * 0.90,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min,          // ← shrink-wraps when content is small
         children: [
-          // Handle
-          const SizedBox(height: 10),
-          Container(
-            width: 36, height: 4,
-            decoration: BoxDecoration(
-                color: kBorder, borderRadius: BorderRadius.circular(2)),
-          ),
-          const SizedBox(height: 14),
-
-          // Sheet header
+          // Drag handle
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(children: [
-              Container(
-                width: 34, height: 34,
-                decoration: BoxDecoration(
-                    color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.person_outline_rounded,
-                    size: 17, color: kPrimary),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
               ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text('Personal Information',
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary)),
-              ),
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: 30, height: 30,
-                  decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: kBorder)),
-                  child: const Icon(Icons.close_rounded,
-                      size: 15, color: kTextMuted),
-                ),
-              ),
-            ]),
+            ),
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1, color: kBorder),
-          const SizedBox(height: 4),
 
-          _row(Icons.person_rounded,         kPrimary, kPrimaryLight,  'Name',         name),
-          _row(Icons.phone_outlined,          const Color(0xFF38A169), kGreenLight, 'Mobile', mobile),
-          _row(Icons.email_outlined,          kInfo,    kInfoLight,     'Email',         email),
-          _row(Icons.wc_outlined,             kPurple,  kPurpleLight,   'Gender',        gender),
-          _row(Icons.calendar_today_rounded,  kPrimary, kPrimaryLight,  'Date of Birth', dob),
-          _row(Icons.cake_outlined,           kWarning, kAmberLight,    'Age',           age),
-          _row(Icons.bloodtype_outlined,      kError,   kRedLight,      'Blood Group',   bloodGroup),
-          _row(Icons.monitor_weight_outlined, kWarning, kAmberLight,    'Weight',        weight),
-          _row(Icons.location_on_outlined,    const Color(0xFF38A169), kGreenLight, 'Address', address,
-              isLast: true),
+          // Title
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Personal Information',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
 
-          const SizedBox(height: 16),
+          const Divider(height: 1),
+
+          // Scrollable content
+          Flexible(                              // ← key fix: Flexible + SingleChildScrollView
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottomPadding),
+              child: Column(
+                children: [
+                  _InfoRow(label: 'Name',        value: name),
+                  _InfoRow(label: 'Mobile',      value: mobile),
+                  _InfoRow(label: 'Email',       value: email),
+                  _InfoRow(label: 'Gender',      value: gender),
+                  _InfoRow(label: 'Date of Birth', value: dob),
+                  _InfoRow(label: 'Age',         value: age),
+                  _InfoRow(label: 'Blood Group', value: bloodGroup),
+                  _InfoRow(label: 'Weight',      value: weight),
+                  _InfoRow(label: 'Address',     value: address, isLast: true),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget _row(IconData icon, Color fg, Color bg, String label, String value,
-      {bool isLast = false}) {
-    return Column(children: [
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-        child: Row(children: [
-          Container(
-            width: 30, height: 30,
-            decoration: BoxDecoration(
-                color: bg, borderRadius: BorderRadius.circular(8)),
-            child: Icon(icon, size: 14, color: fg),
+class _InfoRow extends StatelessWidget {
+  final String label, value;
+  final bool isLast;
+
+  const _InfoRow({
+    required this.label,
+    required this.value,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 110,
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade500,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
-                const SizedBox(height: 2),
-                Text(value,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: kTextPrimary)),
-              ],
-            ),
-          ),
-        ]),
-      ),
-      if (!isLast)
-        const Divider(
-            height: 1, thickness: 1, color: kBorder,
-            indent: 16, endIndent: 16),
-    ]);
+        ),
+        if (!isLast) Divider(height: 1, color: Colors.grey.shade100),
+      ],
+    );
   }
 }
 
@@ -1171,3 +1175,5 @@ class _ProfileSkeletonState extends State<_ProfileSkeleton>
     );
   }
 }
+
+

@@ -772,8 +772,7 @@ class _SessionGroupedBody extends StatefulWidget {
 }
 
 class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
-  final Map<int, bool> _expanded = {};
-  bool _slotBookingsExpanded = true;
+  final Map<int, bool> _slotGroupExpanded = {};
 
   bool _shouldShow(dynamic session) {
     final qs      = session.queueStatus ?? 0;
@@ -787,6 +786,53 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
     return true;
   }
 
+  // Build ordered list of items: slot groups (with their sessions inside)
+  // then ungrouped sessions, then slot-booking patients section.
+  //
+  // A "slot group" = all sessions sharing the same non-null slotId.
+  // Sessions whose session.slotId is null are rendered as standalone accordions.
+  List<_ListItem> _buildItems(List<dynamic> visibleSessions) {
+    final items = <_ListItem>[];
+    final seenSlotIds = <int>{};
+
+    for (int i = 0; i < visibleSessions.length; i++) {
+      final session = visibleSessions[i];
+      final slotId  = session.slotId as int?;
+
+      if (slotId != null) {
+        if (!seenSlotIds.contains(slotId)) {
+          seenSlotIds.add(slotId);
+          final groupSessions = visibleSessions
+              .where((s) => (s.slotId as int?) == slotId)
+              .toList();
+          items.add(_SlotGroupItem(slotId: slotId, sessions: groupSessions));
+        }
+        // already added as part of a group — skip
+      } else {
+        items.add(_StandaloneSessionItem(session: session, globalIndex: i));
+      }
+    }
+
+    return items;
+  }
+
+  // Group slot-booking patients by slotId, preserving insertion order of slotIds.
+  // Patients with no slotId go into a single null-keyed group.
+  List<({int? slotId, List<AppointmentList> patients})> _groupSlotPatients(
+      List<AppointmentList> slotPatients) {
+    final order = <int?>[];
+    final map   = <int?, List<AppointmentList>>{};
+    for (final p in slotPatients) {
+      final key = p.slotId;
+      if (!map.containsKey(key)) {
+        order.add(key);
+        map[key] = [];
+      }
+      map[key]!.add(p);
+    }
+    return order.map((k) => (slotId: k, patients: map[k]!)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final visibleSessions = widget.allSessions.where(_shouldShow).toList();
@@ -795,6 +841,8 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
         .where((p) => p.bookingType == 2)
         .toList()
       ..sort((a, b) => (a.startTime ?? '').compareTo(b.startTime ?? ''));
+
+    final slotGroups = _groupSlotPatients(slotPatients);
 
     if (visibleSessions.isEmpty && slotPatients.isEmpty) {
       return _PatientListBody(
@@ -811,8 +859,8 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
       );
     }
 
-    // Queue session accordions + optional slot section as one list
-    final itemCount = visibleSessions.length + (slotPatients.isNotEmpty ? 1 : 0);
+    final items = _buildItems(visibleSessions);
+    final itemCount = items.length + slotGroups.length;
 
     return RefreshIndicator(
       color: kPrimary,
@@ -822,13 +870,17 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
         padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + widget.extraBottom),
         itemCount: itemCount,
         itemBuilder: (_, i) {
-          // Slot patients section renders after all queue sessions
-          if (i == visibleSessions.length) {
+          // One _SlotBookingsSection per slot group, rendered after queue-session items
+          if (i >= items.length) {
+            final group     = slotGroups[i - items.length];
+            final groupKey  = group.slotId ?? -1;
+            final isExpanded = _slotGroupExpanded[groupKey] ?? true;
             return _SlotBookingsSection(
-              patients: slotPatients,
-              isExpanded: _slotBookingsExpanded,
+              slotId: group.slotId,
+              patients: group.patients,
+              isExpanded: isExpanded,
               onToggle: () => setState(
-                () => _slotBookingsExpanded = !_slotBookingsExpanded,
+                () => _slotGroupExpanded[groupKey] = !isExpanded,
               ),
               selected: widget.selected,
               onStart: widget.onStart,
@@ -840,76 +892,426 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
             );
           }
 
-          final session    = visibleSessions[i];
-          final queueId    = session.queueId as int? ?? i;
-          final isExpanded = _expanded[queueId] ?? true;
+          final item = items[i];
 
-          final sessionPatients = _patientsForSession(session, i, visibleSessions.length);
-          final qs         = _sessionQueueState(session.queueStatus as int?);
-          final slotLabel  = _slotTimeLabel(
-            session.startTime as String?,
-            session.endTime as String?,
-          );
+          if (item is _SlotGroupItem) {
+            final isGroupExpanded = _slotGroupExpanded[item.slotId] ?? true;
+            return _QueueSlotSection(
+              key: ValueKey('qslot_${item.slotId}'),
+              slotId: item.slotId,
+              sessions: item.sessions,
+              isExpanded: isGroupExpanded,
+              onToggle: () => setState(
+                () => _slotGroupExpanded[item.slotId] = !isGroupExpanded,
+              ),
+              todayPatients: widget.todayPatients,
+              selected: widget.selected,
+              globalQs: widget.qs,
+              onStart: widget.onStart,
+              onSkip: widget.onSkip,
+              onPrescription: widget.onPrescription,
+              onCancel: widget.onCancel,
+              onSelect: widget.onSelect,
+              onQueueStart: widget.onQueueStart,
+              onQueuePause: widget.onQueuePause,
+              onQueueStop: widget.onQueueStop,
+            );
+          }
 
-          final currentServingId = session.currentServing as int?;
-          final currentPt = (currentServingId != null && currentServingId > 0)
-              ? sessionPatients.where((p) => p.appointmentId == currentServingId).firstOrNull
-              : sessionPatients
-                  .where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress')
-                  .firstOrNull;
-
-          final waitingPts = sessionPatients
-              .where((p) => p.appointmentId != currentPt?.appointmentId)
-              .toList();
-
-          // Sequential lock: first session not stopped → rest locked
-          final firstSessionStopped = visibleSessions.isEmpty
-              ? true
-              : (_sessionQueueState(visibleSessions[0].queueStatus as int?) ==
-                  QueueState.stopped);
-          final controlsEnabled = (i == 0) || firstSessionStopped;
-
-          return _SessionAccordion(
-            key: ValueKey(queueId),
-            session: session,
-            sessionIndex: i,
-            slotLabel: slotLabel,
-            queueState: qs,
-            sessionPatients: sessionPatients,
-            currentPatient: currentPt,
-            waitingPatients: waitingPts,
-            isExpanded: isExpanded,
-            selected: widget.selected,
-            controlsEnabled: controlsEnabled,
-            onToggle: () => setState(() => _expanded[queueId] = !isExpanded),
-            onStart: widget.onStart,
-            onSkip: widget.onSkip,
-            onPrescription: widget.onPrescription,
-            onCancel: widget.onCancel,
-            onSelect: widget.onSelect,
-            globalQs: widget.qs,
-            onQueueStart: () => widget.onQueueStart(queueId),
-            onQueuePause: () => widget.onQueuePause(queueId),
-            onQueueStop:  () => widget.onQueueStop(queueId),
+          // Standalone session (no slotId)
+          final standaloneItem = item as _StandaloneSessionItem;
+          return _buildSessionAccordion(
+            session: standaloneItem.session,
+            sessionIndex: standaloneItem.globalIndex,
+            visibleSessions: visibleSessions,
           );
         },
       ),
     );
   }
 
+  Widget _buildSessionAccordion({
+    required dynamic session,
+    required int sessionIndex,
+    required List<dynamic> visibleSessions,
+  }) {
+    final queueId    = session.queueId as int? ?? sessionIndex;
+    // Use negative key space so standalone sessions don't collide with slot IDs
+    final expandKey  = -(queueId + 1);
+    final isExpanded = _slotGroupExpanded[expandKey] ?? true;
+    final sessionPatients = _patientsForSession(session, sessionIndex, visibleSessions.length);
+    final qs         = _sessionQueueState(session.queueStatus as int?);
+    final slotLabel  = _slotTimeLabel(
+      session.startTime as String?,
+      session.endTime as String?,
+    );
+    final currentServingId = session.currentServing as int?;
+    final currentPt = (currentServingId != null && currentServingId > 0)
+        ? sessionPatients.where((p) => p.appointmentId == currentServingId).firstOrNull
+        : sessionPatients
+            .where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress')
+            .firstOrNull;
+    final waitingPts = sessionPatients
+        .where((p) => p.appointmentId != currentPt?.appointmentId)
+        .toList();
+    final firstSessionStopped = visibleSessions.isEmpty
+        ? true
+        : (_sessionQueueState(visibleSessions[0].queueStatus as int?) == QueueState.stopped);
+    final controlsEnabled = (sessionIndex == 0) || firstSessionStopped;
+
+    return _SessionAccordion(
+      key: ValueKey(queueId),
+      session: session,
+      sessionIndex: sessionIndex,
+      slotLabel: slotLabel,
+      queueState: qs,
+      sessionPatients: sessionPatients,
+      currentPatient: currentPt,
+      waitingPatients: waitingPts,
+      isExpanded: isExpanded,
+      selected: widget.selected,
+      controlsEnabled: controlsEnabled,
+      onToggle: () => setState(() => _slotGroupExpanded[expandKey] = !isExpanded),
+      onStart: widget.onStart,
+      onSkip: widget.onSkip,
+      onPrescription: widget.onPrescription,
+      onCancel: widget.onCancel,
+      onSelect: widget.onSelect,
+      globalQs: widget.qs,
+      onQueueStart: () => widget.onQueueStart(queueId),
+      onQueuePause: () => widget.onQueuePause(queueId),
+      onQueueStop:  () => widget.onQueueStop(queueId),
+    );
+  }
+
   List<AppointmentList> _patientsForSession(dynamic session, int index, int total) {
-    // Only queue patients (bookingType == 1 or null treated as queue)
     final all = widget.todayPatients
         .where((p) => p.bookingType == null || p.bookingType == 1)
         .toList();
-    // Match by queue_id: appointment.queueId must equal session.queueId
     final queueId = session.queueId as int?;
     if (queueId != null) {
       return all.where((p) => p.queueId == queueId).toList();
     }
-    // Fallback: if no queueId on session, return all (single session case)
     if (total <= 1) return all;
     return [];
+  }
+}
+
+// ── List item types for _SessionGroupedBody ───────────────────────────────────
+abstract class _ListItem {}
+
+class _SlotGroupItem extends _ListItem {
+  final int slotId;
+  final List<dynamic> sessions;
+  _SlotGroupItem({required this.slotId, required this.sessions});
+}
+
+class _StandaloneSessionItem extends _ListItem {
+  final dynamic session;
+  final int globalIndex;
+  _StandaloneSessionItem({required this.session, required this.globalIndex});
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  QUEUE SLOT SECTION
+//  One expandable card per slotId for queue bookings (bookingType == 1).
+//  Header: Slot #id · state badge · chevron
+//  Body  : queue controls (LiveQueueCard) + patient cards flat — no nesting
+// ════════════════════════════════════════════════════════════════════
+class _QueueSlotSection extends StatelessWidget {
+  final int slotId;
+  final List<dynamic> sessions;         // TodayQueueModel entries for this slot
+  final bool isExpanded;
+  final VoidCallback onToggle;
+  final List<AppointmentList> todayPatients;
+  final AppointmentList? selected;
+  final QueueState globalQs;
+  final Future<void> Function(AppointmentList) onStart, onSkip;
+  final void Function(AppointmentList) onPrescription, onCancel;
+  final void Function(AppointmentList)? onSelect;
+  final Future<void> Function(int? queueId) onQueueStart;
+  final Future<void> Function(int? queueId) onQueuePause;
+  final Future<void> Function(int? queueId) onQueueStop;
+
+  const _QueueSlotSection({
+    super.key,
+    required this.slotId,
+    required this.sessions,
+    required this.isExpanded,
+    required this.onToggle,
+    required this.todayPatients,
+    required this.selected,
+    required this.globalQs,
+    required this.onStart,
+    required this.onSkip,
+    required this.onPrescription,
+    required this.onCancel,
+    required this.onQueueStart,
+    required this.onQueuePause,
+    required this.onQueueStop,
+    this.onSelect,
+  });
+
+  // All queue patients belonging to any session in this slot
+  List<AppointmentList> get _allPatients {
+    final queueIds = sessions
+        .map((s) => s.queueId as int?)
+        .whereType<int>()
+        .toSet();
+    final pts = todayPatients
+        .where((p) =>
+            (p.bookingType == null || p.bookingType == 1) &&
+            (queueIds.isEmpty || queueIds.contains(p.queueId)))
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+    return pts;
+  }
+
+  // Use the first running/paused session; fall back to first session
+  dynamic get _activeSession {
+    for (final s in sessions) {
+      final st = s.queueStatus as int? ?? 0;
+      if (st == 1 || st == 2) return s;
+    }
+    return sessions.isNotEmpty ? sessions.first : null;
+  }
+
+  QueueState get _queueState {
+    QueueState result = QueueState.idle;
+    for (final s in sessions) {
+      final st = _sessionQueueState(s.queueStatus as int?);
+      if (st == QueueState.running) return QueueState.running;
+      if (st == QueueState.paused && result != QueueState.running) result = QueueState.paused;
+    }
+    return result;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final qs      = _queueState;
+    final active  = _activeSession;
+    final queueId = active != null ? (active.queueId as int?) : null;
+    final allPts  = _allPatients;
+
+    final (Color hBg, Color hFg, Color hDot) = switch (qs) {
+      QueueState.running => (kPrimaryLighter, kPrimaryDark, kPrimary),
+      QueueState.paused  => (kAmberLight,     kAmberDark,   kWarning),
+      QueueState.stopped => (const Color(0xFFF3F4F6), const Color(0xFF6B7280), const Color(0xFF9CA3AF)),
+      QueueState.idle    => (kRedLight,        kRedDark,     kError),
+    };
+
+    // Derive current/waiting from patients
+    final currentServingId = active != null ? (active.currentServing as int?) : null;
+    final currentPt = (currentServingId != null && currentServingId > 0)
+        ? allPts.where((p) => p.appointmentId == currentServingId).firstOrNull
+        : allPts.where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress').firstOrNull;
+
+    final queueActive   = qs == QueueState.running || qs == QueueState.paused;
+    final hasIP         = allPts.any((p) => (p.status?.toLowerCase() ?? '') == 'in_progress');
+    final nextBooked    = allPts
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kBg,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: kPrimaryLight.withOpacity(0.9)),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimary.withOpacity(0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header ────────────────────────────────────────────
+            InkWell(
+              onTap: onToggle,
+              borderRadius: BorderRadius.vertical(
+                top: const Radius.circular(18),
+                bottom: isExpanded ? Radius.zero : const Radius.circular(18),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                child: Row(children: [
+                  Container(
+                    width: 26, height: 26,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_kGradFrom, _kGradTo],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.people_alt_outlined, size: 13, color: Colors.white),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Queue Booking',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                        ),
+                        Text(
+                          '${allPts.length} patient${allPts.length == 1 ? '' : 's'}',
+                          style: const TextStyle(fontSize: 10, color: kTextSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(color: hBg, borderRadius: BorderRadius.circular(20)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 6, height: 6, decoration: BoxDecoration(color: hDot, shape: BoxShape.circle)),
+                      const SizedBox(width: 4),
+                      Text(
+                        switch (qs) {
+                          QueueState.running => 'Running',
+                          QueueState.paused  => 'Paused',
+                          QueueState.stopped => 'Closed',
+                          QueueState.idle    => 'Idle',
+                        },
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: hFg),
+                      ),
+                    ]),
+                  ),
+                  const SizedBox(width: 8),
+                  AnimatedRotation(
+                    turns: isExpanded ? 0.5 : 0.0,
+                    duration: const Duration(milliseconds: 260),
+                    child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: kTextSecondary),
+                  ),
+                ]),
+              ),
+            ),
+
+            // ── Body ──────────────────────────────────────────────
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity),
+              secondChild: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Divider(height: 1, color: kBorder),
+                    const SizedBox(height: 10),
+
+                    // Queue controls directly below divider
+                    _LiveQueueCard(
+                      patients: allPts,
+                      qs: qs,
+                      onStart: onStart,
+                      onSkip: onSkip,
+                      controlsEnabled: true,
+                      onQueueStart: () => onQueueStart(queueId),
+                      onQueuePause: () => onQueuePause(queueId),
+                      onQueueStop:  () => onQueueStop(queueId),
+                    ),
+
+                    // Patient list
+                    if (allPts.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        alignment: Alignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 40, height: 40,
+                              decoration: BoxDecoration(
+                                color: kPrimaryLighter,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: kPrimaryLight),
+                              ),
+                              child: const Icon(Icons.inbox_rounded, color: kPrimary, size: 18),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text('No patients waiting',
+                                style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      // "Waiting" section label
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8, top: 2),
+                        child: Row(children: [
+                          Container(
+                            width: 3, height: 14,
+                            decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(4)),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text('Waiting',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(20)),
+                            child: Text('${allPts.length}',
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+                          ),
+                        ]),
+                      ),
+                      ...allPts.map((p) {
+                        final status   = p.status?.toLowerCase() ?? '';
+                        final isIP     = status == 'in_progress';
+                        final isNextUp = !hasIP && p.queueNumber == nextBooked.firstOrNull?.queueNumber;
+                        final isCurrent = p.appointmentId == currentPt?.appointmentId || isIP || isNextUp;
+                        final isHighlighted = isCurrent && queueActive;
+
+                        bool accessible = false;
+                        if (isIP) {
+                          accessible = true;
+                        } else if (status == 'skipped') {
+                          accessible = true;
+                        } else if (queueActive && status == 'booked') {
+                          accessible = !hasIP && p.queueNumber == nextBooked.firstOrNull?.queueNumber;
+                        }
+                        final effectiveAccessible = status == 'skipped' ? accessible : queueActive && accessible;
+                        final VoidCallback? effectiveSkip = queueActive && accessible && status == 'booked'
+                            ? () => onSkip(p) : null;
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _PatientCard(
+                            key: ValueKey(p.appointmentId),
+                            patient: p,
+                            tab: _Tab.today,
+                            accessible: effectiveAccessible,
+                            selected: selected?.appointmentId == p.appointmentId,
+                            highlightBorder: isHighlighted,
+                            onTap: onSelect != null ? () => onSelect!(p) : null,
+                            onStart: () => onStart(p),
+                            onSkip: effectiveSkip,
+                            onPrescription: () => onPrescription(p),
+                            onCancel: () => onCancel(p),
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+              ),
+              crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 260),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -1412,6 +1814,7 @@ class _QueueIconBtn extends StatelessWidget {
 //  SLOT BOOKINGS SECTION  (shown independently below queue sessions)
 // ════════════════════════════════════════════════════════════════════
 class _SlotBookingsSection extends StatelessWidget {
+  final int? slotId;
   final List<AppointmentList> patients;
   final QueueState qs;
   final bool isExpanded;
@@ -1430,6 +1833,7 @@ class _SlotBookingsSection extends StatelessWidget {
     required this.onSkip,
     required this.onPrescription,
     required this.onCancel,
+    this.slotId,
     this.selected,
     this.onSelect,
   });
@@ -1470,9 +1874,17 @@ class _SlotBookingsSection extends StatelessWidget {
                     child: const Icon(Icons.calendar_month_rounded, size: 14, color: kInfoDark),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
-                    child: Text('Slot Bookings',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Slot Bookings',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                        ),
+                        
+                      ],
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

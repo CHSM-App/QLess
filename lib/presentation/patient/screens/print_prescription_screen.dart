@@ -71,607 +71,238 @@ class _PatientPrescriptionPdfScreenState
   }
 
   // ── PDF builder ──────────────────────────────────────────────────
-  Future<Uint8List> _buildPdf() async {
-    final doc = pw.Document();
-    final rx = _rx;
+ Future<Uint8List> _buildPdf() async {
+  final doc = pw.Document();
+  final rx = _rx;
 
-    // ── Fonts via printing package (no asset files needed) ────────
-    final ttf = await PdfGoogleFonts.robotoRegular();
-    final ttfBold = await PdfGoogleFonts.robotoBold();
-    final ttfItalic = await PdfGoogleFonts.robotoItalic();
+  final ttf = await PdfGoogleFonts.robotoRegular();
+  final ttfBold = await PdfGoogleFonts.robotoBold();
+  final ttfItalic = await PdfGoogleFonts.robotoItalic();
 
-    // ── PDF colours ───────────────────────────────────────────────
-    final pdfPrimary = PdfColor.fromHex('#1A73E8');
-    final pdfPrimaryDark = PdfColor.fromHex('#1558C0');
-    final pdfGreen = PdfColor.fromHex('#34A853');
-    final pdfTextDark = PdfColor.fromHex('#1F2937');
-    final pdfTextMid = PdfColor.fromHex('#6B7280');
-    final pdfBorder = PdfColor.fromHex('#E5E7EB');
-    final pdfBg = PdfColor.fromHex('#F4F6FB');
-    final pdfPrimaryBg = PdfColor.fromHex('#E8F0FE');
+  pw.TextStyle s({bool bold = false, bool italic = false, double size = 10}) =>
+      pw.TextStyle(
+        font: bold ? ttfBold : italic ? ttfItalic : ttf,
+        fontSize: size,
+        color: PdfColors.black,
+      );
 
-    // ── Shared style helper ───────────────────────────────────────
-    pw.TextStyle style({
-      bool bold = false,
-      bool italic = false,
-      double size = 10,
-      PdfColor? color,
-    }) =>
-        pw.TextStyle(
-          font: bold
-              ? ttfBold
-              : italic
-                  ? ttfItalic
-                  : ttf,
-          fontSize: size,
-          color: color ?? pdfTextDark,
-        );
-
-    // ── Reusable widgets ──────────────────────────────────────────
-    pw.Widget sectionLabel(String t) => pw.Row(
-          children: [
-            pw.Container(
-              width: 3,
-              height: 12,
-              decoration: pw.BoxDecoration(
-                color: pdfPrimary,
-                borderRadius: pw.BorderRadius.circular(2),
-              ),
-            ),
-            pw.SizedBox(width: 6),
-            pw.Text(
-              t,
-              style: pw.TextStyle(
-                font: ttfBold,
-                fontSize: 9,
-                color: pdfPrimary,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ],
-        );
-
-    pw.Widget infoBox(
-      String text, {
-      PdfColor? bg,
-      PdfColor? borderColor,
-    }) =>
-        pw.Container(
-          width: double.infinity,
-          padding: const pw.EdgeInsets.all(10),
-          decoration: pw.BoxDecoration(
-            color: bg ?? pdfPrimaryBg,
-            borderRadius: pw.BorderRadius.circular(8),
-            border: pw.Border.all(
-              color: borderColor ?? pdfPrimary,
-              width: 0.5,
-            ),
-          ),
-          child: pw.Text(text, style: style(size: 10)),
-        );
-
-    pw.Widget smallChip(String t) => pw.Container(
-          padding: const pw.EdgeInsets.symmetric(
-              horizontal: 7, vertical: 3),
-          decoration: pw.BoxDecoration(
-            color: pdfBg,
-            borderRadius: pw.BorderRadius.circular(5),
-            border: pw.Border.all(color: pdfBorder, width: 0.5),
-          ),
-          child: pw.Text(t,
-              style: style(size: 9, color: pdfTextMid)),
-        );
-
-    // ── Page ──────────────────────────────────────────────────────
-    doc.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.symmetric(
-            horizontal: 28, vertical: 24),
-
-        // ════════════════════════════════════════════════════════
-        //  HEADER  (repeats on every page)
-        // ════════════════════════════════════════════════════════
-        header: (_) => pw.Column(
+  pw.Widget labeledRow(String label, String value) => pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(vertical: 3),
+        child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // ── Clinic + Doctor gradient block ────────────────
-            pw.Container(
-              width: double.infinity,
-              decoration: pw.BoxDecoration(
-                gradient: pw.LinearGradient(
-                  colors: [pdfPrimaryDark, pdfPrimary],
-                  begin: pw.Alignment.topLeft,
-                  end: pw.Alignment.bottomRight,
-                ),
-                borderRadius: pw.BorderRadius.circular(12),
-              ),
-              child: pw.Column(
-                crossAxisAlignment:
-                    pw.CrossAxisAlignment.start,
-                children: [
-                  // Clinic row
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.fromLTRB(
-                        14, 14, 14, 10),
-                    child: pw.Row(
-                      mainAxisAlignment:
-                          pw.MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment:
-                          pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Column(
-                          crossAxisAlignment:
-                              pw.CrossAxisAlignment.start,
-                          children: [
-                            pw.Text(
-                              rx.clinicName,
-                              style: pw.TextStyle(
-                                font: ttfBold,
-                                fontSize: 15,
-                                color: PdfColors.white,
-                              ),
-                            ),
-                            pw.SizedBox(height: 3),
-                            pw.Text(
-                              '${rx.clinicAddress}  ·  Ph: ${rx.clinicContact}',
-                              style: pw.TextStyle(
-                                font: ttf,
-                                fontSize: 9,
-                                color: PdfColors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                        // Rx badge
-                        pw.Container(
-                          padding:
-                              const pw.EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6),
-                          decoration: pw.BoxDecoration(
-                            color: PdfColors.white,
-                            borderRadius:
-                                pw.BorderRadius.circular(8),
-                          ),
-                          child: pw.Text(
-                            'Rx #${rx.prescriptionId}',
-                            style: pw.TextStyle(
-                              font: ttfBold,
-                              fontSize: 14,
-                              color: pdfPrimary,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Divider line
-                  pw.Divider(
-                    color: PdfColors.white,
-                    thickness: 0.5,
-                    indent: 14,
-                    endIndent: 14,
-                  ),
-                  // Doctor row
-                  pw.Padding(
-                    padding: const pw.EdgeInsets.fromLTRB(
-                        14, 8, 14, 14),
-                    child: pw.Column(
-                      crossAxisAlignment:
-                          pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          rx.doctorName,
-                          style: pw.TextStyle(
-                            font: ttfBold,
-                            fontSize: 13,
-                            color: PdfColors.white,
-                          ),
-                        ),
-                        pw.SizedBox(height: 2),
-                        pw.Text(
-                          '${rx.qualification}  ·  ${rx.specialization}',
-                          style: pw.TextStyle(
-                            font: ttf,
-                            fontSize: 9,
-                            color: PdfColors.white,
-                          ),
-                        ),
-                        if (rx.regNo?.isNotEmpty == true) ...[
-                          pw.SizedBox(height: 2),
-                          pw.Text(
-                            'Reg. No. ${rx.regNo}',
-                            style: pw.TextStyle(
-                              font: ttfItalic,
-                              fontSize: 8,
-                              color: PdfColors.white,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+            pw.SizedBox(
+              width: 110,
+              child: pw.Text(label, style: s(bold: true, size: 9)),
             ),
-            pw.SizedBox(height: 12),
-
-            // ── Patient info bar ──────────────────────────────
-            pw.Container(
-              padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 10),
-              decoration: pw.BoxDecoration(
-                color: pdfBg,
-                borderRadius: pw.BorderRadius.circular(10),
-                border:
-                    pw.Border.all(color: pdfBorder, width: 0.8),
-              ),
-              child: pw.Row(
-                mainAxisAlignment:
-                    pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment:
-                        pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text(rx.patientName,
-                          style: style(bold: true, size: 13)),
-                      pw.SizedBox(height: 5),
-                      pw.Row(children: [
-                        if (rx.patientAge != null &&
-                            rx.patientAge! > 0) ...[
-                          smallChip('${rx.patientAge} yrs'),
-                          pw.SizedBox(width: 6),
-                        ],
-                        if (rx.patientGender?.isNotEmpty ==
-                            true) ...[
-                          smallChip(rx.patientGender!),
-                          pw.SizedBox(width: 6),
-                        ],
-                        if (rx.tokenNumber != null)
-                          smallChip(
-                              'Token #${rx.tokenNumber}'),
-                      ]),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment:
-                        pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text('Date',
-                          style: style(
-                              size: 9, color: pdfTextMid)),
-                      pw.SizedBox(height: 3),
-                      pw.Text(
-                        _fmtDate(rx.prescriptionDate),
-                        style: style(bold: true, size: 12),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            pw.SizedBox(height: 14),
+            pw.Text(': ', style: s(size: 9)),
+            pw.Expanded(child: pw.Text(value, style: s(size: 9))),
           ],
         ),
+      );
 
-        // ════════════════════════════════════════════════════════
-        //  BODY
-        // ════════════════════════════════════════════════════════
-        build: (context) => [
-          // ── Symptoms ────────────────────────────────────────
-          if (rx.symptoms?.isNotEmpty == true) ...[
-            sectionLabel('SYMPTOMS'),
-            pw.SizedBox(height: 6),
-            infoBox(
-              rx.symptoms!,
-              bg: PdfColor.fromHex('#FFFBEB'),
-              borderColor: PdfColor.fromHex('#FDE68A'),
-            ),
-            pw.SizedBox(height: 14),
-          ],
+  doc.addPage(
+    pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(36),
 
-          // ── Diagnosis ────────────────────────────────────────
-          if (rx.diagnosis?.isNotEmpty == true) ...[
-            sectionLabel('DIAGNOSIS'),
-            pw.SizedBox(height: 6),
-            infoBox(rx.diagnosis!),
-            pw.SizedBox(height: 14),
-          ],
-
-          // ── Medicines table ──────────────────────────────────
-          sectionLabel('MEDICINES'),
-          pw.SizedBox(height: 6),
-          pw.Container(
-            decoration: pw.BoxDecoration(
-              borderRadius: pw.BorderRadius.circular(10),
-              border: pw.Border.all(
-                  color: pdfBorder, width: 0.8),
-            ),
-            child: pw.ClipRRect(
-              horizontalRadius: 10,
-              verticalRadius: 10,
-              child: pw.Table(
-                columnWidths: {
-                  0: const pw.FlexColumnWidth(3.2),
-                  1: const pw.FlexColumnWidth(2.2),
-                  2: const pw.FlexColumnWidth(2),
-                  3: const pw.FlexColumnWidth(1.6),
-                },
-                border: pw.TableBorder(
-                  horizontalInside: pw.BorderSide(
-                      color: pdfBorder, width: 0.5),
-                ),
-                children: [
-                  // Header row
-                  pw.TableRow(
-                    decoration:
-                        pw.BoxDecoration(color: pdfBg),
-                    children: [
-                      'MEDICINE',
-                      'FREQ / DOSE',
-                      'TIMING',
-                      'DURATION',
-                    ]
-                        .map((h) => pw.Padding(
-                              padding: const pw.EdgeInsets
-                                  .symmetric(
-                                      horizontal: 8,
-                                      vertical: 7),
-                              child: pw.Text(
-                                h,
-                                style: pw.TextStyle(
-                                  font: ttfBold,
-                                  fontSize: 8,
-                                  color: pdfTextMid,
-                                  letterSpacing: 0.4,
-                                ),
-                              ),
-                            ))
-                        .toList(),
-                  ),
-                  // Medicine rows
-                  ...rx.medicines.map((m) => pw.TableRow(
-                        children: [
-                          // Name + type tag
-                          pw.Padding(
-                            padding:
-                                const pw.EdgeInsets.all(8),
-                            child: pw.Column(
-                              crossAxisAlignment: pw
-                                  .CrossAxisAlignment.start,
-                              children: [
-                                pw.Text(
-                                  m.medicineName
-                                              ?.isNotEmpty ==
-                                          true
-                                      ? m.medicineName!
-                                      : 'Med #${m.medicineId ?? '-'}',
-                                  style: style(
-                                      bold: true, size: 10),
-                                ),
-                                if (m.extraInfo
-                                        ?.isNotEmpty ==
-                                    true) ...[
-                                  pw.SizedBox(height: 3),
-                                  pw.Text(
-                                    m.extraInfo!,
-                                    style: style(
-                                        size: 9,
-                                        color: pdfPrimary),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          // Dose
-                          pw.Padding(
-                            padding:
-                                const pw.EdgeInsets.all(8),
-                            child: pw.Center(
-                              child: pw.Text(
-                                m.doseDisplay,
-                                style: style(
-                                    bold: true, size: 10),
-                                textAlign:
-                                    pw.TextAlign.center,
-                              ),
-                            ),
-                          ),
-                          // Timing
-                          pw.Padding(
-                            padding:
-                                const pw.EdgeInsets.all(8),
-                            child: pw.Center(
-                              child: pw.Text(
-                                m.timing ?? '-',
-                                style: style(size: 10),
-                                textAlign:
-                                    pw.TextAlign.center,
-                              ),
-                            ),
-                          ),
-                          // Duration
-                          pw.Padding(
-                            padding:
-                                const pw.EdgeInsets.all(8),
-                            child: pw.Center(
-                              child: pw.Text(
-                                m.duration ?? '-',
-                                style: style(
-                                    bold: true, size: 10),
-                                textAlign:
-                                    pw.TextAlign.center,
-                              ),
-                            ),
-                          ),
-                        ],
-                      )),
-                ],
-              ),
-            ),
+      header: (_) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // Clinic & Doctor
+          pw.Text(rx.clinicName, style: s(bold: true, size: 14)),
+          pw.SizedBox(height: 2),
+          pw.Text(
+            '${rx.clinicAddress}  |  Ph: ${rx.clinicContact}',
+            style: s(size: 9),
           ),
-          pw.SizedBox(height: 14),
-
-          // ── Clinical notes + Advice ──────────────────────────
-          if (rx.clinicalNotes?.isNotEmpty == true ||
-              rx.advice?.isNotEmpty == true) ...[
-            pw.Row(
-              crossAxisAlignment:
-                  pw.CrossAxisAlignment.start,
-              children: [
-                if (rx.clinicalNotes?.isNotEmpty == true)
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment:
-                          pw.CrossAxisAlignment.start,
-                      children: [
-                        sectionLabel('CLINICAL INSTRUCTIONS'),
-                        pw.SizedBox(height: 6),
-                        infoBox(
-                          rx.clinicalNotes!,
-                          bg: PdfColor.fromHex('#EFF6FF'),
-                          borderColor:
-                              PdfColor.fromHex('#BFDBFE'),
-                        ),
-                      ],
-                    ),
-                  ),
-                if (rx.clinicalNotes?.isNotEmpty == true &&
-                    rx.advice?.isNotEmpty == true)
-                  pw.SizedBox(width: 10),
-                if (rx.advice?.isNotEmpty == true)
-                  pw.Expanded(
-                    child: pw.Column(
-                      crossAxisAlignment:
-                          pw.CrossAxisAlignment.start,
-                      children: [
-                        sectionLabel("DOCTOR'S ADVICE"),
-                        pw.SizedBox(height: 6),
-                        infoBox(
-                          rx.advice!,
-                          bg: PdfColor.fromHex('#F0FFF4'),
-                          borderColor:
-                              PdfColor.fromHex('#A7F3D0'),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            pw.SizedBox(height: 14),
-          ],
-
-          // ── Follow-up ────────────────────────────────────────
-          if (rx.followUpDate != null) ...[
-            pw.Container(
-              padding: const pw.EdgeInsets.all(12),
-              decoration: pw.BoxDecoration(
-                color: PdfColor.fromHex('#F0FFF4'),
-                borderRadius: pw.BorderRadius.circular(10),
-                border: pw.Border.all(
-                  color: PdfColor.fromHex('#A7F3D0'),
-                  width: 0.8,
-                ),
-              ),
-              child: pw.Row(
-                children: [
-                  pw.Text(
-                    'NEXT FOLLOW-UP:  ',
-                    style: pw.TextStyle(
-                      font: ttfBold,
-                      fontSize: 9,
-                      color: pdfGreen,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  pw.Text(
-                    _fmtDateTime(rx.followUpDate!),
-                    style: style(bold: true, size: 11),
-                  ),
-                  if (rx.followUpRoom?.isNotEmpty == true ||
-                      rx.followUpInstruction?.isNotEmpty ==
-                          true) ...[
-                    pw.SizedBox(width: 8),
-                    pw.Text(
-                      [
-                        if (rx.followUpRoom?.isNotEmpty ==
-                            true)
-                          rx.followUpRoom!,
-                        if (rx.followUpInstruction
-                                ?.isNotEmpty ==
-                            true)
-                          rx.followUpInstruction!,
-                      ].join('  ·  '),
-                      style: style(
-                          size: 9, color: pdfTextMid),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            pw.SizedBox(height: 14),
-          ],
-
-          // ── Footer / Signature ───────────────────────────────
-          pw.Divider(color: pdfBorder, thickness: 0.5),
+          pw.SizedBox(height: 4),
+          pw.Text(rx.doctorName, style: s(bold: true, size: 11)),
+          pw.Text(
+            '${rx.qualification}  |  ${rx.specialization}'
+            '${rx.regNo?.isNotEmpty == true ? '  |  Reg. No. ${rx.regNo}' : ''}',
+            style: s(size: 9),
+          ),
           pw.SizedBox(height: 8),
+          pw.Divider(thickness: 0.8, color: PdfColors.black),
+          pw.SizedBox(height: 6),
+
+          // Patient info
           pw.Row(
-            mainAxisAlignment:
-                pw.MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
               pw.Column(
-                crossAxisAlignment:
-                    pw.CrossAxisAlignment.start,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
+                  pw.Text('Patient: ${rx.patientName}', style: s(bold: true, size: 11)),
+                  pw.SizedBox(height: 2),
                   pw.Text(
-                    'This prescription is valid for 30 days.',
-                    style:
-                        style(size: 9, color: pdfTextMid),
-                  ),
-                  pw.SizedBox(height: 3),
-                  pw.Text(
-                    'Dispensed by licensed pharmacist only.',
-                    style:
-                        style(size: 9, color: pdfTextMid),
+                    [
+                      if (rx.patientAge != null && rx.patientAge! > 0) '${rx.patientAge} yrs',
+                      if (rx.patientGender?.isNotEmpty == true) rx.patientGender!,
+                      if (rx.tokenNumber != null) 'Token #${rx.tokenNumber}',
+                    ].join('  |  '),
+                    style: s(size: 9),
                   ),
                 ],
               ),
-              pw.SizedBox(
-                width: 150,
-                child: pw.Column(
-                  crossAxisAlignment:
-                      pw.CrossAxisAlignment.center,
-                  children: [
-                    pw.Divider(
-                        color: pdfTextDark,
-                        thickness: 0.8),
-                    pw.SizedBox(height: 4),
-                    pw.Text(
-                      rx.doctorName,
-                      style: style(bold: true, size: 11),
-                      textAlign: pw.TextAlign.center,
-                    ),
-                    pw.Text(
-                      '${rx.qualification}  ·  ${rx.specialization}',
-                      style: style(
-                          size: 9, color: pdfTextMid),
-                      textAlign: pw.TextAlign.center,
-                    ),
-                  ],
-                ),
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.end,
+                children: [
+                  pw.Text('Rx #${rx.prescriptionId}', style: s(bold: true, size: 11)),
+                  pw.SizedBox(height: 2),
+                  pw.Text(_fmtDate(rx.prescriptionDate), style: s(size: 9)),
+                ],
               ),
             ],
           ),
+          pw.SizedBox(height: 6),
+          pw.Divider(thickness: 0.5, color: PdfColors.grey600),
+          pw.SizedBox(height: 10),
         ],
       ),
-    );
 
-    return doc.save();
-  }
+      build: (_) => [
+        // Symptoms
+        if (rx.symptoms?.isNotEmpty == true) ...[
+          labeledRow('Symptoms', rx.symptoms!),
+          pw.SizedBox(height: 6),
+        ],
 
+        // Diagnosis
+        if (rx.diagnosis?.isNotEmpty == true) ...[
+          labeledRow('Diagnosis', rx.diagnosis!),
+          pw.SizedBox(height: 10),
+        ],
+
+        // Medicines table
+        pw.Text('Medicines', style: s(bold: true, size: 10)),
+        pw.SizedBox(height: 4),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.black, width: 0.5),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(3),
+            1: const pw.FlexColumnWidth(2),
+            2: const pw.FlexColumnWidth(2),
+            3: const pw.FlexColumnWidth(1.5),
+          },
+          children: [
+            // Header
+            pw.TableRow(
+              decoration: const pw.BoxDecoration(color: PdfColors.grey300),
+              children: ['Medicine', 'Dose / Freq', 'Timing', 'Duration']
+                  .map((h) => pw.Padding(
+                        padding: const pw.EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 5),
+                        child: pw.Text(h, style: s(bold: true, size: 9)),
+                      ))
+                  .toList(),
+            ),
+            // Rows
+            ...rx.medicines.map((m) => pw.TableRow(
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text(
+                            m.medicineName?.isNotEmpty == true
+                                ? m.medicineName!
+                                : 'Med #${m.medicineId ?? '-'}',
+                            style: s(bold: true, size: 9),
+                          ),
+                          if (m.extraInfo?.isNotEmpty == true)
+                            pw.Text(m.extraInfo!, style: s(size: 8, italic: true)),
+                        ],
+                      ),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(m.doseDisplay,
+                          style: s(size: 9), textAlign: pw.TextAlign.center),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(m.timing ?? '-',
+                          style: s(size: 9), textAlign: pw.TextAlign.center),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 5),
+                      child: pw.Text(m.duration ?? '-',
+                          style: s(size: 9), textAlign: pw.TextAlign.center),
+                    ),
+                  ],
+                )),
+          ],
+        ),
+        pw.SizedBox(height: 10),
+
+        // Clinical Notes
+        if (rx.clinicalNotes?.isNotEmpty == true) ...[
+          labeledRow('Instructions', rx.clinicalNotes!),
+          pw.SizedBox(height: 6),
+        ],
+
+        // Advice
+        if (rx.advice?.isNotEmpty == true) ...[
+          labeledRow("Doctor's Advice", rx.advice!),
+          pw.SizedBox(height: 6),
+        ],
+
+        // Follow-up
+        if (rx.followUpDate != null) ...[
+          pw.SizedBox(height: 4),
+          labeledRow(
+            'Follow-up',
+            [
+              _fmtDateTime(rx.followUpDate!),
+              if (rx.followUpRoom?.isNotEmpty == true) rx.followUpRoom!,
+              if (rx.followUpInstruction?.isNotEmpty == true)
+                rx.followUpInstruction!,
+            ].join('  |  '),
+          ),
+          pw.SizedBox(height: 10),
+        ],
+
+        // Footer
+        pw.SizedBox(height: 20),
+        pw.Divider(thickness: 0.5, color: PdfColors.black),
+        pw.SizedBox(height: 6),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.end,
+          children: [
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('Valid for 30 days from date of issue.', style: s(size: 8)),
+                pw.Text('Dispensed by licensed pharmacist only.', style: s(size: 8)),
+              ],
+            ),
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.SizedBox(height: 24), // signature space
+                pw.Container(width: 140, height: 0.5, color: PdfColors.black),
+                pw.SizedBox(height: 3),
+                pw.Text(rx.doctorName, style: s(bold: true, size: 10)),
+                pw.Text('${rx.qualification}  |  ${rx.specialization}',
+                    style: s(size: 8)),
+              ],
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+
+  return doc.save();
+}
 Future<void> _generatePdf() async {
   setState(() {
     _generating = true;
