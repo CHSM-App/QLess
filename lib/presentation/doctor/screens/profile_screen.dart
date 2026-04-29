@@ -7,6 +7,7 @@ import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
+import 'package:qless/presentation/doctor/screens/doctor_help_center_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/core/network/token_provider.dart';
@@ -266,6 +267,15 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReviewsSheet(reviews: reviews, avgRating: avg),
+    );
+  }
+
+  void _openHelpCenterPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const DoctorHelpCenterPage(),
+      ),
     );
   }
 
@@ -1220,16 +1230,22 @@ Widget _buildAvailabilityCard() => Container(
 
   // ── Support Card ──────────────────────────────────────────────────────────
 
-Widget _buildSupportCard() => _tileCard([
-    _Item(Icons.help_outline_rounded, 'Help Center', 'FAQs & documentation'),
-    _Item(Icons.chat_bubble_outline_rounded, 'Contact Support', 'Chat, Email, Phone'),
-    _Item(Icons.privacy_tip_outlined, 'Privacy Policy', null, onTap: () async {
-      final uri = Uri.parse('https://qless.vengurlatech.com/login/privacy');
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }),
-    _Item(Icons.description_outlined, 'Terms of Service', null),
-    _Item(Icons.info_outline_rounded, 'App Version', 'v2.4.1 (Build 204)'),
-  ]);
+  Widget _buildSupportCard() => _tileCard([
+        _Item(
+          Icons.help_outline_rounded,
+          'Help Center',
+          'Doctor FAQs & support',
+          onTap: _openHelpCenterPage,
+        ),
+       
+        _Item(Icons.privacy_tip_outlined, 'Privacy Policy', null,
+            onTap: () async {
+          final uri =
+              Uri.parse('https://qless.vengurlatech.com/login/privacy');
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }),
+
+      ]);
   // ── Logout Button ─────────────────────────────────────────────────────────
 
   Widget _buildLogoutButton() => SizedBox(
