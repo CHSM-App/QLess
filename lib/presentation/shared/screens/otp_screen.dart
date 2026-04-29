@@ -195,23 +195,22 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   }
 
   Future<void> _storeFcmToken() async {
-  try {
-    await _ensureFirebaseInitialized();
-    final token = await FirebaseMessaging.instance.getToken();
-    if (token == null) return;
-    final body = TokenResponse(
-        firebaseToken: token,
-        role: widget.role,
-        mobile: widget.mobileNumber
-    );
-    // Send token to your backende
-    await ref
-        .read(authViewModelProvider.notifier)
-        .saveFirebaseToken(body); 
-  } catch (e) {
-    debugPrint('FCM token store failed: $e');
+    try {
+      await _ensureFirebaseInitialized();
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null) return;
+      final body = TokenResponse(
+          firebaseToken: token,
+          role: widget.role,
+          mobile: widget.mobileNumber);
+      // Send token to your backend
+      await ref
+          .read(authViewModelProvider.notifier)
+          .saveFirebaseToken(body);
+    } catch (e) {
+      debugPrint('FCM token store failed: $e');
+    }
   }
-}
 
   Future<void> _ensureFirebaseInitialized() async {
     if (Firebase.apps.isNotEmpty) return;
@@ -263,41 +262,48 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           ),
         ),
         child: SafeArea(
-          child: OrientationBuilder(
-            builder: (context, orientation) {
-              return orientation == Orientation.landscape
-                  ? _LandscapeLayout(
-                      isDoctor: _isDoctor,
-                      accentColor: _accentColor,
-                      maskedNumber: _maskedNumber,
-                      controllers: _controllers,
-                      focusNodes: _focusNodes,
-                      hasError: _hasError,
-                      isFilled: _isFilled,
-                      isLoading: _isLoading,
-                      secondsLeft: _secondsLeft,
-                      shakeAnim: _shakeAnim,
-                      onOtpChanged: _onOtpChanged,
-                      onKeyEvent: _onKeyEvent,
-                      onVerify: _verifyOtp,
-                      onResend: _resendOtp,
-                    )
-                  : _PortraitLayout(
-                      isDoctor: _isDoctor,
-                      accentColor: _accentColor,
-                      maskedNumber: _maskedNumber,
-                      controllers: _controllers,
-                      focusNodes: _focusNodes,
-                      hasError: _hasError,
-                      isFilled: _isFilled,
-                      isLoading: _isLoading,
-                      secondsLeft: _secondsLeft,
-                      shakeAnim: _shakeAnim,
-                      onOtpChanged: _onOtpChanged,
-                      onKeyEvent: _onKeyEvent,
-                      onVerify: _verifyOtp,
-                      onResend: _resendOtp,
-                    );
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Use landscape layout when width > height OR width >= 600 (tablet portrait)
+              final bool useWideLayout =
+                  constraints.maxWidth > constraints.maxHeight ||
+                      constraints.maxWidth >= 600;
+
+              if (useWideLayout) {
+                return _LandscapeLayout(
+                  isDoctor: _isDoctor,
+                  accentColor: _accentColor,
+                  maskedNumber: _maskedNumber,
+                  controllers: _controllers,
+                  focusNodes: _focusNodes,
+                  hasError: _hasError,
+                  isFilled: _isFilled,
+                  isLoading: _isLoading,
+                  secondsLeft: _secondsLeft,
+                  shakeAnim: _shakeAnim,
+                  onOtpChanged: _onOtpChanged,
+                  onKeyEvent: _onKeyEvent,
+                  onVerify: _verifyOtp,
+                  onResend: _resendOtp,
+                );
+              }
+
+              return _PortraitLayout(
+                isDoctor: _isDoctor,
+                accentColor: _accentColor,
+                maskedNumber: _maskedNumber,
+                controllers: _controllers,
+                focusNodes: _focusNodes,
+                hasError: _hasError,
+                isFilled: _isFilled,
+                isLoading: _isLoading,
+                secondsLeft: _secondsLeft,
+                shakeAnim: _shakeAnim,
+                onOtpChanged: _onOtpChanged,
+                onKeyEvent: _onKeyEvent,
+                onVerify: _verifyOtp,
+                onResend: _resendOtp,
+              );
             },
           ),
         ),
@@ -307,7 +313,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHARED PROPS — passed to both layouts
+// LANDSCAPE / WIDE LAYOUT
+// ─────────────────────────────────────────────────────────────────────────────
 class _LandscapeLayout extends StatelessWidget {
   final bool isDoctor;
   final Color accentColor;
@@ -343,6 +350,16 @@ class _LandscapeLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    // On very short landscape screens (e.g. phone landscape), shrink things slightly
+    final bool isShortLandscape =
+        size.height < 420 && size.width > size.height;
+    final double iconSize = isShortLandscape ? 48.0 : 64.0;
+    final double titleFontSize = isShortLandscape ? 15.0 : 19.0;
+    final double subtitleFontSize = isShortLandscape ? 11.0 : 12.5;
+    final double rightPadV = isShortLandscape ? 12.0 : 20.0;
+    final double rightPadH = isShortLandscape ? 24.0 : 32.0;
+
     return Row(
       children: [
         // ── LEFT PANEL ────────────────────────────────────────────────────
@@ -355,8 +372,8 @@ class _LandscapeLayout extends StatelessWidget {
               children: [
                 // SMS icon circle
                 Container(
-                  width: 64,
-                  height: 64,
+                  width: iconSize,
+                  height: iconSize,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.12),
                     shape: BoxShape.circle,
@@ -365,35 +382,35 @@ class _LandscapeLayout extends StatelessWidget {
                       width: 1.5,
                     ),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.sms_outlined,
                     color: Colors.white,
-                    size: 28,
+                    size: isShortLandscape ? 20 : 28,
                   ),
                 ),
 
-                const SizedBox(height: 18),
+                SizedBox(height: isShortLandscape ? 10 : 18),
 
-                const Text(
+                Text(
                   'OTP Verification',
                   style: TextStyle(
-                    fontSize: 19,
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     letterSpacing: -0.3,
                   ),
                 ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: isShortLandscape ? 6 : 10),
 
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 28),
                   child: RichText(
                     textAlign: TextAlign.center,
                     text: TextSpan(
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        color: Color(0xFF94A3B8),
+                      style: TextStyle(
+                        fontSize: subtitleFontSize,
+                        color: const Color(0xFF94A3B8),
                         height: 1.55,
                       ),
                       children: [
@@ -410,12 +427,14 @@ class _LandscapeLayout extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                SizedBox(height: isShortLandscape ? 10 : 20),
 
                 // Role badge
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 7),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: isShortLandscape ? 4 : 7,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(20),
@@ -456,22 +475,24 @@ class _LandscapeLayout extends StatelessWidget {
           flex: 6,
           child: SingleChildScrollView(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 32, vertical: 20),
+              padding: EdgeInsets.symmetric(
+                horizontal: rightPadH,
+                vertical: rightPadV,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     'Enter the 6-digit code',
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: isShortLandscape ? 14 : 17,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A),
+                      color: const Color(0xFF0F172A),
                       letterSpacing: -0.2,
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  SizedBox(height: isShortLandscape ? 14 : 20),
 
                   // OTP boxes
                   _OtpBoxRow(
@@ -487,7 +508,7 @@ class _LandscapeLayout extends StatelessWidget {
                   // Error text
                   _ErrorText(hasError: hasError),
 
-                  const SizedBox(height: 20),
+                  SizedBox(height: isShortLandscape ? 14 : 20),
 
                   // Verify button
                   _VerifyButton(
@@ -498,7 +519,7 @@ class _LandscapeLayout extends StatelessWidget {
                     onVerify: onVerify,
                   ),
 
-                  const SizedBox(height: 16),
+                  SizedBox(height: isShortLandscape ? 10 : 16),
 
                   // Resend
                   _ResendRow(
@@ -517,7 +538,7 @@ class _LandscapeLayout extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PORTRAIT LAYOUT  (original vertical layout — unchanged)
+// PORTRAIT LAYOUT
 // ─────────────────────────────────────────────────────────────────────────────
 class _PortraitLayout extends StatelessWidget {
   final bool isDoctor;
@@ -554,18 +575,26 @@ class _PortraitLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    // Compact mode for small phones (e.g. iPhone SE, small Android ~667px height)
+    final bool isSmall = size.height < 680;
+    final double iconSize = isSmall ? 54.0 : 68.0;
+    final double titleFontSize = isSmall ? 20.0 : 24.0;
+    final double subFontSize = isSmall ? 12.5 : 13.5;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
+      // Horizontal padding scales with screen width
+      padding: EdgeInsets.symmetric(horizontal: size.width * 0.07),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const SizedBox(height: 12),
+          SizedBox(height: isSmall ? 8 : 12),
 
           // SMS icon
           AnimatedContainer(
             duration: const Duration(milliseconds: 350),
-            width: 68,
-            height: 68,
+            width: iconSize,
+            height: iconSize,
             decoration: BoxDecoration(
               color: accentColor,
               shape: BoxShape.circle,
@@ -577,30 +606,33 @@ class _PortraitLayout extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(Icons.sms_outlined,
-                color: Colors.white, size: 30),
+            child: Icon(
+              Icons.sms_outlined,
+              color: Colors.white,
+              size: isSmall ? 24 : 30,
+            ),
           ),
 
-          const SizedBox(height: 22),
+          SizedBox(height: isSmall ? 16 : 22),
 
-          const Text(
+          Text(
             'OTP Verification',
             style: TextStyle(
-              fontSize: 24,
+              fontSize: titleFontSize,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+              color: const Color(0xFF0F172A),
               letterSpacing: -0.4,
             ),
           ),
 
-          const SizedBox(height: 10),
+          SizedBox(height: isSmall ? 6 : 10),
 
           RichText(
             textAlign: TextAlign.center,
             text: TextSpan(
-              style: const TextStyle(
-                fontSize: 13.5,
-                color: Color(0xFF64748B),
+              style: TextStyle(
+                fontSize: subFontSize,
+                color: const Color(0xFF64748B),
                 height: 1.55,
               ),
               children: [
@@ -616,7 +648,7 @@ class _PortraitLayout extends StatelessWidget {
             ),
           ),
 
-          const SizedBox(height: 36),
+          SizedBox(height: isSmall ? 24 : 36),
 
           // OTP boxes
           _OtpBoxRow(
@@ -632,7 +664,7 @@ class _PortraitLayout extends StatelessWidget {
           // Error text
           _ErrorText(hasError: hasError),
 
-          const SizedBox(height: 32),
+          SizedBox(height: isSmall ? 20 : 32),
 
           // Verify button
           _VerifyButton(
@@ -643,7 +675,7 @@ class _PortraitLayout extends StatelessWidget {
             onVerify: onVerify,
           ),
 
-          const SizedBox(height: 28),
+          SizedBox(height: isSmall ? 18 : 28),
 
           // Resend
           _ResendRow(
@@ -656,9 +688,11 @@ class _PortraitLayout extends StatelessWidget {
 
           // Role badge
           Container(
-            margin: const EdgeInsets.only(bottom: 24),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            margin: EdgeInsets.only(bottom: isSmall ? 14 : 24),
+            padding: EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: isSmall ? 6 : 8,
+            ),
             decoration: BoxDecoration(
               color: accentColor.withOpacity(0.08),
               borderRadius: BorderRadius.circular(20),
@@ -693,7 +727,7 @@ class _PortraitLayout extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SHARED WIDGETS  — reused in both layouts
+// SHARED WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _OtpBoxRow extends StatelessWidget {
@@ -731,18 +765,31 @@ class _OtpBoxRow extends StatelessWidget {
           child: child,
         );
       },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(6, (i) {
-          return _OtpBox(
-            controller: controllers[i],
-            focusNode: focusNodes[i],
-            hasError: hasError,
-            accentColor: accentColor,
-            onChanged: (val) => onOtpChanged(i, val),
-            onKeyEvent: (event) => onKeyEvent(i, event),
+      // LayoutBuilder makes each OTP box size scale with available width
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // 6 boxes + 5 gaps of 8px each
+          final double totalGap = 5 * 8.0;
+          final double boxWidth =
+              ((constraints.maxWidth - totalGap) / 6).clamp(36.0, 54.0);
+          final double boxHeight = (boxWidth * 1.22).clamp(44.0, 66.0);
+
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(6, (i) {
+              return _OtpBox(
+                controller: controllers[i],
+                focusNode: focusNodes[i],
+                hasError: hasError,
+                accentColor: accentColor,
+                boxWidth: boxWidth,
+                boxHeight: boxHeight,
+                onChanged: (val) => onOtpChanged(i, val),
+                onKeyEvent: (event) => onKeyEvent(i, event),
+              );
+            }),
           );
-        }),
+        },
       ),
     );
   }
@@ -916,7 +963,7 @@ class _ResendRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SINGLE OTP BOX  (unchanged)
+// SINGLE OTP BOX
 // ─────────────────────────────────────────────────────────────────────────────
 class _OtpBox extends StatefulWidget {
   const _OtpBox({
@@ -926,6 +973,8 @@ class _OtpBox extends StatefulWidget {
     required this.accentColor,
     required this.onChanged,
     required this.onKeyEvent,
+    this.boxWidth = 46,
+    this.boxHeight = 56,
   });
 
   final TextEditingController controller;
@@ -934,6 +983,8 @@ class _OtpBox extends StatefulWidget {
   final Color accentColor;
   final ValueChanged<String> onChanged;
   final ValueChanged<KeyEvent> onKeyEvent;
+  final double boxWidth;
+  final double boxHeight;
 
   @override
   State<_OtpBox> createState() => _OtpBoxState();
@@ -953,14 +1004,16 @@ class _OtpBoxState extends State<_OtpBox> {
   @override
   Widget build(BuildContext context) {
     final filled = widget.controller.text.isNotEmpty;
+    // Font size scales proportionally with box width
+    final double fontSize = (widget.boxWidth * 0.48).clamp(16.0, 24.0);
 
     return KeyboardListener(
       focusNode: FocusNode(),
       onKeyEvent: widget.onKeyEvent,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 46,
-        height: 56,
+        width: widget.boxWidth,
+        height: widget.boxHeight,
         decoration: BoxDecoration(
           color: widget.hasError
               ? const Color(0xFFFEF2F2)
@@ -996,7 +1049,7 @@ class _OtpBoxState extends State<_OtpBox> {
           maxLength: 1,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           style: TextStyle(
-            fontSize: 22,
+            fontSize: fontSize,
             fontWeight: FontWeight.w800,
             color: widget.hasError
                 ? const Color(0xFFEF4444)

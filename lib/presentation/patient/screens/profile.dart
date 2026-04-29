@@ -6,6 +6,7 @@ import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_help_center_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/patient_edit_profile.dart'
     show PatientEditProfilePage;
@@ -580,6 +581,17 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
         //   subtitle: 'Alerts & reminders',
         // ),
         // ── Privacy Policy ───────────────────────────────────────────
+        _menuRow(
+          icon: Icons.help_outline_rounded,
+          iconFg: kPrimary,
+          iconBg: kPrimaryLight,
+          title: 'Help Center',
+          subtitle: 'Patient FAQs & support',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PatientHelpCenterPage()),
+          ),
+        ),
         _menuRow(
           icon: Icons.privacy_tip_outlined,
           iconFg: kInfo, iconBg: kInfoLight,

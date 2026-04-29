@@ -866,18 +866,33 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   Future<void> _onSkip() async {
     try {
-      await ref.read(appointmentViewModelProvider.notifier).queueSkip(
+      final skipRes = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
         AppointmentRequestModel(doctorId: widget.doctorId,
             appointmentId: widget.appointmentId, patientId: widget.patientId,
             isNext: 1));
       if (!mounted) return;
+
+      // Last patient in queue — go back immediately, same as "No Patient Left"
+      final skipMsg = skipRes.message?.trim() ?? '';
+      if (skipMsg.toLowerCase().contains('last patient')) {
+        _showSnack(skipMsg, isError: false);
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) Navigator.pop(context);
+        return;
+      }
+
       await ref.read(appointmentViewModelProvider.notifier)
           .fetchPatientAppointments(widget.doctorId);
       if (!mounted) return;
       final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
           .maybeWhen(data: (l) => l, orElse: () => <AppointmentList>[]);
       final next = _pickNextAppointment(all);
-      if (next == null) { _showSnack('No next patient', isError: false); Navigator.pop(context); return; }
+      if (next == null) {
+        _showSnack(skipRes.message ?? 'Patient skipped', isError: false);
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) Navigator.pop(context);
+        return;
+      }
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PrescriptionScreen(
         patientId:     next.patientId     ?? 0,
         doctorId:      next.doctorId      ?? widget.doctorId,
