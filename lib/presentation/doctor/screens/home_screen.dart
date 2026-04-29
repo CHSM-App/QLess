@@ -668,11 +668,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   ],
                 ),
               ),
-              _headerBtn(
-                icon: Icons.notifications_outlined,
-                badge: true,
-                onTap: () {},
-              ),
+              // _headerBtn(
+              //   icon: Icons.notifications_outlined,
+              //   badge: true,
+              //   onTap: () {},
+              // ),
             ],
           ),
         ),
@@ -680,38 +680,40 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     );
   }
 
-  Widget _headerBtn({
-    required IconData icon,
-    bool badge = false,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(children: [
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kBorder),
-          ),
-          child: Icon(icon, color: kTextPrimary, size: 17),
-        ),
-        if (badge)
-          Positioned(
-            right: 7,
-            top: 7,
-            child: Container(
-              width: 7,
-              height: 7,
-              decoration:
-                  const BoxDecoration(color: kAmber, shape: BoxShape.circle),
-            ),
-          ),
-      ]),
-    );
-  }
+
+//notification icon
+  // Widget _headerBtn({
+  //   required IconData icon,
+  //   bool badge = false,
+  //   required VoidCallback onTap,
+  // }) {
+  //   return GestureDetector(
+  //     onTap: onTap,
+  //     child: Stack(children: [
+  //       Container(
+  //         width: 36,
+  //         height: 36,
+  //         decoration: BoxDecoration(
+  //           color: const Color(0xFFF7F8FA),
+  //           borderRadius: BorderRadius.circular(10),
+  //           border: Border.all(color: kBorder),
+  //         ),
+  //         child: Icon(icon, color: kTextPrimary, size: 17),
+  //       ),
+  //       if (badge)
+  //         Positioned(
+  //           right: 7,
+  //           top: 7,
+  //           child: Container(
+  //             width: 7,
+  //             height: 7,
+  //             decoration:
+  //                 const BoxDecoration(color: kAmber, shape: BoxShape.circle),
+  //           ),
+  //         ),
+  //     ]),
+  //   );
+  // }
 
   // ─────────────────────────────────────────────────────────────────────────
   // STAT STRIP  (global across all sessions)
