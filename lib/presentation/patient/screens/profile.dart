@@ -587,9 +587,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
           subtitle: 'Read our privacy policy',
           onTap: () async {
             final uri = Uri.parse('https://qless.vengurlatech.com/login/privacy');
-            if (await canLaunchUrl(uri)) {
-              await launchUrl(uri, mode: LaunchMode.externalApplication);
-            }
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
           },
         ),
         _menuRow(
