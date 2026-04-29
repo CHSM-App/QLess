@@ -568,6 +568,13 @@ Future<void> _selectFromMap() async {
     }
 
     // ── STEP 3: Validate + save schedule + lead time → done ────────────────
+    // At least one day must be enabled with a slot
+    final hasAnySchedule = _days.any((d) => d.isEnabled && d.timeSlots.isNotEmpty);
+    if (!hasAnySchedule) {
+      _showError('Please add at least one available day with a time slot.');
+      return;
+    }
+
     // Overlap check
     for (final day in _days) {
       if (!day.isEnabled) continue;
@@ -898,32 +905,32 @@ Widget _buildStep1() {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (_savedDoctorId != null)
-          Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: kSchedPrimaryLight,
-              borderRadius: BorderRadius.circular(10),
-              border:
-                  Border.all(color: kSchedPrimary.withOpacity(0.4)),
-            ),
-            child: Row(children: [
-              const Icon(Icons.check_circle_rounded,
-                  color: kSchedPrimary, size: 16),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Profile registered! Doctor ID: $_savedDoctorId'
-                  '${_savedClinicId != null ? '  •  Clinic ID: $_savedClinicId' : ''}',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kSchedPrimary),
-                ),
-              ),
-            ]),
-          ),
+          // Container(
+          //   margin: const EdgeInsets.only(bottom: 16),
+          //   padding:
+          //       const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          //   decoration: BoxDecoration(
+          //     color: kSchedPrimaryLight,
+          //     borderRadius: BorderRadius.circular(10),
+          //     border:
+          //         Border.all(color: kSchedPrimary.withOpacity(0.4)),
+          //   ),
+          //   child: Row(children: [
+          //     const Icon(Icons.check_circle_rounded,
+          //         color: kSchedPrimary, size: 16),
+          //     const SizedBox(width: 8),
+          //     Expanded(
+          //       child: Text(
+          //         'Profile registered! Doctor ID: $_savedDoctorId'
+          //         '${_savedClinicId != null ? '  •  Clinic ID: $_savedClinicId' : ''}',
+          //         style: const TextStyle(
+          //             fontSize: 12,
+          //             fontWeight: FontWeight.w600,
+          //             color: kSchedPrimary),
+          //       ),
+          //     ),
+          //   ]),
+          // ),
 
         const _SectionHeader(title: 'Weekly Schedule'),
         const SizedBox(height: 4),

@@ -901,7 +901,7 @@ class _AppointmentCard extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
-                    // ── Row 1: Avatar + Name + Status ──────────────
+                    // ── Row 1: Avatar + Name s+ Status ──────────────
                     Row(
                       children: [
                         Container(

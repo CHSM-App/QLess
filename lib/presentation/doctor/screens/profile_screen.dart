@@ -459,12 +459,12 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           _sectionLabel('Availability'),
           _buildAvailabilityCard(),
           const SizedBox(height: 14),
-          _sectionLabel('Notifications'),
-          _buildNotificationsCard(),
-          const SizedBox(height: 14),
-          _sectionLabel('Appearance'),
-          _buildAppearanceCard(),
-          const SizedBox(height: 14),
+          // _sectionLabel('Notifications'),
+          // _buildNotificationsCard(),
+          // const SizedBox(height: 14),
+          // _sectionLabel('Appearance'),
+          // _buildAppearanceCard(),
+          // const SizedBox(height: 14),
           _sectionLabel('Support'),
           _buildSupportCard(),
           const SizedBox(height: 14),
@@ -698,10 +698,10 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         _Item(Icons.medical_information_outlined, 'Professional Details',
             'Specialization, license',
             onTap: () => _showProfessionalDetailsSheet(s, d)),
-        _Item(Icons.lock_outline_rounded, 'Password & Security',
-            'Change password, 2FA'),
-        _Item(Icons.payment_outlined, 'Payment & Earnings',
-            'Bank account, payouts'),
+        // _Item(Icons.lock_outline_rounded, 'Password & Security',
+        //     'Change password, 2FA'),
+        // _Item(Icons.payment_outlined, 'Payment & Earnings',
+        //     'Bank account, payouts'),
       ]);
 
 Widget _buildAvailabilityCard() => Container(
@@ -711,60 +711,60 @@ Widget _buildAvailabilityCard() => Container(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Consultation toggle
-          Row(
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: _availableForConsult ? kGreenLight : kRedLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.videocam_outlined,
-                  color: _availableForConsult ? kSuccess : kError,
-                  size: 17,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Available for Consultation',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary,
-                      ),
-                    ),
-                    Text(
-                      _availableForConsult
-                          ? 'Patients can book appointments'
-                          : 'Not accepting patients',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: kTextMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Switch.adaptive(
-                value: _availableForConsult,
-                activeColor: kSuccess,
-                onChanged: (v) =>
-                    setState(() => _availableForConsult = v),
-              ),
-            ],
-          ),
+          // Row(
+          //   children: [
+          //     Container(
+          //       width: 34,
+          //       height: 34,
+          //       decoration: BoxDecoration(
+          //         color: _availableForConsult ? kGreenLight : kRedLight,
+          //         borderRadius: BorderRadius.circular(10),
+          //       ),
+          //       child: Icon(
+          //         Icons.videocam_outlined,
+          //         color: _availableForConsult ? kSuccess : kError,
+          //         size: 17,
+          //       ),
+          //     ),
+          //     const SizedBox(width: 12),
+          //     Expanded(
+          //       child: Column(
+          //         crossAxisAlignment: CrossAxisAlignment.start,
+          //         children: [
+          //           const Text(
+          //             'Available for Consultation',
+          //             style: TextStyle(
+          //               fontSize: 13,
+          //               fontWeight: FontWeight.w700,
+          //               color: kTextPrimary,
+          //             ),
+          //           ),
+          //           Text(
+          //             _availableForConsult
+          //                 ? 'Patients can book appointments'
+          //                 : 'Not accepting patients',
+          //             style: const TextStyle(
+          //               fontSize: 11,
+          //               color: kTextMuted,
+          //             ),
+          //           ),
+          //         ],
+          //       ),
+          //     ),
+          //     Switch.adaptive(
+          //       value: _availableForConsult,
+          //       activeColor: kSuccess,
+          //       onChanged: (v) =>
+          //           setState(() => _availableForConsult = v),
+          //     ),
+          //   ],
+          // ),
 
           // Lead time (only when available)
           if (_availableForConsult) ...[
-            const SizedBox(height: 12),
-            const Divider(height: 1, color: kDivider),
-            const SizedBox(height: 12),
+            // const SizedBox(height: 12),
+            // const Divider(height: 1, color: kDivider),
+          //  const SizedBox(height: 12),
             const Text(
               'Booking lead time',
               style: TextStyle(

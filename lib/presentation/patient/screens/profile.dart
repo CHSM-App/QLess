@@ -573,12 +573,12 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
             MaterialPageRoute(builder: (_) => const FamilyMembersScreen()),
           ),
         ),
-        _menuRow(
-          icon: Icons.notifications_outlined,
-          iconFg: kWarning, iconBg: kAmberLight,
-          title: 'Notifications',
-          subtitle: 'Alerts & reminders',
-        ),
+        // _menuRow(
+        //   icon: Icons.notifications_outlined,
+        //   iconFg: kWarning, iconBg: kAmberLight,
+        //   title: 'Notifications',
+        //   subtitle: 'Alerts & reminders',
+        // ),
         // ── Privacy Policy ───────────────────────────────────────────
         _menuRow(
           icon: Icons.privacy_tip_outlined,
