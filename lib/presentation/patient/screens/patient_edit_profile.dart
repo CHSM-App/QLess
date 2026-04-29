@@ -964,6 +964,8 @@ Widget _sourceOption({
         TextFormField(
           controller: _mobileController,
           keyboardType: TextInputType.phone,
+          readOnly: true,
+          enableInteractiveSelection: false,
           maxLength: 10,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           style: const TextStyle(fontSize: 13, color: kTextPrimary),
