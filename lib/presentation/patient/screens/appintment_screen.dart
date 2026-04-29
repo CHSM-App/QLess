@@ -54,6 +54,32 @@ class _FilterTab {
   const _FilterTab(this.key, this.label, this.icon, this.color, this.bg);
 }
 
+// ── Date filter enum ──────────────────────────────────────────────────────────
+enum _DateFilter { all, today, thisWeek, thisMonth, last3Months, last6Months, thisYear, custom }
+
+extension _DateFilterX on _DateFilter {
+  String get label => switch (this) {
+    _DateFilter.all         => 'All Time',
+    _DateFilter.today       => 'Today',
+    _DateFilter.thisWeek    => 'This Week',
+    _DateFilter.thisMonth   => 'This Month',
+    _DateFilter.last3Months => 'Last 3 Months',
+    _DateFilter.last6Months => 'Last 6 Months',
+    _DateFilter.thisYear    => 'This Year',
+    _DateFilter.custom      => 'Custom Range',
+  };
+  IconData get icon => switch (this) {
+    _DateFilter.all         => Icons.all_inclusive_rounded,
+    _DateFilter.today       => Icons.today_rounded,
+    _DateFilter.thisWeek    => Icons.view_week_rounded,
+    _DateFilter.thisMonth   => Icons.calendar_month_rounded,
+    _DateFilter.last3Months => Icons.date_range_rounded,
+    _DateFilter.last6Months => Icons.date_range_rounded,
+    _DateFilter.thisYear    => Icons.calendar_today_rounded,
+    _DateFilter.custom      => Icons.tune_rounded,
+  };
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 Color _statusColor(String? s) => switch (s?.toLowerCase()) {
   'upcoming' || 'confirmed' || 'booked' => kInfo,
@@ -140,7 +166,7 @@ Future<void> openMap(double lat, double lng, String? label) async {
   if (await canLaunchUrl(uri)) await launchUrl(uri);
 }
 
-// ── Filter logic ──────────────────────────────────────────────────────────────
+// ── Status filter logic ───────────────────────────────────────────────────────
 bool _isToday(AppointmentList a) {
   final p = DateTime.tryParse(a.appointmentDate ?? '');
   if (p == null) return false;
@@ -167,19 +193,47 @@ bool _isCancelled(AppointmentList a) {
   return s == 'cancelled' || s == 'cancled';
 }
 
+// ── Date filter logic ─────────────────────────────────────────────────────────
+bool _passesDateFilter(AppointmentList a, _DateFilter df,
+    DateTime? customFrom, DateTime? customTo) {
+  final p = DateTime.tryParse(a.appointmentDate ?? '');
+  if (p == null) return df == _DateFilter.all;
+  final now = DateTime.now();
+  return switch (df) {
+    _DateFilter.all         => true,
+    _DateFilter.today       => p.year == now.year && p.month == now.month && p.day == now.day,
+    _DateFilter.thisWeek    => p.isAfter(
+        DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1))
+            .subtract(const Duration(seconds: 1))),
+    _DateFilter.thisMonth   => p.year == now.year && p.month == now.month,
+    _DateFilter.last3Months => p.isAfter(now.subtract(const Duration(days: 90))),
+    _DateFilter.last6Months => p.isAfter(now.subtract(const Duration(days: 180))),
+    _DateFilter.thisYear    => p.year == now.year,
+    _DateFilter.custom      => () {
+        if (customFrom != null && p.isBefore(customFrom)) return false;
+        if (customTo != null &&
+            p.isAfter(customTo.add(const Duration(days: 1)))) return false;
+        return true;
+      }(),
+  };
+}
+
 List<AppointmentList> applyFilter(
-    List<AppointmentList> list, String filter, String search) {
+    List<AppointmentList> list, String filter, String search,
+    _DateFilter dateFilter, DateTime? customFrom, DateTime? customTo) {
   return list.where((a) {
     final matchSearch = search.isEmpty ||
         (a.patientName?.toLowerCase().contains(search.toLowerCase()) ?? false);
-    final matchFilter = switch (filter) {
+    final matchStatus = switch (filter) {
       'today'     => _isToday(a),
       'upcoming'  => _isUpcoming(a),
       'completed' => _isCompleted(a),
       'cancelled' => _isCancelled(a),
       _           => true,
     };
-    return matchSearch && matchFilter;
+    final matchDate = _passesDateFilter(a, dateFilter, customFrom, customTo);
+    return matchSearch && matchStatus && matchDate;
   }).toList();
 }
 
@@ -202,6 +256,12 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool   _isFetching   = false;
   bool   _isWaiting    = false;
   bool   _idMissing    = false;
+
+  // ── Date filter state ──────────────────────────────────────────────
+  _DateFilter _dateFilter = _DateFilter.all;
+  DateTime?   _customFrom;
+  DateTime?   _customTo;
+  bool        _sortNewest = true;
 
   late final TabController _tabCtrl;
 
@@ -458,6 +518,32 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       ),
     );
   }
+bool get _hasDateFilter => 
+    _filterStatus != 'today' && // 
+    (_dateFilter != _DateFilter.all || !_sortNewest);
+
+  String _fmtDateChip(DateTime d) {
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${d.day} ${m[d.month]} ${d.year}';
+  }
+
+  void _showDateFilterSheet() => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => _AppointmentDateFilterSheet(
+          current: _dateFilter,
+          customFrom: _customFrom,
+          customTo: _customTo,
+          sortNewest: _sortNewest,
+          onApply: (f, from, to, newest) => setState(() {
+            _dateFilter = f;
+            _customFrom = from;
+            _customTo   = to;
+            _sortNewest = newest;
+          }),
+        ),
+      );
 
   // ---------------------------------------------------------------------------
   // Build
@@ -503,23 +589,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      // floatingActionButton: Padding(
-      //   padding: const EdgeInsets.only(bottom: 80),
-      //   child: FloatingActionButton.extended(
-      //     backgroundColor: kPrimary,
-      //     elevation: 3,
-      //     onPressed: () {
-      //       if (widget.onTabChange != null) { widget.onTabChange!(1); return; }
-      //       Navigator.push(context, MaterialPageRoute(
-      //         builder: (_) => PatientBottomNav(
-      //           onToggleTheme: () {}, themeMode: ThemeMode.system, initialTab: 1),
-      //       ));
-      //     },
-      //     icon: const Icon(Icons.add_rounded, color: Colors.white, size: 20),
-      //     label: const Text('Book',
-      //         style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
-      //   ),
-      // ),
       body: SafeArea(
         top: false,
         child: Column(
@@ -574,24 +643,105 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
           Padding(
             padding: EdgeInsets.fromLTRB(
                 16, MediaQuery.of(context).padding.top + 12, 16, 0),
-            child: AppExpandableHeaderSearch(
-              leadingIcon: Icons.calendar_month_rounded,
-              title: 'Appointments',
-              subtitle: 'Manage your schedule',
-              hintText: 'Search by patient name...',
-              accentColor: kPrimary,
-              leadingBackgroundColor: kPrimaryLight,
-              titleColor: kTextPrimary,
-              subtitleColor: kTextMuted,
-              fieldColor: const Color(0xFFF7F8FA),
-              borderColor: kBorder,
-              iconColor: kTextMuted,
-              textColor: kTextPrimary,
-              onChanged: (v) => setState(() => _search = v),
+            child: Row(
+              children: [
+                // ── Leading icon ──────────────────────────────────
+                Container(
+                  width: 42, height: 42,
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kPrimary.withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.calendar_month_rounded,
+                      color: kPrimary, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: AppExpandableHeaderSearch(
+                    leadingIcon: Icons.calendar_month_rounded,
+                    title: 'Appointments',
+                    subtitle: 'Manage your schedule',
+                    hintText: 'Search by patient name...',
+                    accentColor: kPrimary,
+                    leadingBackgroundColor: kPrimaryLight,
+                    titleColor: kTextPrimary,
+                    subtitleColor: kTextMuted,
+                    fieldColor: const Color(0xFFF7F8FA),
+                    borderColor: kBorder,
+                    iconColor: kTextMuted,
+                    textColor: kTextPrimary,
+                    onChanged: (v) => setState(() => _search = v),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // ── Date filter button ──────────────────────────
+                GestureDetector(
+                  onTap: _showDateFilterSheet,
+                  child: Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: _hasDateFilter ? kPrimary : const Color(0xFFF7F8FA),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: _hasDateFilter ? kPrimary : kBorder),
+                    ),
+                    child: Icon(Icons.tune_rounded,
+                        color: _hasDateFilter ? Colors.white : kPrimary, size: 18),
+                  ),
+                ),
+                // const SizedBox(width: 6),
+                // // ── Sort button ─────────────────────────────────
+                // GestureDetector(
+                //   onTap: () => setState(() => _sortNewest = !_sortNewest),
+                //   child: Container(
+                //     width: 40, height: 40,
+                //     decoration: BoxDecoration(
+                //       color: const Color(0xFFF7F8FA),
+                //       borderRadius: BorderRadius.circular(10),
+                //       border: Border.all(color: kBorder),
+                //     ),
+                //     child: Icon(
+                //       _sortNewest
+                //           ? Icons.arrow_downward_rounded
+                //           : Icons.arrow_upward_rounded,
+                //       color: kPrimary, size: 17,
+                //     ),
+                //   ),
+                // ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
 
+          // ── Active date filter chips ────────────────────────────
+       // ── Active date filter chips ────────────────────────────────────────────
+if (_hasDateFilter)
+  Container(
+    color: Colors.white,
+    padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+    child: Wrap(
+      spacing: 6, runSpacing: 6,
+      children: [
+      if (_dateFilter != _DateFilter.all && _dateFilter != _DateFilter.today)
+  _filterChip(
+    icon: _dateFilter.icon,
+    label: _dateFilter == _DateFilter.custom && _customFrom != null
+        ? '${_fmtDateChip(_customFrom!)} – ${_customTo != null ? _fmtDateChip(_customTo!) : '…'}'
+        : _dateFilter.label,
+    color: kPrimary,
+    onRemove: () => setState(() => _dateFilter = _DateFilter.all),
+  ),
+        if (!_sortNewest)
+          _filterChip(
+            icon: Icons.arrow_upward_rounded,
+            label: 'Oldest First',
+            color: kPrimary,
+            onRemove: () => setState(() => _sortNewest = true),
+          ),
+      ],
+    ),
+  ),
           // Pill filter tabs — horizontal scroll
           SizedBox(
             height: 34,
@@ -643,99 +793,131 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       ),
     );
   }
-
+Widget _filterChip({
+  required IconData icon, 
+  required String label,
+  required VoidCallback onRemove,
+  Color color = kPrimary, // ← add this
+}) =>
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15), 
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: color, size: 11),
+        const SizedBox(width: 5),
+        Text(label,
+            style: TextStyle(
+                fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+        const SizedBox(width: 5),
+        GestureDetector(
+          onTap: onRemove,
+          child: Icon(Icons.close_rounded, color: color, size: 12),
+        ),
+      ]),
+    );
   // ---------------------------------------------------------------------------
   // Tab content
   // ---------------------------------------------------------------------------
-Widget _buildTabContent(List<AppointmentList> appointments) {
-  return TabBarView(
-    controller: _tabCtrl,
-    children: _filters.map((f) {
-      final list = applyFilter(appointments, f.key, _search);
+  Widget _buildTabContent(List<AppointmentList> appointments) {
+    return TabBarView(
+      controller: _tabCtrl,
+      children: _filters.map((f) {
+        var list = applyFilter(
+            appointments, f.key, _search, _dateFilter, _customFrom, _customTo);
 
-      Future<void> onRefresh() async {
-        final id = ref.read(patientLoginViewModelProvider).patientId;
-        if (id != null && id != 0) {
-          await ref
-              .read(appointmentViewModelProvider.notifier)
-              .getPatientAppointments(id);
+        // Apply sort order
+        list = List<AppointmentList>.from(list)..sort((a, b) {
+          final da = DateTime.tryParse(a.appointmentDate ?? '') ?? DateTime(0);
+          final db = DateTime.tryParse(b.appointmentDate ?? '') ?? DateTime(0);
+          return _sortNewest ? db.compareTo(da) : da.compareTo(db);
+        });
+
+        Future<void> onRefresh() async {
+          final id = ref.read(patientLoginViewModelProvider).patientId;
+          if (id != null && id != 0) {
+            await ref
+                .read(appointmentViewModelProvider.notifier)
+                .getPatientAppointments(id);
+          }
         }
-      }
 
-      if (list.isEmpty && !vmState.isLoading) {
-        // Empty state — still pull-to-refresh
+        if (list.isEmpty && !vmState.isLoading) {
+          return RefreshIndicator(
+            color: kPrimary,
+            strokeWidth: 2,
+            onRefresh: onRefresh,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverFillRemaining(
+                  child: _emptyState(f),
+                ),
+              ],
+            ),
+          );
+        }
+
         return RefreshIndicator(
           color: kPrimary,
           strokeWidth: 2,
           onRefresh: onRefresh,
-          child: CustomScrollView(
+          child: ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverFillRemaining(
-                child: _emptyState(f),
-              ),
-            ],
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
+            itemCount: list.length,
+            itemBuilder: (_, i) {
+              final a    = list[i];
+              final live = _isLive(a);
+              return _AppointmentCard(
+                appointment:          a,
+                onViewDetails:        () => _openDetail(a),
+                onViewPrescription:   _isCompleted(a) && a.appointmentId != null ? () => _handleViewPrescription(a) : null,
+                onReview:             _canReview(a) ? () => _handleReview(context, a) : null,
+                onCancel:             _canCancel(a) ? () => _handleCancel(a) : null,
+                onReschedule:         _canReschedule(a) ? () => _handleReschedule(a) : null,
+                queueNumber:          live ? (a.myQueueNumber ?? a.queueNumber) : null,
+                isLiveQueue:          live,
+                queueStarted:         live ? (a.queueStarted ?? false) : false,
+                isMyTurn:             live ? (a.isMyTurn ?? false) : false,
+                patientsAhead:        live ? a.patientsAhead : null,
+                estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
+                queueState:           a.queueState,
+              );
+            },
           ),
         );
-      }
-
-      return RefreshIndicator(
-        color: kPrimary,
-        strokeWidth: 2,
-        onRefresh: onRefresh,
-        child: ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
-          itemCount: list.length,
-          itemBuilder: (_, i) {
-            final a    = list[i];
-            final live = _isLive(a);
-            return _AppointmentCard(
-              appointment:          a,
-              onViewDetails:        () => _openDetail(a),
-              onViewPrescription:   _isCompleted(a) && a.appointmentId != null ? () => _handleViewPrescription(a) : null,
-              onReview:             _canReview(a) ? () => _handleReview(context, a) : null,
-              onCancel:             _canCancel(a) ? () => _handleCancel(a) : null,
-              onReschedule:         _canReschedule(a) ? () => _handleReschedule(a) : null,
-              queueNumber:          live ? (a.myQueueNumber ?? a.queueNumber) : null,
-              isLiveQueue:          live,
-              queueStarted:         live ? (a.queueStarted ?? false) : false,
-              isMyTurn:             live ? (a.isMyTurn ?? false) : false,
-              patientsAhead:        live ? a.patientsAhead : null,
-              estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
-              queueState  : a.queueState,
-            );
-          },
-        ),
-      );
-    }).toList(),
-  );
-}
+      }).toList(),
+    );
+  }
 
   AppointmentState get vmState => ref.read(appointmentViewModelProvider);
 
   // ---------------------------------------------------------------------------
   // States
   // ---------------------------------------------------------------------------
-Widget _buildLoading(String msg) {
-  // Show skeleton only for the appointments fetch, spinner for account loading
-  if (msg.contains('Fetching')) {
-    return _buildSkeletonList();
+  Widget _buildLoading(String msg) {
+    if (msg.contains('Fetching')) {
+      return _buildSkeletonList();
+    }
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 36, height: 36,
+            child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5),
+          ),
+          const SizedBox(height: 12),
+          Text(msg, style: const TextStyle(fontSize: 13, color: kTextMuted)),
+        ],
+      ),
+    );
   }
-  return Center(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const SizedBox(
-          width: 36, height: 36,
-          child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5),
-        ),
-        const SizedBox(height: 12),
-        Text(msg, style: const TextStyle(fontSize: 13, color: kTextMuted)),
-      ],
-    ),
-  );
-}
+
   Widget _emptyState(_FilterTab f) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -755,6 +937,20 @@ Widget _buildLoading(String msg) {
             const SizedBox(height: 4),
             const Text('Pull down to refresh',
                 style: TextStyle(fontSize: 12, color: kTextMuted)),
+            // Show clear filter button when date filter is active
+            if (_hasDateFilter) ...[
+              const SizedBox(height: 14),
+              TextButton.icon(
+                onPressed: () => setState(() {
+                  _dateFilter = _DateFilter.all;
+                  _sortNewest = true;
+                }),
+                icon: const Icon(Icons.clear_all_rounded, size: 15),
+                label: const Text('Clear Date Filter',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                style: TextButton.styleFrom(foregroundColor: kPrimary),
+              ),
+            ],
           ],
         ),
       );
@@ -839,7 +1035,265 @@ Widget _buildLoading(String msg) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  APPOINTMENT CARD
+//  DATE FILTER BOTTOM SHEET  (appointment-specific)
+// ════════════════════════════════════════════════════════════════════
+class _AppointmentDateFilterSheet extends StatefulWidget {
+  final _DateFilter current;
+  final DateTime? customFrom, customTo;
+  final bool sortNewest;
+  final void Function(_DateFilter, DateTime?, DateTime?, bool) onApply;
+
+  const _AppointmentDateFilterSheet({
+    required this.current,
+    required this.customFrom,
+    required this.customTo,
+    required this.sortNewest,
+    required this.onApply,
+  });
+
+  @override
+  State<_AppointmentDateFilterSheet> createState() =>
+      _AppointmentDateFilterSheetState();
+}
+
+class _AppointmentDateFilterSheetState
+    extends State<_AppointmentDateFilterSheet> {
+  late _DateFilter _sel;
+  late DateTime?   _from, _to;
+  late bool        _newest;
+
+  @override
+  void initState() {
+    super.initState();
+    _sel    = widget.current;
+    _from   = widget.customFrom;
+    _to     = widget.customTo;
+    _newest = widget.sortNewest;
+  }
+
+  String _fmt(DateTime d) {
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${d.day} ${m[d.month]} ${d.year}';
+  }
+
+  Future<void> _pick(bool isFrom) async {
+    final p = await showDatePicker(
+      context: context,
+      initialDate: (isFrom ? _from : _to) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+          data: Theme.of(ctx).copyWith(
+              colorScheme: const ColorScheme.light(primary: kPrimary)),
+          child: child!),
+    );
+    if (p != null) setState(() => isFrom ? _from = p : _to = p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                  color: kBorder, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          // Header
+          Row(children: [
+            const Text('Filter by Date',
+                style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+            const Spacer(),
+            TextButton(
+              onPressed: () => setState(() {
+                _sel = _DateFilter.all; _from = null; _to = null; _newest = true;
+              }),
+              child: const Text('Reset',
+                  style: TextStyle(
+                      color: kError, fontWeight: FontWeight.w600, fontSize: 13)),
+            ),
+          ]),
+          const SizedBox(height: 8),
+
+          // Preset chips
+          Wrap(
+            spacing: 7, runSpacing: 7,
+            children: _DateFilter.values
+                .where((f) => f != _DateFilter.custom)
+                .map((f) {
+              final sel = _sel == f;
+              return GestureDetector(
+                onTap: () => setState(() => _sel = f),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 11, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: sel ? kPrimary : const Color(0xFFF7F8FA),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: sel ? kPrimary : kBorder,
+                        width: sel ? 1.5 : 1),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(f.icon,
+                        color: sel ? Colors.white : kTextMuted, size: 12),
+                    const SizedBox(width: 5),
+                    Text(f.label,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: sel ? Colors.white : kTextSecondary)),
+                  ]),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+
+          // Custom range
+          GestureDetector(
+            onTap: () => setState(() => _sel = _DateFilter.custom),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _sel == _DateFilter.custom
+                    ? kPrimaryLight
+                    : const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: _sel == _DateFilter.custom ? kPrimary : kBorder,
+                    width: _sel == _DateFilter.custom ? 1.5 : 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.tune_rounded,
+                        color: _sel == _DateFilter.custom
+                            ? kPrimary : kTextMuted, size: 15),
+                    const SizedBox(width: 7),
+                    Text('Custom Date Range',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600,
+                            color: _sel == _DateFilter.custom
+                                ? kPrimary : kTextMuted)),
+                  ]),
+                  if (_sel == _DateFilter.custom) ...[
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: _datePick('From', _from, () => _pick(true))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _datePick('To', _to, () => _pick(false))),
+                    ]),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Sort order
+          const Text('Sort Order',
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _sortBtn('Newest First', Icons.arrow_downward_rounded,
+                _newest, () => setState(() => _newest = true))),
+            const SizedBox(width: 8),
+            Expanded(child: _sortBtn('Oldest First', Icons.arrow_upward_rounded,
+                !_newest, () => setState(() => _newest = false))),
+          ]),
+          const SizedBox(height: 16),
+
+          // Apply button
+          SizedBox(
+            width: double.infinity, height: 46,
+            child: ElevatedButton(
+              onPressed: () {
+                widget.onApply(_sel, _from, _to, _newest);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary, foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Apply Filter',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _datePick(String label, DateTime? val, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: kBorder)),
+          child: Row(children: [
+            const Icon(Icons.calendar_today_rounded, color: kPrimary, size: 13),
+            const SizedBox(width: 7),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: const TextStyle(fontSize: 10, color: kTextMuted)),
+              Text(val != null ? _fmt(val) : 'Select',
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: val != null ? kTextPrimary : kTextMuted)),
+            ]),
+          ]),
+        ),
+      );
+
+  Widget _sortBtn(String label, IconData icon, bool sel, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: sel ? kPrimary : const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: sel ? kPrimary : kBorder),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: sel ? Colors.white : kTextMuted, size: 14),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: sel ? Colors.white : kTextSecondary)),
+            ],
+          ),
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  APPOINTMENT CARD  (unchanged)
 // ════════════════════════════════════════════════════════════════════
 class _AppointmentCard extends StatelessWidget {
   final AppointmentList appointment;
@@ -901,7 +1355,6 @@ class _AppointmentCard extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
-                    // ── Row 1: Avatar + Name s+ Status ──────────────
                     Row(
                       children: [
                         Container(
@@ -979,7 +1432,6 @@ class _AppointmentCard extends StatelessWidget {
                       child: Divider(height: 1, color: kBorder),
                     ),
 
-                    // ── Row 2: Date + Time ──────────────────────────
                     Row(
                       children: [
                         Expanded(
@@ -1003,8 +1455,6 @@ class _AppointmentCard extends StatelessWidget {
                       ],
                     ),
 
-
-                    // ── Live Queue Banner ───────────────────────────
                     if (isLiveQueue) ...[
                       const SizedBox(height: 8),
                       _LiveQueueBanner(
@@ -1013,13 +1463,12 @@ class _AppointmentCard extends StatelessWidget {
                         isMyTurn:             isMyTurn,
                         estimatedArrivalTime: estimatedArrivalTime,
                         patientsAhead:        patientsAhead,
-                        queueState : queueState,
+                        queueState:           queueState,
                       ),
                     ],
 
                     const SizedBox(height: 8),
 
-                    // ── Actions ─────────────────────────────────────
                     Row(
                       children: [
                         Expanded(
@@ -1035,7 +1484,9 @@ class _AppointmentCard extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(10)),
                               ),
                               child: Text(
-                                  onViewPrescription != null ? 'View Prescription' : 'View Details',
+                                  onViewPrescription != null
+                                      ? 'View Prescription'
+                                      : 'View Details',
                                   style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600)),
@@ -1066,7 +1517,8 @@ class _AppointmentCard extends StatelessWidget {
                           _iconBtn(Icons.edit_calendar_rounded,
                               kAmberLight, kWarning, onReschedule!),
                         ],
-                        if (onCancel != null && queueState?.toLowerCase() != 'queue closed') ...[
+                        if (onCancel != null &&
+                            queueState?.toLowerCase() != 'queue closed') ...[
                           const SizedBox(width: 6),
                           _iconBtn(Icons.cancel_rounded,
                               kRedLight, kError, onCancel!),
@@ -1074,45 +1526,68 @@ class _AppointmentCard extends StatelessWidget {
                         const SizedBox(width: 6),
                         if (hasMap) ...[
                           _iconBtn(Icons.map_rounded, kInfoLight, kInfo,
-                              () => openMap(a.latitude!, a.longitude!, a.clinicName)),
+                              () => openMap(
+                                  a.latitude!, a.longitude!, a.clinicName)),
                           const SizedBox(width: 6),
                         ],
-                        _iconBtn(Icons.call_rounded, kPrimaryLight, kPrimary,
-                            () => showDialog(
-                              context: context,
-                              builder: (ctx) => Dialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Container(
-                                        width: 44, height: 44,
-                                        decoration: const BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle),
-                                        child: const Icon(Icons.call_rounded, color: kPrimary, size: 22),
+                        _iconBtn(
+                          Icons.call_rounded, kPrimaryLight, kPrimary,
+                          () => showDialog(
+                            context: context,
+                            builder: (ctx) => Dialog(
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 44, height: 44,
+                                      decoration: const BoxDecoration(
+                                          color: kPrimaryLight,
+                                          shape: BoxShape.circle),
+                                      child: const Icon(Icons.call_rounded,
+                                          color: kPrimary, size: 22),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text('Contact',
+                                        style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w700,
+                                            color: kTextPrimary)),
+                                    const SizedBox(height: 16),
+                                    if (a.clinicContact?.isNotEmpty == true)
+                                      _callOption(
+                                          ctx,
+                                          'Call Clinic',
+                                          a.clinicName ?? 'Clinic',
+                                          a.clinicContact!,
+                                          Icons.local_hospital_rounded,
+                                          kWarning,
+                                          kAmberLight)
+                                    else
+                                      const Text('No contact available',
+                                          style: TextStyle(
+                                              fontSize: 13,
+                                              color: kTextMuted)),
+                                    const SizedBox(height: 14),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: TextButton(
+                                        onPressed: () => Navigator.pop(ctx),
+                                        child: const Text('Cancel',
+                                            style: TextStyle(
+                                                color: kTextSecondary,
+                                                fontSize: 13)),
                                       ),
-                                      const SizedBox(height: 10),
-                                      const Text('Contact',
-                                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                                      const SizedBox(height: 16),
-                                      if (a.clinicContact?.isNotEmpty == true)
-                                        _callOption(ctx, 'Call Clinic', a.clinicName ?? 'Clinic', a.clinicContact!, Icons.local_hospital_rounded, kWarning, kAmberLight)
-                                      else
-                                        const Text('No contact available', style: TextStyle(fontSize: 13, color: kTextMuted)),
-                                      const SizedBox(height: 14),
-                                      SizedBox(
-                                        width: double.infinity,
-                                        child: TextButton(
-                                          onPressed: () => Navigator.pop(ctx),
-                                          child: const Text('Cancel', style: TextStyle(color: kTextSecondary, fontSize: 13)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            )),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -1122,8 +1597,8 @@ class _AppointmentCard extends StatelessWidget {
           ),
         ),
 
-        // Queue badge
-        if (queueNumber != null && queueState?.toLowerCase() != 'queue closed')
+        if (queueNumber != null &&
+            queueState?.toLowerCase() != 'queue closed')
           Positioned(
             top: -7, left: 12,
             child: Container(
@@ -1132,8 +1607,10 @@ class _AppointmentCard extends StatelessWidget {
                 color: kPrimary,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(color: kPrimary.withOpacity(0.35),
-                      blurRadius: 6, offset: const Offset(0, 2)),
+                  BoxShadow(
+                      color: kPrimary.withOpacity(0.35),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2)),
                 ],
               ),
               child: Text('Q$queueNumber',
@@ -1181,13 +1658,16 @@ class _AppointmentCard extends StatelessWidget {
         ],
       );
 
-  Widget _iconBtn(IconData icon, Color bg, Color fg, VoidCallback onTap) =>
+  Widget _iconBtn(
+          IconData icon, Color bg, Color fg, VoidCallback onTap) =>
       SizedBox(
         width: 36, height: 36,
         child: ElevatedButton(
           onPressed: onTap,
           style: ElevatedButton.styleFrom(
-            backgroundColor: bg, elevation: 0, padding: EdgeInsets.zero,
+            backgroundColor: bg,
+            elevation: 0,
+            padding: EdgeInsets.zero,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
           ),
@@ -1196,7 +1676,7 @@ class _AppointmentCard extends StatelessWidget {
       );
 
   Widget _callOption(BuildContext ctx, String title, String subtitle,
-      String number, IconData icon, Color fg, Color bg) =>
+          String number, IconData icon, Color fg, Color bg) =>
       GestureDetector(
         onTap: () async {
           Navigator.pop(ctx);
@@ -1224,9 +1704,12 @@ class _AppointmentCard extends StatelessWidget {
                 children: [
                   Text(title,
                       style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: fg)),
                   Text(subtitle,
-                      style: const TextStyle(fontSize: 11, color: kTextSecondary),
+                      style: const TextStyle(
+                          fontSize: 11, color: kTextSecondary),
                       overflow: TextOverflow.ellipsis),
                 ],
               ),
@@ -1238,7 +1721,7 @@ class _AppointmentCard extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  LIVE QUEUE BANNER
+//  LIVE QUEUE BANNER  (unchanged)
 // ════════════════════════════════════════════════════════════════════
 class _LiveQueueBanner extends StatefulWidget {
   final int?    queueNumber;
@@ -1247,10 +1730,10 @@ class _LiveQueueBanner extends StatefulWidget {
   final String? queueState;
   final int?    patientsAhead;
 
-
   const _LiveQueueBanner({
     this.queueNumber, this.queueStarted = false,
-    this.isMyTurn = false, this.estimatedArrivalTime, this.patientsAhead, this.queueState
+    this.isMyTurn = false, this.estimatedArrivalTime,
+    this.patientsAhead, this.queueState,
   });
 
   @override
@@ -1284,13 +1767,12 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
 
   @override
   Widget build(BuildContext context) {
-    final myTurn   = widget.isMyTurn;
-    final started  = widget.queueStarted;
-    
-    final q        = widget.queueNumber;
-    final ahead    = widget.patientsAhead;
-    final arrival  = widget.estimatedArrivalTime;
-    final queueState = widget.queueState ?? "";
+    final myTurn    = widget.isMyTurn;
+    final started   = widget.queueStarted;
+    final q         = widget.queueNumber;
+    final ahead     = widget.patientsAhead;
+    final arrival   = widget.estimatedArrivalTime;
+    final queueState = widget.queueState ?? '';
 
     final topColor  = myTurn || started ? kSuccess : kWarning;
     final topBg     = topColor.withOpacity(0.07);
@@ -1309,7 +1791,6 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
           ),
           child: Row(
             children: [
-              // Pulse dot
               if (started)
                 AnimatedBuilder(
                   animation: _pulse,
@@ -1341,7 +1822,8 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                                     ? ''
                                     : 'Queue token  ',
                         style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
                             color: kTextSecondary),
                       ),
                       if (!myTurn && !_isClosed)
@@ -1357,9 +1839,12 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: myTurn ? kSuccess : (started ? kSuccess : kWarning),
+                  color: myTurn
+                      ? kSuccess
+                      : (started ? kSuccess : kWarning),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
@@ -1372,8 +1857,10 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                     Text(
                       myTurn ? 'YOUR TURN' : queueState,
                       style: const TextStyle(
-                          color: Colors.white, fontSize: 10,
-                          fontWeight: FontWeight.w700, letterSpacing: 0.5),
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5),
                     ),
                   ],
                 ),
@@ -1432,7 +1919,8 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                       color: kWarning.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(ahead == 0 ? 'Next' : '$ahead ahead',
+                    child: Text(
+                        ahead == 0 ? 'Next' : '$ahead ahead',
                         style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -1448,7 +1936,7 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  DETAIL BOTTOM SHEET
+//  DETAIL BOTTOM SHEET  (unchanged)
 // ════════════════════════════════════════════════════════════════════
 class _DetailSheet extends StatelessWidget {
   final AppointmentList appointment;
@@ -1489,7 +1977,6 @@ class _DetailSheet extends StatelessWidget {
                 controller: ctrl,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 children: [
-                  // Hero banner
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -1532,24 +2019,27 @@ class _DetailSheet extends StatelessWidget {
                                 '${a.gender ?? '—'}  ·  DOB: ${_fmtDate(a.dob)}',
                                 style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white.withOpacity(0.85)),
+                                    color:
+                                        Colors.white.withOpacity(0.85)),
                               ),
                               const SizedBox(height: 7),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color:
+                                      Colors.white.withOpacity(0.2),
                                   borderRadius: BorderRadius.circular(6),
                                   border: Border.all(
-                                      color:
-                                          Colors.white.withOpacity(0.3)),
+                                      color: Colors.white
+                                          .withOpacity(0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(sIcon,
-                                        size: 11, color: Colors.white),
+                                        size: 11,
+                                        color: Colors.white),
                                     const SizedBox(width: 5),
                                     Text(_cap(a.status),
                                         style: const TextStyle(
@@ -1567,7 +2057,6 @@ class _DetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Schedule
                   _sectionLabel('Schedule'),
                   const SizedBox(height: 8),
                   Row(
@@ -1586,8 +2075,7 @@ class _DetailSheet extends StatelessWidget {
                         Expanded(
                           child: _schedChip(
                             icon: Icons.access_time_filled_rounded,
-                            fg: kSuccess,
-                            bg: kGreenLight,
+                            fg: kSuccess, bg: kGreenLight,
                             label: 'Time',
                             value: _appointmentTimePrimary(a),
                             sub: _appointmentTimeChipSub(a),
@@ -1598,7 +2086,6 @@ class _DetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Doctor
                   _sectionLabel('Doctor'),
                   const SizedBox(height: 8),
                   _infoCard(
@@ -1630,7 +2117,8 @@ class _DetailSheet extends StatelessWidget {
                                       fontWeight: FontWeight.w500)),
                               if (a.experience != null) ...[
                                 const SizedBox(height: 2),
-                                Text('${a.experience} yrs experience',
+                                Text(
+                                    '${a.experience} yrs experience',
                                     style: const TextStyle(
                                         fontSize: 11,
                                         color: kTextSecondary)),
@@ -1643,7 +2131,6 @@ class _DetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Clinic
                   _sectionLabel('Clinic'),
                   const SizedBox(height: 8),
                   _infoCard(
@@ -1656,13 +2143,15 @@ class _DetailSheet extends StatelessWidget {
                               decoration: BoxDecoration(
                                   color: kAmberLight,
                                   borderRadius: BorderRadius.circular(10)),
-                              child: const Icon(Icons.local_hospital_rounded,
+                              child: const Icon(
+                                  Icons.local_hospital_rounded,
                                   color: kWarning, size: 18),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
                                 children: [
                                   Text(a.clinicName ?? '—',
                                       style: const TextStyle(
@@ -1684,11 +2173,12 @@ class _DetailSheet extends StatelessWidget {
                           const Divider(height: 1, color: kBorder),
                           const SizedBox(height: 10),
                           SizedBox(
-                            width: double.infinity,
-                            height: 38,
+                            width: double.infinity, height: 38,
                             child: ElevatedButton.icon(
                               onPressed: () => openMap(
-                                  a.latitude!, a.longitude!, a.clinicName),
+                                  a.latitude!,
+                                  a.longitude!,
+                                  a.clinicName),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: kInfoLight,
                                 elevation: 0,
@@ -1711,29 +2201,34 @@ class _DetailSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Details
                   _sectionLabel('Details'),
                   const SizedBox(height: 8),
                   _infoCard(
                     padding: EdgeInsets.zero,
                     child: Column(
                       children: [
-                        _detailRow(Icons.badge_rounded,       kInfoLight,   kInfo,    'Patient',      a.patientName ?? '—'),
+                        _detailRow(Icons.badge_rounded, kInfoLight, kInfo,
+                            'Patient', a.patientName ?? '—'),
                         _divLine(),
-                        _detailRow(Icons.wc_rounded,          kPurpleLight, kPurple,  'Gender',       a.gender ?? '—'),
+                        _detailRow(Icons.wc_rounded, kPurpleLight,
+                            kPurple, 'Gender', a.gender ?? '—'),
                         _divLine(),
-                        _detailRow(Icons.cake_rounded,        kAmberLight,  kWarning, 'Date of Birth',_fmtDate(a.dob)),
+                        _detailRow(Icons.cake_rounded, kAmberLight,
+                            kWarning, 'Date of Birth', _fmtDate(a.dob)),
                         if (a.queueNumber != null) ...[
                           _divLine(),
-                          _detailRow(Icons.queue_rounded,     kGreenLight,  kSuccess, 'Queue No.','Q #${a.queueNumber}'),
+                          _detailRow(Icons.queue_rounded, kGreenLight,
+                              kSuccess, 'Queue No.', 'Q #${a.queueNumber}'),
                         ],
                         if (a.bookingFor != null) ...[
                           _divLine(),
-                          _detailRow(Icons.people_rounded,    kPurpleLight, kPurple,  'Booking For',  a.bookingFor!),
+                          _detailRow(Icons.people_rounded, kPurpleLight,
+                              kPurple, 'Booking For', a.bookingFor!),
                         ],
                         if (a.cancelledBy != null) ...[
                           _divLine(),
-                          _detailRow(Icons.cancel_rounded,    kRedLight,    kError,   'Cancelled By', _cap(a.cancelledBy)),
+                          _detailRow(Icons.cancel_rounded, kRedLight,
+                              kError, 'Cancelled By', _cap(a.cancelledBy)),
                         ],
                       ],
                     ),
@@ -1866,8 +2361,7 @@ class _DetailSheet extends StatelessWidget {
             ),
             const SizedBox(height: 7),
             Text(label,
-                style: const TextStyle(
-                    fontSize: 11, color: kTextSecondary)),
+                style: const TextStyle(fontSize: 11, color: kTextSecondary)),
             const SizedBox(height: 2),
             Text(value,
                 style: const TextStyle(
@@ -1876,8 +2370,7 @@ class _DetailSheet extends StatelessWidget {
                     color: kTextPrimary)),
             if (sub.isNotEmpty)
               Text(sub,
-                  style: const TextStyle(
-                      fontSize: 11, color: kTextSecondary)),
+                  style: const TextStyle(fontSize: 11, color: kTextSecondary)),
           ],
         ),
       );
@@ -1914,7 +2407,7 @@ class _DetailSheet extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  REVIEW DIALOG  (font sizes aligned, teal submit button)
+//  REVIEW DIALOG  (unchanged)
 // ════════════════════════════════════════════════════════════════════
 class AppointmentReviewInput {
   final int rating;
@@ -1952,7 +2445,6 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Header
                 Row(
                   children: [
                     Container(
@@ -1996,18 +2488,14 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text('How was your experience?',
-                      style: TextStyle(
-                          fontSize: 12, color: kTextSecondary)),
+                      style: TextStyle(fontSize: 12, color: kTextSecondary)),
                 ),
                 const SizedBox(height: 10),
-                // Stars
                 Row(
                   children: List.generate(5, (i) {
                     final idx    = i + 1;
                     final filled = idx <= active;
-                    final color  = active > 0
-                        ? starColors[active]
-                        : kBorder;
+                    final color  = active > 0 ? starColors[active] : kBorder;
                     return GestureDetector(
                       onTap: () =>
                           setState(() { rating = idx; hovered = 0; }),
@@ -2044,16 +2532,13 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                       : const SizedBox(height: 16),
                 ),
                 const SizedBox(height: 12),
-                // Comment
                 TextField(
                   controller: commentCtrl,
                   maxLines: 3,
-                  style: const TextStyle(
-                      fontSize: 13, color: kTextPrimary),
+                  style: const TextStyle(fontSize: 13, color: kTextPrimary),
                   decoration: InputDecoration(
                     hintText: 'Write a short review (optional)',
-                    hintStyle: const TextStyle(
-                        fontSize: 13, color: kTextMuted),
+                    hintStyle: const TextStyle(fontSize: 13, color: kTextMuted),
                     filled: true,
                     fillColor: const Color(0xFFF7F8FA),
                     contentPadding: const EdgeInsets.all(12),
@@ -2075,8 +2560,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                       child: OutlinedButton(
                         onPressed: () => Navigator.pop(ctx),
                         style: OutlinedButton.styleFrom(
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 11),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
                           side: const BorderSide(color: kBorder),
                           foregroundColor: kTextSecondary,
                           shape: RoundedRectangleBorder(
@@ -2084,8 +2568,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                         ),
                         child: const Text('Cancel',
                             style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600)),
+                                fontSize: 13, fontWeight: FontWeight.w600)),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -2101,19 +2584,16 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                                     comment: commentCtrl.text.trim())),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimary,
-                          disabledBackgroundColor:
-                              kPrimaryLight,
+                          disabledBackgroundColor: kPrimaryLight,
                           foregroundColor: Colors.white,
                           elevation: 0,
-                          padding:
-                              const EdgeInsets.symmetric(vertical: 11),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10)),
                         ),
                         child: const Text('Submit',
                             style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700)),
+                                fontSize: 13, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ],
@@ -2127,26 +2607,28 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
   );
 }
 
-
 // ════════════════════════════════════════════════════════════════════
-//  SHIMMER SKELETON
+//  SHIMMER SKELETON  (unchanged)
 // ════════════════════════════════════════════════════════════════════
 class _Shimmer extends StatefulWidget {
   final double width, height, radius;
-  const _Shimmer({this.width = double.infinity, this.height = 16, this.radius = 8});
+  const _Shimmer(
+      {this.width = double.infinity, this.height = 16, this.radius = 8});
 
   @override
   State<_Shimmer> createState() => _ShimmerState();
 }
 
-class _ShimmerState extends State<_Shimmer> with SingleTickerProviderStateMixin {
+class _ShimmerState extends State<_Shimmer>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+    _ctrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1200))
       ..repeat();
     _anim = Tween<double>(begin: -2, end: 2)
         .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
@@ -2168,11 +2650,8 @@ class _ShimmerState extends State<_Shimmer> with SingleTickerProviderStateMixin 
             begin: Alignment(_anim.value - 1, 0),
             end: Alignment(_anim.value + 1, 0),
             colors: const [
-              Color(0xFFEDF2F7),
-              Color(0xFFE2E8F0),
-              Color(0xFFCBD5E0),
-              Color(0xFFE2E8F0),
-              Color(0xFFEDF2F7),
+              Color(0xFFEDF2F7), Color(0xFFE2E8F0),
+              Color(0xFFCBD5E0), Color(0xFFE2E8F0), Color(0xFFEDF2F7),
             ],
           ),
         ),
@@ -2204,7 +2683,6 @@ class _SkeletonCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Row 1: Avatar + name + status badge
           Row(
             children: [
               _Shimmer(width: 44, height: 44, radius: 12),
@@ -2227,7 +2705,6 @@ class _SkeletonCard extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(height: 1, color: kBorder),
           ),
-          // Row 2: Date + Time tiles
           Row(
             children: [
               Expanded(
@@ -2269,7 +2746,6 @@ class _SkeletonCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // Action buttons row
           Row(
             children: [
               Expanded(child: _Shimmer(height: 36, radius: 10)),
