@@ -16,6 +16,8 @@ import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/models/review_model.dart';
 import 'package:qless/domain/models/today_queue_model.dart';
 import 'package:qless/domain/models/review_request_model.dart';
+import 'package:qless/domain/models/clinic_image_model.dart';
+
 import 'package:qless/domain/models/token_response.dart';
 import 'package:retrofit/retrofit.dart';
 part 'api_service.g.dart';
@@ -73,6 +75,15 @@ abstract class ApiService {
     @Path("doctor_id") int doctorId,
   );
 
+  @GET("doctor/users/clinicGallery/{clinic_id}")
+  Future<List<DoctorDetails>> fetchClinicGallery(
+    @Path("clinic_id") String clinicId,
+  );
+
+  @DELETE("doctor/index/delete/clinicGallery")
+  Future<dynamic> deleteClinicGallery(
+    @Body() Map<String, dynamic> body,
+  );
 
 
   //  POST API
@@ -101,8 +112,9 @@ abstract class ApiService {
     @Part(name: "clinic_contact") String clinicContact,
     @Part(name: "gender_id") int genderId,
     @Part(name: "doctor_image") MultipartFile? doctorImage,
-    @Part(name: "clinic_image") MultipartFile? clinicImage,
+    @Part(name: "clinic_images") List<MultipartFile>? clinicImages,
   );
+
 
   @POST("doctor/insert/insertMedicine")
   Future<dynamic> addMedicine(@Body() Medicine medicine);

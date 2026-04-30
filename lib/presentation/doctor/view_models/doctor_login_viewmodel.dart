@@ -134,14 +134,14 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   Future<void> addDoctorDetails(
     DoctorDetails doctorLogin, {
     File? doctorImage,
-    File? clinicImage,
+    List<File>? clinicImages,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.addDoctorDetails(
         doctorLogin,
         doctorImage: doctorImage,
-        clinicImage: clinicImage,
+        clinicImages: clinicImages,
       );
       final dynamic rawDoctorId = result['doctor_id'];
       final dynamic rawClinicId = result['clinic_id'];
@@ -169,6 +169,31 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
             clinicId: clinicId,
           );
           return;
+        }
+
+        // Some backend flows create doctor/clinic records but still return 500
+        // with { success: false, message: "Doctor creation failed" }.
+        // Reconcile using mobile lookup so registration can proceed safely.
+        final String rawMessage = (data['message'] ?? '').toString().toLowerCase();
+        if (rawMessage.contains('doctor creation failed') &&
+            (doctorLogin.mobile ?? '').trim().isNotEmpty) {
+          try {
+            final existing = await usecase.checkPhoneDoctor(
+              doctorLogin.mobile!.trim(),
+            );
+            if (existing.isNotEmpty) {
+              final d = existing.first;
+              state = state.copyWith(
+                isLoading: false,
+                doctorId: d.doctorId,
+                clinicId: d.clinicId,
+                error: null,
+              );
+              return;
+            }
+          } catch (_) {
+            // fall through to original error handling
+          }
         }
       }
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -252,6 +277,36 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     } catch (e) {
       state = state.copyWith(error: e.toString());
       return [];
+    }
+  }
+
+
+  Future<List<String>> fetchClinicGallery(String clinicId) async {
+    try {
+      return await usecase.fetchClinicGallery(clinicId);
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteClinicGallery(
+    String clinicId,
+    List<String> imageUrls,
+  ) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      final response = await usecase.deleteClinicGallery(clinicId, imageUrls);
+      state = state.copyWith(isLoading: false);
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return {"success": true, "message": "Images deleted"};
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return {"success": false, "message": e.toString()};
     }
   }
 

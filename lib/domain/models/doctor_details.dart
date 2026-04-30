@@ -107,6 +107,13 @@ class DoctorDetails {
   final double? rating;
 
 
+//CLINIC IMAGES
+
+  @JsonKey(name: 'clinic_image_id')
+  final int? clinicImageId;
+    @JsonKey(name: 'sortOrder')
+  final int? sortOrder;
+
   DoctorDetails({
     this.doctorId,
     this.name,
@@ -144,6 +151,8 @@ class DoctorDetails {
     this.bookingEndTime,
     this.isRecentlyVisited,
     this.rating,
+    this.clinicImageId,
+    this.sortOrder,
   });
 
   factory DoctorDetails.fromJson(Map<String, dynamic> json) =>
