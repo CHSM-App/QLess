@@ -130,6 +130,57 @@ QueueState _sessionQueueState(int? status) {
   }
 }
 
+// ── Date filter ───────────────────────────────────────────────────────────────
+enum _DateFilter { all, today, thisWeek, thisMonth, last3Months, last6Months, thisYear, custom }
+
+extension _DateFilterX on _DateFilter {
+  String get label => switch (this) {
+    _DateFilter.all         => 'All Time',
+    _DateFilter.today       => 'Today',
+    _DateFilter.thisWeek    => 'This Week',
+    _DateFilter.thisMonth   => 'This Month',
+    _DateFilter.last3Months => 'Last 3 Months',
+    _DateFilter.last6Months => 'Last 6 Months',
+    _DateFilter.thisYear    => 'This Year',
+    _DateFilter.custom      => 'Custom Range',
+  };
+  IconData get icon => switch (this) {
+    _DateFilter.all         => Icons.all_inclusive_rounded,
+    _DateFilter.today       => Icons.today_rounded,
+    _DateFilter.thisWeek    => Icons.view_week_rounded,
+    _DateFilter.thisMonth   => Icons.calendar_month_rounded,
+    _DateFilter.last3Months => Icons.date_range_rounded,
+    _DateFilter.last6Months => Icons.date_range_rounded,
+    _DateFilter.thisYear    => Icons.calendar_today_rounded,
+    _DateFilter.custom      => Icons.tune_rounded,
+  };
+}
+
+bool _passesDateFilter(AppointmentList a, _DateFilter df,
+    DateTime? customFrom, DateTime? customTo) {
+  final p = DateTime.tryParse(a.appointmentDate ?? '');
+  if (p == null) return df == _DateFilter.all;
+  final now = DateTime.now();
+  return switch (df) {
+    _DateFilter.all         => true,
+    _DateFilter.today       => p.year == now.year && p.month == now.month && p.day == now.day,
+    _DateFilter.thisWeek    => p.isAfter(
+        DateTime(now.year, now.month, now.day)
+            .subtract(Duration(days: now.weekday - 1))
+            .subtract(const Duration(seconds: 1))),
+    _DateFilter.thisMonth   => p.year == now.year && p.month == now.month,
+    _DateFilter.last3Months => p.isAfter(now.subtract(const Duration(days: 90))),
+    _DateFilter.last6Months => p.isAfter(now.subtract(const Duration(days: 180))),
+    _DateFilter.thisYear    => p.year == now.year,
+    _DateFilter.custom      => () {
+        if (customFrom != null && p.isBefore(customFrom)) return false;
+        if (customTo != null &&
+            p.isAfter(customTo.add(const Duration(days: 1)))) return false;
+        return true;
+      }(),
+  };
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  MAIN SCREEN
 // ════════════════════════════════════════════════════════════════════
@@ -149,6 +200,11 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   late final ProviderSubscription<int?> _idSub;
   AppointmentList? _selected;
   _Tab _activeTab = _Tab.today;
+
+  _DateFilter _dateFilter = _DateFilter.all;
+  DateTime?   _customFrom;
+  DateTime?   _customTo;
+  bool        _sortNewest = true;
 
   @override
   void initState() {
@@ -221,18 +277,36 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       .toList()
     ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
 
-  List<AppointmentList> _upcomingList(List<AppointmentList> all) => all
-      .where((a) =>
-          (a.status?.toLowerCase().trim() ?? '') == 'booked' &&
-          _isAfter(_pd(a.appointmentDate)) && _match(a))
-      .toList();
+  List<AppointmentList> _upcomingList(List<AppointmentList> all) {
+    final list = all
+        .where((a) =>
+            (a.status?.toLowerCase().trim() ?? '') == 'booked' &&
+            _isAfter(_pd(a.appointmentDate)) && _match(a) &&
+            _passesDateFilter(a, _dateFilter, _customFrom, _customTo))
+        .toList();
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a.appointmentDate ?? '') ?? DateTime(0);
+      final db = DateTime.tryParse(b.appointmentDate ?? '') ?? DateTime(0);
+      return _sortNewest ? db.compareTo(da) : da.compareTo(db);
+    });
+    return list;
+  }
 
-  List<AppointmentList> _completedList(List<AppointmentList> all) => all
-      .where((a) {
-        final s = a.status?.toLowerCase().trim() ?? '';
-        return (s == 'completed' || s == 'done' || s == 'closed') && _match(a);
-      })
-      .toList();
+  List<AppointmentList> _completedList(List<AppointmentList> all) {
+    final list = all
+        .where((a) {
+          final s = a.status?.toLowerCase().trim() ?? '';
+          return (s == 'completed' || s == 'done' || s == 'closed') && _match(a) &&
+              _passesDateFilter(a, _dateFilter, _customFrom, _customTo);
+        })
+        .toList();
+    list.sort((a, b) {
+      final da = DateTime.tryParse(a.appointmentDate ?? '') ?? DateTime(0);
+      final db = DateTime.tryParse(b.appointmentDate ?? '') ?? DateTime(0);
+      return _sortNewest ? db.compareTo(da) : da.compareTo(db);
+    });
+    return list;
+  }
 
   void _snack(String msg, {bool isError = false}) =>
       ScaffoldMessenger.of(context).showSnackBar(
@@ -572,6 +646,58 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     );
   }
 
+  bool get _hasDateFilter =>
+      _activeTab != _Tab.today && (_dateFilter != _DateFilter.all || !_sortNewest);
+
+  String _fmtDateChip(DateTime d) {
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${d.day} ${m[d.month]} ${d.year}';
+  }
+
+  void _showDateFilterSheet() => showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => _PatientDateFilterSheet(
+      current: _dateFilter,
+      customFrom: _customFrom,
+      customTo: _customTo,
+      sortNewest: _sortNewest,
+      onApply: (f, from, to, newest) => setState(() {
+        _dateFilter = f;
+        _customFrom = from;
+        _customTo   = to;
+        _sortNewest = newest;
+      }),
+    ),
+  );
+
+  Widget _filterChip({
+    required IconData icon,
+    required String label,
+    required VoidCallback onRemove,
+    Color color = kPrimary,
+  }) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, color: color, size: 11),
+          const SizedBox(width: 5),
+          Text(label,
+              style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 5),
+          GestureDetector(
+            onTap: onRemove,
+            child: Icon(Icons.close_rounded, color: color, size: 12),
+          ),
+        ]),
+      );
+
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -580,23 +706,76 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       ),
       child: SafeArea(
         bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-          child: AppExpandableHeaderSearch(
-            controller: _searchCtrl,
-            leadingIcon: Icons.people_alt_outlined,
-            title: 'Patients',
-            subtitle: 'Manage your patient queue',
-            hintText: 'Search by name, status or queue...',
-            accentColor: kPrimary,
-            leadingBackgroundColor: kPrimaryLight,
-            titleColor: kTextPrimary,
-            subtitleColor: kTextSecondary,
-            fieldColor: kBg,
-            borderColor: kBorder,
-            iconColor: kTextMuted,
-            textColor: kTextPrimary,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: AppExpandableHeaderSearch(
+                      controller: _searchCtrl,
+                      leadingIcon: Icons.people_alt_outlined,
+                      title: 'Patients',
+                      subtitle: 'Manage your patient queue',
+                      hintText: 'Search by name, status or queue...',
+                      accentColor: kPrimary,
+                      leadingBackgroundColor: kPrimaryLight,
+                      titleColor: kTextPrimary,
+                      subtitleColor: kTextSecondary,
+                      fieldColor: kBg,
+                      borderColor: kBorder,
+                      iconColor: kTextMuted,
+                      textColor: kTextPrimary,
+                    ),
+                  ),
+                  if (_activeTab != _Tab.today) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _showDateFilterSheet,
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: _hasDateFilter ? kPrimary : const Color(0xFFF7F8FA),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _hasDateFilter ? kPrimary : kBorder),
+                      ),
+                      child: Icon(Icons.tune_rounded,
+                          color: _hasDateFilter ? Colors.white : kPrimary, size: 18),
+                    ),
+                  ),
+                ],
+                ],
+              ),
+            ),
+            if (_hasDateFilter)
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                child: Wrap(
+                  spacing: 6, runSpacing: 6,
+                  children: [
+                    if (_dateFilter != _DateFilter.all)
+                      _filterChip(
+                        icon: _dateFilter.icon,
+                        label: _dateFilter == _DateFilter.custom && _customFrom != null
+                            ? '${_fmtDateChip(_customFrom!)} – ${_customTo != null ? _fmtDateChip(_customTo!) : '…'}'
+                            : _dateFilter.label,
+                        color: kPrimary,
+                        onRemove: () => setState(() => _dateFilter = _DateFilter.all),
+                      ),
+                    if (!_sortNewest)
+                      _filterChip(
+                        icon: Icons.arrow_upward_rounded,
+                        label: 'Oldest First',
+                        color: kPrimary,
+                        onRemove: () => setState(() => _sortNewest = true),
+                      ),
+                  ],
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -3066,4 +3245,249 @@ class _SkeletonPatientList extends StatelessWidget {
       ),
     ],
   );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  DATE FILTER BOTTOM SHEET
+// ════════════════════════════════════════════════════════════════════
+class _PatientDateFilterSheet extends StatefulWidget {
+  final _DateFilter current;
+  final DateTime? customFrom, customTo;
+  final bool sortNewest;
+  final void Function(_DateFilter, DateTime?, DateTime?, bool) onApply;
+
+  const _PatientDateFilterSheet({
+    required this.current,
+    required this.customFrom,
+    required this.customTo,
+    required this.sortNewest,
+    required this.onApply,
+  });
+
+  @override
+  State<_PatientDateFilterSheet> createState() => _PatientDateFilterSheetState();
+}
+
+class _PatientDateFilterSheetState extends State<_PatientDateFilterSheet> {
+  late _DateFilter _sel;
+  late DateTime?   _from, _to;
+  late bool        _newest;
+
+  @override
+  void initState() {
+    super.initState();
+    _sel    = widget.current;
+    _from   = widget.customFrom;
+    _to     = widget.customTo;
+    _newest = widget.sortNewest;
+  }
+
+  String _fmt(DateTime d) {
+    const m = ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${d.day} ${m[d.month]} ${d.year}';
+  }
+
+  Future<void> _pick(bool isFrom) async {
+    final p = await showDatePicker(
+      context: context,
+      initialDate: (isFrom ? _from : _to) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+          data: Theme.of(ctx).copyWith(
+              colorScheme: const ColorScheme.light(primary: kPrimary)),
+          child: child!),
+    );
+    if (p != null) setState(() => isFrom ? _from = p : _to = p);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          16, 0, 16, MediaQuery.of(context).padding.bottom + 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                  color: kBorder, borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          Row(children: [
+            const Text('Filter by Date',
+                style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+            const Spacer(),
+            TextButton(
+              onPressed: () => setState(() {
+                _sel = _DateFilter.all; _from = null; _to = null; _newest = true;
+              }),
+              child: const Text('Reset',
+                  style: TextStyle(
+                      color: kError, fontWeight: FontWeight.w600, fontSize: 13)),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 7, runSpacing: 7,
+            children: _DateFilter.values
+                .where((f) => f != _DateFilter.custom)
+                .map((f) {
+              final sel = _sel == f;
+              return GestureDetector(
+                onTap: () => setState(() => _sel = f),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: sel ? kPrimary : const Color(0xFFF7F8FA),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                        color: sel ? kPrimary : kBorder,
+                        width: sel ? 1.5 : 1),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(f.icon,
+                        color: sel ? Colors.white : kTextMuted, size: 12),
+                    const SizedBox(width: 5),
+                    Text(f.label,
+                        style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: sel ? Colors.white : kTextSecondary)),
+                  ]),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => setState(() => _sel = _DateFilter.custom),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _sel == _DateFilter.custom
+                    ? kPrimaryLight
+                    : const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: _sel == _DateFilter.custom ? kPrimary : kBorder,
+                    width: _sel == _DateFilter.custom ? 1.5 : 1),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.tune_rounded,
+                        color: _sel == _DateFilter.custom ? kPrimary : kTextMuted,
+                        size: 15),
+                    const SizedBox(width: 7),
+                    Text('Custom Date Range',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600,
+                            color: _sel == _DateFilter.custom
+                                ? kPrimary : kTextMuted)),
+                  ]),
+                  if (_sel == _DateFilter.custom) ...[
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      Expanded(child: _datePick('From', _from, () => _pick(true))),
+                      const SizedBox(width: 8),
+                      Expanded(child: _datePick('To', _to, () => _pick(false))),
+                    ]),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          const Text('Sort Order',
+              style: TextStyle(
+                  fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+          const SizedBox(height: 8),
+          Row(children: [
+            Expanded(child: _sortBtn('Newest First', Icons.arrow_downward_rounded,
+                _newest, () => setState(() => _newest = true))),
+            const SizedBox(width: 8),
+            Expanded(child: _sortBtn('Oldest First', Icons.arrow_upward_rounded,
+                !_newest, () => setState(() => _newest = false))),
+          ]),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity, height: 46,
+            child: ElevatedButton(
+              onPressed: () {
+                widget.onApply(_sel, _from, _to, _newest);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary, foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Apply Filter',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _datePick(String label, DateTime? val, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+          decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: kBorder)),
+          child: Row(children: [
+            const Icon(Icons.calendar_today_rounded, color: kPrimary, size: 13),
+            const SizedBox(width: 7),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(label,
+                  style: const TextStyle(fontSize: 10, color: kTextMuted)),
+              Text(val != null ? _fmt(val) : 'Select',
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: val != null ? kTextPrimary : kTextMuted)),
+            ]),
+          ]),
+        ),
+      );
+
+  Widget _sortBtn(String label, IconData icon, bool sel, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: sel ? kPrimary : const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: sel ? kPrimary : kBorder),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: sel ? Colors.white : kTextMuted, size: 14),
+              const SizedBox(width: 6),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,
+                      color: sel ? Colors.white : kTextSecondary)),
+            ],
+          ),
+        ),
+      );
 }
