@@ -134,14 +134,14 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   Future<void> addDoctorDetails(
     DoctorDetails doctorLogin, {
     File? doctorImage,
-    File? clinicImage,
+    List<File>? clinicImages,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.addDoctorDetails(
         doctorLogin,
         doctorImage: doctorImage,
-        clinicImage: clinicImage,
+        clinicImages: clinicImages,
       );
       final dynamic rawDoctorId = result['doctor_id'];
       final dynamic rawClinicId = result['clinic_id'];
@@ -251,6 +251,15 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       return await usecase.mobileExistDoctor(mobile);
     } catch (e) {
       state = state.copyWith(error: e.toString());
+      return [];
+    }
+  }
+
+
+  Future<List<String>> fetchClinicGallery(String clinicId) async {
+    try {
+      return await usecase.fetchClinicGallery(clinicId);
+    } catch (e) {
       return [];
     }
   }

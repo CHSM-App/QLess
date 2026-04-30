@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/review_model.dart';
+import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart'
+    hide appointmentViewModelProvider;
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
@@ -90,6 +92,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   bool _didFetchReviews      = false;
   bool _didFetchAvail        = false;
   bool _didFetchPatientCount = false;
+  bool _didFetchGallery      = false;
+  List<String> _galleryImages = [];
   int? _favFetchedDid;
   int? _favFetchedPid;
 
@@ -106,6 +110,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
       _tryFetchReviews();
       _tryFetchAvail();
       _tryFetchPatientCount();
+      _tryFetchGallery();
     });
   }
 
@@ -138,6 +143,16 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     if (did <= 0 || (_didFetchPatientCount && !force)) return;
     _didFetchPatientCount = true;
     ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
+  }
+
+  Future<void> _tryFetchGallery({bool force = false}) async {
+    final clinicId = widget.doctor.clinicId;
+    if (clinicId == null || clinicId.isEmpty || (_didFetchGallery && !force)) return;
+    _didFetchGallery = true;
+    final images = await ref
+        .read(doctorLoginViewModelProvider.notifier)
+        .fetchClinicGallery(clinicId);
+    if (mounted) setState(() => _galleryImages = images);
   }
 
   Future<void> _toggleFav(bool v) async {
@@ -301,6 +316,15 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             // _buildActionPills(),
             // const SizedBox(height: 14),
 
+            // ── Clinic Gallery ───────────────────────────────────
+            if (_galleryImages.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              _buildSectionLabel('Clinic Photos'),
+              const SizedBox(height: 8),
+              _buildClinicGallery(_galleryImages),
+              const SizedBox(height: 14),
+            ],
+
             // ── About ────────────────────────────────────────────
             _buildSectionLabel('About Doctor'),
             const SizedBox(height: 8),
@@ -338,6 +362,32 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // ── Clinic Gallery ──────────────────────────────────────────────────
+  Widget _buildClinicGallery(List<String> images) {
+    return SizedBox(
+      height: 150,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (_, i) => _GalleryThumb(
+          url: images[i],
+          index: i,
+          total: images.length,
+          onTap: () => _previewNetworkImage(images, i),
+        ),
+      ),
+    );
+  }
+
+  void _previewNetworkImage(List<String> images, int startIndex) {
+    showDialog(
+      context: context,
+      builder: (_) => _GalleryPreviewDialog(images: images, startIndex: startIndex),
     );
   }
 
@@ -1239,4 +1289,183 @@ int _calcSlots(String start, String end, int? duration) {
   final e = _toMinutes(end);
   if (s < 0 || e <= s) return 0;
   return (e - s) ~/ duration;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  GALLERY THUMB  — horizontal scroll photo tile
+// ════════════════════════════════════════════════════════════════════
+class _GalleryThumb extends StatelessWidget {
+  final String       url;
+  final int          index, total;
+  final VoidCallback onTap;
+  const _GalleryThumb({
+    required this.url,
+    required this.index,
+    required this.total,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            Image.network(
+              url,
+              width: 170,
+              height: 150,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                width: 170,
+                height: 150,
+                color: kBorder,
+                child: const Icon(Icons.broken_image_outlined,
+                    color: kTextMuted, size: 28),
+              ),
+              loadingBuilder: (_, child, progress) => progress == null
+                  ? child
+                  : Container(
+                      width: 170,
+                      height: 150,
+                      color: kBorder,
+                      child: const Center(
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: kPrimary),
+                      ),
+                    ),
+            ),
+            // Photo count badge on last image
+            if (index == total - 1 && total > 1)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.photo_library_outlined,
+                        color: Colors.white, size: 11),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$total photos',
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600),
+                    ),
+                  ]),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  GALLERY PREVIEW DIALOG  — full-screen swipeable viewer
+// ════════════════════════════════════════════════════════════════════
+class _GalleryPreviewDialog extends StatefulWidget {
+  final List<String> images;
+  final int          startIndex;
+  const _GalleryPreviewDialog(
+      {required this.images, required this.startIndex});
+
+  @override
+  State<_GalleryPreviewDialog> createState() => _GalleryPreviewDialogState();
+}
+
+class _GalleryPreviewDialogState extends State<_GalleryPreviewDialog> {
+  late PageController _pageCtrl;
+  late int _current;
+
+  @override
+  void initState() {
+    super.initState();
+    _current  = widget.startIndex;
+    _pageCtrl = PageController(initialPage: widget.startIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.black,
+      insetPadding: EdgeInsets.zero,
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _pageCtrl,
+            itemCount: widget.images.length,
+            onPageChanged: (i) => setState(() => _current = i),
+            itemBuilder: (_, i) => InteractiveViewer(
+              child: Image.network(
+                widget.images[i],
+                fit: BoxFit.contain,
+                width: double.infinity,
+                height: double.infinity,
+                errorBuilder: (_, __, ___) => const Center(
+                  child: Icon(Icons.broken_image_outlined,
+                      color: Colors.white54, size: 48),
+                ),
+              ),
+            ),
+          ),
+          // Close button
+          Positioned(
+            top: 12,
+            right: 12,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                    color: Colors.black54, shape: BoxShape.circle),
+                child: const Icon(Icons.close,
+                    color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+          // Page counter
+          if (widget.images.length > 1)
+            Positioned(
+              bottom: 16,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${_current + 1} / ${widget.images.length}',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
