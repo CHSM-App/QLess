@@ -49,4 +49,8 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.fetchClinicGallery(clinicId);
   }
 
+  Future<dynamic> deleteClinicGallery(String clinicId, List<String> imageUrls) {
+    return doctorLoginRepository.deleteClinicGallery(clinicId, imageUrls);
+  }
+
 }

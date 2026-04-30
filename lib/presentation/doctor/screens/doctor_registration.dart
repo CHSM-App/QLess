@@ -786,14 +786,14 @@ Widget _buildStep1() {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Doctor photo – tapping opens camera/gallery sheet
-        Center(
-          child: _AvatarPicker(
-            photo: _doctorPhoto,
-            icon: Icons.person_rounded,
-            label: 'Upload Doctor Photo',
-            onTap: () => _pickImage(true),
-          ),
-        ),
+        // Center(
+        //   child: _AvatarPicker(
+        //     photo: _doctorPhoto,
+        //     icon: Icons.person_rounded,
+        //     label: 'Upload Doctor Photo',
+        //     onTap: () => _pickImage(true),
+        //   ),
+        // ),
         const SizedBox(height: 24),
         const _SectionHeader(title: 'Basic Details'),
         const SizedBox(height: 12),

@@ -100,6 +100,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
   List<File> _clinicPhotos = [];         // newly picked local files
   List<String> _clinicNetworkImages = []; // fetched from server
+  final List<String> _removedClinicImageUrls = [];
 
   final ImagePicker _picker = ImagePicker();
 
@@ -437,6 +438,17 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     );
   }
 
+  void _removeNetworkClinicImageAt(int index) {
+    if (index < 0 || index >= _clinicNetworkImages.length) return;
+    final removedUrl = _clinicNetworkImages[index].trim();
+    setState(() {
+      _clinicNetworkImages.removeAt(index);
+      if (removedUrl.isNotEmpty && !_removedClinicImageUrls.contains(removedUrl)) {
+        _removedClinicImageUrls.add(removedUrl);
+      }
+    });
+  }
+
   Widget _sourceOption({
     required IconData icon,
     required Color iconBg,
@@ -654,6 +666,26 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
     debugPrint('doctorId: ${details?.doctorId}');
     debugPrint('clinicPhotos new: ${_clinicPhotos.length}');
+    debugPrint('clinicPhotos removed: ${_removedClinicImageUrls.length}');
+
+    final clinicId = (doctor.clinicId ?? '').trim();
+    if (_removedClinicImageUrls.isNotEmpty && clinicId.isNotEmpty) {
+      final deleteRes = await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .deleteClinicGallery(clinicId, _removedClinicImageUrls);
+      final deleteOk = (deleteRes['success'] == true) ||
+          (deleteRes['deleted_count'] is num &&
+              (deleteRes['deleted_count'] as num) >= 0);
+      if (!deleteOk) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        _showSnack(
+          (deleteRes['message'] ?? 'Failed to delete clinic image(s)').toString(),
+          isError: true,
+        );
+        return;
+      }
+    }
 
     await ref.read(doctorLoginViewModelProvider.notifier).addDoctorDetails(
           doctor,
@@ -835,7 +867,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
   Widget _personalTab() => SingleChildScrollView(
     padding: EdgeInsets.fromLTRB(_isTablet ? 20 : 14, 14, _isTablet ? 20 : 14, 24),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _doctorAvatarCard(),
+    //  _doctorAvatarCard(),
       _gap(12),
       _sectionLabel('Personal Details'),
       _gap(6),
@@ -870,8 +902,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
         networkImages: _clinicNetworkImages,
         localPhotos: _clinicPhotos,
         onAdd: _addClinicPhoto,
-        onRemoveNetwork: (i) =>
-            setState(() => _clinicNetworkImages.removeAt(i)),
+        onRemoveNetwork: _removeNetworkClinicImageAt,
         onRemoveLocal: (i) => setState(() => _clinicPhotos.removeAt(i)),
         onPreviewNetwork: (i) => _previewNetworkPhoto(_clinicNetworkImages[i]),
         onPreviewLocal: (i) => _previewLocalPhoto(_clinicPhotos[i]),

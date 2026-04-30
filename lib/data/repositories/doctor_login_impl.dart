@@ -112,4 +112,12 @@ class DoctorLoginImpl implements DoctorLoginRepository {
     return result.map((e) => e.imageUrl ?? '').where((url) => url.isNotEmpty).toList();
   }
 
+  @override
+  Future<dynamic> deleteClinicGallery(String clinicId, List<String> imageUrls) {
+    return apiService.deleteClinicGallery({
+      "clinic_id": clinicId,
+      "image_urls": imageUrls,
+    });
+  }
+
 }

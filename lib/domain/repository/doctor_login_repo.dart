@@ -23,5 +23,6 @@ abstract class DoctorLoginRepository {
   Future<List<DoctorDetails>> mobileExistDoctor(String mobile);
 
   Future<List<String>> fetchClinicGallery(String clinicId);
+  Future<dynamic> deleteClinicGallery(String clinicId, List<String> imageUrls);
 
 }

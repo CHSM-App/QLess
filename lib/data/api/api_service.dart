@@ -80,6 +80,11 @@ abstract class ApiService {
     @Path("clinic_id") String clinicId,
   );
 
+  @DELETE("doctor/index/delete/clinicGallery")
+  Future<dynamic> deleteClinicGallery(
+    @Body() Map<String, dynamic> body,
+  );
+
 
   //  POST API
   // @POST("login/addDoctorDetails")
