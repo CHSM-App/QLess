@@ -383,6 +383,35 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<List<DoctorDetails>> fetchClinicGallery(String clinicId) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<DoctorDetails>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'doctor/users/clinicGallery/${clinicId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<DoctorDetails> _value;
+    try {
+      _value = _result.data!
+          .map((dynamic i) => DoctorDetails.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<dynamic> addDoctorMultipart(
     int? doctorId,
     String name,
@@ -403,7 +432,7 @@ class _ApiService implements ApiService {
     String clinicContact,
     int genderId,
     MultipartFile? doctorImage,
-    MultipartFile? clinicImage,
+    List<MultipartFile>? clinicImages,
   ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -433,8 +462,8 @@ class _ApiService implements ApiService {
     if (doctorImage != null) {
       _data.files.add(MapEntry('doctor_image', doctorImage));
     }
-    if (clinicImage != null) {
-      _data.files.add(MapEntry('clinic_image', clinicImage));
+    if (clinicImages != null) {
+      _data.files.addAll(clinicImages.map((i) => MapEntry('clinic_images', i)));
     }
     final _options = _setStreamType<dynamic>(
       Options(

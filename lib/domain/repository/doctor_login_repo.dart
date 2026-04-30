@@ -8,7 +8,7 @@ abstract class DoctorLoginRepository {
   Future<dynamic> addDoctorDetails(
     DoctorDetails doctorLogin, {
     File? doctorImage,
-    File? clinicImage,
+    List<File>? clinicImages,
   });
    Future<List<DoctorDetails>> checkPhoneDoctor(String mobile);
 
@@ -21,5 +21,7 @@ abstract class DoctorLoginRepository {
   Future<dynamic> updateLeadTime(DoctorDetails doctor);
 
   Future<List<DoctorDetails>> mobileExistDoctor(String mobile);
+
+  Future<List<String>> fetchClinicGallery(String clinicId);
 
 }

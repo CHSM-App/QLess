@@ -140,8 +140,8 @@ class _DoctorProfileSetupScreenState
   String? _selectedGender;
   int?    _selectedGenderId;
 
-  File?  _doctorPhoto;
-  File?  _clinicPhoto;
+  File?        _doctorPhoto;
+  List<File>   _clinicPhotos = [];
   String? _fcmToken;
   double? _latitude;
   double? _longitude;
@@ -264,14 +264,19 @@ final List<Map<String, dynamic>> _genderOptions = const [
   //
   // Shows a bottom sheet with two options: Camera and Gallery.
   // [isDoctorPhoto] true  → sets _doctorPhoto
-  //                false → sets _clinicPhoto
+  //                false → adds to _clinicPhotos (max 5)
   Future<void> _pickImage(bool isDoctorPhoto) async {
+    if (!isDoctorPhoto && _clinicPhotos.length >= 5) {
+      _showError('Maximum 5 clinic photos allowed.');
+      return;
+    }
+
     final source = await _showImageSourceSheet(isDoctorPhoto);
-    if (source == null) return; // user dismissed
+    if (source == null) return;
 
     final XFile? image = await _picker.pickImage(
       source: source,
-      imageQuality: 85, // compress slightly to keep upload size reasonable
+      imageQuality: 85,
     );
 
     if (image != null) {
@@ -279,7 +284,7 @@ final List<Map<String, dynamic>> _genderOptions = const [
         if (isDoctorPhoto) {
           _doctorPhoto = File(image.path);
         } else {
-          _clinicPhoto = File(image.path);
+          _clinicPhotos.add(File(image.path));
         }
       });
     }
@@ -525,7 +530,7 @@ Future<void> _selectFromMap() async {
         consultationFee: _consultationFeeController.text.trim().isEmpty
             ? null
             : double.tryParse(_consultationFeeController.text.trim()),
-        imageUrl:        _clinicPhoto?.path,
+        imageUrl:        _clinicPhotos.isNotEmpty ? _clinicPhotos.first.path : null,
         latitude:        _latitude,
         longitude:       _longitude,
         roleId:          1,
@@ -537,8 +542,8 @@ Future<void> _selectFromMap() async {
           .read(doctorLoginViewModelProvider.notifier)
           .addDoctorDetails(
             doctorPayload,
-            doctorImage: _doctorPhoto, // null → field omitted in multipart
-            clinicImage: _clinicPhoto, // null → field omitted in multipart
+            doctorImage: _doctorPhoto,
+            clinicImages: _clinicPhotos.isNotEmpty ? _clinicPhotos : null,
           );
 
       final latestState = ref.read(doctorLoginViewModelProvider);
@@ -839,14 +844,12 @@ Widget _buildStep1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Clinic photo – tapping opens camera/gallery sheet
-        Center(
-          child: _AvatarPicker(
-            photo: _clinicPhoto,
-            icon: Icons.local_hospital_rounded,
-            label: 'Upload Clinic Photo',
-            onTap: () => _pickImage(false),
-          ),
+        // Clinic photos – multi-select up to 5
+        _ClinicPhotoGrid(
+          photos: _clinicPhotos,
+          onAdd: () => _pickImage(false),
+          onRemove: (i) => setState(() => _clinicPhotos.removeAt(i)),
+          onPreview: (i) => _previewClinicPhoto(_clinicPhotos[i]),
         ),
         const SizedBox(height: 24),
         const _SectionHeader(title: 'Clinic Details'),
@@ -1357,6 +1360,38 @@ Widget _buildGenderSection() {
       ],
     );
   }
+
+  void _previewClinicPhoto(File photo) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(children: [
+          InteractiveViewer(
+            child: Center(
+              child: Image.file(photo, fit: BoxFit.contain),
+            ),
+          ),
+          Positioned(
+            top: 8,
+            right: 8,
+            child: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(16)),
+                child: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 18),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -1525,6 +1560,129 @@ class _SourceTile extends StatelessWidget {
                 color: kTextMuted, size: 20),
           ]),
         ),
+      );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLINIC PHOTO GRID  (up to 5 images, with remove + preview)
+// ═════════════════════════════════════════════════════════════════════════════
+class _ClinicPhotoGrid extends StatelessWidget {
+  final List<File> photos;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+  final ValueChanged<int> onPreview;
+
+  const _ClinicPhotoGrid({
+    required this.photos,
+    required this.onAdd,
+    required this.onRemove,
+    required this.onPreview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final canAdd = photos.length < 5;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 8),
+          child: Row(children: [
+            const Text('Clinic Photos',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: kTextDark)),
+            const SizedBox(width: 6),
+            Text('(${photos.length}/5)',
+                style: const TextStyle(fontSize: 12, color: kTextMuted)),
+          ]),
+        ),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            // Existing photos
+            ...List.generate(photos.length, (i) => _PhotoThumb(
+              file: photos[i],
+              onRemove: () => onRemove(i),
+              onTap: () => onPreview(i),
+            )),
+            // Add button (hidden when at max)
+            if (canAdd)
+              GestureDetector(
+                onTap: onAdd,
+                child: Container(
+                  width: 80, height: 80,
+                  decoration: BoxDecoration(
+                    color: kSurface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: kPrimaryBlue.withValues(alpha: 0.4),
+                        width: 1.5,
+                        strokeAlign: BorderSide.strokeAlignInside),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.add_photo_alternate_outlined,
+                          color: kPrimaryBlue, size: 26),
+                      SizedBox(height: 4),
+                      Text('Add',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: kPrimaryBlue,
+                              fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+class _PhotoThumb extends StatelessWidget {
+  final File file;
+  final VoidCallback onRemove;
+  final VoidCallback onTap;
+
+  const _PhotoThumb({
+    required this.file,
+    required this.onRemove,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+        width: 80, height: 80,
+        child: Stack(children: [
+          GestureDetector(
+            onTap: onTap,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(file,
+                  width: 80, height: 80, fit: BoxFit.cover),
+            ),
+          ),
+          Positioned(
+            top: 4, right: 4,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                width: 22, height: 22,
+                decoration: BoxDecoration(
+                    color: kRedAccent,
+                    borderRadius: BorderRadius.circular(11)),
+                child: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 13),
+              ),
+            ),
+          ),
+        ]),
       );
 }
 

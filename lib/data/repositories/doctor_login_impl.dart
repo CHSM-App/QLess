@@ -17,10 +17,10 @@ class DoctorLoginImpl implements DoctorLoginRepository {
   Future<dynamic> addDoctorDetails(
     DoctorDetails doctorLogin, {
     File? doctorImage,
-    File? clinicImage,
+    List<File>? clinicImages,
   }) async {
     MultipartFile? multipartDoctorImage;
-    MultipartFile? multipartClinicImage;
+    List<MultipartFile>? multipartClinicImages;
 
     if (doctorImage != null) {
       multipartDoctorImage = await MultipartFile.fromFile(
@@ -29,10 +29,12 @@ class DoctorLoginImpl implements DoctorLoginRepository {
       );
     }
 
-    if (clinicImage != null) {
-      multipartClinicImage = await MultipartFile.fromFile(
-        clinicImage.path,
-        filename: p.basename(clinicImage.path),
+    if (clinicImages != null && clinicImages.isNotEmpty) {
+      multipartClinicImages = await Future.wait(
+        clinicImages.map((f) => MultipartFile.fromFile(
+              f.path,
+              filename: p.basename(f.path),
+            )),
       );
     }
 
@@ -43,22 +45,22 @@ class DoctorLoginImpl implements DoctorLoginRepository {
       doctorLogin.mobile ?? "",
       doctorLogin.qualification ?? "",
       doctorLogin.licenseNo ?? "",
-    doctorLogin.experience?.toString() ?? "0",
+      doctorLogin.experience?.toString() ?? "0",
       doctorLogin.specialization ?? "",
       doctorLogin.roleId ?? 0,
       doctorLogin.clinicName ?? "",
       doctorLogin.clinicAddress ?? "",
-doctorLogin.latitude?.toString() ?? "0",
-doctorLogin.longitude?.toString() ?? "0",
-   doctorLogin.consultationFee != null 
-    ? doctorLogin.consultationFee.toString() 
-    : "0",
+      doctorLogin.latitude?.toString() ?? "0",
+      doctorLogin.longitude?.toString() ?? "0",
+      doctorLogin.consultationFee != null
+          ? doctorLogin.consultationFee.toString()
+          : "0",
       doctorLogin.websiteName ?? "",
       doctorLogin.clinicEmail ?? "",
       doctorLogin.clinicContact ?? "",
       doctorLogin.genderId ?? 0,
       multipartDoctorImage,
-      multipartClinicImage,
+      multipartClinicImages,
     );
   }
 
@@ -103,4 +105,11 @@ doctorLogin.longitude?.toString() ?? "0",
   Future<List<DoctorDetails>> mobileExistDoctor(String mobile) {
     return apiService.mobileExistDoctor(mobile);
   }
+
+  @override
+  Future<List<String>> fetchClinicGallery(String clinicId) async {
+    final result = await apiService.fetchClinicGallery(clinicId);
+    return result.map((e) => e.imageUrl ?? '').where((url) => url.isNotEmpty).toList();
+  }
+
 }
