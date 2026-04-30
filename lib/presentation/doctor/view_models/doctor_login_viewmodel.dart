@@ -289,6 +289,27 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     }
   }
 
+  Future<Map<String, dynamic>> deleteClinicGallery(
+    String clinicId,
+    List<String> imageUrls,
+  ) async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      final response = await usecase.deleteClinicGallery(clinicId, imageUrls);
+      state = state.copyWith(isLoading: false);
+      if (response is Map<String, dynamic>) {
+        return response;
+      }
+      if (response is Map) {
+        return Map<String, dynamic>.from(response);
+      }
+      return {"success": true, "message": "Images deleted"};
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return {"success": false, "message": e.toString()};
+    }
+  }
+
   Future<void> updateLeadTime(DoctorDetails doctor) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
