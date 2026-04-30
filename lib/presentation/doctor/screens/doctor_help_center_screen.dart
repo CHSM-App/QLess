@@ -939,7 +939,7 @@ const _helpSections = [
       _HelpTopic(
         title: 'Need more help',
         body:
-            'Email abc@example.com with your registered mobile number, clinic name, and a short description of the issue.',
+            'Email support@vengurlatech.com with your registered mobile number, clinic name, and a short description of the issue.',
         tips: [
           'Attach screenshots when reporting UI or data issues.',
           'Mention the screen name where the problem happened.',
