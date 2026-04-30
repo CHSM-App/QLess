@@ -862,7 +862,7 @@ const _helpSections = [
       _HelpTopic(
         title: 'Need more help',
         body:
-            'Email abc@example.com with your registered mobile number, patient name, and a short description of the issue.',
+            'Email support@vengurlatech.com with your registered mobile number, patient name, and a short description of the issue.',
         tips: [
           'Mention the screen where the problem happened.',
           'Add appointment date or doctor name when reporting booking issues.',
