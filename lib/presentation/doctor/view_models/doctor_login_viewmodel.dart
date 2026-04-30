@@ -170,6 +170,31 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           );
           return;
         }
+
+        // Some backend flows create doctor/clinic records but still return 500
+        // with { success: false, message: "Doctor creation failed" }.
+        // Reconcile using mobile lookup so registration can proceed safely.
+        final String rawMessage = (data['message'] ?? '').toString().toLowerCase();
+        if (rawMessage.contains('doctor creation failed') &&
+            (doctorLogin.mobile ?? '').trim().isNotEmpty) {
+          try {
+            final existing = await usecase.checkPhoneDoctor(
+              doctorLogin.mobile!.trim(),
+            );
+            if (existing.isNotEmpty) {
+              final d = existing.first;
+              state = state.copyWith(
+                isLoading: false,
+                doctorId: d.doctorId,
+                clinicId: d.clinicId,
+                error: null,
+              );
+              return;
+            }
+          } catch (_) {
+            // fall through to original error handling
+          }
+        }
       }
       state = state.copyWith(isLoading: false, error: e.toString());
     }
