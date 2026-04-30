@@ -674,22 +674,24 @@ bool get _hasDateFilter =>
                     onChanged: (v) => setState(() => _search = v),
                   ),
                 ),
-                const SizedBox(width: 8),
-                // ── Date filter button ──────────────────────────
-                GestureDetector(
-                  onTap: _showDateFilterSheet,
-                  child: Container(
-                    width: 40, height: 40,
-                    decoration: BoxDecoration(
-                      color: _hasDateFilter ? kPrimary : const Color(0xFFF7F8FA),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                          color: _hasDateFilter ? kPrimary : kBorder),
+                if (_filterStatus != 'today') ...[
+                  const SizedBox(width: 8),
+                  // ── Date filter button ──────────────────────────
+                  GestureDetector(
+                    onTap: _showDateFilterSheet,
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: _hasDateFilter ? kPrimary : const Color(0xFFF7F8FA),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: _hasDateFilter ? kPrimary : kBorder),
+                      ),
+                      child: Icon(Icons.tune_rounded,
+                          color: _hasDateFilter ? Colors.white : kPrimary, size: 18),
                     ),
-                    child: Icon(Icons.tune_rounded,
-                        color: _hasDateFilter ? Colors.white : kPrimary, size: 18),
                   ),
-                ),
+                ],
                 // const SizedBox(width: 6),
                 // // ── Sort button ─────────────────────────────────
                 // GestureDetector(
