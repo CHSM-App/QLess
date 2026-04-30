@@ -44,6 +44,8 @@ DoctorDetails _$DoctorDetailsFromJson(Map<String, dynamic> json) =>
       bookingEndTime: json['booking_end_time'] as String?,
       isRecentlyVisited: _intFromJson(json['is_recently_visited']),
       rating: _doubleFromJson(json['rating']),
+      clinicImageId: (json['clinic_image_id'] as num?)?.toInt(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt(),
     );
 
 Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
@@ -84,4 +86,6 @@ Map<String, dynamic> _$DoctorDetailsToJson(DoctorDetails instance) =>
       'booking_end_time': instance.bookingEndTime,
       'is_recently_visited': instance.isRecentlyVisited,
       'rating': instance.rating,
+      'clinic_image_id': instance.clinicImageId,
+      'sortOrder': instance.sortOrder,
     };

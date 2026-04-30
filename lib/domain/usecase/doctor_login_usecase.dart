@@ -12,12 +12,12 @@ class DoctorLoginUsecase {
   Future<dynamic> addDoctorDetails(
     DoctorDetails doctorLogin, {
     File? doctorImage,
-    File? clinicImage,
+    List<File>? clinicImages,
   }) {
     return doctorLoginRepository.addDoctorDetails(
       doctorLogin,
       doctorImage: doctorImage,
-      clinicImage: clinicImage,
+      clinicImages: clinicImages,
     );
   }
 
@@ -43,6 +43,14 @@ class DoctorLoginUsecase {
 
   Future<List<DoctorDetails>> mobileExistDoctor(String mobile) {
     return doctorLoginRepository.mobileExistDoctor(mobile);
+  }
+
+  Future<List<String>> fetchClinicGallery(String clinicId) {
+    return doctorLoginRepository.fetchClinicGallery(clinicId);
+  }
+
+  Future<dynamic> deleteClinicGallery(String clinicId, List<String> imageUrls) {
+    return doctorLoginRepository.deleteClinicGallery(clinicId, imageUrls);
   }
 
 }
