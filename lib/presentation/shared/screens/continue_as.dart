@@ -2,6 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
+// ── Colour Palette ─────────────────────────────────────────────────
+const kPrimary = Color(0xFF26C6B0);
+const kPrimaryDark = Color(0xFF1EA898);
+const kPrimaryLight = Color(0xFFD9F5F1);
+
+const kTextPrimary = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted = Color(0xFFA0AEC0);
+
+const kBorder = Color(0xFFEDF2F7);
+const kDivider = Color(0xFFE5E7EB);
+
+const kError = Color(0xFFFC8181);
+const kRedLight = Color(0xFFFEE2E2);
+const kSuccess = Color(0xFF68D391);
+const kGreenLight = Color(0xFFDCFCE7);
+const kWarning = Color(0xFFF6AD55);
+const kAmberLight = Color(0xFFFEF3C7);
+const kPurple = Color(0xFF9F7AEA);
+const kPurpleLight = Color(0xFFEDE9FE);
+const kInfo = Color(0xFF3B82F6);
+const kInfoLight = Color(0xFFDBEAFE);
+
 class ContinueAsScreen extends ConsumerStatefulWidget {
   const ContinueAsScreen({super.key});
 
@@ -14,8 +37,6 @@ class _ContinueAsScreenState extends ConsumerState<ContinueAsScreen> {
   void initState() {
     super.initState();
   }
-
-
 
   void _goDoctor() => Navigator.push(
         context,
@@ -52,7 +73,7 @@ class _ContinueAsScreenState extends ConsumerState<ContinueAsScreen> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LANDSCAPE LAYOUT
-// Left panel: dark branding  |  Right panel: white action buttons
+// Left panel: teal branding  |  Right panel: white action buttons
 // ─────────────────────────────────────────────────────────────────────────────
 class _LandscapeLayout extends StatelessWidget {
   final VoidCallback onDoctorTap;
@@ -71,7 +92,7 @@ class _LandscapeLayout extends StatelessWidget {
         Expanded(
           flex: 5,
           child: Container(
-            color: const Color(0xFF0F172A),
+            color: kPrimary,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -80,10 +101,10 @@ class _LandscapeLayout extends StatelessWidget {
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withOpacity(0.18),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withOpacity(0.35),
                       width: 1.5,
                     ),
                   ),
@@ -116,7 +137,7 @@ class _LandscapeLayout extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12.5,
-                      color: Color(0xFF94A3B8),
+                      color: Colors.white70,
                       height: 1.5,
                     ),
                   ),
@@ -140,7 +161,7 @@ class _LandscapeLayout extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
+                    color: kTextPrimary,
                   ),
                 ),
 
@@ -150,7 +171,7 @@ class _LandscapeLayout extends StatelessWidget {
                   'Choose how you want to continue',
                   style: TextStyle(
                     fontSize: 12.5,
-                    color: Color(0xFF64748B),
+                    color: kTextSecondary,
                   ),
                 ),
 
@@ -162,7 +183,7 @@ class _LandscapeLayout extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: onDoctorTap,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F172A),
+                      backgroundColor: kPrimary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -174,8 +195,7 @@ class _LandscapeLayout extends StatelessWidget {
                       children: [
                         CustomPaint(
                           size: const Size(20, 20),
-                          painter:
-                              _ButtonStethoPainter(color: Colors.white),
+                          painter: _ButtonStethoPainter(color: Colors.white),
                         ),
                         const SizedBox(width: 10),
                         const Flexible(
@@ -204,7 +224,7 @@ class _LandscapeLayout extends StatelessWidget {
                     style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
                       side: const BorderSide(
-                        color: Color(0xFFD1D5DB),
+                        color: kPrimaryLight,
                         width: 1.5,
                       ),
                       shape: RoundedRectangleBorder(
@@ -216,8 +236,8 @@ class _LandscapeLayout extends StatelessWidget {
                       children: [
                         CustomPaint(
                           size: const Size(20, 20),
-                          painter: _ButtonPersonPainter(
-                              color: const Color(0xFF0F172A)),
+                          painter:
+                              _ButtonPersonPainter(color: kPrimary),
                         ),
                         const SizedBox(width: 10),
                         const Flexible(
@@ -226,7 +246,7 @@ class _LandscapeLayout extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF0F172A),
+                              color: kTextPrimary,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -238,13 +258,32 @@ class _LandscapeLayout extends StatelessWidget {
 
                 const SizedBox(height: 24),
 
-                const Text(
-                  'By continuing, you agree to our Terms & Privacy Policy',
+                RichText(
                   textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: Color(0xFF9CA3AF),
-                    height: 1.5,
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: kTextMuted,
+                      height: 1.5,
+                    ),
+                    children: [
+                      TextSpan(text: 'By continuing, you agree to our '),
+                      TextSpan(
+                        text: 'Terms',
+                        style: TextStyle(
+                          color: kPrimary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                      TextSpan(text: ' & '),
+                      TextSpan(
+                        text: 'Privacy Policy',
+                        style: TextStyle(
+                          color: kPrimary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -257,7 +296,7 @@ class _LandscapeLayout extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PORTRAIT LAYOUT  (original vertical layout — unchanged)
+// PORTRAIT LAYOUT
 // ─────────────────────────────────────────────────────────────────────────────
 class _PortraitLayout extends StatelessWidget {
   final VoidCallback onDoctorTap;
@@ -270,151 +309,245 @@ class _PortraitLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Spacer(flex: 5),
-
-          // Logo circle
-          Container(
-            width: 84,
-            height: 84,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0F172A),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: CustomPaint(
-                size: const Size(42, 42),
-                painter: _LogoIconPainter(),
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 22),
-
-          const Text(
-            'HealthConnect',
-            style: TextStyle(
-              fontSize: 27,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
-              letterSpacing: -0.2,
-            ),
-          ),
-
-          const SizedBox(height: 9),
-
-          const Text(
-            'Connecting doctors and patients seamlessly',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13.5,
-              color: Color(0xFF64748B),
-              height: 1.45,
-            ),
-          ),
-
-          const SizedBox(height: 44),
-
-          // Doctor button
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton(
-              onPressed: onDoctorTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F172A),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(13),
+    return Column(
+      children: [
+        // ── TEAL HEADER ───────────────────────────────────────────────────
+        Container(
+          width: double.infinity,
+          color: kPrimary,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(
+                  top: 52,
+                  bottom: 56,
+                  left: 30,
+                  right: 30,
                 ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CustomPaint(
-                    size: const Size(22, 22),
-                    painter: _ButtonStethoPainter(color: Colors.white),
-                  ),
-                  const SizedBox(width: 10),
-                  const Flexible(
-                    child: Text(
-                      'Continue as Doctor',
+                child: Column(
+                  children: [
+                    // Logo circle
+                    Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.35),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Center(
+                        child: CustomPaint(
+                          size: const Size(42, 42),
+                          painter: _LogoIconPainter(),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    const Text(
+                      'HealthConnect',
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 27,
+                        fontWeight: FontWeight.w700,
                         color: Colors.white,
+                        letterSpacing: -0.2,
                       ),
-                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-                ],
-              ),
-            ),
-          ),
 
-          const SizedBox(height: 14),
+                    const SizedBox(height: 8),
 
-          // Patient button
-          SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: OutlinedButton(
-              onPressed: onPatientTap,
-              style: OutlinedButton.styleFrom(
-                backgroundColor: Colors.white,
-                side: const BorderSide(
-                  color: Color(0xFFD1D5DB),
-                  width: 1.5,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(13),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CustomPaint(
-                    size: const Size(22, 22),
-                    painter: _ButtonPersonPainter(
-                        color: const Color(0xFF0F172A)),
-                  ),
-                  const SizedBox(width: 10),
-                  const Flexible(
-                    child: Text(
-                      'Continue as Patient',
+                    const Text(
+                      'Connecting doctors and patients seamlessly',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF0F172A),
+                        fontSize: 13.5,
+                        color: Colors.white70,
+                        height: 1.45,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Curved white bottom
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(28),
+                      topRight: Radius.circular(28),
                     ),
                   ),
-                ],
+                ),
               ),
+            ],
+          ),
+        ),
+
+        // ── WHITE BODY ────────────────────────────────────────────────────
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 30),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 28),
+
+                const Text(
+                  'Get Started',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                const Text(
+                  'Choose how you want to continue',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: kTextSecondary,
+                    height: 1.45,
+                  ),
+                ),
+
+                const SizedBox(height: 32),
+
+                // Doctor button
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: onDoctorTap,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CustomPaint(
+                          size: const Size(22, 22),
+                          painter: _ButtonStethoPainter(color: Colors.white),
+                        ),
+                        const SizedBox(width: 10),
+                        const Flexible(
+                          child: Text(
+                            'Continue as Doctor',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+
+                // Patient button
+                SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: OutlinedButton(
+                    onPressed: onPatientTap,
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      side: const BorderSide(
+                        color: kPrimaryLight,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CustomPaint(
+                          size: const Size(22, 22),
+                          painter: _ButtonPersonPainter(color: kPrimary),
+                        ),
+                        const SizedBox(width: 10),
+                        const Flexible(
+                          child: Text(
+                            'Continue as Patient',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: kTextPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const Spacer(),
+
+                const Divider(color: kBorder, thickness: 0.5),
+
+                const SizedBox(height: 14),
+
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: const TextSpan(
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: kTextMuted,
+                      height: 1.5,
+                    ),
+                    children: [
+                      TextSpan(text: 'By continuing, you agree to our '),
+                      TextSpan(
+                        text: 'Terms',
+                        style: TextStyle(
+                          color: kPrimary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                      TextSpan(text: ' & '),
+                      TextSpan(
+                        text: 'Privacy Policy',
+                        style: TextStyle(
+                          color: kPrimary,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+              ],
             ),
           ),
-
-          const Spacer(flex: 4),
-
-          const Text(
-            'By continuing, you agree to our Terms & Privacy Policy',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              color: Color(0xFF9CA3AF),
-              height: 1.5,
-            ),
-          ),
-
-          const SizedBox(height: 22),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

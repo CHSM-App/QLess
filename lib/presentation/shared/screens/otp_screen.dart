@@ -13,6 +13,21 @@ import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 
+// ── Colour Palette ─────────────────────────────────────────────────
+const kPrimary      = Color(0xFF26C6B0);
+const kPrimaryDark  = Color(0xFF1EA898);
+const kPrimaryLight = Color(0xFFD9F5F1);
+
+const kTextPrimary   = Color(0xFF2D3748);
+const kTextSecondary = Color(0xFF718096);
+const kTextMuted     = Color(0xFFA0AEC0);
+
+const kBorder  = Color(0xFFEDF2F7);
+const kDivider = Color(0xFFE5E7EB);
+
+const kError      = Color(0xFFFC8181);
+const kRedLight   = Color(0xFFFEE2E2);
+
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String mobileNumber;
   final String role;
@@ -50,7 +65,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   bool _hasError = false;
 
   bool get _isDoctor => widget.role == 'doctor';
-  Color get _accentColor => const Color(0xFF0F172A);
 
   String get _maskedNumber {
     final n = widget.mobileNumber;
@@ -71,8 +85,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       duration: const Duration(milliseconds: 500),
     );
 
-    _fadeAnim =
-        CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
+    _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
     _slideAnim = Tween<double>(begin: 30, end: 0).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
     );
@@ -137,7 +150,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     if (!_isFilled) return;
     setState(() => _isLoading = true);
 
-    // Fetch full profile and save to storage
     if (widget.role == 'doctor') {
       await ref
           .read(doctorLoginViewModelProvider.notifier)
@@ -174,8 +186,10 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
-          builder: (_) =>
-              PatientBottomNav(onToggleTheme: () {}, themeMode: ThemeMode.light),
+          builder: (_) => PatientBottomNav(
+            onToggleTheme: () {},
+            themeMode: ThemeMode.light,
+          ),
         ),
         (_) => false,
       );
@@ -200,13 +214,11 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
       final body = TokenResponse(
-          firebaseToken: token,
-          role: widget.role,
-          mobile: widget.mobileNumber);
-      // Send token to your backend
-      await ref
-          .read(authViewModelProvider.notifier)
-          .saveFirebaseToken(body);
+        firebaseToken: token,
+        role: widget.role,
+        mobile: widget.mobileNumber,
+      );
+      await ref.read(authViewModelProvider.notifier).saveFirebaseToken(body);
     } catch (e) {
       debugPrint('FCM token store failed: $e');
     }
@@ -242,13 +254,13 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: kPrimary,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF0F172A), size: 20),
+              color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -264,7 +276,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
         child: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // Use landscape layout when width > height OR width >= 600 (tablet portrait)
               final bool useWideLayout =
                   constraints.maxWidth > constraints.maxHeight ||
                       constraints.maxWidth >= 600;
@@ -272,7 +283,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
               if (useWideLayout) {
                 return _LandscapeLayout(
                   isDoctor: _isDoctor,
-                  accentColor: _accentColor,
                   maskedNumber: _maskedNumber,
                   controllers: _controllers,
                   focusNodes: _focusNodes,
@@ -290,7 +300,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
               return _PortraitLayout(
                 isDoctor: _isDoctor,
-                accentColor: _accentColor,
                 maskedNumber: _maskedNumber,
                 controllers: _controllers,
                 focusNodes: _focusNodes,
@@ -317,7 +326,6 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 // ─────────────────────────────────────────────────────────────────────────────
 class _LandscapeLayout extends StatelessWidget {
   final bool isDoctor;
-  final Color accentColor;
   final String maskedNumber;
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
@@ -333,7 +341,6 @@ class _LandscapeLayout extends StatelessWidget {
 
   const _LandscapeLayout({
     required this.isDoctor,
-    required this.accentColor,
     required this.maskedNumber,
     required this.controllers,
     required this.focusNodes,
@@ -351,9 +358,7 @@ class _LandscapeLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    // On very short landscape screens (e.g. phone landscape), shrink things slightly
-    final bool isShortLandscape =
-        size.height < 420 && size.width > size.height;
+    final bool isShortLandscape = size.height < 420 && size.width > size.height;
     final double iconSize = isShortLandscape ? 48.0 : 64.0;
     final double titleFontSize = isShortLandscape ? 15.0 : 19.0;
     final double subtitleFontSize = isShortLandscape ? 11.0 : 12.5;
@@ -366,19 +371,18 @@ class _LandscapeLayout extends StatelessWidget {
         Expanded(
           flex: 4,
           child: Container(
-            color: const Color(0xFF0F172A),
+            color: kPrimary,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // SMS icon circle
                 Container(
                   width: iconSize,
                   height: iconSize,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
+                    color: Colors.white.withOpacity(0.18),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.25),
+                      color: Colors.white.withOpacity(0.35),
                       width: 1.5,
                     ),
                   ),
@@ -410,7 +414,7 @@ class _LandscapeLayout extends StatelessWidget {
                     text: TextSpan(
                       style: TextStyle(
                         fontSize: subtitleFontSize,
-                        color: const Color(0xFF94A3B8),
+                        color: Colors.white70,
                         height: 1.55,
                       ),
                       children: [
@@ -429,17 +433,16 @@ class _LandscapeLayout extends StatelessWidget {
 
                 SizedBox(height: isShortLandscape ? 10 : 20),
 
-                // Role badge
                 Container(
                   padding: EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: isShortLandscape ? 4 : 7,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.15),
+                      color: Colors.white.withOpacity(0.30),
                       width: 1,
                     ),
                   ),
@@ -487,44 +490,30 @@ class _LandscapeLayout extends StatelessWidget {
                     style: TextStyle(
                       fontSize: isShortLandscape ? 14 : 17,
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0F172A),
+                      color: kTextPrimary,
                       letterSpacing: -0.2,
                     ),
                   ),
-
                   SizedBox(height: isShortLandscape ? 14 : 20),
-
-                  // OTP boxes
                   _OtpBoxRow(
                     controllers: controllers,
                     focusNodes: focusNodes,
                     hasError: hasError,
-                    accentColor: accentColor,
                     shakeAnim: shakeAnim,
                     onOtpChanged: onOtpChanged,
                     onKeyEvent: onKeyEvent,
                   ),
-
-                  // Error text
                   _ErrorText(hasError: hasError),
-
                   SizedBox(height: isShortLandscape ? 14 : 20),
-
-                  // Verify button
                   _VerifyButton(
                     isFilled: isFilled,
                     isLoading: isLoading,
                     isDoctor: isDoctor,
-                    accentColor: accentColor,
                     onVerify: onVerify,
                   ),
-
                   SizedBox(height: isShortLandscape ? 10 : 16),
-
-                  // Resend
                   _ResendRow(
                     secondsLeft: secondsLeft,
-                    accentColor: accentColor,
                     onResend: onResend,
                   ),
                 ],
@@ -542,7 +531,6 @@ class _LandscapeLayout extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _PortraitLayout extends StatelessWidget {
   final bool isDoctor;
-  final Color accentColor;
   final String maskedNumber;
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
@@ -558,7 +546,6 @@ class _PortraitLayout extends StatelessWidget {
 
   const _PortraitLayout({
     required this.isDoctor,
-    required this.accentColor,
     required this.maskedNumber,
     required this.controllers,
     required this.focusNodes,
@@ -576,152 +563,186 @@ class _PortraitLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    // Compact mode for small phones (e.g. iPhone SE, small Android ~667px height)
     final bool isSmall = size.height < 680;
     final double iconSize = isSmall ? 54.0 : 68.0;
     final double titleFontSize = isSmall ? 20.0 : 24.0;
     final double subFontSize = isSmall ? 12.5 : 13.5;
 
-    return Padding(
-      // Horizontal padding scales with screen width
-      padding: EdgeInsets.symmetric(horizontal: size.width * 0.07),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(height: isSmall ? 8 : 12),
-
-          // SMS icon
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 350),
-            width: iconSize,
-            height: iconSize,
-            decoration: BoxDecoration(
-              color: accentColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.28),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
+    return Column(
+      children: [
+        // ── TEAL HEADER ───────────────────────────────────────────────────
+        Container(
+          color: kPrimary,
+          width: double.infinity,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(
+                  top: isSmall ? 20 : 28,
+                  bottom: 48,
+                  left: 30,
+                  right: 30,
                 ),
-              ],
-            ),
-            child: Icon(
-              Icons.sms_outlined,
-              color: Colors.white,
-              size: isSmall ? 24 : 30,
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 16 : 22),
-
-          Text(
-            'OTP Verification',
-            style: TextStyle(
-              fontSize: titleFontSize,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-              letterSpacing: -0.4,
-            ),
-          ),
-
-          SizedBox(height: isSmall ? 6 : 10),
-
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: TextStyle(
-                fontSize: subFontSize,
-                color: const Color(0xFF64748B),
-                height: 1.55,
+                child: Column(
+                  children: [
+                    Container(
+                      width: iconSize,
+                      height: iconSize,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.18),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.35),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.sms_outlined,
+                        color: Colors.white,
+                        size: isSmall ? 24 : 30,
+                      ),
+                    ),
+                    SizedBox(height: isSmall ? 14 : 18),
+                    Text(
+                      'OTP Verification',
+                      style: TextStyle(
+                        fontSize: titleFontSize,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    SizedBox(height: isSmall ? 6 : 10),
+                    RichText(
+                      textAlign: TextAlign.center,
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: subFontSize,
+                          color: Colors.white70,
+                          height: 1.55,
+                        ),
+                        children: [
+                          const TextSpan(text: 'We sent a 6-digit code to\n'),
+                          TextSpan(
+                            text: '+91 $maskedNumber',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              children: [
-                const TextSpan(text: 'We sent a 6-digit code to\n'),
-                TextSpan(
-                  text: '+91 $maskedNumber',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
+              // Curved white bottom
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 28,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(28),
+                      topRight: Radius.circular(28),
+                    ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
 
-          SizedBox(height: isSmall ? 24 : 36),
-
-          // OTP boxes
-          _OtpBoxRow(
-            controllers: controllers,
-            focusNodes: focusNodes,
-            hasError: hasError,
-            accentColor: accentColor,
-            shakeAnim: shakeAnim,
-            onOtpChanged: onOtpChanged,
-            onKeyEvent: onKeyEvent,
-          ),
-
-          // Error text
-          _ErrorText(hasError: hasError),
-
-          SizedBox(height: isSmall ? 20 : 32),
-
-          // Verify button
-          _VerifyButton(
-            isFilled: isFilled,
-            isLoading: isLoading,
-            isDoctor: isDoctor,
-            accentColor: accentColor,
-            onVerify: onVerify,
-          ),
-
-          SizedBox(height: isSmall ? 18 : 28),
-
-          // Resend
-          _ResendRow(
-            secondsLeft: secondsLeft,
-            accentColor: accentColor,
-            onResend: onResend,
-          ),
-
-          const Spacer(),
-
-          // Role badge
-          Container(
-            margin: EdgeInsets.only(bottom: isSmall ? 14 : 24),
-            padding: EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: isSmall ? 6 : 8,
-            ),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: accentColor.withOpacity(0.18)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+        // ── WHITE BODY ────────────────────────────────────────────────────
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: size.width * 0.07),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(
-                  isDoctor
-                      ? Icons.medical_services_outlined
-                      : Icons.person_outline_rounded,
-                  size: 14,
-                  color: accentColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Logging in as ${isDoctor ? 'Doctor' : 'Patient'}',
+                SizedBox(height: isSmall ? 20 : 28),
+
+                const Text(
+                  'Enter the 6-digit code',
                   style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w600,
-                    color: accentColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+
+                SizedBox(height: isSmall ? 20 : 28),
+
+                _OtpBoxRow(
+                  controllers: controllers,
+                  focusNodes: focusNodes,
+                  hasError: hasError,
+                  shakeAnim: shakeAnim,
+                  onOtpChanged: onOtpChanged,
+                  onKeyEvent: onKeyEvent,
+                ),
+
+                _ErrorText(hasError: hasError),
+
+                SizedBox(height: isSmall ? 20 : 28),
+
+                _VerifyButton(
+                  isFilled: isFilled,
+                  isLoading: isLoading,
+                  isDoctor: isDoctor,
+                  onVerify: onVerify,
+                ),
+
+                SizedBox(height: isSmall ? 18 : 24),
+
+                _ResendRow(secondsLeft: secondsLeft, onResend: onResend),
+
+                const Spacer(),
+
+                // Role badge
+                Container(
+                  margin: EdgeInsets.only(bottom: isSmall ? 14 : 24),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: isSmall ? 6 : 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: kPrimary.withOpacity(0.30)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isDoctor
+                            ? Icons.medical_services_outlined
+                            : Icons.person_outline_rounded,
+                        size: 14,
+                        color: kPrimaryDark,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Logging in as ${isDoctor ? 'Doctor' : 'Patient'}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: kPrimaryDark,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -734,7 +755,6 @@ class _OtpBoxRow extends StatelessWidget {
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
   final bool hasError;
-  final Color accentColor;
   final Animation<double> shakeAnim;
   final void Function(int, String) onOtpChanged;
   final void Function(int, KeyEvent) onKeyEvent;
@@ -743,7 +763,6 @@ class _OtpBoxRow extends StatelessWidget {
     required this.controllers,
     required this.focusNodes,
     required this.hasError,
-    required this.accentColor,
     required this.shakeAnim,
     required this.onOtpChanged,
     required this.onKeyEvent,
@@ -760,15 +779,10 @@ class _OtpBoxRow extends StatelessWidget {
                 2 *
                 (shakeAnim.value < 0.5 ? 1 : -1))
             : 0.0;
-        return Transform.translate(
-          offset: Offset(shake, 0),
-          child: child,
-        );
+        return Transform.translate(offset: Offset(shake, 0), child: child);
       },
-      // LayoutBuilder makes each OTP box size scale with available width
       child: LayoutBuilder(
         builder: (context, constraints) {
-          // 6 boxes + 5 gaps of 8px each
           final double totalGap = 5 * 8.0;
           final double boxWidth =
               ((constraints.maxWidth - totalGap) / 6).clamp(36.0, 54.0);
@@ -781,7 +795,6 @@ class _OtpBoxRow extends StatelessWidget {
                 controller: controllers[i],
                 focusNode: focusNodes[i],
                 hasError: hasError,
-                accentColor: accentColor,
                 boxWidth: boxWidth,
                 boxHeight: boxHeight,
                 onChanged: (val) => onOtpChanged(i, val),
@@ -810,14 +823,13 @@ class _ErrorText extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: const [
-                  Icon(Icons.error_outline_rounded,
-                      color: Color(0xFFEF4444), size: 15),
+                  Icon(Icons.error_outline_rounded, color: kError, size: 15),
                   SizedBox(width: 5),
                   Text(
                     'Incorrect OTP. Please try again.',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFFEF4444),
+                      color: kError,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -833,69 +845,52 @@ class _VerifyButton extends StatelessWidget {
   final bool isFilled;
   final bool isLoading;
   final bool isDoctor;
-  final Color accentColor;
   final VoidCallback onVerify;
 
   const _VerifyButton({
     required this.isFilled,
     required this.isLoading,
     required this.isDoctor,
-    required this.accentColor,
     required this.onVerify,
   });
 
   @override
   Widget build(BuildContext context) {
     return AnimatedOpacity(
-      opacity: isFilled ? 1.0 : 0.55,
+      opacity: isFilled ? 1.0 : 0.5,
       duration: const Duration(milliseconds: 250),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 350),
+      child: SizedBox(
         width: double.infinity,
         height: 54,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1E3A5F)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: isFilled
-              ? [
-                  BoxShadow(
-                    color: accentColor.withOpacity(0.30),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : [],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: (isFilled && !isLoading) ? onVerify : null,
-            child: Center(
-              child: isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2.5,
-                      ),
-                    )
-                  : const Text(
-                      'Verify OTP',
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
+        child: ElevatedButton(
+          onPressed: (isFilled && !isLoading) ? onVerify : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kPrimary,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: kPrimaryLight,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
           ),
+          child: isLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : const Text(
+                  'Verify OTP',
+                  style: TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.2,
+                  ),
+                ),
         ),
       ),
     );
@@ -904,14 +899,9 @@ class _VerifyButton extends StatelessWidget {
 
 class _ResendRow extends StatelessWidget {
   final int secondsLeft;
-  final Color accentColor;
   final VoidCallback onResend;
 
-  const _ResendRow({
-    required this.secondsLeft,
-    required this.accentColor,
-    required this.onResend,
-  });
+  const _ResendRow({required this.secondsLeft, required this.onResend});
 
   @override
   Widget build(BuildContext context) {
@@ -919,7 +909,7 @@ class _ResendRow extends StatelessWidget {
       children: [
         const Text(
           "Didn't receive the code?",
-          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          style: TextStyle(fontSize: 13, color: kTextSecondary),
         ),
         const SizedBox(height: 8),
         AnimatedSwitcher(
@@ -930,14 +920,14 @@ class _ResendRow extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Icon(Icons.timer_outlined,
-                        size: 14, color: Color(0xFF94A3B8)),
+                        size: 14, color: kTextMuted),
                     const SizedBox(width: 5),
                     Text(
                       'Resend in ${secondsLeft}s',
                       style: const TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF94A3B8),
+                        color: kTextMuted,
                       ),
                     ),
                   ],
@@ -945,14 +935,14 @@ class _ResendRow extends StatelessWidget {
               : GestureDetector(
                   key: const ValueKey('resend'),
                   onTap: onResend,
-                  child: Text(
+                  child: const Text(
                     'Resend OTP',
                     style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
-                      color: accentColor,
+                      color: kPrimary,
                       decoration: TextDecoration.underline,
-                      decorationColor: accentColor,
+                      decorationColor: kPrimary,
                     ),
                   ),
                 ),
@@ -970,7 +960,6 @@ class _OtpBox extends StatefulWidget {
     required this.controller,
     required this.focusNode,
     required this.hasError,
-    required this.accentColor,
     required this.onChanged,
     required this.onKeyEvent,
     this.boxWidth = 46,
@@ -980,7 +969,6 @@ class _OtpBox extends StatefulWidget {
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool hasError;
-  final Color accentColor;
   final ValueChanged<String> onChanged;
   final ValueChanged<KeyEvent> onKeyEvent;
   final double boxWidth;
@@ -1004,7 +992,6 @@ class _OtpBoxState extends State<_OtpBox> {
   @override
   Widget build(BuildContext context) {
     final filled = widget.controller.text.isNotEmpty;
-    // Font size scales proportionally with box width
     final double fontSize = (widget.boxWidth * 0.48).clamp(16.0, 24.0);
 
     return KeyboardListener(
@@ -1016,30 +1003,21 @@ class _OtpBoxState extends State<_OtpBox> {
         height: widget.boxHeight,
         decoration: BoxDecoration(
           color: widget.hasError
-              ? const Color(0xFFFEF2F2)
+              ? kRedLight
               : filled
-                  ? widget.accentColor.withOpacity(0.07)
-                  : const Color(0xFFF1F5F9),
+                  ? kPrimaryLight
+                  : kBorder,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(
             color: widget.hasError
-                ? const Color(0xFFEF4444)
+                ? kError
                 : _isFocused
-                    ? widget.accentColor
+                    ? kPrimary
                     : filled
-                        ? widget.accentColor.withOpacity(0.4)
-                        : const Color(0xFFE2E8F0),
+                        ? kPrimaryDark.withOpacity(0.4)
+                        : kDivider,
             width: _isFocused ? 2 : 1.5,
           ),
-          boxShadow: _isFocused && !widget.hasError
-              ? [
-                  BoxShadow(
-                    color: widget.accentColor.withOpacity(0.18),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ]
-              : [],
         ),
         child: TextField(
           controller: widget.controller,
@@ -1051,9 +1029,7 @@ class _OtpBoxState extends State<_OtpBox> {
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
-            color: widget.hasError
-                ? const Color(0xFFEF4444)
-                : widget.accentColor,
+            color: widget.hasError ? kError : kPrimary,
             height: 1,
           ),
           decoration: const InputDecoration(
