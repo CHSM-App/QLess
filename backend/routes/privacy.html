@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — HealthConnect by Vengurla Tech Private Limited</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:        #0D1117;
+    --ink-soft:   #3D4451;
+    --ink-muted:  #6B7585;
+    --rule:       #E2E6ED;
+    --teal:       #26C6B0;
+    --teal-dim:   #D4F5F0;
+    --amber:      #F59E0B;
+    --surface:    #F7F9FC;
+    --white:      #FFFFFF;
+    --col-w:      760px;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15.5px;
+    line-height: 1.78;
+    color: var(--ink-soft);
+    background: var(--white);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── HEADER ─────────────────────────────────────────────────────────── */
+  header {
+    position: relative;
+    background: var(--ink);
+    color: var(--white);
+    overflow: hidden;
+    padding: 80px 24px 72px;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 80% at 80% 50%, rgba(38,198,176,0.18) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 60% at 10% 80%, rgba(245,158,11,0.10) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  header::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.03) 39px, rgba(255,255,255,0.03) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.03) 39px, rgba(255,255,255,0.03) 40px);
+    pointer-events: none;
+  }
+
+  .header-inner { position: relative; max-width: var(--col-w); margin: 0 auto; }
+
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 40px;
+    text-decoration: none;
+  }
+  .brand-mark {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--teal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .brand-mark svg { width: 20px; height: 20px; }
+  .brand-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: var(--white);
+    letter-spacing: -0.2px;
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(34px, 6vw, 52px);
+    font-weight: 400;
+    line-height: 1.1;
+    color: var(--white);
+    letter-spacing: -1px;
+    margin-bottom: 16px;
+  }
+  h1 em { font-style: italic; color: var(--teal); }
+
+  .header-sub {
+    font-size: 14.5px;
+    color: rgba(255,255,255,0.52);
+    max-width: 520px;
+    line-height: 1.7;
+    margin-top: 10px;
+  }
+
+  /* IMPORTANT legal notice banner in header */
+  .legal-notice {
+    margin-top: 24px;
+    padding: 14px 18px;
+    background: rgba(38,198,176,0.12);
+    border: 1px solid rgba(38,198,176,0.30);
+    border-radius: 8px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    line-height: 1.65;
+    max-width: 600px;
+  }
+  .legal-notice strong { color: var(--teal); }
+
+  .header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.40);
+    margin-top: 24px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(255,255,255,0.10);
+  }
+  .header-meta span { display: flex; align-items: center; gap: 6px; }
+  .header-meta strong { color: rgba(255,255,255,0.72); font-weight: 500; }
+
+  /* ── QUICK NAV ───────────────────────────────────────────────────────── */
+  .quick-nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--rule);
+    padding: 0 24px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .quick-nav-inner {
+    max-width: var(--col-w);
+    margin: 0 auto;
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .quick-nav-inner::-webkit-scrollbar { display: none; }
+  .quick-nav a {
+    display: block;
+    padding: 13px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-muted);
+    text-decoration: none;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    transition: color 0.18s, border-color 0.18s;
+  }
+  .quick-nav a:hover { color: var(--teal); border-bottom-color: var(--teal); }
+
+  /* ── MAIN ────────────────────────────────────────────────────────────── */
+  main {
+    max-width: var(--col-w);
+    margin: 0 auto;
+    padding: 60px 24px 96px;
+  }
+
+  /* ── SECTION ─────────────────────────────────────────────────────────── */
+  section {
+    margin-bottom: 60px;
+    padding-bottom: 60px;
+    border-bottom: 1px solid var(--rule);
+    opacity: 0;
+    transform: translateY(16px);
+    animation: fadeUp 0.5s ease forwards;
+  }
+  section:last-child { border-bottom: none; }
+  section:nth-child(1)  { animation-delay: 0.04s; }
+  section:nth-child(2)  { animation-delay: 0.08s; }
+  section:nth-child(3)  { animation-delay: 0.12s; }
+  section:nth-child(4)  { animation-delay: 0.16s; }
+  section:nth-child(5)  { animation-delay: 0.20s; }
+  section:nth-child(6)  { animation-delay: 0.24s; }
+  section:nth-child(7)  { animation-delay: 0.28s; }
+  section:nth-child(8)  { animation-delay: 0.32s; }
+  section:nth-child(9)  { animation-delay: 0.36s; }
+  section:nth-child(10) { animation-delay: 0.40s; }
+  section:nth-child(11) { animation-delay: 0.44s; }
+  section:nth-child(12) { animation-delay: 0.48s; }
+  section:nth-child(13) { animation-delay: 0.52s; }
+  section:nth-child(14) { animation-delay: 0.56s; }
+
+  @keyframes fadeUp { to { opacity: 1; transform: translateY(0); } }
+
+  .section-number {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 7px;
+  }
+
+  h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px;
+    font-weight: 400;
+    color: var(--ink);
+    line-height: 1.25;
+    letter-spacing: -0.3px;
+    margin-bottom: 18px;
+  }
+
+  h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--ink);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 28px 0 9px;
+  }
+
+  p {
+    font-size: 15px;
+    line-height: 1.82;
+    color: var(--ink-soft);
+    margin-bottom: 13px;
+  }
+  p:last-child { margin-bottom: 0; }
+
+  /* uppercase binding clause */
+  .binding {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.7;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 16px 0 20px;
+    letter-spacing: 0.1px;
+  }
+
+  /* ── CALLOUT ─────────────────────────────────────────────────────────── */
+  .callout {
+    display: flex;
+    gap: 13px;
+    background: var(--teal-dim);
+    border-left: 3px solid var(--teal);
+    border-radius: 0 10px 10px 0;
+    padding: 15px 17px;
+    margin: 18px 0;
+  }
+  .callout-icon { flex-shrink: 0; width: 19px; height: 19px; margin-top: 2px; color: var(--teal); }
+  .callout p { font-size: 13.5px; line-height: 1.7; margin: 0; color: #1a4f47; }
+  .callout-amber { background: #FEF3C7; border-left-color: var(--amber); }
+  .callout-amber p { color: #6b4c10; }
+  .callout-amber .callout-icon { color: var(--amber); }
+  .callout-red { background: #FEF2F2; border-left-color: #EF4444; }
+  .callout-red p { color: #7f1d1d; }
+  .callout-red .callout-icon { color: #EF4444; }
+
+  /* ── TABLE ───────────────────────────────────────────────────────────── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+    margin: 18px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+  }
+  .data-table thead tr { background: var(--ink); color: var(--white); }
+  .data-table thead th {
+    padding: 11px 15px;
+    text-align: left;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .data-table tbody tr { border-bottom: 1px solid var(--rule); transition: background 0.12s; }
+  .data-table tbody tr:last-child { border-bottom: none; }
+  .data-table tbody tr:hover { background: var(--surface); }
+  .data-table td { padding: 11px 15px; vertical-align: top; line-height: 1.6; color: var(--ink-soft); }
+  .data-table td:first-child { font-weight: 600; color: var(--ink); white-space: nowrap; }
+
+  /* ── LIST ────────────────────────────────────────────────────────────── */
+  ul, ol { padding-left: 0; margin: 10px 0 18px; list-style: none; }
+  ul li, ol li {
+    position: relative;
+    padding-left: 20px;
+    font-size: 15px;
+    line-height: 1.75;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  ul li::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 10px;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--teal);
+  }
+  ol { counter-reset: ol; }
+  ol li { counter-increment: ol; }
+  ol li::before {
+    content: counter(ol) '.';
+    position: absolute;
+    left: 0; top: 0;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--teal);
+    line-height: 1.75;
+  }
+
+  /* ── DEFINITION TERM ─────────────────────────────────────────────────── */
+  .def-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 14px 0 20px;
+  }
+  .def-item {
+    padding: 12px 14px;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+  }
+  .def-term { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+  .def-desc { font-size: 13.5px; color: var(--ink-soft); line-height: 1.65; }
+
+  /* ── RIGHTS GRID ─────────────────────────────────────────────────────── */
+  .rights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+    gap: 10px;
+    margin: 16px 0;
+  }
+  .right-card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 14px;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+  .right-card:hover {
+    border-color: var(--teal);
+    box-shadow: 0 0 0 3px rgba(38,198,176,0.10);
+  }
+  .right-card-icon { font-size: 18px; margin-bottom: 7px; display: block; }
+  .right-card-title { font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 4px; }
+  .right-card-desc { font-size: 11.5px; color: var(--ink-muted); line-height: 1.55; }
+
+  /* ── CONTACT CARD ────────────────────────────────────────────────────── */
+  .contact-card {
+    background: var(--ink);
+    color: var(--white);
+    border-radius: 14px;
+    padding: 26px 26px 22px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-top: 22px;
+  }
+  .contact-card h3 { color: var(--white); text-transform: none; letter-spacing: 0; font-size: 15px; margin: 0 0 5px; }
+  .contact-card p { font-size: 13px; color: rgba(255,255,255,0.50); margin: 0; }
+  .contact-item { display: flex; flex-direction: column; gap: 3px; }
+  .contact-label { font-size: 10px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--teal); font-weight: 600; }
+  .contact-value { font-size: 13.5px; color: rgba(255,255,255,0.82); font-weight: 500; }
+
+  /* ── FOOTER ──────────────────────────────────────────────────────────── */
+  footer {
+    background: var(--surface);
+    border-top: 1px solid var(--rule);
+    padding: 26px 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-muted);
+  }
+  footer a { color: var(--teal); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  /* ── RESPONSIVE ──────────────────────────────────────────────────────── */
+  @media (max-width: 600px) {
+    header { padding: 56px 18px 48px; }
+    h1 { font-size: 30px; }
+    main { padding: 44px 18px 64px; }
+    .rights-grid { grid-template-columns: 1fr 1fr; }
+    .contact-card { padding: 18px; }
+    .data-table { font-size: 12.5px; }
+    .data-table td, .data-table th { padding: 9px 11px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ──────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="header-inner">
+
+    <a href="#" class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+      </div>
+      <span class="brand-name">HealthConnect</span>
+    </a>
+
+    <h1>Your Privacy,<br><em>Our Responsibility</em></h1>
+
+    <p class="header-sub">
+      We believe you deserve to know exactly how your health information is
+      collected, used, and protected. This document is your complete and binding
+      statement of those rights and obligations.
+    </p>
+
+    <div class="legal-notice">
+      <strong>IMPORTANT — PLEASE READ CAREFULLY.</strong> By downloading, installing,
+      accessing, or using the HealthConnect application or any associated service,
+      you confirm that you have read, understood, and unconditionally agree to be
+      bound by this Privacy Policy and our Terms of Use. If you do not agree,
+      please immediately cease use of all HealthConnect services.
+    </div>
+
+    <div class="header-meta">
+      <span><strong>Effective Date:</strong> April 20, 2026</span>
+      <span><strong>Last Updated:</strong> April 20, 2026</span>
+      <span><strong>Version:</strong> 1.0</span>
+      <span><strong>Jurisdiction:</strong> India (DPDP Act, 2023 &amp; IT Act, 2000)</span>
+    </div>
+
+  </div>
+</header>
+
+<!-- ── QUICK NAV ────────────────────────────────────────────────────────────── -->
+<nav class="quick-nav" aria-label="Jump to section">
+  <div class="quick-nav-inner">
+    <a href="#definitions">Definitions</a>
+    <a href="#overview">Overview</a>
+    <a href="#collection">Data Collected</a>
+    <a href="#sensitive">Sensitive Data</a>
+    <a href="#use">How We Use It</a>
+    <a href="#sharing">Sharing</a>
+    <a href="#storage">Security</a>
+    <a href="#rights">Your Rights</a>
+    <a href="#consent">Consent</a>
+    <a href="#children">Children</a>
+    <a href="#retention">Retention</a>
+    <a href="#third-party">Third Parties</a>
+    <a href="#changes">Changes</a>
+    <a href="#contact">Contact</a>
+  </div>
+</nav>
+
+<!-- ── MAIN ─────────────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- 1. DEFINITIONS -->
+  <section id="definitions">
+    <div class="section-number">01 — Definitions</div>
+    <h2>Key Terms Used in This Policy</h2>
+
+    <p>For the purposes of this Privacy Policy, the following terms shall have the meanings set out below. These definitions align with the Digital Personal Data Protection Act, 2023 ("DPDP Act") and the Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011 ("SPI Rules").</p>
+
+    <div class="def-grid">
+      <div class="def-item">
+        <div class="def-term">"Company" / "We" / "Us" / "Our"</div>
+        <div class="def-desc">Vengurla Tech Private Limited, a company incorporated under the Companies Act, 2013, having its registered office at Vengurla, Sindhudurg, Maharashtra, India, operating the HealthConnect platform.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Platform" / "Services"</div>
+        <div class="def-desc">The HealthConnect mobile application (Android), associated APIs, and any related services provided by the Company.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"User" / "You"</div>
+        <div class="def-desc">Any individual who accesses or uses the Platform, including Patients, Doctors, and Clinic Administrators.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Patient"</div>
+        <div class="def-desc">A User who registers to seek medical consultation, book appointments, or join queues through the Platform.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Doctor" / "Practitioner"</div>
+        <div class="def-desc">A registered medical professional who uses the Platform to manage appointments, schedules, and patient queues.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Personal Data"</div>
+        <div class="def-desc">Any data about an individual who is identifiable by or in relation to such data, as defined under the DPDP Act, 2023.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Sensitive Personal Data or Information" (SPDI)</div>
+        <div class="def-desc">Information as defined under Rule 3 of the SPI Rules, including passwords, financial information, physical/physiological/mental health conditions, medical records and history, biometric information, and any details relating thereto.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Data Fiduciary"</div>
+        <div class="def-desc">Vengurla Tech Private Limited, as the entity that alone or in conjunction with others determines the purpose and means of processing Personal Data.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Data Principal"</div>
+        <div class="def-desc">The individual to whom the Personal Data relates — i.e., you, the User.</div>
+      </div>
+      <div class="def-item">
+        <div class="def-term">"Consent Manager"</div>
+        <div class="def-desc">A registered entity, as may be designated under the DPDP Act, 2023, through whom a Data Principal may give, manage, review, and withdraw consent.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. OVERVIEW -->
+  <section id="overview">
+    <div class="section-number">02 — Overview & Applicability</div>
+    <h2>Who We Are & What This Policy Covers</h2>
+
+    <div class="callout">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+      </svg>
+      <p>This Privacy Policy applies to all Users of the <strong>HealthConnect</strong> mobile application, including registered Doctors and Patients. By using the Services, you confirm your unconditional acceptance of this Privacy Policy.</p>
+    </div>
+
+    <p>HealthConnect is a product of <strong>Vengurla Tech Private Limited</strong> ("Company"), a digital healthcare platform that connects Patients with verified medical professionals for appointment booking, queue management, and consultations. This Privacy Policy is published in compliance with:</p>
+
+    <ul>
+      <li>The <strong>Information Technology Act, 2000</strong> and rules thereunder</li>
+      <li>The <strong>Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011</strong> ("SPI Rules")</li>
+      <li>The <strong>Digital Personal Data Protection Act, 2023</strong> ("DPDP Act")</li>
+      <li>The <strong>Indian Medical Council (Professional Conduct, Etiquette and Ethics) Regulations, 2002</strong>, as applicable to Practitioners</li>
+    </ul>
+
+    <div class="binding">
+      BY CONFIRMING THAT YOU ARE BOUND BY THIS PRIVACY POLICY (BY THE MEANS PROVIDED WITHIN THE APPLICATION), BY USING THE SERVICES OR BY OTHERWISE GIVING US YOUR INFORMATION, YOU AGREE TO THE PRACTICES AND POLICIES OUTLINED IN THIS PRIVACY POLICY AND YOU HEREBY CONSENT TO OUR COLLECTION, USE, AND SHARING OF YOUR INFORMATION AS DESCRIBED IN THIS PRIVACY POLICY. WE RESERVE THE RIGHT TO CHANGE, MODIFY, ADD OR DELETE PORTIONS OF THE TERMS OF THIS PRIVACY POLICY AT OUR SOLE DISCRETION AND AT ANY TIME.
+    </div>
+
+    <h3>Scope</h3>
+    <p>This policy covers:</p>
+    <ul>
+      <li>The HealthConnect mobile application (Android)</li>
+      <li>All communications between you and HealthConnect, including via email, SMS, telephone, or in-app messaging</li>
+      <li>Data collected from Doctors, Patients, and any other Users of the Platform</li>
+      <li>Data processed by third-party service providers acting on our behalf</li>
+    </ul>
+
+    <h3>If You Use Services on Behalf of Another</h3>
+    <p>IF YOU USE THE SERVICES ON BEHALF OF SOMEONE ELSE (SUCH AS YOUR CHILD OR A DEPENDENT) OR AN ENTITY (SUCH AS YOUR EMPLOYER), YOU REPRESENT THAT YOU ARE AUTHORISED BY SUCH INDIVIDUAL OR ENTITY TO (I) ACCEPT THIS PRIVACY POLICY ON SUCH INDIVIDUAL'S OR ENTITY'S BEHALF, AND (II) CONSENT ON BEHALF OF SUCH INDIVIDUAL OR ENTITY TO OUR COLLECTION, USE AND DISCLOSURE OF SUCH INDIVIDUAL'S OR ENTITY'S INFORMATION AS DESCRIBED IN THIS PRIVACY POLICY.</p>
+  </section>
+
+  <!-- 3. DATA COLLECTED -->
+  <section id="collection">
+    <div class="section-number">03 — Information We Collect</div>
+    <h2>Categories of Personal Data Collected</h2>
+
+    <p>We collect Personal Data only to the extent necessary for the purposes described in this Policy. You hereby consent to the collection of such information by the Company. The collection occurs (a) directly from you when you provide it voluntarily, (b) automatically through your use of the Platform, and (c) from third parties as described below.</p>
+
+    <h3>A. Information You Provide Directly</h3>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Specific Data Points</th>
+          <th>Who</th>
+          <th>Mandatory?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Identity</td>
+          <td>Full name, gender, profile photograph</td>
+          <td>All Users</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Contact</td>
+          <td>Mobile number, email address</td>
+          <td>All Users</td>
+          <td>Yes (mobile mandatory)</td>
+        </tr>
+        <tr>
+          <td>Health / Medical</td>
+          <td>Symptoms, medical history, current medications, allergies, blood group, appointment notes</td>
+          <td>Patients</td>
+          <td>Optional (patient-controlled)</td>
+        </tr>
+        <tr>
+          <td>Professional Credentials</td>
+          <td>Medical registration number, qualification, specialization, years of experience</td>
+          <td>Doctors</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Clinic Details</td>
+          <td>Clinic name, address, GPS coordinates, contact number, email, website, consultation fee</td>
+          <td>Doctors</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Schedule &amp; Availability</td>
+          <td>Working days, time slots, booking mode (queue/slots), slot duration, queue lead time, max queue length</td>
+          <td>Doctors</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Appointment Records</td>
+          <td>Booking history, queue position, visit dates, status (completed/cancelled)</td>
+          <td>All Users</td>
+          <td>Generated automatically</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>B. Information Collected Automatically</h3>
+    <ul>
+      <li>Device type, model, manufacturer, operating system version, and application version</li>
+      <li>Internet Protocol (IP) address of the User's device or proxy server</li>
+      <li>Approximate location derived from IP address (city/region level only)</li>
+      <li>Precise GPS location — <strong>only</strong> when you actively use the map feature and grant explicit location permission</li>
+      <li>Firebase Cloud Messaging (FCM) push notification token for appointment alerts and queue updates</li>
+      <li>Login timestamps, session duration, and session frequency</li>
+      <li>Type of web browser or mobile browser used</li>
+      <li>URL of the page from which you accessed the Platform (referrer URL)</li>
+      <li>Crash reports and technical diagnostics to diagnose and fix application errors</li>
+    </ul>
+
+    <h3>C. Information From Third Parties</h3>
+    <ul>
+      <li>Credential verification data from the Medical Council of India or State Medical Councils, for the purpose of verifying Doctor registration numbers</li>
+      <li>OTP delivery confirmation metadata from telecom service providers</li>
+      <li>Anonymised aggregated analytics from Firebase (Google) to understand platform usage patterns</li>
+    </ul>
+
+    <div class="callout callout-amber">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <p>We do not collect payment card numbers, CVV codes, or bank account credentials. If payment features are introduced in future versions, all processing will be handled exclusively by PCI-DSS Level 1 certified payment gateways. We will update this Policy before any such introduction.</p>
+    </div>
+
+    <h3>D. Consequence of Non-Provision</h3>
+    <p>Where the provision of certain Personal Data is mandatory for the delivery of a particular Service, your refusal to provide such data may result in the Company being unable to provide that specific Service to you. We will clearly indicate which fields are mandatory at the point of collection.</p>
+  </section>
+
+  <!-- 4. SENSITIVE PERSONAL DATA -->
+  <section id="sensitive">
+    <div class="section-number">04 — Sensitive Personal Data</div>
+    <h2>Special Category: Health &amp; Sensitive Information</h2>
+
+    <div class="callout callout-red">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <p>Health and medical information constitutes <strong>Sensitive Personal Data or Information (SPDI)</strong> under Rule 3 of the SPI Rules, 2011 and <strong>Special Category Personal Data</strong> under the DPDP Act, 2023. The Company applies heightened standards of protection to all such data.</p>
+    </div>
+
+    <h3>What Constitutes SPDI on This Platform</h3>
+    <ul>
+      <li>Medical history, diagnoses, and treatment records shared by Patients</li>
+      <li>Symptoms and health notes entered during appointment booking</li>
+      <li>Prescriptions or clinical notes attached by Doctors to appointment records</li>
+      <li>Blood group and known allergies or medical conditions</li>
+    </ul>
+
+    <h3>Heightened Protections Applied to SPDI</h3>
+    <ul>
+      <li><strong>Express prior written consent</strong> is obtained before collection of SPDI, separate from general terms acceptance</li>
+      <li>SPDI is <strong>never transferred to any third party</strong> without your explicit consent, except as required by law or court order</li>
+      <li>SPDI is encrypted both in transit (TLS 1.3) and at rest (AES-256) at all times</li>
+      <li>Access to SPDI within the Company is restricted on a strict need-to-know basis enforced by role-based access controls</li>
+      <li>SPDI shared between Patient and Doctor is accessible <strong>only to the specific Doctor</strong> with whom you have booked an appointment — it is not visible to other Doctors on the Platform</li>
+      <li>We do not use SPDI for profiling, advertising, or any secondary commercial purpose whatsoever</li>
+    </ul>
+
+    <h3>Withdrawal of Consent for SPDI</h3>
+    <p>You may withdraw consent for the collection and use of your SPDI at any time by contacting us at <strong>support@vengurlatech.com</strong>. Upon withdrawal, we will cease further collection; however, information already lawfully collected and processed prior to withdrawal may be retained for the minimum period required by law.</p>
+  </section>
+
+  <!-- 5. HOW WE USE IT -->
+  <section id="use">
+    <div class="section-number">05 — Purposes of Processing</div>
+    <h2>How We Use Your Personal Data</h2>
+
+    <p>The Company uses Personal Data only for the specific, lawful purposes described below. <strong>We will never sell your Personal Data to any third party, advertiser, or data broker.</strong> After a period of time, de-identified or anonymised data may be retained and used solely for aggregate analytics to improve healthcare delivery.</p>
+
+    <h3>A. Core Service Delivery</h3>
+    <ul>
+      <li>Creating, authenticating, and managing your User account</li>
+      <li>Connecting Patients with verified Doctors for appointment booking and live queue management</li>
+      <li>Processing appointment bookings, cancellations, rescheduling, and status updates</li>
+      <li>Displaying real-time queue position, estimated wait times, and Doctor availability</li>
+      <li>Facilitating in-app communication between Doctor and Patient within the scope of a booked appointment</li>
+      <li>Displaying clinic location, map coordinates, and navigation assistance</li>
+    </ul>
+
+    <h3>B. Verification, Safety &amp; Compliance</h3>
+    <ul>
+      <li>Verifying Doctor credentials against medical council registries to ensure only licensed practitioners are listed</li>
+      <li>Sending One-Time Passwords (OTPs) to authenticate User identity at login and for sensitive operations</li>
+      <li>Detecting, investigating, and preventing fraudulent, abusive, or illegal activity on the Platform</li>
+      <li>Enforcing our Terms of Use and this Privacy Policy</li>
+      <li>Complying with applicable Indian laws, regulations, and lawful orders of government authorities</li>
+    </ul>
+
+    <h3>C. Communications</h3>
+    <ul>
+      <li>Sending push notifications (via FCM) for appointment confirmations, reminders, cancellations, and queue position updates</li>
+      <li>Sending SMS alerts for time-sensitive appointment changes — <strong>only if your mobile number is not registered with the DNCR (Do Not Call Registry)</strong>, unless you provide express, clear, and unambiguous written consent for such communication</li>
+      <li>Responding to your support inquiries, grievances, and feedback</li>
+      <li>Sending service-related email communications; <strong>marketing communications only with your prior opt-in consent</strong></li>
+    </ul>
+
+    <h3>D. Platform Improvement</h3>
+    <ul>
+      <li>Analysing application performance, diagnosing bugs, and monitoring system health</li>
+      <li>Understanding aggregate usage patterns to improve features and user experience</li>
+      <li>Conducting anonymised, aggregate research to identify trends in healthcare access and queue management</li>
+    </ul>
+
+    <h3>E. Legal Basis for Each Processing Purpose</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>Purpose</th><th>Legal Basis</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Account creation &amp; service delivery</td><td>Performance of contract (Terms of Use)</td></tr>
+        <tr><td>Health data / SPDI collection</td><td>Express prior written consent</td></tr>
+        <tr><td>Location access (GPS)</td><td>Express prior consent via OS-level permission</td></tr>
+        <tr><td>Push notifications</td><td>Consent (app-level permission grant)</td></tr>
+        <tr><td>Fraud detection &amp; security</td><td>Legitimate interest of the Company</td></tr>
+        <tr><td>Marketing communications</td><td>Opt-in consent</td></tr>
+        <tr><td>Legal compliance &amp; disclosures</td><td>Legal obligation under applicable Indian law</td></tr>
+        <tr><td>Anonymised analytics</td><td>Legitimate interest (no re-identification possible)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 6. SHARING -->
+  <section id="sharing">
+    <div class="section-number">06 — Disclosure &amp; Sharing</div>
+    <h2>When and With Whom We Share Your Data</h2>
+
+    <div class="callout">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+      <p><strong>We do not sell, rent, or trade your Personal Data.</strong> Sharing occurs only in the limited circumstances below, and in every case with appropriate contractual safeguards or legal authority.</p>
+    </div>
+
+    <h3>A. Between Patients and Doctors (Platform-Mediated)</h3>
+    <p>When a Patient books an appointment with a Doctor, the following limited data is shared to facilitate that consultation:</p>
+    <ul>
+      <li><strong>Patient → Doctor:</strong> Name, mobile number, and any health notes or symptoms the Patient voluntarily adds to the booking</li>
+      <li><strong>Doctor → Patient:</strong> Name, photo, specialization, qualification, clinic name, address, schedule, and consultation fee</li>
+    </ul>
+    <p>This sharing is strictly limited to the specific appointment relationship. A Doctor cannot access the medical records of a Patient who has not booked an appointment with that Doctor.</p>
+
+    <h3>B. Service Providers (Data Processors)</h3>
+    <p>The Company engages carefully vetted third-party processors under written Data Processing Agreements that require them to maintain confidentiality and implement appropriate security measures. Current processors include:</p>
+
+    <table class="data-table">
+      <thead>
+        <tr><th>Processor</th><th>Purpose</th><th>Data Shared</th><th>Location</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Firebase (Google LLC)</td>
+          <td>Push notification delivery, crash analytics</td>
+          <td>FCM device token, anonymised event data</td>
+          <td>USA / Global</td>
+        </tr>
+        <tr>
+          <td>Telecom providers (BSNL, Jio, Airtel, etc.)</td>
+          <td>OTP SMS delivery</td>
+          <td>Mobile number only</td>
+          <td>India</td>
+        </tr>
+        <tr>
+          <td>Cloud infrastructure provider</td>
+          <td>Server hosting and encrypted database storage</td>
+          <td>All Platform data (encrypted)</td>
+          <td>India</td>
+        </tr>
+        <tr>
+          <td>Google Maps Platform</td>
+          <td>Clinic location display, map-based location picker</td>
+          <td>Location coordinates (when map feature used)</td>
+          <td>USA / Global</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>C. Legal Disclosures</h3>
+    <p>The Company may disclose your Personal Data without your consent when required or permitted to do so by applicable law, including in the following circumstances:</p>
+    <ul>
+      <li>In response to a court order, subpoena, or lawful request from a government or regulatory authority</li>
+      <li>To protect the rights, property, or safety of the Company, our Users, or the general public</li>
+      <li>To enforce our Terms of Use or this Privacy Policy</li>
+      <li>In connection with the investigation of a breach or potential breach of any agreement or law</li>
+    </ul>
+    <p>The Company may also transfer User-generated information to its affiliates or governmental authorities in such manner as permitted or required by applicable Indian law, and you hereby consent to such transfer.</p>
+
+    <h3>D. Transfer of Sensitive Personal Data</h3>
+    <p>In accordance with Rule 7 of the SPI Rules, 2011, the Company shall not transfer SPDI to any body corporate or person in India or outside India unless: (i) the receiving entity ensures the same level of data protection as required under the SPI Rules, and (ii) such transfer is necessary for the performance of a lawful contract, or the User has consented to such transfer.</p>
+
+    <h3>E. Business Transfers</h3>
+    <p>In the event of a merger, acquisition, restructuring, or sale of all or a material portion of the Company's assets, your Personal Data may be transferred to the successor entity. The Company will provide prior notice via in-app notification and email (where available), and will give you a reasonable opportunity to request deletion of your account before any such transfer becomes effective.</p>
+
+    <h3>F. Aggregated, Anonymised Data</h3>
+    <p>The Company may share anonymised, aggregated statistical information (from which no individual can be identified) with research institutions, public health bodies, or the public, for the purpose of improving healthcare accessibility and outcomes in India.</p>
+  </section>
+
+  <!-- 7. STORAGE & SECURITY -->
+  <section id="storage">
+    <div class="section-number">07 — Data Storage &amp; Security</div>
+    <h2>How We Store and Protect Your Data</h2>
+
+    <h3>Data Location</h3>
+    <p>All Personal Data and SPDI is stored on secure servers located <strong>within India</strong>. Anonymised analytics data processed by Firebase may reside on Google's global infrastructure. In all such cross-border processing, the Company ensures that equivalent data protection safeguards are maintained, as required by the DPDP Act, 2023 and the SPI Rules.</p>
+
+    <h3>Technical Security Measures</h3>
+    <ul>
+      <li><strong>Encryption in Transit:</strong> All data transmitted between User devices and Company servers is protected using TLS 1.3 (HTTPS). Unencrypted connections are refused.</li>
+      <li><strong>Encryption at Rest:</strong> All Personal Data and SPDI stored in Company databases is encrypted using AES-256 bit encryption. Only authorised systems with the correct decryption keys can access this data.</li>
+      <li><strong>OTP-Based Authentication:</strong> User accounts are protected by mobile number OTP verification. No password-based login is used, eliminating password-related vulnerabilities.</li>
+      <li><strong>Role-Based Access Control (RBAC):</strong> Internal access to Personal Data is strictly limited to authorised personnel based on their functional role. No employee has blanket access to all User data.</li>
+      <li><strong>Access Zones:</strong> Systems are configured to restrict data access from unauthorised IP ranges or geographic locations, so that even if authentication credentials were compromised, access would be refused from unauthorised locations.</li>
+      <li><strong>Database Separation:</strong> Doctor data and Patient data are stored in logically separated database schemas to prevent cross-contamination of access.</li>
+      <li><strong>Regular Security Audits:</strong> The Company conducts periodic security assessments, penetration testing, and vulnerability scanning of its systems and infrastructure.</li>
+      <li><strong>Backup &amp; Recovery:</strong> Data is backed up and versioned at regular intervals. Point-in-time recovery capabilities are maintained to restore data from any specific historical moment.</li>
+    </ul>
+
+    <h3>Organisational Security Measures</h3>
+    <ul>
+      <li>All employees and contractors with access to Personal Data are bound by confidentiality obligations</li>
+      <li>Security awareness training is provided to all personnel handling User data</li>
+      <li>Third-party processors are contractually obligated to maintain equivalent security standards</li>
+    </ul>
+
+    <h3>Data Breach Response</h3>
+    <p>The Company maintains a documented Incident Response Plan. In the event of a confirmed personal data breach that is likely to cause harm to any Data Principal:</p>
+    <ol>
+      <li>Affected Users will be notified <strong>within 72 hours</strong> of the Company becoming aware of the breach</li>
+      <li>The Data Protection Board of India will be notified as required under the DPDP Act, 2023</li>
+      <li>Notifications will describe the nature of the breach, categories of data affected, likely consequences, and steps taken to address it</li>
+    </ol>
+
+    <div class="callout callout-amber">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <p>Despite our best efforts, no method of electronic transmission or storage is 100% secure. The Company cannot guarantee the absolute security of your data. You are responsible for keeping your OTP confidential and not sharing it with any third party, including anyone claiming to be a Company representative.</p>
+    </div>
+  </section>
+
+  <!-- 8. YOUR RIGHTS -->
+  <section id="rights">
+    <div class="section-number">08 — Your Rights as a Data Principal</div>
+    <h2>Rights You Have Over Your Personal Data</h2>
+
+    <p>Under the Digital Personal Data Protection Act, 2023, the IT Act, 2000, and the SPI Rules, you are entitled to the following rights with respect to your Personal Data held by the Company:</p>
+
+    <div class="rights-grid">
+      <div class="right-card">
+        <span class="right-card-icon">👁️</span>
+        <div class="right-card-title">Right to Access &amp; Information</div>
+        <div class="right-card-desc">Request a summary of your Personal Data we process, the identities of all Data Fiduciaries we share it with, and the purposes of such sharing.</div>
+      </div>
+      <div class="right-card">
+        <span class="right-card-icon">✏️</span>
+        <div class="right-card-title">Right to Correction</div>
+        <div class="right-card-desc">Require us to correct inaccurate, incomplete, or misleading Personal Data we hold about you.</div>
+      </div>
+      <div class="right-card">
+        <span class="right-card-icon">🗑️</span>
+        <div class="right-card-title">Right to Erasure</div>
+        <div class="right-card-desc">Request deletion of your Personal Data, subject to legal retention obligations. Exercising this right may result in termination of your account.</div>
+      </div>
+      <div class="right-card">
+        <span class="right-card-icon">📦</span>
+        <div class="right-card-title">Right to Data Portability</div>
+        <div class="right-card-desc">Receive a copy of your Personal Data in a structured, commonly used, machine-readable format.</div>
+      </div>
+      <div class="right-card">
+        <span class="right-card-icon">🚫</span>
+        <div class="right-card-title">Right to Grievance Redressal</div>
+        <div class="right-card-desc">File a complaint with the Company's Grievance Officer. If unsatisfied with the resolution, escalate to the Data Protection Board of India.</div>
+      </div>
+      <div class="right-card">
+        <span class="right-card-icon">🔒</span>
+        <div class="right-card-title">Right to Withdraw Consent</div>
+        <div class="right-card-desc">Withdraw consent at any time. Withdrawal will not affect the lawfulness of processing based on consent prior to its withdrawal.</div>
+      </div>
+      <div class="right-card">
+        <span class="right-card-icon">👤</span>
+        <div class="right-card-title">Right of Nominee</div>
+        <div class="right-card-desc">Nominate another individual to exercise data rights on your behalf in the event of your death or incapacity, as per the DPDP Act, 2023.</div>
+      </div>
+      <div class="right-card">
+        <span class="right-card-icon">⛔</span>
+        <div class="right-card-title">Right Against Automated Decisions</div>
+        <div class="right-card-desc">We do not use your Personal Data to make solely automated decisions (including profiling) that produce legal or similarly significant effects on you.</div>
+      </div>
+    </div>
+
+    <h3>How to Exercise Your Rights</h3>
+    <p>You may exercise most rights directly within the HealthConnect application under <strong>Settings → Account → Privacy</strong>. For requests requiring the Company's direct involvement, submit a written request to:</p>
+    <ul>
+      <li><strong>Email:</strong> support@vengurlatech.com (Subject: "Data Rights Request — [Your Name]")</li>
+      <li>The Company will acknowledge receipt within <strong>7 business days</strong> and fulfil the request within <strong>30 days</strong> from the date of receipt, or such extended period as permitted by law.</li>
+      <li>Identity verification may be required before processing any data rights request.</li>
+    </ul>
+  
+    <ul>
+      <li><strong>Email:</strong> support@vengurlatech.com</li>
+      <li><strong>Address:</strong> Vengurla Tech Private Limited, Vengurla, Sindhudurg, Maharashtra — 416 516, India</li>
+      <li><strong>Acknowledgement time:</strong> Within 48 hours of receipt</li>
+      <li><strong>Resolution time:</strong> Within 30 days of receipt</li>
+    </ul>
+    <p>If you are dissatisfied with the resolution provided by the Grievance Officer, you may escalate your complaint to the <strong>Data Protection Board of India</strong> established under Section 18 of the DPDP Act, 2023.</p>
+  </section>
+
+  <!-- 9. CONSENT -->
+  <section id="consent">
+    <div class="section-number">09 — Consent &amp; Its Management</div>
+    <h2>How We Obtain, Manage &amp; Honour Consent</h2>
+
+    <div class="callout">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+      </svg>
+      <p>The Company collects or uses any Personal or Sensitive Personal Data belonging to you <strong>only after receiving appropriate and clear consent</strong> from you. No consent is permanent — any consent given can be revoked at any time.</p>
+    </div>
+
+    <h3>Consent for Personal Data</h3>
+    <p>By registering for an account and accepting this Privacy Policy, you consent to the collection and use of your Personal Data for the purposes set out in this Policy. This consent is given freely and may be withdrawn at any time.</p>
+
+    <h3>Consent for Sensitive Personal Data (SPDI)</h3>
+    <p>Prior to collecting any health-related SPDI, the Company will present a separate, explicit consent notice that:</p>
+    <ul>
+      <li>Identifies the specific SPDI being collected</li>
+      <li>States the purpose of collection</li>
+      <li>Names the persons who may have access to the SPDI</li>
+      <li>Provides the option to review the information being collected</li>
+      <li>Includes a clear mechanism to grant or deny consent</li>
+    </ul>
+
+    <h3>Consent for Communications</h3>
+    <ul>
+      <li><strong>Push notifications:</strong> Granted at the OS level when you first install the app. You may revoke via your device settings at any time.</li>
+      <li><strong>SMS communications:</strong> The Company will not send SMS to numbers registered with the DNCR (Do Not Call Registry) without your express written consent.</li>
+      <li><strong>Marketing emails:</strong> Only sent with prior opt-in consent. An unsubscribe link is included in every marketing communication.</li>
+    </ul>
+
+    <h3>Revoking Consent</h3>
+    <p>You may revoke any consent previously granted by:</p>
+    <ul>
+      <li>Using the privacy controls within the HealthConnect app (Settings → Account → Privacy)</li>
+      <li>Emailing us at support@vengurlatech.com with the subject "Consent Withdrawal — [Your Name]"</li>
+      <li>Revoking OS-level permissions (location, notifications) through your device settings</li>
+    </ul>
+    <p>Upon receiving a valid revocation request, the Company will cease the relevant processing as soon as reasonably practicable. Revocation will not affect the lawfulness of processing that occurred prior to the withdrawal.</p>
+
+    <h3>Consent of Minors</h3>
+    <p>The Platform is not directed at persons under 18 years of age. For Patients who are minors, a parent or legal guardian must provide consent on their behalf. By providing data for a minor, the guardian confirms they have the legal authority to do so.</p>
+  </section>
+
+  <!-- 10. CHILDREN -->
+  <section id="children">
+    <div class="section-number">10 — Children's Privacy</div>
+    <h2>Policy Regarding Persons Under 18 Years of Age</h2>
+
+    <div class="callout callout-amber">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <p>HealthConnect is not directed at children under 18 years of age and does not knowingly collect Personal Data from children without verified parental or guardian consent, as required under Section 9 of the DPDP Act, 2023.</p>
+    </div>
+
+    <p>Where a child under 18 requires access to healthcare services through the Platform, a parent or legal guardian must:</p>
+    <ol>
+      <li>Create and maintain the account on the child's behalf using their own (guardian's) verified mobile number</li>
+      <li>Provide consent to this Privacy Policy on the child's behalf</li>
+      <li>Take full responsibility for all data submitted on behalf of the child</li>
+    </ol>
+
+    <p>The Company will not process data of a child for the purpose of tracking, behavioural monitoring, or targeted advertising.</p>
+
+    <p>If the Company becomes aware that Personal Data of a child has been collected without appropriate guardian consent, it will take immediate steps to delete that data. To report such a concern, contact us at <strong>support@vengurlatech.com</strong>.</p>
+  </section>
+
+  <!-- 11. RETENTION -->
+  <section id="retention">
+    <div class="section-number">11 — Data Retention</div>
+    <h2>How Long We Retain Your Personal Data</h2>
+
+    <p>The Company shall not retain Personal Data for a period longer than is necessary for the purpose for which it was collected or as required under applicable Indian law. The specific retention periods below reflect legal, regulatory, and operational requirements.</p>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Data Category</th>
+          <th>Retention Period</th>
+          <th>Legal / Regulatory Basis</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Account &amp; profile information</td>
+          <td>Duration of active account + 3 years post-closure</td>
+          <td>IT Act, 2000; DPDP Act, 2023</td>
+        </tr>
+        <tr>
+          <td>Medical records &amp; appointment history</td>
+          <td>7 years from last appointment date</td>
+          <td>MCI Ethics Regulations, 2002; Clinical Establishments Act</td>
+        </tr>
+        <tr>
+          <td>Doctor registration &amp; credential documents</td>
+          <td>Duration of registration + 5 years post-deregistration</td>
+          <td>Indian Medical Council Act, 1956</td>
+        </tr>
+        <tr>
+          <td>App usage logs &amp; analytics</td>
+          <td>13 months (rolling window)</td>
+          <td>Operational necessity</td>
+        </tr>
+        <tr>
+          <td>Support &amp; grievance correspondence</td>
+          <td>3 years from resolution date</td>
+          <td>Limitation Act, 1963 (dispute resolution)</td>
+        </tr>
+        <tr>
+          <td>OTP / authentication logs</td>
+          <td>90 days</td>
+          <td>Security audit purposes</td>
+        </tr>
+        <tr>
+          <td>Anonymised &amp; aggregated analytics</td>
+          <td>Indefinite (no re-identification possible)</td>
+          <td>Legitimate interest (public health research)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>Account Deletion</h3>
+    <p>When you delete your account, the Company will anonymise or permanently delete your Personal Data within <strong>30 calendar days</strong> from the date of deletion request, except for categories of data that must be retained under the periods specified above. You will receive a confirmation email upon completion of deletion.</p>
+
+    <h3>Post-Retention Disposal</h3>
+    <p>Upon expiry of the applicable retention period, Personal Data will be securely deleted, anonymised beyond re-identification, or archived in a manner that prevents further processing, in accordance with industry-standard secure disposal procedures.</p>
+  </section>
+
+  <!-- 12. THIRD PARTIES -->
+  <section id="third-party">
+    <div class="section-number">12 — Third-Party Links &amp; Services</div>
+    <h2>Links to External Platforms and Services</h2>
+
+    <p>The Platform may display or link to third-party websites, embedded maps, and external services (for example, Google Maps for clinic location display). These third parties operate independently and have their own privacy policies. The Company does not exercise control over such third-party sites and accepts no responsibility or liability for their privacy practices, data collection, or content.</p>
+
+    <p>The Company does not make any representations concerning the privacy practices or policies of such third parties or terms of use of such websites. The inclusion of any such link or integration does not imply endorsement by the Company.</p>
+
+    <h3>Key Third-Party Privacy Policies</h3>
+    <ul>
+      <li><strong>Google / Firebase:</strong> policies.google.com/privacy</li>
+      <li><strong>Google Maps Platform:</strong> cloud.google.com/maps-platform/terms</li>
+    </ul>
+
+    <p>We encourage you to review the privacy policies of any third-party service you interact with through the Platform before providing them with any personal information.</p>
+  </section>
+
+  <!-- 13. CHANGES -->
+  <section id="changes">
+    <div class="section-number">13 — Changes to This Policy</div>
+    <h2>How We Handle Updates to This Privacy Policy</h2>
+
+    <p>The Company reserves the right to amend, update, or replace any part of this Privacy Policy at its sole discretion and at any time, including to reflect changes in applicable law, Platform features, or data processing practices.</p>
+
+    <h3>Notification of Changes</h3>
+    <ol>
+      <li>The revised policy will be posted within the application and on our website with an updated "Last Updated" date</li>
+      <li>For material changes — particularly those that affect your rights, the categories of data collected, or the purposes of processing — the Company will provide in-app notification and, where your email is available, an email notice at least <strong>15 days prior</strong> to the change taking effect</li>
+      <li>For changes that significantly alter your rights or obligations, the Company will require your re-acknowledgement of the updated Policy before you may continue to use the Services</li>
+    </ol>
+
+    <div class="callout callout-amber">
+      <svg class="callout-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      <p>Your continued use of the HealthConnect Platform after any changes to this Privacy Policy are posted shall constitute your acceptance of those changes. If you do not agree to the revised Policy, you must cease using the Services and may request deletion of your account.</p>
+    </div>
+  </section>
+
+  <!-- 14. CONTACT -->
+  <section id="contact">
+    <div class="section-number">14 — Contact &amp; Grievance Redressal</div>
+    <h2>Get in Touch With the Privacy Team</h2>
+
+    <p>For any questions, concerns, access requests, correction requests, deletion requests, or complaints regarding this Privacy Policy or the processing of your Personal Data, please contact us through any of the following channels. The Company is committed to resolving all genuine privacy concerns promptly and fairly.</p>
+
+    <div class="contact-card">
+      <div>
+        <h3>Vengurla Tech Private Limited — Privacy &amp; Grievance</h3>
+        <p>Acknowledgement within 48 hrs · Resolution within 30 days</p>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:20px;">
+        <div class="contact-item">
+          <span class="contact-label">Email</span>
+          <span class="contact-value">support@vengurlatech.com</span>
+        </div>
+   
+        <div class="contact-item">
+          <span class="contact-label">Registered Address</span>
+          <span class="contact-value">Vengurla Tech Private Limited<br>Vengurla, Sindhudurg<br>Maharashtra — 416 516, India</span>
+        </div>
+        <div class="contact-item">
+          <span class="contact-label">Escalation</span>
+          <span class="contact-value">Data Protection Board of India<br>(dpboard.gov.in)</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top:20px; font-size:13.5px; color:var(--ink-muted);">
+      If you are not satisfied with the resolution provided by the Company's Grievance Officer within 30 days, you have the right to file a complaint with the <strong>Data Protection Board of India</strong> constituted under Section 18 of the Digital Personal Data Protection Act, 2023.
+    </p>
+  </section>
+
+</main>
+
+<!-- ── FOOTER ────────────────────────────────────────────────────────────────── -->
+<footer>
+  <p>© 2026 Vengurla Tech Private Limited. All rights reserved.</p>
+  <p style="margin-top:5px;">
+    HealthConnect is a product of Vengurla Tech Private Limited, registered under the Companies Act, 2013, India.
+  </p>
+  <p style="margin-top:8px;">
+    <a href="#">Terms of Service</a> &nbsp;·&nbsp;
+    <a href="#">Privacy Policy</a> &nbsp;·&nbsp;
+    <a href="#">Contact Us</a>
+  </p>
+</footer>
+
+</body>
+</html>
