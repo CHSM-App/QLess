@@ -305,7 +305,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           children: [
 
             // ── Doctor Hero Card ─────────────────────────────────
-            _buildHeroCard(init, accent, accentBg, avgRating, reviews, d, patientCount),
+            _buildHeroCard(init, accent, accentBg, avgRating, reviews, d, patientCount, availabilities),
             const SizedBox(height: 10),
 
             // ── Stats row ────────────────────────────────────────
@@ -393,7 +393,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
   // ── Hero Card ──────────────────────────────────────────────────────
   Widget _buildHeroCard(String init, Color accent, Color accentBg,
-      double avgRating, List<ReviewModel> reviews, DoctorDetails d, int? patientCount) {
+      double avgRating, List<ReviewModel> reviews, DoctorDetails d,
+      int? patientCount, List<DoctorAvailabilityModel> avail) {
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
       padding: const EdgeInsets.all(14),
@@ -556,7 +557,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 icon: Icons.event_available_rounded,
                 iconColor: kPrimary,
                 iconBg: kPrimaryLight,
-                value: _isOpen(d) ? 'Open' : 'Closed',
+                value: _isOpenNow(avail) ? 'Open' : 'Closed',
                 label: 'Status',
               ),
             ],
@@ -566,7 +567,28 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     );
   }
 
-  bool _isOpen(DoctorDetails d) => d.isQueueAvailable == 1;
+  // Open = today's day is enabled in the availability schedule AND the
+  // current time falls within one of that day's enabled slots. This mirrors
+  // the per-day Open/Closed logic in _buildWorkingHours rather than the live
+  // queue flag (isQueueAvailable), which is null/0 for slot-based doctors or
+  // before the booking window opens — and was wrongly showing "Closed".
+  bool _isOpenNow(List<DoctorAvailabilityModel> avail) {
+    if (avail.isEmpty) return false;
+    const days = [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+    ];
+    final today   = days[DateTime.now().weekday - 1];
+    final nowMins = DateTime.now().hour * 60 + DateTime.now().minute;
+    for (final a in avail) {
+      if (a.isEnabled != true || a.dayOfWeek != today) continue;
+      final s = _toMinutes(a.startTime ?? '');
+      final e = _toMinutes(a.endTime ?? '');
+      // Enabled today but no parseable time → treat as open today.
+      if (s < 0 || e <= s) return true;
+      if (nowMins >= s && nowMins < e) return true;
+    }
+    return false;
+  }
 
   // ── Stats row ───────────────────────────────────────────────────────
   Widget _buildStatsRow(double avg, int reviewCount, DoctorDetails d) {
