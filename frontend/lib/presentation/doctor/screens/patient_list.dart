@@ -328,10 +328,40 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         ),
       );
 
+  // A scheduled time as a UTC instant, parsed exactly the way _fmtTime()
+  // formats it so the guard matches the time shown on the card.
+  DateTime? _instantOf(String? raw) {
+    final v = raw?.trim();
+    if (v == null || v.isEmpty || v.toLowerCase() == 'null') return null;
+    try {
+      return DateTime.parse(v).toUtc();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _startSession(AppointmentList p) async {
     final pid = p.patientId ?? 0;
     final did = _doctorId;
     if (pid == 0 || did == 0) { _snack('Missing info', isError: true); return; }
+
+    // ── Slot-time guard ──────────────────────────────────────────────
+    // A fresh ('booked') session can't be started before its scheduled
+    // slot/queue time. 'in_progress' (Continue) and 'skipped' (recall)
+    // are intentionally exempt — those flows are already underway.
+    final status = p.status?.toLowerCase() ?? '';
+    if (status == 'booked') {
+      final slotStart = _instantOf(p.startTime);
+      if (slotStart != null &&
+          DateTime.now().toUtc().isBefore(slotStart)) {
+        _snack(
+          'Scheduled for ${_fmtTime(p.startTime)} — you can start once the slot time begins.',
+          isError: true,
+        );
+        return;
+      }
+    }
+
     try {
       await ref.read(appointmentViewModelProvider.notifier).startSession(
         AppointmentRequestModel(
@@ -351,7 +381,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           patientAge: _ageStr(p.dob),
           patientGender: p.gender,
           queueNumber: p.queueNumber,
-          patientStatus: 'booked',
+          patientStatus: p.status ?? 'booked',
           symptoms: p.symptoms,
         ),
       ),
@@ -373,9 +403,13 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         ),
       );
       if (!mounted) return;
-      _hasFetched = false;
-      _refresh(force: true);
-      _snack(res.message ?? 'Patient skipped');
+      if (res.success == true) {
+        _hasFetched = false;
+        _refresh(force: true);
+        _snack(res.message ?? 'Patient skipped');
+      } else {
+        _snack(res.message ?? 'Skip failed', isError: true);
+      }
     } catch (e) {
       if (mounted) _snack('Failed to skip: $e', isError: true);
     }
@@ -393,6 +427,29 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         queueNumber: p.queueNumber,
       ),
     ));
+  }
+
+  Future<void> _cancelByDoctor(AppointmentList p) async {
+    final did = _doctorId;
+    if (did == 0) { _snack('Missing info', isError: true); return; }
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier).cancelByDoctor(
+        AppointmentRequestModel(
+          doctorId: did,
+          appointmentId: p.appointmentId ?? 0,
+        ),
+      );
+      if (!mounted) return;
+      if (res.success == true) {
+        _hasFetched = false;
+        _refresh(force: true);
+        _snack(res.message ?? 'Appointment cancelled');
+      } else {
+        _snack(res.message ?? 'Cancel failed', isError: true);
+      }
+    } catch (e) {
+      if (mounted) _snack('Failed to cancel: $e', isError: true);
+    }
   }
 
   void _cancelConfirm(AppointmentList p) => showDialog(
@@ -429,7 +486,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
             )),
             const SizedBox(width: 10),
             Expanded(child: ElevatedButton(
-              onPressed: () { Navigator.pop(ctx); _snack('Appointment cancelled'); },
+              onPressed: () { Navigator.pop(ctx); _cancelByDoctor(p); },
               style: ElevatedButton.styleFrom(
                 backgroundColor: kError, foregroundColor: Colors.white, elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -529,6 +586,27 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   // ── Queue Controls ────────────────────────────────────────────────────────
 
   Future<void> _onQueueStart(int? queueId) async {
+    // ── Slot-time guard ──────────────────────────────────────────────
+    // Don't allow the queue session to be started before its slot time.
+    final sessions =
+        ref.read(appointmentViewModelProvider).todayQueueResult?.value ??
+            const [];
+    String? rawStart;
+    for (final dynamic s in sessions) {
+      if (s.queueId == queueId) {
+        rawStart = s.startTime as String?;
+        break;
+      }
+    }
+    final slotStart = _instantOf(rawStart);
+    if (slotStart != null && DateTime.now().toUtc().isBefore(slotStart)) {
+      _snack(
+        'Queue starts at ${_fmtTime(rawStart)} — please wait until the slot time begins.',
+        isError: true,
+      );
+      return;
+    }
+
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier)
           .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));

@@ -1,10 +1,6 @@
-
-
-// ─── Color Palette ───────────────────────────────────────────────────────────
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -19,55 +15,35 @@ import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
-const kPrimaryBlue  = Color(0xFF1A73E8);
-const kLightBlue    = Color(0xFFE8F0FE);
-const kAccentGreen  = Color(0xFF34A853);
-const kRedAccent    = Color(0xFFEA4335);
-const kSurface      = Color(0xFFF8F9FA);
-const kCardBg       = Color(0xFFFFFFFF);
-const kTextDark     = Color(0xFF1F2937);
-const kTextMuted    = Color(0xFF6B7280);
+// ── Colour palette (matches login + patient registration) ─────────
+const kPrimary       = Color(0xFF26C6B0);
+const kPrimaryDark   = Color(0xFF1EA898);
+const kPrimaryDarker = Color(0xFF158578);
+const kPrimaryLight  = Color(0xFFD9F5F1);
+const kPrimaryGlow   = Color(0xFF4DD9C4);
+
+const kBgSoft  = Color(0xFFF7FAFC);
+const kSurface = Color(0xFFFFFFFF);
+const kBg      = Color(0xFFF7FAFC);
+
+const kTextPrimary   = Color(0xFF1A202C);
+const kTextSecondary = Color(0xFF4A5568);
+const kTextMuted     = Color(0xFF94A3B8);
+
+const kBorder       = Color(0xFFF1F5F9);
+const kBorderStrong = Color(0xFFE2E8F0);
 const kDivider      = Color(0xFFE5E7EB);
 
-// Schedule colours (teal palette from availability page)
-const kSchedPrimary       = Color(0xFF26C6B0);
-const kSchedPrimaryDark   = Color(0xFF2BB5A0);
-const kSchedPrimaryLight  = Color(0xFFD9F5F1);
-const kSchedError         = Color(0xFFFC8181);
-const kSchedRedLight      = Color(0xFFFEE2E2);
-const kSchedSuccess       = Color(0xFF68D391);
-const kSchedGreenLight    = Color(0xFFDCFCE7);
-const kSchedBorder        = Color(0xFFEDF2F7);
-const kSchedTextPrimary   = Color(0xFF2D3748);
-const kSchedTextSecondary = Color(0xFF718096);
-const kSchedTextMuted     = Color(0xFFA0AEC0);
-
-const kPrimary = Color(0xFF26C6B0);
-const kPrimaryDark = Color(0xFF2BB5A0);
-const kPrimaryLight = Color(0xFFD9F5F1);
-const kPrimaryLighter = Color(0xFFF2FCFA);
-
-const kTextPrimary = Color(0xFF2D3748);
-const kTextSecondary = Color(0xFF718096);
-
-const kBorder = Color(0xFFEDF2F7);
-const kBg = Color(0xFFF7F8FA);
-
-const kSuccess = Color(0xFF68D391);
+const kError      = Color(0xFFFC8181);
+const kRedLight   = Color(0xFFFEE2E2);
+const kSuccess    = Color(0xFF68D391);
 const kGreenLight = Color(0xFFDCFCE7);
-const kGreenDark = Color(0xFF276749);
-
-const kError = Color(0xFFFC8181);
-const kRedLight = Color(0xFFFEE2E2);
-const kRedDark = Color(0xFFC53030);
-
-const kWarning = Color(0xFFF6AD55);
+const kWarning    = Color(0xFFF6AD55);
 const kAmberLight = Color(0xFFFEF3C7);
-const kAmberDark = Color(0xFF975A16);
-
-// ════════════════════════════════════════════════════════════════════
-//  BREAKPOINTS
-// ════════════════════════════════════════════════════════════════════
+const kPurple     = Color(0xFF9F7AEA);
+const kPurpleLight= Color(0xFFEDE9FE);
+const kInfo       = Color(0xFF3B82F6);
+const kInfoLight  = Color(0xFFDBEAFE);
 
 // ─── Schedule UI Models ──────────────────────────────────────────────────────
 enum BookingMode { queue, slots, both }
@@ -140,11 +116,11 @@ class _DoctorProfileSetupScreenState
   String? _selectedGender;
   int?    _selectedGenderId;
 
-  File?        _doctorPhoto;
-  List<File>   _clinicPhotos = [];
-  String? _fcmToken;
-  double? _latitude;
-  double? _longitude;
+  File?       _doctorPhoto;
+  List<File>  _clinicPhotos = [];
+  String?     _fcmToken;
+  double?     _latitude;
+  double?     _longitude;
   StreamSubscription<String>? _tokenRefreshSub;
 
   Timer?  _mobileDebounce;
@@ -152,16 +128,15 @@ class _DoctorProfileSetupScreenState
 
   final ImagePicker _picker = ImagePicker();
 
-  // IDs returned from Step 2 API (clinic registration response)
   int?    _savedDoctorId;
   String? _savedClinicId;
 
   final List<Map<String, String>> _specializations = [
-    {'value': 'general physician',     'label': 'General Physician'},
-    {'value': 'cardiology',  'label': 'Cardiology'},
-    {'value': 'dermatology', 'label': 'Dermatology'},
-    {'value': 'pediatrics',  'label': 'Pediatrics'},
-    {'value': 'orthopedics', 'label': 'Orthopedics'},
+    {'value': 'general physician', 'label': 'General Physician'},
+    {'value': 'cardiology',        'label': 'Cardiology'},
+    {'value': 'dermatology',       'label': 'Dermatology'},
+    {'value': 'pediatrics',        'label': 'Pediatrics'},
+    {'value': 'orthopedics',       'label': 'Orthopedics'},
   ];
 
   // ── Step 3: Schedule state ────────────────────────────────────────────────
@@ -173,8 +148,8 @@ class _DoctorProfileSetupScreenState
 
   late List<_DaySchedule> _days;
 
-  int  _leadHours   = 0;
-  int  _leadMinutes = 0;
+  int _leadHours   = 0;
+  int _leadMinutes = 0;
 
   bool get _anyQueueEnabled {
     for (final d in _days) {
@@ -187,13 +162,12 @@ class _DoctorProfileSetupScreenState
     return false;
   }
 
-final List<Map<String, dynamic>> _genderOptions = const [
-  {'id': 1, 'label': 'Male'},
-  {'id': 2, 'label': 'Female'},
-  {'id': 3, 'label': 'Other'},
-];
+  final List<Map<String, dynamic>> _genderOptions = const [
+    {'id': 1, 'label': 'Male'},
+    {'id': 2, 'label': 'Female'},
+    {'id': 3, 'label': 'Other'},
+  ];
 
-  // ── Init / Dispose ────────────────────────────────────────────────────────
   @override
   void initState() {
     super.initState();
@@ -207,13 +181,7 @@ final List<Map<String, dynamic>> _genderOptions = const [
     _days = _dayMeta
         .map((m) => _DaySchedule(dayName: m.$1, shortName: m.$2))
         .toList();
-
-    // WidgetsBinding.instance.addPostFrameCallback((_) {
-    //   if (!mounted) return;
-    //   ref.read(masterViewModelProvider.notifier).fetchGenderList();
-    // });
   }
-
 
   @override
   void dispose() {
@@ -260,11 +228,7 @@ final List<Map<String, dynamic>> _genderOptions = const [
     });
   }
 
-  // ── Image Picker – Camera + Gallery bottom sheet ──────────────────────────
-  //
-  // Shows a bottom sheet with two options: Camera and Gallery.
-  // [isDoctorPhoto] true  → sets _doctorPhoto
-  //                false → adds to _clinicPhotos (max 5)
+  // ── Image picker ──────────────────────────────────────────────────────────
   Future<void> _pickImage(bool isDoctorPhoto) async {
     if (!isDoctorPhoto && _clinicPhotos.length >= 5) {
       _showError('Maximum 5 clinic photos allowed.');
@@ -290,8 +254,6 @@ final List<Map<String, dynamic>> _genderOptions = const [
     }
   }
 
-  /// Shows a bottom sheet and returns [ImageSource.camera] or
-  /// [ImageSource.gallery], or null when the user taps outside.
   Future<ImageSource?> _showImageSourceSheet(bool isDoctorPhoto) {
     final title = isDoctorPhoto ? 'Doctor Photo' : 'Clinic Photo';
     return showModalBottomSheet<ImageSource>(
@@ -312,7 +274,8 @@ final List<Map<String, dynamic>> _genderOptions = const [
       }
     }
     if (permission == LocationPermission.deniedForever) {
-      _showError('Location permission permanently denied. Enable it in settings.');
+      _showError(
+          'Location permission permanently denied. Enable it in settings.');
       return;
     }
     try {
@@ -329,24 +292,24 @@ final List<Map<String, dynamic>> _genderOptions = const [
     }
   }
 
-Future<void> _selectFromMap() async {
-  final result = await Navigator.push<gmap.LatLng>(  // ← gmap.LatLng
-    context,
-    MaterialPageRoute(
-      builder: (_) => _MapPickerScreen(
-        initialLatLng: (_latitude != null && _longitude != null)
-            ? gmap.LatLng(_latitude!, _longitude!)        // ← gmap.LatLng
-            : const gmap.LatLng(15.9073, 73.6990),
+  Future<void> _selectFromMap() async {
+    final result = await Navigator.push<gmap.LatLng>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => _MapPickerScreen(
+          initialLatLng: (_latitude != null && _longitude != null)
+              ? gmap.LatLng(_latitude!, _longitude!)
+              : const gmap.LatLng(15.9073, 73.6990),
+        ),
       ),
-    ),
-  );
-  if (result != null) {
-    setState(() {
-      _latitude  = result.latitude;
-      _longitude = result.longitude;
-    });
+    );
+    if (result != null) {
+      setState(() {
+        _latitude  = result.latitude;
+        _longitude = result.longitude;
+      });
+    }
   }
-}
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   bool _isBlank(TextEditingController c) => c.text.trim().isEmpty;
@@ -356,18 +319,22 @@ Future<void> _selectFromMap() async {
           .hasMatch(email.trim());
 
   void _showError(String message) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(children: [
-          const Icon(Icons.error_outline_rounded, color: Colors.white, size: 18),
+          const Icon(Icons.error_outline_rounded,
+              color: Colors.white, size: 18),
           const SizedBox(width: 10),
           Expanded(
-              child: Text(message, style: const TextStyle(fontSize: 13))),
+              child: Text(message,
+                  style: const TextStyle(
+                      fontSize: 13.5, fontWeight: FontWeight.w500))),
         ]),
-        backgroundColor: kRedAccent,
+        backgroundColor: kTextPrimary,
         behavior: SnackBarBehavior.floating,
         shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
         duration: const Duration(seconds: 3),
       ),
@@ -379,9 +346,9 @@ Future<void> _selectFromMap() async {
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00';
 
   int _modeToInt(BookingMode m) => switch (m) {
-        BookingMode.queue  => 1,
-        BookingMode.slots  => 2,
-        BookingMode.both   => 3,
+        BookingMode.queue => 1,
+        BookingMode.slots => 2,
+        BookingMode.both  => 3,
       };
 
   DoctorScheduleModel _buildScheduleModel() {
@@ -394,10 +361,10 @@ Future<void> _selectFromMap() async {
                 isEnabled: day.isEnabled ? 1 : 0,
                 slots: day.timeSlots
                     .map((slot) => TimeSlotModel(
-                          startTime:      _fmtTime(slot.startTime),
-                          endTime:        _fmtTime(slot.endTime),
-                          bookingMode:    _modeToInt(slot.bookingMode),
-                          slotDuration:   slot.bookingMode == BookingMode.queue
+                          startTime:    _fmtTime(slot.startTime),
+                          endTime:      _fmtTime(slot.endTime),
+                          bookingMode:  _modeToInt(slot.bookingMode),
+                          slotDuration: slot.bookingMode == BookingMode.queue
                               ? null
                               : slot.slotDurationMinutes,
                           maxQueueLength: slot.maxQueueLength,
@@ -419,7 +386,7 @@ Future<void> _selectFromMap() async {
 
   // ── Schedule mutations ────────────────────────────────────────────────────
   void _toggleDay(int i, bool v) => setState(() {
-        _days[i].isEnabled  = v;
+        _days[i].isEnabled = v;
         if (!v) _days[i].isExpanded = false;
       });
 
@@ -448,16 +415,17 @@ Future<void> _selectFromMap() async {
 
   // ── Submit handler ────────────────────────────────────────────────────────
   Future<void> _handleSubmit() async {
-    // ── STEP 1 → STEP 2 ────────────────────────────────────────────────────
     if (_step == 1) {
-      if (_isBlank(_fullNameController))
+      if (_isBlank(_fullNameController)) {
         return _showError('Full Name is required');
-      if (_isBlank(_contactController))
+      }
+      if (_isBlank(_contactController)) {
         return _showError('Contact No is required');
-      if (_contactController.text.trim().length != 10)
+      }
+      if (_contactController.text.trim().length != 10) {
         return _showError('Contact No must be 10 digits');
+      }
 
-      // Cancel pending debounce and do an explicit check on Continue press
       _mobileDebounce?.cancel();
       final mobileCheck = await ref
           .read(doctorLoginViewModelProvider.notifier)
@@ -470,38 +438,47 @@ Future<void> _selectFromMap() async {
       setState(() => _mobileExistsError = null);
 
       if (_emailController.text.trim().isNotEmpty &&
-          !_isValidEmail(_emailController.text))
+          !_isValidEmail(_emailController.text)) {
         return _showError('Please enter a valid Email Address');
-      if (_selectedGenderId == null || _selectedGenderId! <= 0)
+      }
+      if (_selectedGenderId == null || _selectedGenderId! <= 0) {
         return _showError('Gender is required');
-      if (_selectedSpecialization.isEmpty)
+      }
+      if (_selectedSpecialization.isEmpty) {
         return _showError('Specialization is required');
-      if (_isBlank(_qualificationController))
+      }
+      if (_isBlank(_qualificationController)) {
         return _showError('Qualification is required');
-      if (_isBlank(_licenseController))
+      }
+      if (_isBlank(_licenseController)) {
         return _showError('License Number is required');
-      if (_isBlank(_experienceController))
+      }
+      if (_isBlank(_experienceController)) {
         return _showError('Experience is required');
-      if (int.tryParse(_experienceController.text.trim()) == null)
+      }
+      if (int.tryParse(_experienceController.text.trim()) == null) {
         return _showError('Experience must be a valid number');
+      }
       setState(() => _step = 2);
       _animateStep();
       return;
     }
 
-    // ── STEP 2 → STEP 3: Register doctor + clinic ──────────────────────────
     if (_step == 2) {
-      if (_isBlank(_clinicNameController))
+      if (_isBlank(_clinicNameController)) {
         return _showError('Clinic Name is required');
-      if (_isBlank(_clinicAddressController))
+      }
+      if (_isBlank(_clinicAddressController)) {
         return _showError('Clinic Address is required');
-      if (_isBlank(_clinicContactController))
+      }
+      if (_isBlank(_clinicContactController)) {
         return _showError('Clinic Contact is required');
+      }
       if (_clinicEmailController.text.trim().isNotEmpty &&
-          !_isValidEmail(_clinicEmailController.text))
+          !_isValidEmail(_clinicEmailController.text)) {
         return _showError('Please enter a valid Clinic Email Address');
+      }
 
-      // Fetch FCM token once
       if (_fcmToken == null) {
         try {
           _fcmToken = await FirebaseMessaging.instance.getToken();
@@ -519,8 +496,6 @@ Future<void> _selectFromMap() async {
         qualification:   _qualificationController.text.trim(),
         licenseNo:       _licenseController.text.trim(),
         experience:      int.tryParse(_experienceController.text.trim()),
-        // image / imageUrl fields carry the local path only as fallback.
-        // The actual file bytes are sent via doctorImage / clinicImage below.
         image:           _doctorPhoto?.path,
         clinicName:      _clinicNameController.text.trim(),
         clinicAddress:   _clinicAddressController.text.trim(),
@@ -530,14 +505,13 @@ Future<void> _selectFromMap() async {
         consultationFee: _consultationFeeController.text.trim().isEmpty
             ? null
             : double.tryParse(_consultationFeeController.text.trim()),
-        imageUrl:        _clinicPhotos.isNotEmpty ? _clinicPhotos.first.path : null,
-        latitude:        _latitude,
-        longitude:       _longitude,
-        roleId:          1,
-        Token:           _fcmToken,
+        imageUrl: _clinicPhotos.isNotEmpty ? _clinicPhotos.first.path : null,
+        latitude:  _latitude,
+        longitude: _longitude,
+        roleId:    1,
+        Token:     _fcmToken,
       );
 
-      // ── API call: pass File objects so the usecase builds multipart ────────
       await ref
           .read(doctorLoginViewModelProvider.notifier)
           .addDoctorDetails(
@@ -547,7 +521,6 @@ Future<void> _selectFromMap() async {
           );
 
       final latestState = ref.read(doctorLoginViewModelProvider);
-
       if (latestState.error != null) {
         _showError(latestState.error!);
         return;
@@ -570,15 +543,14 @@ Future<void> _selectFromMap() async {
       return;
     }
 
-    // ── STEP 3: Validate + save schedule + lead time → done ────────────────
-    // At least one day must be enabled with a slot
-    final hasAnySchedule = _days.any((d) => d.isEnabled && d.timeSlots.isNotEmpty);
+    // STEP 3
+    final hasAnySchedule =
+        _days.any((d) => d.isEnabled && d.timeSlots.isNotEmpty);
     if (!hasAnySchedule) {
       _showError('Please add at least one available day with a time slot.');
       return;
     }
 
-    // Overlap check
     for (final day in _days) {
       if (!day.isEnabled) continue;
       final slots = day.timeSlots;
@@ -597,7 +569,6 @@ Future<void> _selectFromMap() async {
       }
     }
 
-    // Enabled days must have at least one slot
     final invalid =
         _days.where((d) => d.isEnabled && d.timeSlots.isEmpty).toList();
     if (invalid.isNotEmpty) {
@@ -612,12 +583,10 @@ Future<void> _selectFromMap() async {
       return;
     }
 
-    // Save schedule
     await ref
         .read(doctorSettingsViewModelProvider.notifier)
         .saveDoctorSchedule(_buildScheduleModel());
 
-    // Save lead time (always, so backend can store 0 if no queue)
     await ref
         .read(doctorLoginViewModelProvider.notifier)
         .updateLeadTime(_buildLeadTimeModel());
@@ -628,7 +597,6 @@ Future<void> _selectFromMap() async {
       return;
     }
 
-    // Extra lead-time call when queue slots exist (idempotent if already called)
     if (_anyQueueEnabled && _savedDoctorId != null) {
       final leadTimeMinutes = _leadHours * 60 + _leadMinutes;
       await ref
@@ -641,7 +609,6 @@ Future<void> _selectFromMap() async {
       final leadErr = ref.read(doctorLoginViewModelProvider).error;
       if (leadErr != null) {
         _showError('Schedule saved, but lead time update failed: $leadErr');
-        // Non-fatal — still navigate
       }
     }
 
@@ -661,54 +628,11 @@ Future<void> _selectFromMap() async {
     final isLoading  = state.isLoading || schedState.isLoading;
 
     return Scaffold(
-      backgroundColor: kSurface,
-      appBar: _buildAppBar(),
-      body: Stack(children: [
-        FadeTransition(
-          opacity: _fadeAnim,
-          child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildStepIndicator(),
-                const SizedBox(height: 20),
-if (_step == 1) _buildStep1(),
-                if (_step == 2) _buildStep2(),
-                if (_step == 3) _buildStep3(),
-                const SizedBox(height: 24),
-                _buildCTA(),
-                const SizedBox(height: 32),
-              ],
-            ),
-          ),
-        ),
-        if (isLoading)
-          Container(
-            color: Colors.black26,
-            child: const Center(
-              child: CircularProgressIndicator(color: kPrimaryBlue),
-            ),
-          ),
-      ]),
-    );
-  }
-
-  // ─── AppBar ───────────────────────────────────────────────────────────────
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: kCardBg,
-      elevation: 0,
-      surfaceTintColor: kCardBg,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(height: 0.5, color: kDivider),
-      ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: kTextDark),
-        onPressed: () {
+      backgroundColor: kBg,
+      appBar: _SimpleTitleBar(
+        title: 'Doctor Profile Setup',
+        subtitle: 'Step $_step of 3',
+        onBack: () {
           if (_step > 1) {
             setState(() => _step -= 1);
             _animateStep();
@@ -717,124 +641,157 @@ if (_step == 1) _buildStep1(),
           }
         },
       ),
-      title: const Text('Profile Setup',
-          style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w600,
-              color: kTextDark)),
-      centerTitle: true,
-      actions: [
-        Container(
-          margin: const EdgeInsets.only(right: 16),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-              color: kLightBlue,
-              borderRadius: BorderRadius.circular(20)),
-          child: Text('Step $_step of 3',
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: kPrimaryBlue)),
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
         ),
-      ],
+        child: Stack(
+          children: [
+            FadeTransition(
+              opacity: _fadeAnim,
+              child: SingleChildScrollView(
+                padding:
+                    const EdgeInsets.fromLTRB(20, 18, 20, 32),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _StepProgressBar(currentStep: _step),
+                    const SizedBox(height: 22),
+                    if (_step == 1) _buildStep1(),
+                    if (_step == 2) _buildStep2(),
+                    if (_step == 3) _buildStep3(),
+                    const SizedBox(height: 26),
+                    _PrimaryButton(
+                      label: _step == 1
+                          ? 'Continue'
+                          : _step == 2
+                              ? 'Register Clinic'
+                              : 'Complete Setup',
+                      icon: _step == 3
+                          ? Icons.check_circle_outline_rounded
+                          : Icons.arrow_forward_rounded,
+                      onPressed: _handleSubmit,
+                    ),
+                    const SizedBox(height: 16),
+                    const _SecureFooter(),
+                  ],
+                ),
+              ),
+            ),
+            if (isLoading)
+              Container(
+                color: Colors.black.withOpacity(0.35),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const SizedBox(
+                      width: 30,
+                      height: 30,
+                      child: CircularProgressIndicator(
+                          color: kPrimary, strokeWidth: 2.6),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
-  // ─── Step Indicator ───────────────────────────────────────────────────────
-  Widget _buildStepIndicator() {
-    return Row(children: [
-      _StepChip(
-        label: 'Personal',
-        icon: Icons.person_outline_rounded,
-        state: _step == 1 ? _StepState.active : _StepState.done,
-      ),
-      _stepLine(_step >= 2),
-      _StepChip(
-        label: 'Clinic',
-        icon: Icons.local_hospital_outlined,
-        state: _step == 2
-            ? _StepState.active
-            : _step > 2
-                ? _StepState.done
-                : _StepState.pending,
-      ),
-      _stepLine(_step >= 3),
-      _StepChip(
-        label: 'Schedule',
-        icon: Icons.calendar_month_outlined,
-        state:
-            _step == 3 ? _StepState.active : _StepState.pending,
-      ),
-    ]);
-  }
-
-  Widget _stepLine(bool active) => Expanded(
-        child: Container(
-          height: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 6),
-          decoration: BoxDecoration(
-            color: active ? kPrimaryBlue : kDivider,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      );
-
-  // ─── Step 1: Personal Info ────────────────────────────────────────────────
-Widget _buildStep1() {
+  // ─── Step 1: Personal & Professional Info ─────────────────────────────────
+  Widget _buildStep1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Doctor photo – tapping opens camera/gallery sheet
-        // Center(
-        //   child: _AvatarPicker(
-        //     photo: _doctorPhoto,
-        //     icon: Icons.person_rounded,
-        //     label: 'Upload Doctor Photo',
-        //     onTap: () => _pickImage(true),
-        //   ),
-        // ),
-        const SizedBox(height: 24),
-        const _SectionHeader(title: 'Basic Details'),
-        const SizedBox(height: 12),
-        _Card(children: [
-          _buildField('Full Name', _fullNameController,
-              hint: 'Dr. Arjun Sharma', required: true),
-          _buildField('Contact No', _contactController,
-              hint: '+91 98765 43210',
-              keyboard: TextInputType.phone,
-              required: true,
-              onChanged: _onContactChanged,
-              errorText: _mobileExistsError,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(10),
-              ]),
-          _buildField('Email Address', _emailController,
-              hint: 'doctor@email.com',
-              keyboard: TextInputType.emailAddress),
-          _buildGenderSection(),
-        ]),
-        const SizedBox(height: 16),
-        const _SectionHeader(title: 'Professional Info'),
-        const SizedBox(height: 12),
-        _Card(children: [
-          _buildDropdown(),
-          _buildField('Qualification', _qualificationController,
-              hint: 'MBBS, MD...', required: true),
-          Row(children: [
-            Expanded(
-                child: _buildField('License No', _licenseController,
-                    hint: 'MCI-XXXXX', required: true)),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _buildField(
-                    'Experience (yrs)', _experienceController,
-                    hint: 'e.g. 8',
-                    keyboard: TextInputType.number,
-                    required: true)),
-          ]),
-        ]),
+        // Avatar picker
+        // Center(child: _DoctorAvatarPicker(
+        //   photo: _doctorPhoto,
+        //   onTap: () => _pickImage(true),
+        // )),
+        // const SizedBox(height: 22),
+
+        // Basic Details card
+        _SectionCard(
+          icon: Icons.person_outline_rounded,
+          iconBg: kPrimaryLight,
+          iconColor: kPrimaryDark,
+          title: 'Basic Details',
+          subtitle: 'Your personal information',
+          children: [
+            _buildField('Full Name', _fullNameController,
+                hint: 'Dr. Arjun Sharma', required: true),
+            _buildField('Contact No', _contactController,
+                hint: '9876543210',
+                keyboard: TextInputType.phone,
+                required: true,
+                onChanged: _onContactChanged,
+                errorText: _mobileExistsError,
+                prefixWidget: const _PhonePrefix(),
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ]),
+            _buildField('Email Address', _emailController,
+                hint: 'doctor@email.com',
+                icon: Icons.email_outlined,
+                keyboard: TextInputType.emailAddress),
+            const _FieldLabel(label: 'Gender', required: true),
+            const SizedBox(height: 10),
+            _GenderSelector(
+              options: _genderOptions
+                  .map((e) => e['label'] as String)
+                  .toList(),
+              selected: _selectedGender,
+              onChanged: (val) => setState(() {
+                _selectedGender = val;
+                _selectedGenderId = _genderOptions
+                    .firstWhere((e) => e['label'] == val)['id'] as int;
+              }),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Professional Info card
+        _SectionCard(
+          icon: Icons.workspace_premium_outlined,
+          iconBg: kInfoLight,
+          iconColor: kInfo,
+          title: 'Professional Info',
+          subtitle: 'Your credentials and expertise',
+          children: [
+            _buildSpecializationDropdown(),
+            _buildField('Qualification', _qualificationController,
+                hint: 'MBBS, MD...',
+                icon: Icons.school_outlined,
+                required: true),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildField('License No', _licenseController,
+                      hint: 'MCI-XXXXX',
+                      icon: Icons.badge_outlined,
+                      required: true),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildField(
+                      'Experience (yrs)', _experienceController,
+                      hint: 'e.g. 8',
+                      icon: Icons.work_history_outlined,
+                      keyboard: TextInputType.number,
+                      required: true),
+                ),
+              ],
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -844,58 +801,86 @@ Widget _buildStep1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Clinic photos – multi-select up to 5
+        // Clinic photos
         _ClinicPhotoGrid(
           photos: _clinicPhotos,
           onAdd: () => _pickImage(false),
           onRemove: (i) => setState(() => _clinicPhotos.removeAt(i)),
           onPreview: (i) => _previewClinicPhoto(_clinicPhotos[i]),
         ),
-        const SizedBox(height: 24),
-        const _SectionHeader(title: 'Clinic Details'),
-        const SizedBox(height: 12),
-        _Card(children: [
-          _buildField('Clinic Name', _clinicNameController,
-              hint: 'Apollo Clinic', required: true),
-          _buildTextArea(
-              'Clinic Address', _clinicAddressController,
-              hint: '123, MG Road, Panaji, Goa', required: true),
-          Row(children: [
-            Expanded(
-                child: _buildField('Clinic Contact',
-                    _clinicContactController,
-                    hint: '+91...',
-                    keyboard: TextInputType.phone,
-                    required: true,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
-                    ])),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _buildField(
-                    'Clinic Email', _clinicEmailController,
-                    hint: 'clinic@...',
-                    keyboard: TextInputType.emailAddress)),
-          ]),
-          Row(children: [
-            Expanded(
-                child: _buildField(
-                    'Website', _clinicWebsiteController,
-                    hint: 'www.clinic.com')),
-            const SizedBox(width: 12),
-            Expanded(
-                child: _buildField(
-                    'Consult. Fee (₹)',
-                    _consultationFeeController,
-                    hint: '500',
-                    keyboard: TextInputType.number)),
-          ]),
-        ]),
-        const SizedBox(height: 16),
-        const _SectionHeader(title: 'Location'),
-        const SizedBox(height: 12),
-        _Card(children: [_buildLocationField()]),
+        const SizedBox(height: 18),
+
+        // Clinic Details card
+        _SectionCard(
+          icon: Icons.local_hospital_outlined,
+          iconBg: kPrimaryLight,
+          iconColor: kPrimaryDark,
+          title: 'Clinic Details',
+          subtitle: 'Where your patients can find you',
+          children: [
+            _buildField('Clinic Name', _clinicNameController,
+                hint: 'Apollo Clinic',
+                icon: Icons.business_outlined,
+                required: true),
+            _buildTextArea(
+                'Clinic Address', _clinicAddressController,
+                hint: '123, MG Road, Panaji, Goa',
+                required: true),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildField(
+                      'Clinic Contact', _clinicContactController,
+                      hint: '9876543210',
+                      keyboard: TextInputType.phone,
+                      required: true,
+                      icon: Icons.phone_outlined,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(10),
+                      ]),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildField(
+                      'Clinic Email', _clinicEmailController,
+                      hint: 'clinic@...',
+                      icon: Icons.email_outlined,
+                      keyboard: TextInputType.emailAddress),
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildField(
+                      'Website', _clinicWebsiteController,
+                      hint: 'www.clinic.com',
+                      icon: Icons.language_outlined),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildField(
+                      'Fee (₹)', _consultationFeeController,
+                      hint: '500',
+                      icon: Icons.currency_rupee_rounded,
+                      keyboard: TextInputType.number),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // Location card
+        _SectionCard(
+          icon: Icons.location_on_outlined,
+          iconBg: kAmberLight,
+          iconColor: kWarning,
+          title: 'Clinic Location',
+          subtitle: 'Pin your clinic on the map',
+          children: [_buildLocationField()],
+        ),
       ],
     );
   }
@@ -905,202 +890,179 @@ Widget _buildStep1() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_savedDoctorId != null)
-          // Container(
-          //   margin: const EdgeInsets.only(bottom: 16),
-          //   padding:
-          //       const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          //   decoration: BoxDecoration(
-          //     color: kSchedPrimaryLight,
-          //     borderRadius: BorderRadius.circular(10),
-          //     border:
-          //         Border.all(color: kSchedPrimary.withOpacity(0.4)),
-          //   ),
-          //   child: Row(children: [
-          //     const Icon(Icons.check_circle_rounded,
-          //         color: kSchedPrimary, size: 16),
-          //     const SizedBox(width: 8),
-          //     Expanded(
-          //       child: Text(
-          //         'Profile registered! Doctor ID: $_savedDoctorId'
-          //         '${_savedClinicId != null ? '  •  Clinic ID: $_savedClinicId' : ''}',
-          //         style: const TextStyle(
-          //             fontSize: 12,
-          //             fontWeight: FontWeight.w600,
-          //             color: kSchedPrimary),
-          //       ),
-          //     ),
-          //   ]),
-          // ),
-
-        const _SectionHeader(title: 'Weekly Schedule'),
-        const SizedBox(height: 4),
-        const Padding(
-          padding: EdgeInsets.only(left: 11, bottom: 12),
-          child: Text(
-            'Toggle days you are available and add time slots.',
-            style: TextStyle(fontSize: 12, color: kTextMuted),
+        if (_savedDoctorId != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(
+                horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: kGreenLight,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: kSuccess.withOpacity(0.4)),
+            ),
+            child: Row(children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.check_circle_rounded,
+                    color: kSuccess, size: 18),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Profile Registered!',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF15803D),
+                      ),
+                    ),
+                    // Text(
+                    //   'Doctor ID: $_savedDoctorId'
+                    //   '${_savedClinicId != null ? '  •  Clinic: $_savedClinicId' : ''}',
+                    //   style: const TextStyle(
+                    //     fontSize: 11,
+                    //     color: Color(0xFF166534),
+                    //     fontWeight: FontWeight.w500,
+                    //   ),
+                    // ),
+                  ],
+                ),
+              ),
+            ]),
           ),
-        ),
+          const SizedBox(height: 18),
+        ],
 
-        ..._days.asMap().entries.map((e) => _ScheduleDayCard(
-              schedule:     e.value,
-              onToggle:     (v) => _toggleDay(e.key, v),
-              onTapHeader:  ()  => _toggleExpand(e.key),
-              onAddSlot:    ()  => _addSlot(e.key),
-              onRemoveSlot: (si) => _removeSlot(e.key, si),
-              onUpdateSlot: (si, updated) =>
-                  _updateSlot(e.key, si, updated),
-            )),
+        _SectionCard(
+          icon: Icons.calendar_month_outlined,
+          iconBg: kPrimaryLight,
+          iconColor: kPrimaryDark,
+          title: 'Weekly Schedule',
+          subtitle: 'Toggle days and add time slots',
+          children: [
+            ..._days.asMap().entries.map((e) => _ScheduleDayCard(
+                  schedule: e.value,
+                  onToggle: (v) => _toggleDay(e.key, v),
+                  onTapHeader: () => _toggleExpand(e.key),
+                  onAddSlot: () => _addSlot(e.key),
+                  onRemoveSlot: (si) => _removeSlot(e.key, si),
+                  onUpdateSlot: (si, updated) =>
+                      _updateSlot(e.key, si, updated),
+                )),
+          ],
+        ),
 
         AnimatedSize(
           duration: const Duration(milliseconds: 280),
           curve: Curves.easeInOut,
           child: _anyQueueEnabled
-              ? _buildLeadTimeSection()
+              ? Padding(
+                  padding: const EdgeInsets.only(top: 18),
+                  child: _SectionCard(
+                    icon: Icons.access_time_rounded,
+                    iconBg: kAmberLight,
+                    iconColor: kWarning,
+                    title: 'Queue Lead Time',
+                    subtitle:
+                        'How early patients can join the queue',
+                    children: [_buildLeadTimeRow()],
+                  ),
+                )
               : const SizedBox.shrink(),
         ),
       ],
     );
   }
 
-  Widget _buildLeadTimeSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildLeadTimeRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const SizedBox(height: 16),
-        const _SectionHeader(title: 'Queue Booking Lead Time'),
-        const SizedBox(height: 4),
-        const Padding(
-          padding: EdgeInsets.only(left: 11, bottom: 12),
-          child: Text(
-            'How early can patients join the queue before your session starts.',
-            style: TextStyle(fontSize: 12, color: kTextMuted),
-          ),
-        ),
         Container(
+          width: 42,
+          height: 42,
           decoration: BoxDecoration(
-            color: kCardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: kDivider),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2))
-            ],
+            color: kAmberLight,
+            borderRadius: BorderRadius.circular(11),
           ),
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          child: const Icon(Icons.timer_outlined,
+              color: kWarning, size: 22),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(
-                    color: kSchedGreenLight,
-                    borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.access_time_outlined,
-                    color: kSchedSuccess, size: 20),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Lead Time',
-                        style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: kTextDark)),
-                    SizedBox(height: 2),
-                    Text('Hours  :  Minutes before session',
-                        style:
-                            TextStyle(fontSize: 11, color: kTextMuted)),
-                  ],
+              Text(
+                'Lead Time',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: kTextPrimary,
                 ),
               ),
-              Column(children: [
-                const Row(children: [
-                  SizedBox(
-                      width: 50,
-                      child: Center(
-                          child: Text('HH',
-                              style: TextStyle(
-                                  fontSize: 10, color: kTextMuted)))),
-                  SizedBox(width: 12),
-                  SizedBox(
-                      width: 50,
-                      child: Center(
-                          child: Text('MM',
-                              style: TextStyle(
-                                  fontSize: 10, color: kTextMuted)))),
-                ]),
-                const SizedBox(height: 3),
-                Row(children: [
-                  _WheelPicker(
-                    key: ValueKey('leadH_$_leadHours'),
-                    value: _leadHours,
-                    max: 24,
-                    onChanged: (v) =>
-                        setState(() => _leadHours = v),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(':',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: kTextDark)),
-                  const SizedBox(width: 6),
-                  _WheelPicker(
-                    key: ValueKey('leadM_$_leadMinutes'),
-                    value: _leadMinutes,
-                    max: 60,
-                    onChanged: (v) =>
-                        setState(() => _leadMinutes = v),
-                  ),
-                ]),
-              ]),
+              SizedBox(height: 2),
+              Text(
+                'Hours : Minutes',
+                style: TextStyle(fontSize: 11, color: kTextMuted),
+              ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  // ─── CTA Button ───────────────────────────────────────────────────────────
-  Widget _buildCTA() {
-    final labels = ['Continue', 'Register Clinic', 'Complete Setup'];
-    final icons  = [
-      Icons.arrow_forward_rounded,
-      Icons.arrow_forward_rounded,
-      Icons.check_circle_outline_rounded,
-    ];
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: _handleSubmit,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: kPrimaryBlue,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Column(
           children: [
-            Text(labels[_step - 1],
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.3)),
-            const SizedBox(width: 8),
-            Icon(icons[_step - 1], size: 18),
+            const Row(
+              children: [
+                SizedBox(
+                    width: 50,
+                    child: Center(
+                        child: Text('HH',
+                            style: TextStyle(
+                                fontSize: 10, color: kTextMuted)))),
+                SizedBox(width: 12),
+                SizedBox(
+                    width: 50,
+                    child: Center(
+                        child: Text('MM',
+                            style: TextStyle(
+                                fontSize: 10, color: kTextMuted)))),
+              ],
+            ),
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                _WheelPicker(
+                  key: ValueKey('leadH_$_leadHours'),
+                  value: _leadHours,
+                  max: 24,
+                  onChanged: (v) => setState(() => _leadHours = v),
+                ),
+                const SizedBox(width: 6),
+                const Text(':',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary,
+                    )),
+                const SizedBox(width: 6),
+                _WheelPicker(
+                  key: ValueKey('leadM_$_leadMinutes'),
+                  value: _leadMinutes,
+                  max: 60,
+                  onChanged: (v) => setState(() => _leadMinutes = v),
+                ),
+              ],
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -1111,8 +1073,10 @@ Widget _buildStep1() {
     String hint = '',
     TextInputType keyboard = TextInputType.text,
     bool required = false,
+    IconData? icon,
     ValueChanged<String>? onChanged,
     String? errorText,
+    Widget? prefixWidget,
     List<TextInputFormatter>? inputFormatters,
   }) {
     return Padding(
@@ -1121,49 +1085,58 @@ Widget _buildStep1() {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _FieldLabel(label: label, required: required),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           TextField(
             controller: controller,
             keyboardType: keyboard,
             onChanged: onChanged,
             inputFormatters: inputFormatters,
-            style:
-                const TextStyle(fontSize: 14, color: kTextDark),
+            style: const TextStyle(
+                fontSize: 14,
+                color: kTextPrimary,
+                fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(
-                  color: Color(0xFFBCC1C8), fontSize: 14),
+              hintStyle: const TextStyle(color: kTextMuted, fontSize: 13.5),
+              prefixIcon: prefixWidget ??
+                  (icon != null
+                      ? Icon(icon, color: kTextMuted, size: 19)
+                      : null),
               filled: true,
-              fillColor: kSurface,
+              fillColor: kBgSoft,
               contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 14),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: kDivider)),
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kBorderStrong),
+              ),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: errorText != null
-                      ? const BorderSide(color: kRedAccent)
-                      : const BorderSide(color: kDivider)),
+                borderRadius: BorderRadius.circular(13),
+                borderSide: errorText != null
+                    ? const BorderSide(color: kError)
+                    : const BorderSide(color: kBorderStrong),
+              ),
               focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: errorText != null
-                      ? const BorderSide(color: kRedAccent, width: 1.5)
-                      : const BorderSide(color: kPrimaryBlue, width: 1.5)),
+                borderRadius: BorderRadius.circular(13),
+                borderSide: errorText != null
+                    ? const BorderSide(color: kError, width: 1.6)
+                    : const BorderSide(color: kPrimary, width: 1.6),
+              ),
             ),
           ),
           if (errorText != null) ...[
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(children: [
               const Icon(Icons.error_outline_rounded,
-                  size: 13, color: kRedAccent),
-              const SizedBox(width: 4),
-              Text(errorText,
-                  style: const TextStyle(
-                      fontSize: 11,
-                      color: kRedAccent,
-                      fontWeight: FontWeight.w500)),
+                  size: 13, color: kError),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(errorText,
+                    style: const TextStyle(
+                        fontSize: 11.5,
+                        color: kError,
+                        fontWeight: FontWeight.w600)),
+              ),
             ]),
           ],
         ],
@@ -1183,32 +1156,33 @@ Widget _buildStep1() {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _FieldLabel(label: label, required: required),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           TextField(
             controller: controller,
             maxLines: 3,
-            style:
-                const TextStyle(fontSize: 14, color: kTextDark),
+            style: const TextStyle(
+                fontSize: 14,
+                color: kTextPrimary,
+                fontWeight: FontWeight.w500),
             decoration: InputDecoration(
               hintText: hint,
-              hintStyle: const TextStyle(
-                  color: Color(0xFFBCC1C8), fontSize: 14),
+              hintStyle: const TextStyle(color: kTextMuted, fontSize: 13.5),
               filled: true,
-              fillColor: kSurface,
+              fillColor: kBgSoft,
               contentPadding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 12),
               border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: kDivider)),
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kBorderStrong),
+              ),
               enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      const BorderSide(color: kDivider)),
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kBorderStrong),
+              ),
               focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                      color: kPrimaryBlue, width: 1.5)),
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kPrimary, width: 1.6),
+              ),
             ),
           ),
         ],
@@ -1216,102 +1190,89 @@ Widget _buildStep1() {
     );
   }
 
-  Widget _buildDropdown() {
+  Widget _buildSpecializationDropdown() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const _FieldLabel(label: 'Specialization', required: true),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Container(
             height: 50,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
-              color: kSurface,
-              borderRadius: BorderRadius.circular(10),
+              color: kBgSoft,
+              borderRadius: BorderRadius.circular(13),
               border: Border.all(
                 color: _selectedSpecialization.isNotEmpty
-                    ? kPrimaryBlue
-                    : kDivider,
-                width:
-                    _selectedSpecialization.isNotEmpty ? 1.5 : 1,
+                    ? kPrimary
+                    : kBorderStrong,
+                width: _selectedSpecialization.isNotEmpty ? 1.6 : 1,
               ),
             ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedSpecialization.isEmpty
-                    ? null
-                    : _selectedSpecialization,
-                hint: const Text('Select specialization',
-                    style: TextStyle(
-                        color: Color(0xFFBCC1C8), fontSize: 14)),
-                isExpanded: true,
-                icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: kTextMuted),
-                style: const TextStyle(
-                    fontSize: 14, color: kTextDark),
-                items: _specializations
-                    .map((s) => DropdownMenuItem<String>(
-                          value: s['value'],
-                          child: Text(s['label']!),
-                        ))
-                    .toList(),
-                onChanged: (val) => setState(
-                    () => _selectedSpecialization = val ?? ''),
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.medical_services_outlined,
+                    color:
+                        _selectedSpecialization.isNotEmpty
+                            ? kPrimaryDark
+                            : kTextMuted,
+                    size: 19),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedSpecialization.isEmpty
+                          ? null
+                          : _selectedSpecialization,
+                      hint: const Text('Select specialization',
+                          style: TextStyle(
+                              color: kTextMuted, fontSize: 13.5)),
+                      isExpanded: true,
+                      icon: const Icon(
+                          Icons.keyboard_arrow_down_rounded,
+                          color: kTextMuted),
+                      style: const TextStyle(
+                          fontSize: 14,
+                          color: kTextPrimary,
+                          fontWeight: FontWeight.w600),
+                      items: _specializations
+                          .map((s) => DropdownMenuItem<String>(
+                                value: s['value'],
+                                child: Text(s['label']!),
+                              ))
+                          .toList(),
+                      onChanged: (val) => setState(() =>
+                          _selectedSpecialization = val ?? ''),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-Widget _buildGenderSection() {
-  return Padding(
-    padding: const EdgeInsets.only(bottom: 4),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _FieldLabel(label: 'Gender', required: true),
-        const SizedBox(height: 8),
-        _GenderSelector(
-          options: _genderOptions.map((e) => e['label'] as String).toList(),
-          selected: _selectedGender,
-          onChanged: (val) => setState(() {
-            _selectedGender   = val;
-            _selectedGenderId = _genderOptions
-                .firstWhere((e) => e['label'] == val)['id'] as int;
-            debugPrint('Gender: $_selectedGender | ID: $_selectedGenderId');
-          }),
-        ),
-      ],
-    ),
-  );
-}
 
   Widget _buildLocationField() {
     final hasLocation = _latitude != null && _longitude != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _FieldLabel(label: 'Clinic Location'),
-        const SizedBox(height: 8),
         Row(children: [
           Expanded(
             child: Container(
               height: 50,
               alignment: Alignment.centerLeft,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
               decoration: BoxDecoration(
-                color: hasLocation ? kLightBlue : kSurface,
-                borderRadius: BorderRadius.circular(10),
+                color: hasLocation ? kPrimaryLight : kBgSoft,
+                borderRadius: BorderRadius.circular(13),
                 border: Border.all(
-                  color:
-                      hasLocation ? kPrimaryBlue : kDivider,
-                  width: hasLocation ? 1.5 : 1,
+                  color: hasLocation ? kPrimary : kBorderStrong,
+                  width: hasLocation ? 1.6 : 1,
                 ),
               ),
               child: Row(children: [
@@ -1319,9 +1280,8 @@ Widget _buildGenderSection() {
                   hasLocation
                       ? Icons.location_on_rounded
                       : Icons.location_off_rounded,
-                  size: 16,
-                  color:
-                      hasLocation ? kPrimaryBlue : kTextMuted,
+                  size: 17,
+                  color: hasLocation ? kPrimaryDark : kTextMuted,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -1331,12 +1291,10 @@ Widget _buildGenderSection() {
                         : 'No location selected',
                     style: TextStyle(
                       fontSize: 13,
-                      color: hasLocation
-                          ? kPrimaryBlue
-                          : kTextMuted,
+                      color: hasLocation ? kPrimaryDarker : kTextMuted,
                       fontWeight: hasLocation
-                          ? FontWeight.w500
-                          : FontWeight.normal,
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1344,7 +1302,7 @@ Widget _buildGenderSection() {
               ]),
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           _LocationButton(
             icon: Icons.my_location_rounded,
             tooltip: 'Use GPS',
@@ -1369,9 +1327,7 @@ Widget _buildGenderSection() {
         insetPadding: const EdgeInsets.all(12),
         child: Stack(children: [
           InteractiveViewer(
-            child: Center(
-              child: Image.file(photo, fit: BoxFit.contain),
-            ),
+            child: Center(child: Image.file(photo, fit: BoxFit.contain)),
           ),
           Positioned(
             top: 8,
@@ -1379,10 +1335,11 @@ Widget _buildGenderSection() {
             child: GestureDetector(
               onTap: () => Navigator.pop(context),
               child: Container(
-                width: 32, height: 32,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                     color: Colors.black54,
-                    borderRadius: BorderRadius.circular(16)),
+                    borderRadius: BorderRadius.circular(18)),
                 child: const Icon(Icons.close_rounded,
                     color: Colors.white, size: 18),
               ),
@@ -1395,116 +1352,511 @@ Widget _buildGenderSection() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// IMAGE SOURCE BOTTOM SHEET
-// Shows two tappable tiles: Camera and Gallery.
-// Returns the chosen [ImageSource] or null if dismissed.
+// SIMPLE TITLE BAR
 // ═════════════════════════════════════════════════════════════════════════════
-class _ImageSourceSheet extends StatelessWidget {
+class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
-  const _ImageSourceSheet({required this.title});
+  final String subtitle;
+  final VoidCallback onBack;
+
+  const _SimpleTitleBar({
+    required this.title,
+    required this.subtitle,
+    required this.onBack,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(68);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kSurface,
+      elevation: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          height: 68,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          decoration: const BoxDecoration(
+            color: kSurface,
+            border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+          ),
+          child: Row(
+            children: [
+              Material(
+                color: kBgSoft,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                  side: const BorderSide(color: kBorderStrong, width: 0.5),
+                ),
+                child: InkWell(
+                  onTap: onBack,
+                  borderRadius: BorderRadius.circular(11),
+                  child: const SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 16,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: kTextSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.medical_services_outlined,
+                        size: 11, color: kPrimaryDarker),
+                    SizedBox(width: 5),
+                    Text(
+                      'Doctor',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDarker,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STEP PROGRESS BAR
+// ═════════════════════════════════════════════════════════════════════════════
+class _StepProgressBar extends StatelessWidget {
+  final int currentStep;
+  const _StepProgressBar({required this.currentStep});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(20),
+        color: kSurface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: kBorder, width: 1),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 24,
-              offset: const Offset(0, -4)),
+            color: kTextPrimary.withOpacity(0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          // Handle bar
-          Container(
-            margin: const EdgeInsets.only(top: 12, bottom: 4),
-            width: 36, height: 4,
-            decoration: BoxDecoration(
-                color: kDivider,
-                borderRadius: BorderRadius.circular(2)),
+          _StepDot(
+            number: 1,
+            label: 'Personal',
+            state: currentStep == 1
+                ? _StepDotState.active
+                : _StepDotState.done,
           ),
-
-          // Title
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-            child: Row(children: [
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                    color: kLightBlue,
-                    borderRadius: BorderRadius.circular(10)),
-                child: const Icon(Icons.add_photo_alternate_outlined,
-                    color: kPrimaryBlue, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Column(crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                const Text('Upload Photo',
-                    style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: kTextDark)),
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 12, color: kTextMuted)),
-              ]),
-            ]),
+          _stepLine(currentStep >= 2),
+          _StepDot(
+            number: 2,
+            label: 'Clinic',
+            state: currentStep == 2
+                ? _StepDotState.active
+                : currentStep > 2
+                    ? _StepDotState.done
+                    : _StepDotState.pending,
           ),
-
-          Divider(height: 1, color: kDivider),
-
-          // Camera option
-          _SourceTile(
-            icon: Icons.camera_alt_rounded,
-            iconColor: kPrimaryBlue,
-            iconBg: kLightBlue,
-            label: 'Take Photo',
-            subtitle: 'Open camera and capture now',
-            onTap: () => Navigator.pop(context, ImageSource.camera),
+          _stepLine(currentStep >= 3),
+          _StepDot(
+            number: 3,
+            label: 'Schedule',
+            state: currentStep == 3
+                ? _StepDotState.active
+                : _StepDotState.pending,
           ),
+        ],
+      ),
+    );
+  }
 
-          Divider(height: 1, color: kDivider,
-              indent: 68, endIndent: 20),
-
-          // Gallery option
-          _SourceTile(
-            icon: Icons.photo_library_rounded,
-            iconColor: kAccentGreen,
-            iconBg: const Color(0xFFE6F4EA),
-            label: 'Choose from Gallery',
-            subtitle: 'Pick an existing photo',
-            onTap: () => Navigator.pop(context, ImageSource.gallery),
+  Widget _stepLine(bool active) => Expanded(
+        child: Container(
+          height: 2,
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: active ? kPrimary : kBorderStrong,
+            borderRadius: BorderRadius.circular(2),
           ),
+        ),
+      );
+}
 
-          const SizedBox(height: 8),
+enum _StepDotState { active, done, pending }
 
-          // Cancel
-          Padding(
-            padding:
-                const EdgeInsets.fromLTRB(20, 4, 20, 8),
-            child: SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  backgroundColor: kSurface,
+class _StepDot extends StatelessWidget {
+  final int number;
+  final String label;
+  final _StepDotState state;
+
+  const _StepDot({
+    required this.number,
+    required this.label,
+    required this.state,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Color circleBg;
+    Color circleFg;
+    Color labelColor;
+    Widget content;
+
+    switch (state) {
+      case _StepDotState.active:
+        circleBg = kPrimary;
+        circleFg = Colors.white;
+        labelColor = kPrimaryDarker;
+        content = Text(
+          '$number',
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w800, color: circleFg),
+        );
+      case _StepDotState.done:
+        circleBg = kPrimaryLight;
+        circleFg = kPrimaryDark;
+        labelColor = kPrimaryDark;
+        content = const Icon(Icons.check_rounded, size: 14, color: kPrimaryDark);
+      case _StepDotState.pending:
+        circleBg = kBgSoft;
+        circleFg = kTextMuted;
+        labelColor = kTextMuted;
+        content = Text(
+          '$number',
+          style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w700, color: circleFg),
+        );
+    }
+
+    final isActive = state == _StepDotState.active;
+
+    return Column(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          width: isActive ? 30 : 26,
+          height: isActive ? 30 : 26,
+          decoration: BoxDecoration(
+            color: circleBg,
+            shape: BoxShape.circle,
+            border: state == _StepDotState.pending
+                ? Border.all(color: kBorderStrong, width: 1)
+                : null,
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: kPrimary.withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : [],
+          ),
+          alignment: Alignment.center,
+          child: content,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10.5,
+            fontWeight:
+                isActive ? FontWeight.w800 : FontWeight.w600,
+            color: labelColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SECTION CARD
+// ═════════════════════════════════════════════════════════════════════════════
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final List<Widget> children;
+
+  const _SectionCard({
+    required this.icon,
+    required this.iconBg,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: kTextPrimary.withOpacity(0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 20),
                 ),
-                child: const Text('Cancel',
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: kTextMuted)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: kTextPrimary,
+                            letterSpacing: -0.3,
+                          )),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            color: kTextSecondary,
+                            fontWeight: FontWeight.w500,
+                          )),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(color: kBorder, height: 22, thickness: 1),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PRIMARY BUTTON (gradient CTA)
+// ═════════════════════════════════════════════════════════════════════════════
+class _PrimaryButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+  const _PrimaryButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [kPrimary, kPrimaryDark],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: kPrimary.withOpacity(0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: onPressed,
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(icon, color: Colors.white, size: 19),
+                ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DOCTOR AVATAR PICKER
+// ═════════════════════════════════════════════════════════════════════════════
+class _DoctorAvatarPicker extends StatelessWidget {
+  final File? photo;
+  final VoidCallback onTap;
+  const _DoctorAvatarPicker({required this.photo, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              Container(
+                width: 104,
+                height: 104,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: photo == null
+                      ? const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [kPrimaryLight, Colors.white],
+                        )
+                      : null,
+                  color: photo != null ? Colors.white : null,
+                  border: Border.all(
+                    color: photo != null ? kPrimary : kBorderStrong,
+                    width: photo != null ? 2.5 : 1.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kPrimary.withOpacity(0.18),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: photo != null
+                    ? ClipOval(
+                        child: Image.file(photo!,
+                            fit: BoxFit.cover, width: 104, height: 104),
+                      )
+                    : const Icon(Icons.medical_services_outlined,
+                        size: 42, color: kPrimaryDark),
+              ),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [kPrimary, kPrimaryDark],
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: kPrimary.withOpacity(0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(Icons.camera_alt_rounded,
+                    color: Colors.white, size: 16),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            photo != null ? 'Change Photo' : 'Upload Doctor Photo',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: photo != null ? kPrimaryDark : kTextPrimary,
+              letterSpacing: -0.1,
+            ),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Tap to add or change',
+            style: TextStyle(
+                fontSize: 11,
+                color: kTextMuted,
+                fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1512,59 +1864,8 @@ class _ImageSourceSheet extends StatelessWidget {
   }
 }
 
-/// Single row inside the image-source sheet.
-class _SourceTile extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor, iconBg;
-  final String label, subtitle;
-  final VoidCallback onTap;
-
-  const _SourceTile({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.label,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          child: Row(children: [
-            Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: BorderRadius.circular(14)),
-              child: Icon(icon, color: iconColor, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Column(crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: kTextDark)),
-              const SizedBox(height: 2),
-              Text(subtitle,
-                  style: const TextStyle(
-                      fontSize: 12, color: kTextMuted)),
-            ]),
-            const Spacer(),
-            const Icon(Icons.chevron_right_rounded,
-                color: kTextMuted, size: 20),
-          ]),
-        ),
-      );
-}
-
 // ═════════════════════════════════════════════════════════════════════════════
-// CLINIC PHOTO GRID  (up to 5 images, with remove + preview)
+// CLINIC PHOTO GRID
 // ═════════════════════════════════════════════════════════════════════════════
 class _ClinicPhotoGrid extends StatelessWidget {
   final List<File> photos;
@@ -1582,65 +1883,108 @@ class _ClinicPhotoGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canAdd = photos.length < 5;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 2, bottom: 8),
-          child: Row(children: [
-            const Text('Clinic Photos',
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: kTextDark)),
-            const SizedBox(width: 6),
-            Text('(${photos.length}/5)',
-                style: const TextStyle(fontSize: 12, color: kTextMuted)),
-          ]),
-        ),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            // Existing photos
-            ...List.generate(photos.length, (i) => _PhotoThumb(
-              file: photos[i],
-              onRemove: () => onRemove(i),
-              onTap: () => onPreview(i),
-            )),
-            // Add button (hidden when at max)
-            if (canAdd)
-              GestureDetector(
-                onTap: onAdd,
-                child: Container(
-                  width: 80, height: 80,
-                  decoration: BoxDecoration(
-                    color: kSurface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: kPrimaryBlue.withValues(alpha: 0.4),
-                        width: 1.5,
-                        strokeAlign: BorderSide.strokeAlignInside),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.add_photo_alternate_outlined,
-                          color: kPrimaryBlue, size: 26),
-                      SizedBox(height: 4),
-                      Text('Add',
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: kPrimaryBlue,
-                              fontWeight: FontWeight.w600)),
-                    ],
-                  ),
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: kTextPrimary.withOpacity(0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: kPurpleLight,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(Icons.photo_library_outlined,
+                    color: kPurple, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Clinic Photos',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Text(
+                      'Showcase your space (${photos.length}/5)',
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: kTextSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-          ],
-        ),
-        const SizedBox(height: 16),
-      ],
+            ],
+          ),
+          const Divider(color: kBorder, height: 22, thickness: 1),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              ...List.generate(
+                photos.length,
+                (i) => _PhotoThumb(
+                  file: photos[i],
+                  onRemove: () => onRemove(i),
+                  onTap: () => onPreview(i),
+                ),
+              ),
+              if (canAdd)
+                GestureDetector(
+                  onTap: onAdd,
+                  child: Container(
+                    width: 86,
+                    height: 86,
+                    decoration: BoxDecoration(
+                      color: kPrimaryLight.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: kPrimary.withOpacity(0.4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.add_photo_alternate_outlined,
+                            color: kPrimaryDark, size: 28),
+                        SizedBox(height: 4),
+                        Text('Add',
+                            style: TextStyle(
+                                fontSize: 11.5,
+                                color: kPrimaryDarker,
+                                fontWeight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1658,31 +2002,38 @@ class _PhotoThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 80, height: 80,
-        child: Stack(children: [
-          GestureDetector(
-            onTap: onTap,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.file(file,
-                  width: 80, height: 80, fit: BoxFit.cover),
-            ),
-          ),
-          Positioned(
-            top: 4, right: 4,
-            child: GestureDetector(
-              onTap: onRemove,
-              child: Container(
-                width: 22, height: 22,
-                decoration: BoxDecoration(
-                    color: kRedAccent,
-                    borderRadius: BorderRadius.circular(11)),
-                child: const Icon(Icons.close_rounded,
-                    color: Colors.white, size: 13),
+        width: 86,
+        height: 86,
+        child: Stack(
+          children: [
+            GestureDetector(
+              onTap: onTap,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.file(file,
+                    width: 86, height: 86, fit: BoxFit.cover),
               ),
             ),
-          ),
-        ]),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: kTextPrimary.withOpacity(0.85),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: const Icon(Icons.close_rounded,
+                      color: Colors.white, size: 13),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 }
 
@@ -1710,148 +2061,164 @@ class _ScheduleDayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        color: schedule.isEnabled ? kSurface : kBgSoft,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: schedule.isEnabled
-              ? kSchedPrimary.withOpacity(0.35)
-              : kSchedBorder,
+              ? kPrimary.withOpacity(0.45)
+              : kBorderStrong,
+          width: schedule.isEnabled ? 1.4 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+      ),
+      child: Column(
+        children: [
+          _buildHeader(),
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: _buildExpanded(),
+            crossFadeState:
+                (schedule.isExpanded && schedule.isEnabled)
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 220),
+            sizeCurve: Curves.easeInOut,
+          ),
         ],
       ),
-      child: Column(children: [
-        _buildHeader(),
-        AnimatedCrossFade(
-          firstChild: const SizedBox(width: double.infinity),
-          secondChild: _buildExpanded(),
-          crossFadeState:
-              (schedule.isExpanded && schedule.isEnabled)
-                  ? CrossFadeState.showSecond
-                  : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 220),
-          sizeCurve: Curves.easeInOut,
-        ),
-      ]),
     );
   }
 
   Widget _buildHeader() => InkWell(
         onTap: onTapHeader,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: schedule.isEnabled
-                    ? kSchedPrimaryLight
-                    : const Color(0xFFF7F8FA),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                schedule.shortName,
-                style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: schedule.isEnabled ? kPrimaryLight : kBgSoft,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  schedule.shortName,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: 0.5,
                     color: schedule.isEnabled
-                        ? kSchedPrimary
-                        : kSchedTextMuted),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(schedule.dayName,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: schedule.isEnabled
-                              ? kSchedTextPrimary
-                              : kSchedTextMuted)),
-                  Text(
-                    schedule.isEnabled
-                        ? (schedule.timeSlots.isEmpty
-                            ? 'No slots added'
-                            : '${schedule.timeSlots.length} slot${schedule.timeSlots.length > 1 ? 's' : ''}')
-                        : 'Unavailable',
-                    style: const TextStyle(
-                        fontSize: 11, color: kSchedTextMuted),
+                        ? kPrimaryDarker
+                        : kTextMuted,
                   ),
-                ],
+                ),
               ),
-            ),
-            if (schedule.isEnabled)
-              AnimatedRotation(
-                turns: schedule.isExpanded ? 0.5 : 0,
-                duration: const Duration(milliseconds: 200),
-                child: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: kSchedTextMuted, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      schedule.dayName,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: schedule.isEnabled
+                            ? kTextPrimary
+                            : kTextMuted,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      schedule.isEnabled
+                          ? (schedule.timeSlots.isEmpty
+                              ? 'No slots added'
+                              : '${schedule.timeSlots.length} slot${schedule.timeSlots.length > 1 ? 's' : ''}')
+                          : 'Unavailable',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: schedule.isEnabled
+                            ? kPrimaryDark
+                            : kTextMuted,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            const SizedBox(width: 6),
-            Transform.scale(
-              scale: 0.82,
-              child: Switch(
-                value: schedule.isEnabled,
-                onChanged: onToggle,
-                activeColor: kSchedPrimary,
-                materialTapTargetSize:
-                    MaterialTapTargetSize.shrinkWrap,
+              if (schedule.isEnabled)
+                AnimatedRotation(
+                  turns: schedule.isExpanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: kTextSecondary,
+                      size: 22),
+                ),
+              const SizedBox(width: 4),
+              Transform.scale(
+                scale: 0.82,
+                child: Switch(
+                  value: schedule.isEnabled,
+                  onChanged: onToggle,
+                  activeColor: kPrimary,
+                  materialTapTargetSize:
+                      MaterialTapTargetSize.shrinkWrap,
+                ),
               ),
-            ),
-          ]),
+            ],
+          ),
         ),
       );
 
   Widget _buildExpanded() => Container(
         decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: kSchedBorder))),
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+          border: Border(top: BorderSide(color: kBorder)),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
         child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ...schedule.timeSlots.asMap().entries.map((e) =>
-                  _ScheduleTimeSlotCard(
-                    index:    e.key,
-                    slot:     e.value,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...schedule.timeSlots.asMap().entries.map(
+                  (e) => _ScheduleTimeSlotCard(
+                    index: e.key,
+                    slot: e.value,
                     allSlots: schedule.timeSlots,
                     onRemove: () => onRemoveSlot(e.key),
                     onUpdate: (u) => onUpdateSlot(e.key, u),
-                  )),
-              const SizedBox(height: 4),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: onAddSlot,
-                  icon: const Icon(Icons.add_rounded, size: 16),
-                  label: const Text('Add Time Slot',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: kSchedPrimary,
-                    side: const BorderSide(
-                        color: kSchedPrimary, width: 1.5),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onAddSlot,
+                icon: const Icon(Icons.add_rounded, size: 17),
+                label: const Text(
+                  'Add Time Slot',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kPrimaryDark,
+                  side: BorderSide(
+                      color: kPrimary.withOpacity(0.5), width: 1.4),
+                  backgroundColor: kPrimaryLight.withOpacity(0.4),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11)),
+                ),
               ),
-            ]),
+            ),
+          ],
+        ),
       );
 }
 
@@ -1887,11 +2254,11 @@ class _ScheduleTimeSlotCardState
   void initState() {
     super.initState();
     _local = _TimeSlot(
-      startTime:           widget.slot.startTime,
-      endTime:             widget.slot.endTime,
-      bookingMode:         widget.slot.bookingMode,
+      startTime: widget.slot.startTime,
+      endTime: widget.slot.endTime,
+      bookingMode: widget.slot.bookingMode,
       slotDurationMinutes: widget.slot.slotDurationMinutes,
-      maxQueueLength:      widget.slot.maxQueueLength,
+      maxQueueLength: widget.slot.maxQueueLength,
     );
     _queueCtrl = TextEditingController(
         text: _local.maxQueueLength != null
@@ -1924,36 +2291,32 @@ class _ScheduleTimeSlotCardState
   Future<void> _pickTime(bool isStart) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime:
-          isStart ? _local.startTime : _local.endTime,
+      initialTime: isStart ? _local.startTime : _local.endTime,
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
-            colorScheme: const ColorScheme.light(
-                primary: kSchedPrimary)),
+            colorScheme: const ColorScheme.light(primary: kPrimary)),
         child: child!,
       ),
     );
     if (picked == null) return;
     final newStart = isStart ? picked : _local.startTime;
-    final newEnd   = isStart ? _local.endTime : picked;
+    final newEnd = isStart ? _local.endTime : picked;
     if (_overlaps(newStart, newEnd)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: const Row(children: [
             Icon(Icons.warning_amber_rounded,
-                color: Colors.white, size: 15),
+                color: Colors.white, size: 16),
             SizedBox(width: 8),
             Expanded(
-                child: Text(
-                    'This time overlaps with another slot.',
-                    style: TextStyle(
-                        fontSize: 13, color: Colors.white))),
+                child: Text('This time overlaps with another slot.',
+                    style: TextStyle(fontSize: 13, color: Colors.white))),
           ]),
-          backgroundColor: kSchedError,
+          backgroundColor: kTextPrimary,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 3),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
         ));
       }
@@ -1965,8 +2328,8 @@ class _ScheduleTimeSlotCardState
   }
 
   String _fmtTime(TimeOfDay t) {
-    final h      = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
-    final m      = t.minute.toString().padLeft(2, '0');
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final m = t.minute.toString().padLeft(2, '0');
     final period = t.period == DayPeriod.am ? 'AM' : 'PM';
     return '$h:$m $period';
   }
@@ -1974,7 +2337,13 @@ class _ScheduleTimeSlotCardState
   String _modeLabel(BookingMode m) => switch (m) {
         BookingMode.queue => 'Queue',
         BookingMode.slots => 'Slots',
-        BookingMode.both  => 'Both',
+        BookingMode.both => 'Both',
+      };
+
+  IconData _modeIcon(BookingMode m) => switch (m) {
+        BookingMode.queue => Icons.queue_rounded,
+        BookingMode.slots => Icons.event_available_rounded,
+        BookingMode.both => Icons.all_inclusive_rounded,
       };
 
   @override
@@ -1983,146 +2352,184 @@ class _ScheduleTimeSlotCardState
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kSchedBorder),
+        color: kBgSoft,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: kBorderStrong),
       ),
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(children: [
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
               Container(
-                width: 20, height: 20,
-                decoration: const BoxDecoration(
-                    color: kSchedPrimaryLight,
-                    shape: BoxShape.circle),
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: kPrimary,
+                  borderRadius: BorderRadius.circular(7),
+                ),
                 alignment: Alignment.center,
-                child: Text('${widget.index + 1}',
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: kSchedPrimary)),
+                child: Text(
+                  '${widget.index + 1}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
-              const Text('Time Slot',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kSchedTextPrimary)),
+              const Text(
+                'Time Slot',
+                style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary),
+              ),
               const Spacer(),
               GestureDetector(
                 onTap: widget.onRemove,
                 child: Container(
-                  width: 26, height: 26,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
-                      color: kSchedRedLight,
-                      borderRadius: BorderRadius.circular(7)),
+                    color: kRedLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                   alignment: Alignment.center,
                   child: const Icon(Icons.close_rounded,
-                      size: 14, color: kSchedError),
+                      size: 14, color: kError),
                 ),
               ),
-            ]),
-            const SizedBox(height: 10),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-            // Time pickers
-            Row(children: [
-              Expanded(child: _SchedTimePicker(
-                label: 'Start',
-                time:  _fmtTime(_local.startTime),
-                onTap: () => _pickTime(true),
-              )),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8),
-                child: Text('→',
-                    style: TextStyle(
-                        fontSize: 14, color: kSchedTextMuted)),
+          // Time pickers
+          Row(
+            children: [
+              Expanded(
+                child: _SchedTimePicker(
+                  label: 'Start',
+                  time: _fmtTime(_local.startTime),
+                  onTap: () => _pickTime(true),
+                ),
               ),
-              Expanded(child: _SchedTimePicker(
-                label: 'End',
-                time:  _fmtTime(_local.endTime),
-                onTap: () => _pickTime(false),
-              )),
-            ]),
-            const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: Icon(Icons.arrow_forward_rounded,
+                    size: 14, color: kTextMuted),
+              ),
+              Expanded(
+                child: _SchedTimePicker(
+                  label: 'End',
+                  time: _fmtTime(_local.endTime),
+                  onTap: () => _pickTime(false),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
 
-            // Booking mode
-            const Text('Booking Mode',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: kSchedTextSecondary,
-                    letterSpacing: 0.2)),
-            const SizedBox(height: 6),
-            Row(
-              children: BookingMode.values.asMap().entries
-                  .map((e) {
-                final mode  = e.value;
-                final isLast =
-                    e.key == BookingMode.values.length - 1;
-                final sel = _local.bookingMode == mode;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() => _local.bookingMode = mode);
-                      _update();
-                    },
-                    child: AnimatedContainer(
-                      duration:
-                          const Duration(milliseconds: 140),
-                      margin: EdgeInsets.only(
-                          right: isLast ? 0 : 8),
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 7),
-                      decoration: BoxDecoration(
-                        color: sel
-                            ? kSchedPrimary
-                            : Colors.white,
-                        borderRadius:
-                            BorderRadius.circular(8),
-                        border: Border.all(
-                            color: sel
-                                ? kSchedPrimary
-                                : kSchedBorder),
+          // Booking mode
+          const Text(
+            'Booking Mode',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: kTextSecondary,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: BookingMode.values.asMap().entries.map((e) {
+              final mode = e.value;
+              final isLast =
+                  e.key == BookingMode.values.length - 1;
+              final sel = _local.bookingMode == mode;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() => _local.bookingMode = mode);
+                    _update();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    margin: EdgeInsets.only(right: isLast ? 0 : 7),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      gradient: sel
+                          ? const LinearGradient(
+                              colors: [kPrimary, kPrimaryDark],
+                            )
+                          : null,
+                      color: sel ? null : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: sel ? kPrimary : kBorderStrong,
                       ),
-                      alignment: Alignment.center,
-                      child: Text(_modeLabel(mode),
+                      boxShadow: sel
+                          ? [
+                              BoxShadow(
+                                color: kPrimary.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : [],
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(_modeIcon(mode),
+                            size: 13,
+                            color: sel ? Colors.white : kTextSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          _modeLabel(mode),
                           style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: sel
-                                  ? Colors.white
-                                  : kSchedTextSecondary)),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: sel ? Colors.white : kTextSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              );
+            }).toList(),
+          ),
 
-            // Max queue length
-            if (_local.bookingMode == BookingMode.queue ||
-                _local.bookingMode == BookingMode.both) ...[
-              const SizedBox(height: 12),
-              const Text('Max Queue Length',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: kSchedTextSecondary,
-                      letterSpacing: 0.2)),
-              const SizedBox(height: 6),
-              Container(
-                height: 40,
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                    border:
-                        Border.all(color: kSchedBorder)),
-                child: Row(children: [
-                  const SizedBox(width: 10),
+          // Max queue length
+          if (_local.bookingMode == BookingMode.queue ||
+              _local.bookingMode == BookingMode.both) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Max Queue Length',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: kTextSecondary,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Container(
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBorderStrong),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 11),
                   const Icon(Icons.people_alt_rounded,
-                      size: 15, color: kSchedPrimary),
+                      size: 16, color: kPrimaryDark),
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
@@ -2132,23 +2539,21 @@ class _ScheduleTimeSlotCardState
                         FilteringTextInputFormatter.digitsOnly
                       ],
                       style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kSchedTextPrimary),
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         hintText: 'e.g. 20',
                         hintStyle: TextStyle(
-                            fontSize: 13,
-                            color: kSchedTextMuted),
+                            fontSize: 13.5, color: kTextMuted),
                         isDense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
                       onChanged: (val) {
-                        setState(() => _local.maxQueueLength =
-                            val.isEmpty
-                                ? null
-                                : int.tryParse(val));
+                        setState(() => _local.maxQueueLength = val.isEmpty
+                            ? null
+                            : int.tryParse(val));
                         _update();
                       },
                     ),
@@ -2156,46 +2561,52 @@ class _ScheduleTimeSlotCardState
                   Container(
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 3),
+                        horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                        color: kSchedPrimaryLight,
-                        borderRadius: BorderRadius.circular(6)),
-                    child: const Text('patients',
-                        style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: kSchedPrimary)),
+                        color: kPrimaryLight,
+                        borderRadius: BorderRadius.circular(7)),
+                    child: const Text(
+                      'patients',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDarker,
+                      ),
+                    ),
                   ),
-                ]),
+                ],
               ),
-            ],
+            ),
+          ],
 
-            // Slot duration
-            if (_local.bookingMode == BookingMode.slots ||
-                _local.bookingMode == BookingMode.both) ...[
-              const SizedBox(height: 12),
-              const Text('Slot Duration',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: kSchedTextSecondary,
-                      letterSpacing: 0.2)),
-              const SizedBox(height: 6),
-              _SlotDurationPicker(
-                value: _local.slotDurationMinutes,
-                onChanged: (val) {
-                  setState(
-                      () => _local.slotDurationMinutes = val);
-                  _update();
-                },
+          // Slot duration
+          if (_local.bookingMode == BookingMode.slots ||
+              _local.bookingMode == BookingMode.both) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Slot Duration',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: kTextSecondary,
+                letterSpacing: 0.2,
               ),
-            ],
-          ]),
+            ),
+            const SizedBox(height: 7),
+            _SlotDurationPicker(
+              value: _local.slotDurationMinutes,
+              onChanged: (val) {
+                setState(() => _local.slotDurationMinutes = val);
+                _update();
+              },
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-// ─── Schedule helpers ──────────────────────────────────────────────────────
 class _SchedTimePicker extends StatelessWidget {
   final String label, time;
   final VoidCallback onTap;
@@ -2206,33 +2617,43 @@ class _SchedTimePicker extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 8),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
           decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: kSchedBorder)),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kBorderStrong),
+          ),
           child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: kSchedTextMuted,
-                        letterSpacing: 0.3)),
-                const SizedBox(height: 2),
-                Row(children: [
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                  color: kTextMuted,
+                  letterSpacing: 0.3,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
                   const Icon(Icons.access_time_rounded,
-                      size: 12, color: kSchedPrimary),
+                      size: 13, color: kPrimaryDark),
                   const SizedBox(width: 4),
-                  Text(time,
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: kSchedTextPrimary)),
-                ]),
-              ]),
+                  Text(
+                    time,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       );
 }
@@ -2246,7 +2667,8 @@ class _SlotDurationPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Wrap(
-        spacing: 7, runSpacing: 7,
+        spacing: 7,
+        runSpacing: 7,
         children: _opts.map((min) {
           final sel = value == min;
           return GestureDetector(
@@ -2254,21 +2676,26 @@ class _SlotDurationPicker extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 140),
               padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
+                  horizontal: 13, vertical: 7),
               decoration: BoxDecoration(
-                color: sel ? kSchedPrimary : Colors.white,
-                borderRadius: BorderRadius.circular(7),
+                gradient: sel
+                    ? const LinearGradient(
+                        colors: [kPrimary, kPrimaryDark],
+                      )
+                    : null,
+                color: sel ? null : Colors.white,
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                    color:
-                        sel ? kSchedPrimary : kSchedBorder),
+                    color: sel ? kPrimary : kBorderStrong),
               ),
-              child: Text('${min}m',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: sel
-                          ? Colors.white
-                          : kSchedTextSecondary)),
+              child: Text(
+                '${min}m',
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: sel ? Colors.white : kTextSecondary,
+                ),
+              ),
             ),
           );
         }).toList(),
@@ -2296,7 +2723,7 @@ class _WheelPickerState extends State<_WheelPicker> {
   @override
   void initState() {
     super.initState();
-    _cur  = widget.value.clamp(0, widget.max - 1);
+    _cur = widget.value.clamp(0, widget.max - 1);
     _ctrl = FixedExtentScrollController(initialItem: _cur);
   }
 
@@ -2305,7 +2732,7 @@ class _WheelPickerState extends State<_WheelPicker> {
     super.didUpdateWidget(old);
     if (old.value != widget.value) {
       final target = widget.value.clamp(0, widget.max - 1);
-      final delta  = (target - _cur).abs();
+      final delta = (target - _cur).abs();
       if (delta <= 3) {
         _ctrl.animateToItem(target,
             duration: const Duration(milliseconds: 280),
@@ -2325,7 +2752,8 @@ class _WheelPickerState extends State<_WheelPicker> {
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 50, height: 50,
+        width: 50,
+        height: 50,
         child: ShaderMask(
           shaderCallback: (bounds) => const LinearGradient(
             begin: Alignment.topCenter,
@@ -2358,17 +2786,12 @@ class _WheelPickerState extends State<_WheelPicker> {
                   child: AnimatedDefaultTextStyle(
                     duration: const Duration(milliseconds: 160),
                     style: TextStyle(
-                      fontSize:
-                          sel ? 16 : 12,
-                      fontWeight: sel
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                      color: sel
-                          ? kSchedPrimary
-                          : kSchedTextMuted,
+                      fontSize: sel ? 17 : 12,
+                      fontWeight:
+                          sel ? FontWeight.w800 : FontWeight.w500,
+                      color: sel ? kPrimaryDark : kTextMuted,
                     ),
-                    child: Text(
-                        i.toString().padLeft(2, '0')),
+                    child: Text(i.toString().padLeft(2, '0')),
                   ),
                 );
               },
@@ -2381,133 +2804,66 @@ class _WheelPickerState extends State<_WheelPicker> {
 // ═════════════════════════════════════════════════════════════════════════════
 // REUSABLE WIDGETS
 // ═════════════════════════════════════════════════════════════════════════════
-
-class _Card extends StatelessWidget {
-  final List<Widget> children;
-  const _Card({required this.children});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
-        decoration: BoxDecoration(
-          color: kCardBg,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: kDivider),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2))
-          ],
-        ),
-        child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: children),
-      );
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
-
-  @override
-  Widget build(BuildContext context) => Row(children: [
-        Container(
-            width: 3, height: 14,
-            decoration: BoxDecoration(
-                color: kPrimaryBlue,
-                borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 8),
-        Text(title,
-            style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: kTextDark,
-                letterSpacing: 0.3)),
-      ]);
-}
-
 class _FieldLabel extends StatelessWidget {
   final String label;
   final bool required;
-  const _FieldLabel(
-      {required this.label, this.required = false});
+  const _FieldLabel({required this.label, this.required = false});
 
   @override
-  Widget build(BuildContext context) => Row(children: [
-        Text(label,
+  Widget build(BuildContext context) => Row(
+        children: [
+          Text(
+            label,
             style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: kTextMuted)),
-        if (required) ...[
-          const SizedBox(width: 3),
-          const Text('*',
-              style: TextStyle(
-                  color: kRedAccent,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700)),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
+              letterSpacing: 0.1,
+            ),
+          ),
+          if (required) ...[
+            const SizedBox(width: 3),
+            const Text('*',
+                style: TextStyle(
+                    color: kError,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800)),
+          ],
         ],
-      ]);
+      );
 }
 
-class _AvatarPicker extends StatelessWidget {
-  final File? photo;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _AvatarPicker({
-    required this.photo,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+class _PhonePrefix extends StatelessWidget {
+  const _PhonePrefix();
 
   @override
-  Widget build(BuildContext context) =>
-      Column(children: [
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 88, height: 88,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: kLightBlue,
-              border:
-                  Border.all(color: kPrimaryBlue, width: 2),
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Text('🇮🇳', style: TextStyle(fontSize: 16)),
+          SizedBox(width: 6),
+          Text(
+            '+91',
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: kTextPrimary,
             ),
-            child: photo != null
-                ? ClipOval(
-                    child: Image.file(photo!,
-                        fit: BoxFit.cover))
-                : Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Icon(icon, size: 42, color: kPrimaryBlue),
-                      Positioned(
-                        bottom: 6, right: 6,
-                        child: Container(
-                          width: 22, height: 22,
-                          decoration: const BoxDecoration(
-                              color: kPrimaryBlue,
-                              shape: BoxShape.circle),
-                          child: const Icon(Icons.add_rounded,
-                              color: Colors.white, size: 14),
-                        ),
-                      ),
-                    ],
-                  ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Text(label,
-            style: const TextStyle(
-                fontSize: 12,
-                color: kPrimaryBlue,
-                fontWeight: FontWeight.w500)),
-      ]);
+          SizedBox(width: 8),
+          SizedBox(
+            height: 22,
+            child: VerticalDivider(
+                color: kBorderStrong, width: 1, thickness: 1),
+          ),
+          SizedBox(width: 2),
+        ],
+      ),
+    );
+  }
 }
 
 class _LocationButton extends StatelessWidget {
@@ -2522,81 +2878,27 @@ class _LocationButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
         message: tooltip,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Container(
-            width: 50, height: 50,
-            decoration: BoxDecoration(
-              color: kLightBlue,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: kPrimaryBlue.withOpacity(0.3)),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(13),
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(
+                    color: kPrimary.withOpacity(0.3), width: 1),
+              ),
+              child: Icon(icon, color: kPrimaryDark, size: 20),
             ),
-            child: Icon(icon, color: kPrimaryBlue, size: 20),
           ),
         ),
       );
 }
 
-// ─── Step Chip ────────────────────────────────────────────────────────────────
-enum _StepState { active, done, pending }
-
-class _StepChip extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final _StepState state;
-
-  const _StepChip(
-      {required this.label,
-      required this.icon,
-      required this.state});
-
-  @override
-  Widget build(BuildContext context) {
-    Color bg, fg, border;
-    IconData displayIcon;
-
-    switch (state) {
-      case _StepState.active:
-        bg = kLightBlue;
-        fg = kPrimaryBlue;
-        border = kPrimaryBlue;
-        displayIcon = icon;
-      case _StepState.done:
-        bg = const Color(0xFFE6F4EA);
-        fg = kAccentGreen;
-        border = kAccentGreen;
-        displayIcon = Icons.check_rounded;
-      case _StepState.pending:
-        bg = kSurface;
-        fg = kTextMuted;
-        border = kDivider;
-        displayIcon = icon;
-    }
-
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(
-        width: 26, height: 26,
-        decoration: BoxDecoration(
-            color: bg,
-            shape: BoxShape.circle,
-            border: Border.all(color: border, width: 1.5)),
-        child:
-            Icon(displayIcon, size: 13, color: fg),
-      ),
-      const SizedBox(width: 5),
-      Text(label,
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: state == _StepState.pending
-                  ? FontWeight.normal
-                  : FontWeight.w600,
-              color: fg)),
-    ]);
-  }
-}
-
-// ─── Gender Selector ──────────────────────────────────────────────────────────
 class _GenderSelector extends StatelessWidget {
   final List<String> options;
   final String? selected;
@@ -2608,118 +2910,277 @@ class _GenderSelector extends StatelessWidget {
       required this.onChanged});
 
   static const _iconMap = {
-    'male':   Icons.male_rounded,
+    'male': Icons.male_rounded,
     'female': Icons.female_rounded,
-    'other':  Icons.transgender_rounded,
+    'other': Icons.transgender_rounded,
   };
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 14),
-        child: Row(
-          children: List.generate(options.length, (i) {
-            final label      = options[i];
-            final icon       = _iconMap[label.toLowerCase()] ??
-                Icons.person_outline_rounded;
-            final isSelected = selected == label;
-            return Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(
-                    right: i < options.length - 1 ? 8 : 0),
-                child: GestureDetector(
-                  onTap: () => onChanged(label),
-                  child: AnimatedContainer(
-                    duration:
-                        const Duration(milliseconds: 200),
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? kLightBlue
-                          : kSurface,
-                      borderRadius:
-                          BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isSelected
-                            ? kPrimaryBlue
-                            : kDivider,
-                        width: isSelected ? 1.5 : 1,
-                      ),
+  Widget build(BuildContext context) => Row(
+        children: List.generate(options.length, (i) {
+          final label = options[i];
+          final icon = _iconMap[label.toLowerCase()] ??
+              Icons.person_outline_rounded;
+          final isSelected = selected == label;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                  right: i < options.length - 1 ? 7 : 0),
+              child: GestureDetector(
+                onTap: () => onChanged(label),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: isSelected ? kPrimaryLight : kBgSoft,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected ? kPrimary : kBorderStrong,
+                      width: isSelected ? 1.8 : 1,
                     ),
-                    child: Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.center,
-                        children: [
-                          Icon(icon,
-                              size: 16,
-                              color: isSelected
-                                  ? kPrimaryBlue
-                                  : kTextMuted),
-                          const SizedBox(width: 5),
-                          Text(label,
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w600
-                                      : FontWeight.w400,
-                                  color: isSelected
-                                      ? kPrimaryBlue
-                                      : kTextMuted)),
-                        ]),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: kPrimary.withOpacity(0.18),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ]
+                        : [],
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        icon,
+                        size: 20,
+                        color: isSelected ? kPrimaryDarker : kTextSecondary,
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        label,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          color: isSelected
+                              ? kPrimaryDarker
+                              : kTextSecondary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            );
-          }),
-        ),
+            ),
+          );
+        }),
       );
 }
 
-// ─── Inline States ────────────────────────────────────────────────────────────
-class _InlineLoading extends StatelessWidget {
-  const _InlineLoading();
+class _SecureFooter extends StatelessWidget {
+  const _SecureFooter();
+
   @override
-  Widget build(BuildContext context) => const SizedBox(
-        height: 44,
-        child: Center(
-          child: SizedBox(
-              width: 18, height: 18,
-              child: CircularProgressIndicator(
-                  strokeWidth: 2, color: kPrimaryBlue)),
-        ),
+  Widget build(BuildContext context) => const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
+          SizedBox(width: 6),
+          Text(
+            'Your data is protected and encrypted',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: kTextMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       );
 }
 
-class _InlineError extends StatelessWidget {
-  final String text;
-  const _InlineError({required this.text});
+// ═════════════════════════════════════════════════════════════════════════════
+// IMAGE SOURCE BOTTOM SHEET
+// ═════════════════════════════════════════════════════════════════════════════
+class _ImageSourceSheet extends StatelessWidget {
+  final String title;
+  const _ImageSourceSheet({required this.title});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFEF2F2),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFFECACA)),
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 28,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.only(top: 12, bottom: 4),
+            width: 44,
+            height: 4,
+            decoration: BoxDecoration(
+                color: kBorderStrong,
+                borderRadius: BorderRadius.circular(2)),
+          ),
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(11)),
+                  child: const Icon(Icons.add_photo_alternate_outlined,
+                      color: kPrimaryDark, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Upload Photo',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: kTextPrimary,
+                            letterSpacing: -0.3)),
+                    const SizedBox(height: 1),
+                    Text(title,
+                        style: const TextStyle(
+                            fontSize: 12, color: kTextSecondary)),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _SourceTile(
+                    icon: Icons.camera_alt_rounded,
+                    iconColor: kPrimary,
+                    iconBg: kPrimaryLight,
+                    label: 'Camera',
+                    subtitle: 'Take photo',
+                    onTap: () =>
+                        Navigator.pop(context, ImageSource.camera),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _SourceTile(
+                    icon: Icons.photo_library_rounded,
+                    iconColor: kPurple,
+                    iconBg: kPurpleLight,
+                    label: 'Gallery',
+                    subtitle: 'Pick photo',
+                    onTap: () =>
+                        Navigator.pop(context, ImageSource.gallery),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+            child: SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: kBgSoft,
+                ),
+                child: const Text('Cancel',
+                    style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: kTextSecondary)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor, iconBg;
+  final String label, subtitle;
+  final VoidCallback onTap;
+
+  const _SourceTile({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            decoration: BoxDecoration(
+                color: iconBg.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: iconBg)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                      color: Colors.white, shape: BoxShape.circle),
+                  child: Icon(icon, color: iconColor, size: 26),
+                ),
+                const SizedBox(height: 10),
+                Text(label,
+                    style: TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w800,
+                        color: iconColor)),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 11, color: kTextSecondary)),
+              ],
+            ),
+          ),
         ),
-        child: Row(children: [
-          const Icon(Icons.error_outline_rounded,
-              size: 18, color: kRedAccent),
-          const SizedBox(width: 8),
-          Expanded(
-              child: Text(text,
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFFB91C1C)))),
-        ]),
       );
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAP PICKER SCREEN
 // ═════════════════════════════════════════════════════════════════════════════
-
 class _MapPickerScreen extends StatefulWidget {
   final gmap.LatLng initialLatLng;
   const _MapPickerScreen({required this.initialLatLng});
@@ -2733,13 +3194,13 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
   gmap.GoogleMapController? _mapController;
 
   final _searchCtrl = TextEditingController();
-  final _focusNode  = FocusNode();
+  final _focusNode = FocusNode();
 
   static const _apiKey = 'AIzaSyDTRL5VzQ9UAwsCB9uCbSNj5wZasYHjFKA';
 
   List<Map<String, dynamic>> _predictions = [];
   bool _showSuggestions = false;
-  bool _isSearching     = false;
+  bool _isSearching = false;
 
   @override
   void initState() {
@@ -2757,7 +3218,10 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
 
   Future<void> _onSearchChanged(String query) async {
     if (query.trim().isEmpty) {
-      setState(() { _predictions = []; _showSuggestions = false; });
+      setState(() {
+        _predictions = [];
+        _showSuggestions = false;
+      });
       return;
     }
     setState(() => _isSearching = true);
@@ -2770,15 +3234,17 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
         '&key=$_apiKey',
       );
       final response = await http.get(url);
-      final data     = jsonDecode(response.body);
+      final data = jsonDecode(response.body);
       if (data['status'] == 'OK') {
         setState(() {
-          _predictions     = List<Map<String, dynamic>>.from(data['predictions']);
+          _predictions = List<Map<String, dynamic>>.from(data['predictions']);
           _showSuggestions = _predictions.isNotEmpty;
         });
       } else {
-        debugPrint('Places API status: ${data['status']}');
-        setState(() { _predictions = []; _showSuggestions = false; });
+        setState(() {
+          _predictions = [];
+          _showSuggestions = false;
+        });
       }
     } catch (e) {
       debugPrint('Places search error: $e');
@@ -2789,21 +3255,18 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
 
   Future<void> _selectPrediction(Map<String, dynamic> prediction) async {
     _focusNode.unfocus();
-    setState(() { _showSuggestions = false; });
+    setState(() => _showSuggestions = false);
     _searchCtrl.text = prediction['description'] ?? '';
-
     try {
       final placeId = prediction['place_id'];
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/details/json'
-        '?place_id=$placeId'
-        '&fields=geometry'
-        '&key=$_apiKey',
+        '?place_id=$placeId&fields=geometry&key=$_apiKey',
       );
       final response = await http.get(url);
-      final data     = jsonDecode(response.body);
+      final data = jsonDecode(response.body);
       if (data['status'] == 'OK') {
-        final loc    = data['result']['geometry']['location'];
+        final loc = data['result']['geometry']['location'];
         final latLng = gmap.LatLng(loc['lat'], loc['lng']);
         setState(() => _selected = latLng);
         _mapController?.animateCamera(
@@ -2819,251 +3282,262 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
 
   void _clearSearch() {
     _searchCtrl.clear();
-    setState(() { _predictions = []; _showSuggestions = false; });
+    setState(() {
+      _predictions = [];
+      _showSuggestions = false;
+    });
     _focusNode.unfocus();
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: kBg,
-    appBar: AppBar(
-      backgroundColor: Colors.white,
-      elevation: 0,
-      surfaceTintColor: Colors.white,
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(0.5),
-        child: Container(height: 0.5, color: kBorder),
-      ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back_ios_new_rounded,
-            size: 18, color: kTextPrimary),
-        onPressed: () => Navigator.pop(context),
-      ),
-      title: const Text('Select Location',
-          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600,
-              color: kTextPrimary)),
-      centerTitle: true,
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: TextButton(
-            onPressed: () => Navigator.pop(context, _selected),
-            style: TextButton.styleFrom(
-              backgroundColor: kPrimary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            ),
-            child: const Text('Confirm',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          ),
+        backgroundColor: kBg,
+        appBar: _SimpleTitleBar(
+          title: 'Select Location',
+          subtitle: 'Pin your clinic on the map',
+          onBack: () => Navigator.pop(context),
         ),
-      ],
-    ),
-    body: Stack(children: [
-
-      // ── Google Map ──────────────────────────────────────────────
-      gmap.GoogleMap(
-        initialCameraPosition:
-            gmap.CameraPosition(target: _selected, zoom: 14),
-        onMapCreated: (ctrl) => _mapController = ctrl,
-        onTap: (gmap.LatLng latLng) {
-          _focusNode.unfocus();
-          setState(() {
-            _selected        = latLng;
-            _showSuggestions = false;
-          });
-        },
-        markers: {
-          gmap.Marker(
-            markerId: const gmap.MarkerId('selected'),
-            position: _selected,
-          ),
-        },
-        myLocationEnabled: true,
-        myLocationButtonEnabled: true,
-        zoomControlsEnabled: true,
-      ),
-
-      // ── Search bar + suggestions ────────────────────────────────
-      Positioned(
-        top: 12, left: 12, right: 12,
-        child: Column(children: [
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(color: Color(0x18000000),
-                    blurRadius: 12, offset: Offset(0, 3)),
-              ],
+        body: Stack(
+          children: [
+            gmap.GoogleMap(
+              initialCameraPosition:
+                  gmap.CameraPosition(target: _selected, zoom: 14),
+              onMapCreated: (ctrl) => _mapController = ctrl,
+              onTap: (latLng) {
+                _focusNode.unfocus();
+                setState(() {
+                  _selected = latLng;
+                  _showSuggestions = false;
+                });
+              },
+              markers: {
+                gmap.Marker(
+                  markerId: const gmap.MarkerId('selected'),
+                  position: _selected,
+                ),
+              },
+              myLocationEnabled: true,
+              myLocationButtonEnabled: true,
+              zoomControlsEnabled: true,
             ),
-            child: TextField(
-              controller: _searchCtrl,
-              focusNode:  _focusNode,
-              onChanged:  _onSearchChanged,
-              style: const TextStyle(fontSize: 14, color: kTextPrimary),
-              decoration: InputDecoration(
-                hintText: 'Search for a place...',
-                hintStyle: const TextStyle(fontSize: 14, color: kTextMuted),
-                prefixIcon: _isSearching
-                    ? const Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(width: 18, height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: kPrimary)),
-                      )
-                    : const Icon(Icons.search_rounded, color: kPrimary, size: 20),
-                suffixIcon: _searchCtrl.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close_rounded,
-                            color: kTextMuted, size: 18),
-                        onPressed: _clearSearch,
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 14),
-              ),
-            ),
-          ),
-
-          if (_showSuggestions)
-            Container(
-              margin: const EdgeInsets.only(top: 6),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: const [
-                  BoxShadow(color: Color(0x18000000),
-                      blurRadius: 12, offset: Offset(0, 3)),
+            // Search
+            Positioned(
+              top: 12,
+              left: 12,
+              right: 12,
+              child: Column(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Color(0x18000000),
+                            blurRadius: 14,
+                            offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _searchCtrl,
+                      focusNode: _focusNode,
+                      onChanged: _onSearchChanged,
+                      style: const TextStyle(
+                          fontSize: 14, color: kTextPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'Search for a place...',
+                        hintStyle: const TextStyle(
+                            fontSize: 14, color: kTextMuted),
+                        prefixIcon: _isSearching
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: kPrimary)),
+                              )
+                            : const Icon(Icons.search_rounded,
+                                color: kPrimaryDark, size: 20),
+                        suffixIcon: _searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.close_rounded,
+                                    color: kTextMuted, size: 18),
+                                onPressed: _clearSearch,
+                              )
+                            : null,
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide.none),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                  ),
+                  if (_showSuggestions)
+                    Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: const [
+                          BoxShadow(
+                              color: Color(0x18000000),
+                              blurRadius: 14,
+                              offset: Offset(0, 4)),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          itemCount: _predictions.length,
+                          separatorBuilder: (_, __) =>
+                              const Divider(height: 1, color: kBorder),
+                          itemBuilder: (_, i) {
+                            final p = _predictions[i];
+                            final mainText = p['structured_formatting']
+                                    ?['main_text'] ??
+                                p['description'] ??
+                                '';
+                            final secondText = p['structured_formatting']
+                                    ?['secondary_text'] ??
+                                '';
+                            return InkWell(
+                              onTap: () => _selectPrediction(p),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        color: kPrimaryLight,
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                      ),
+                                      child: const Icon(
+                                          Icons.location_on_rounded,
+                                          color: kPrimaryDark,
+                                          size: 16),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(mainText,
+                                              style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: kTextPrimary),
+                                              maxLines: 1,
+                                              overflow:
+                                                  TextOverflow.ellipsis),
+                                          if (secondText.isNotEmpty) ...[
+                                            const SizedBox(height: 2),
+                                            Text(secondText,
+                                                style: const TextStyle(
+                                                    fontSize: 11,
+                                                    color: kTextSecondary),
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                        Icons.north_west_rounded,
+                                        size: 14,
+                                        color: kTextMuted),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
                 ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
-                  itemCount: _predictions.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: kBorder),
-                  itemBuilder: (_, i) {
-                    final p           = _predictions[i];
-                    final mainText    = p['structured_formatting']?['main_text'] ?? p['description'] ?? '';
-                    final secondText  = p['structured_formatting']?['secondary_text'] ?? '';
-                    return InkWell(
-                      onTap: () => _selectPrediction(p),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 12),
-                        child: Row(children: [
-                          Container(
-                            width: 32, height: 32,
-                            decoration: BoxDecoration(
-                              color: kPrimaryLight,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.location_on_rounded,
-                                color: kPrimary, size: 16),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(mainText,
-                                    style: const TextStyle(fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                        color: kTextPrimary),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis),
-                                if (secondText.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(secondText,
-                                      style: const TextStyle(
-                                          fontSize: 11, color: kTextSecondary),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const Icon(Icons.north_west_rounded,
-                              size: 14, color: kTextMuted),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
-              ),
             ),
-        ]),
-      ),
-
-      // ── Bottom coordinates card ─────────────────────────────────
-      Positioned(
-        bottom: 24, left: 16, right: 16,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kPrimary.withOpacity(0.3)),
-            boxShadow: const [
-              BoxShadow(color: Color(0x14000000),
-                  blurRadius: 16, offset: Offset(0, 4)),
-            ],
-          ),
-          child: Row(children: [
-            Container(
-              width: 36, height: 36,
-              decoration: const BoxDecoration(
-                  color: kPrimaryLight, shape: BoxShape.circle),
-              child: const Icon(Icons.location_on_rounded,
-                  color: kPrimary, size: 20),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
+            // Bottom coordinates + confirm
+            Positioned(
+              bottom: 24,
+              left: 16,
+              right: 16,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Selected coordinates',
-                      style: TextStyle(fontSize: 11, color: kTextSecondary)),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${_selected.latitude.toStringAsFixed(6)}, '
-                    '${_selected.longitude.toStringAsFixed(6)}',
-                    style: const TextStyle(fontSize: 13,
-                        fontWeight: FontWeight.w600, color: kTextPrimary),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: kPrimary.withOpacity(0.3)),
+                      boxShadow: const [
+                        BoxShadow(
+                            color: Color(0x14000000),
+                            blurRadius: 16,
+                            offset: Offset(0, 4)),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 38,
+                          height: 38,
+                          decoration: const BoxDecoration(
+                              color: kPrimaryLight,
+                              shape: BoxShape.circle),
+                          child: const Icon(Icons.location_on_rounded,
+                              color: kPrimaryDark, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Selected coordinates',
+                                style: TextStyle(
+                                    fontSize: 11, color: kTextSecondary),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${_selected.latitude.toStringAsFixed(6)}, '
+                                '${_selected.longitude.toStringAsFixed(6)}',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: kTextPrimary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  _PrimaryButton(
+                    label: 'Confirm Location',
+                    icon: Icons.check_rounded,
+                    onPressed: () => Navigator.pop(context, _selected),
                   ),
                 ],
               ),
             ),
-            GestureDetector(
-              onTap: () => _mapController?.animateCamera(
-                gmap.CameraUpdate.newCameraPosition(
-                  gmap.CameraPosition(target: _selected, zoom: 15),
-                ),
-              ),
-              child: Container(
-                width: 34, height: 34,
-                decoration: BoxDecoration(
-                  color: kPrimaryLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.center_focus_strong_rounded,
-                    color: kPrimary, size: 17),
-              ),
-            ),
-          ]),
+          ],
         ),
-      ),
-    ]),
-  );
-} 
+      );
+}

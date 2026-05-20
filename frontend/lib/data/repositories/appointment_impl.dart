@@ -140,4 +140,11 @@ class AppointmentImpl implements AppointmentRepository {
   Future<AppointmentResponseModel> queuePauseEmergency(int queueId) {
     return apiService.queuePauseEmergency(queueId);
   }
+
+  @override
+  Future<AppointmentResponseModel> cancelByDoctor(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.cancelByDoctor(appointmentRequest);
+  }
 }
