@@ -569,10 +569,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             if (shown.isEmpty)
               _EmptyNote('No upcoming appointments')
             else
-              ...shown.map(
-                (a) => Padding(
+              ...shown.asMap().entries.map(
+                (e) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: _ApptCard(appointment: a, isToday: _isToday(a)),
+                  child: _ApptCard(
+                    appointment: e.value,
+                    isToday: _isToday(e.value),
+                    isNext: e.key == 0,
+                  ),
                 ),
               ),
           ],
@@ -1854,7 +1858,9 @@ class _TopDoctorSkeletonCard extends StatelessWidget {
 class _ApptCard extends StatefulWidget {
   final AppointmentList appointment;
   final bool isToday;
-  const _ApptCard({required this.appointment, this.isToday = false});
+  final bool isNext;
+  const _ApptCard(
+      {required this.appointment, this.isToday = false, this.isNext = false});
   @override
   State<_ApptCard> createState() => _ApptCardState();
 }
@@ -1925,17 +1931,15 @@ String _fmtClockTime(String? raw) {
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: isMyTurn
-                  ? kPrimary
-                  : (widget.isToday
-                      ? kPrimary.withOpacity(0.6)
-                      : kBorder),
-              width: isMyTurn ? 2 : (widget.isToday ? 1.5 : 1),
+              color: (isMyTurn || widget.isNext) ? kPrimary : kBorder,
+              width: isMyTurn ? 2 : (widget.isNext ? 1.8 : 1),
             ),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
+                  color: widget.isNext
+                      ? kPrimary.withOpacity(0.20)
+                      : Colors.black.withOpacity(0.05),
+                  blurRadius: widget.isNext ? 16 : 10,
                   offset: const Offset(0, 3))
             ],
           ),

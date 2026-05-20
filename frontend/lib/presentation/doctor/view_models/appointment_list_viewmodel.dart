@@ -252,6 +252,23 @@ Future<AppointmentResponseModel> startSession(
     }
   }
 
+  // ── Cancel Appointment By Doctor ───────────────────────────────────────────
+
+  Future<AppointmentResponseModel> cancelByDoctor(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await usecase.cancelByDoctor(appointmentRequest);
+      await fetchPatientAppointments(appointmentRequest.doctorId!);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
   Future<List<TodayQueueModel>> getTodayQueue(int doctorId) async {
     state = state.copyWith(
       todayQueueResult: const AsyncValue.loading(),

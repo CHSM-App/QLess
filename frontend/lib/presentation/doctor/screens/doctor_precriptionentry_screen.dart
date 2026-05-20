@@ -872,6 +872,13 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
             isNext: 1));
       if (!mounted) return;
 
+      // SP rejected the skip (queue not started, invalid state, …) —
+      // surface the real reason instead of navigating to a "next" patient.
+      if (skipRes.success != true) {
+        _showSnack(skipRes.message ?? 'Skip failed', isError: true);
+        return;
+      }
+
       // Last patient in queue — go back immediately, same as "No Patient Left"
       final skipMsg = skipRes.message?.trim() ?? '';
       if (skipMsg.toLowerCase().contains('last patient')) {

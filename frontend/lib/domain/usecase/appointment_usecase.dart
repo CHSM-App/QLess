@@ -116,4 +116,10 @@ class AppointmentUsecase {
   Future<AppointmentResponseModel> queuePauseEmergency(int queueId) {
     return appointmentRepository.queuePauseEmergency(queueId);
   }
+
+  Future<AppointmentResponseModel> cancelByDoctor(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.cancelByDoctor(appointmentRequest);
+  }
 }

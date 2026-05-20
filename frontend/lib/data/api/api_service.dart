@@ -193,6 +193,11 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   @Path("queue_id") int queueId,
 );
 
+  @POST("doctor/insert/appointment/cancelByDoctor")
+  Future<AppointmentResponseModel> cancelByDoctor(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
   @POST("doctor/insert/addQueueStartTime/")
   Future<dynamic> updateLeadTime(
      @Body() DoctorDetails doctor

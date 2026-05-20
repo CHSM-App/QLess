@@ -13,20 +13,27 @@ import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 
-// ── Colour Palette ─────────────────────────────────────────────────
-const kPrimary      = Color(0xFF26C6B0);
-const kPrimaryDark  = Color(0xFF1EA898);
-const kPrimaryLight = Color(0xFFD9F5F1);
+// ── Colour Palette (matches login + patient registration) ──────────
+const kPrimary       = Color(0xFF26C6B0);
+const kPrimaryDark   = Color(0xFF1EA898);
+const kPrimaryDarker = Color(0xFF158578);
+const kPrimaryLight  = Color(0xFFD9F5F1);
+const kPrimaryGlow   = Color(0xFF4DD9C4);
 
-const kTextPrimary   = Color(0xFF2D3748);
-const kTextSecondary = Color(0xFF718096);
-const kTextMuted     = Color(0xFFA0AEC0);
+const kBgSoft  = Color(0xFFF7FAFC);
+const kSurface = Color(0xFFFFFFFF);
+const kBg      = Color(0xFFF7FAFC);
 
-const kBorder  = Color(0xFFEDF2F7);
-const kDivider = Color(0xFFE5E7EB);
+const kTextPrimary   = Color(0xFF1A202C);
+const kTextSecondary = Color(0xFF4A5568);
+const kTextMuted     = Color(0xFF94A3B8);
 
-const kError      = Color(0xFFFC8181);
-const kRedLight   = Color(0xFFFEE2E2);
+const kBorder       = Color(0xFFF1F5F9);
+const kBorderStrong = Color(0xFFE2E8F0);
+
+const kError    = Color(0xFFFC8181);
+const kRedLight = Color(0xFFFEE2E2);
+const kSuccess  = Color(0xFF68D391);
 
 class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String mobileNumber;
@@ -56,7 +63,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   late AnimationController _fadeController;
   late AnimationController _shakeController;
   late Animation<double> _fadeAnim;
-  late Animation<double> _slideAnim;
+  late Animation<Offset> _slideAnim;
   late Animation<double> _shakeAnim;
 
   int _secondsLeft = _timerSeconds;
@@ -78,7 +85,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
     _fadeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 700),
     );
     _shakeController = AnimationController(
       vsync: this,
@@ -86,7 +93,10 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     );
 
     _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
-    _slideAnim = Tween<double>(begin: 30, end: 0).animate(
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(
       CurvedAnimation(parent: _fadeController, curve: Curves.easeOut),
     );
     _shakeAnim = Tween<double>(begin: 0, end: 1).animate(
@@ -118,6 +128,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     _fadeController.dispose();
     _shakeController.dispose();
     _timer?.cancel();
+    for (final c in _controllers) c.dispose();
+    for (final f in _focusNodes) f.dispose();
     super.dispose();
   }
 
@@ -254,66 +266,72 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: kPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: Colors.white, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
+      backgroundColor: kBg,
+      appBar: _SimpleTitleBar(
+        title: 'Verify Your Number',
+        subtitle: 'Enter the code we just sent',
+        isDoctor: _isDoctor,
+        onBack: () => Navigator.pop(context),
       ),
-      body: AnimatedBuilder(
-        animation: _fadeAnim,
-        builder: (context, child) => Opacity(
-          opacity: _fadeAnim.value,
-          child: Transform.translate(
-            offset: Offset(0, _slideAnim.value),
-            child: child,
-          ),
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
         ),
         child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bool useWideLayout =
-                  constraints.maxWidth > constraints.maxHeight ||
-                      constraints.maxWidth >= 600;
+          top: false,
+          child: FadeTransition(
+            opacity: _fadeAnim,
+            child: SlideTransition(
+              position: _slideAnim,
+              child: Builder(
+                builder: (context) {
+                  // Decide layout from the physical screen size, NOT the
+                  // keyboard-shrunk viewport. Otherwise opening the number
+                  // keypad shrinks the height below the width and flips
+                  // portrait -> landscape, overflowing the page.
+                  final Size screen = MediaQuery.of(context).size;
+                  final bool useWideLayout =
+                      screen.width > screen.height || screen.width >= 600;
 
-              if (useWideLayout) {
-                return _LandscapeLayout(
-                  isDoctor: _isDoctor,
-                  maskedNumber: _maskedNumber,
-                  controllers: _controllers,
-                  focusNodes: _focusNodes,
-                  hasError: _hasError,
-                  isFilled: _isFilled,
-                  isLoading: _isLoading,
-                  secondsLeft: _secondsLeft,
-                  shakeAnim: _shakeAnim,
-                  onOtpChanged: _onOtpChanged,
-                  onKeyEvent: _onKeyEvent,
-                  onVerify: _verifyOtp,
-                  onResend: _resendOtp,
-                );
-              }
+                  if (useWideLayout) {
+                    return _LandscapeLayout(
+                      isDoctor: _isDoctor,
+                      maskedNumber: _maskedNumber,
+                      mobileNumber: widget.mobileNumber,
+                      controllers: _controllers,
+                      focusNodes: _focusNodes,
+                      hasError: _hasError,
+                      isFilled: _isFilled,
+                      isLoading: _isLoading,
+                      secondsLeft: _secondsLeft,
+                      shakeAnim: _shakeAnim,
+                      onOtpChanged: _onOtpChanged,
+                      onKeyEvent: _onKeyEvent,
+                      onVerify: _verifyOtp,
+                      onResend: _resendOtp,
+                    );
+                  }
 
-              return _PortraitLayout(
-                isDoctor: _isDoctor,
-                maskedNumber: _maskedNumber,
-                controllers: _controllers,
-                focusNodes: _focusNodes,
-                hasError: _hasError,
-                isFilled: _isFilled,
-                isLoading: _isLoading,
-                secondsLeft: _secondsLeft,
-                shakeAnim: _shakeAnim,
-                onOtpChanged: _onOtpChanged,
-                onKeyEvent: _onKeyEvent,
-                onVerify: _verifyOtp,
-                onResend: _resendOtp,
-              );
-            },
+                  return _PortraitLayout(
+                    isDoctor: _isDoctor,
+                    maskedNumber: _maskedNumber,
+                    mobileNumber: widget.mobileNumber,
+                    controllers: _controllers,
+                    focusNodes: _focusNodes,
+                    hasError: _hasError,
+                    isFilled: _isFilled,
+                    isLoading: _isLoading,
+                    secondsLeft: _secondsLeft,
+                    shakeAnim: _shakeAnim,
+                    onOtpChanged: _onOtpChanged,
+                    onKeyEvent: _onKeyEvent,
+                    onVerify: _verifyOtp,
+                    onResend: _resendOtp,
+                  );
+                },
+              ),
+            ),
           ),
         ),
       ),
@@ -321,217 +339,133 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// LANDSCAPE / WIDE LAYOUT
-// ─────────────────────────────────────────────────────────────────────────────
-class _LandscapeLayout extends StatelessWidget {
+// ═════════════════════════════════════════════════════════════════════════════
+// SIMPLE TITLE BAR
+// ═════════════════════════════════════════════════════════════════════════════
+class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
+  final String title;
+  final String subtitle;
   final bool isDoctor;
-  final String maskedNumber;
-  final List<TextEditingController> controllers;
-  final List<FocusNode> focusNodes;
-  final bool hasError;
-  final bool isFilled;
-  final bool isLoading;
-  final int secondsLeft;
-  final Animation<double> shakeAnim;
-  final void Function(int, String) onOtpChanged;
-  final void Function(int, KeyEvent) onKeyEvent;
-  final VoidCallback onVerify;
-  final VoidCallback onResend;
+  final VoidCallback onBack;
 
-  const _LandscapeLayout({
+  const _SimpleTitleBar({
+    required this.title,
+    required this.subtitle,
     required this.isDoctor,
-    required this.maskedNumber,
-    required this.controllers,
-    required this.focusNodes,
-    required this.hasError,
-    required this.isFilled,
-    required this.isLoading,
-    required this.secondsLeft,
-    required this.shakeAnim,
-    required this.onOtpChanged,
-    required this.onKeyEvent,
-    required this.onVerify,
-    required this.onResend,
+    required this.onBack,
   });
 
   @override
+  Size get preferredSize => const Size.fromHeight(68);
+
+  @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final bool isShortLandscape = size.height < 420 && size.width > size.height;
-    final double iconSize = isShortLandscape ? 48.0 : 64.0;
-    final double titleFontSize = isShortLandscape ? 15.0 : 19.0;
-    final double subtitleFontSize = isShortLandscape ? 11.0 : 12.5;
-    final double rightPadV = isShortLandscape ? 12.0 : 20.0;
-    final double rightPadH = isShortLandscape ? 24.0 : 32.0;
-
-    return Row(
-      children: [
-        // ── LEFT PANEL ────────────────────────────────────────────────────
-        Expanded(
-          flex: 4,
-          child: Container(
-            color: kPrimary,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: iconSize,
-                  height: iconSize,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.35),
-                      width: 1.5,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.sms_outlined,
-                    color: Colors.white,
-                    size: isShortLandscape ? 20 : 28,
-                  ),
-                ),
-
-                SizedBox(height: isShortLandscape ? 10 : 18),
-
-                Text(
-                  'OTP Verification',
-                  style: TextStyle(
-                    fontSize: titleFontSize,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-
-                SizedBox(height: isShortLandscape ? 6 : 10),
-
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  child: RichText(
-                    textAlign: TextAlign.center,
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: subtitleFontSize,
-                        color: Colors.white70,
-                        height: 1.55,
-                      ),
-                      children: [
-                        const TextSpan(text: 'We sent a 6-digit code to\n'),
-                        TextSpan(
-                          text: '+91 $maskedNumber',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: isShortLandscape ? 10 : 20),
-
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: isShortLandscape ? 4 : 7,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.30),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isDoctor
-                            ? Icons.medical_services_outlined
-                            : Icons.person_outline_rounded,
-                        size: 13,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Logging in as ${isDoctor ? 'Doctor' : 'Patient'}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    return Material(
+      color: kSurface,
+      elevation: 0,
+      child: SafeArea(
+        bottom: false,
+        child: Container(
+          height: 68,
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          decoration: const BoxDecoration(
+            color: kSurface,
+            border: Border(bottom: BorderSide(color: kBorder, width: 1)),
           ),
-        ),
-
-        // ── RIGHT PANEL ───────────────────────────────────────────────────
-        Expanded(
-          flex: 6,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.symmetric(
-                horizontal: rightPadH,
-                vertical: rightPadV,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text(
-                    'Enter the 6-digit code',
-                    style: TextStyle(
-                      fontSize: isShortLandscape ? 14 : 17,
-                      fontWeight: FontWeight.w700,
+          child: Row(
+            children: [
+              Material(
+                color: kBgSoft,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(11),
+                  side: const BorderSide(color: kBorderStrong, width: 0.5),
+                ),
+                child: InkWell(
+                  onTap: onBack,
+                  borderRadius: BorderRadius.circular(11),
+                  child: const SizedBox(
+                    width: 38,
+                    height: 38,
+                    child: Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 16,
                       color: kTextPrimary,
-                      letterSpacing: -0.2,
                     ),
                   ),
-                  SizedBox(height: isShortLandscape ? 14 : 20),
-                  _OtpBoxRow(
-                    controllers: controllers,
-                    focusNodes: focusNodes,
-                    hasError: hasError,
-                    shakeAnim: shakeAnim,
-                    onOtpChanged: onOtpChanged,
-                    onKeyEvent: onKeyEvent,
-                  ),
-                  _ErrorText(hasError: hasError),
-                  SizedBox(height: isShortLandscape ? 14 : 20),
-                  _VerifyButton(
-                    isFilled: isFilled,
-                    isLoading: isLoading,
-                    isDoctor: isDoctor,
-                    onVerify: onVerify,
-                  ),
-                  SizedBox(height: isShortLandscape ? 10 : 16),
-                  _ResendRow(
-                    secondsLeft: secondsLeft,
-                    onResend: onResend,
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: kTextSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isDoctor
+                          ? Icons.medical_services_outlined
+                          : Icons.favorite_border_rounded,
+                      size: 11,
+                      color: kPrimaryDarker,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      isDoctor ? 'Doctor' : 'Patient',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDarker,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 // PORTRAIT LAYOUT
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 class _PortraitLayout extends StatelessWidget {
   final bool isDoctor;
   final String maskedNumber;
+  final String mobileNumber;
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
   final bool hasError;
@@ -547,6 +481,7 @@ class _PortraitLayout extends StatelessWidget {
   const _PortraitLayout({
     required this.isDoctor,
     required this.maskedNumber,
+    required this.mobileNumber,
     required this.controllers,
     required this.focusNodes,
     required this.hasError,
@@ -563,194 +498,379 @@ class _PortraitLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final bool isSmall = size.height < 680;
-    final double iconSize = isSmall ? 54.0 : 68.0;
-    final double titleFontSize = isSmall ? 20.0 : 24.0;
-    final double subFontSize = isSmall ? 12.5 : 13.5;
+    final isSmall = size.height < 700;
+    final isVerySmall = size.height < 600;
 
-    return Column(
-      children: [
-        // ── TEAL HEADER ───────────────────────────────────────────────────
-        Container(
-          color: kPrimary,
-          width: double.infinity,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Padding(
-                padding: EdgeInsets.only(
-                  top: isSmall ? 20 : 28,
-                  bottom: 48,
-                  left: 30,
-                  right: 30,
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: iconSize,
-                      height: iconSize,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.18),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.35),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.sms_outlined,
-                        color: Colors.white,
-                        size: isSmall ? 24 : 30,
-                      ),
-                    ),
-                    SizedBox(height: isSmall ? 14 : 18),
-                    Text(
-                      'OTP Verification',
-                      style: TextStyle(
-                        fontSize: titleFontSize,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    SizedBox(height: isSmall ? 6 : 10),
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
-                        style: TextStyle(
-                          fontSize: subFontSize,
-                          color: Colors.white70,
-                          height: 1.55,
-                        ),
-                        children: [
-                          const TextSpan(text: 'We sent a 6-digit code to\n'),
-                          TextSpan(
-                            text: '+91 $maskedNumber',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Curved white bottom
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Container(
-                  height: 28,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(28),
-                      topRight: Radius.circular(28),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(20, isVerySmall ? 12 : 22, 20, 32),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // ── Hero icon ────────────────────────────────────────
+          _OtpHeroIcon(small: isVerySmall),
+          SizedBox(height: isVerySmall ? 14 : 20),
+
+          // ── Title + subtitle ─────────────────────────────────
+          Text(
+            'Enter the 6-digit code',
+            style: TextStyle(
+              fontSize: isVerySmall ? 19 : 22,
+              fontWeight: FontWeight.w800,
+              color: kTextPrimary,
+              letterSpacing: -0.4,
+            ),
           ),
-        ),
-
-        // ── WHITE BODY ────────────────────────────────────────────────────
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: size.width * 0.07),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+          const SizedBox(height: 8),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: kTextSecondary,
+                fontWeight: FontWeight.w500,
+                height: 1.5,
+              ),
               children: [
-                SizedBox(height: isSmall ? 20 : 28),
-
-                const Text(
-                  'Enter the 6-digit code',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                const TextSpan(text: "We've sent a verification code to\n"),
+                TextSpan(
+                  text: '+91 $maskedNumber',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
                     color: kTextPrimary,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-
-                SizedBox(height: isSmall ? 20 : 28),
-
-                _OtpBoxRow(
-                  controllers: controllers,
-                  focusNodes: focusNodes,
-                  hasError: hasError,
-                  shakeAnim: shakeAnim,
-                  onOtpChanged: onOtpChanged,
-                  onKeyEvent: onKeyEvent,
-                ),
-
-                _ErrorText(hasError: hasError),
-
-                SizedBox(height: isSmall ? 20 : 28),
-
-                _VerifyButton(
-                  isFilled: isFilled,
-                  isLoading: isLoading,
-                  isDoctor: isDoctor,
-                  onVerify: onVerify,
-                ),
-
-                SizedBox(height: isSmall ? 18 : 24),
-
-                _ResendRow(secondsLeft: secondsLeft, onResend: onResend),
-
-                const Spacer(),
-
-                // Role badge
-                Container(
-                  margin: EdgeInsets.only(bottom: isSmall ? 14 : 24),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: isSmall ? 6 : 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: kPrimary.withOpacity(0.30)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isDoctor
-                            ? Icons.medical_services_outlined
-                            : Icons.person_outline_rounded,
-                        size: 14,
-                        color: kPrimaryDark,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Logging in as ${isDoctor ? 'Doctor' : 'Patient'}',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: kPrimaryDark,
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          SizedBox(height: isVerySmall ? 18 : 26),
+
+          // ── OTP card ─────────────────────────────────────────
+          _OtpCard(
+            controllers: controllers,
+            focusNodes: focusNodes,
+            hasError: hasError,
+            shakeAnim: shakeAnim,
+            onOtpChanged: onOtpChanged,
+            onKeyEvent: onKeyEvent,
+            secondsLeft: secondsLeft,
+            onResend: onResend,
+          ),
+          SizedBox(height: isSmall ? 18 : 24),
+
+          // ── Verify button ────────────────────────────────────
+          _VerifyButton(
+            isFilled: isFilled,
+            isLoading: isLoading,
+            onVerify: onVerify,
+          ),
+          const SizedBox(height: 16),
+
+          // ── Change number link ───────────────────────────────
+          _ChangeNumberLink(
+            mobileNumber: mobileNumber,
+            onTap: () => Navigator.of(context).maybePop(),
+          ),
+          SizedBox(height: isVerySmall ? 14 : 22),
+
+          // ── Secure footer ────────────────────────────────────
+          const _SecureFooter(),
+        ],
+      ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SHARED WIDGETS
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// LANDSCAPE LAYOUT
+// ═════════════════════════════════════════════════════════════════════════════
+class _LandscapeLayout extends StatelessWidget {
+  final bool isDoctor;
+  final String maskedNumber;
+  final String mobileNumber;
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+  final bool hasError;
+  final bool isFilled;
+  final bool isLoading;
+  final int secondsLeft;
+  final Animation<double> shakeAnim;
+  final void Function(int, String) onOtpChanged;
+  final void Function(int, KeyEvent) onKeyEvent;
+  final VoidCallback onVerify;
+  final VoidCallback onResend;
 
+  const _LandscapeLayout({
+    required this.isDoctor,
+    required this.maskedNumber,
+    required this.mobileNumber,
+    required this.controllers,
+    required this.focusNodes,
+    required this.hasError,
+    required this.isFilled,
+    required this.isLoading,
+    required this.secondsLeft,
+    required this.shakeAnim,
+    required this.onOtpChanged,
+    required this.onKeyEvent,
+    required this.onVerify,
+    required this.onResend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 880),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // ── LEFT brand panel ─────────────────────────────────
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _OtpHeroIcon(small: true),
+                    const SizedBox(height: 18),
+                    const Text(
+                      'Enter the\n6-digit code',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        height: 1.15,
+                        letterSpacing: -0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          color: kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                          height: 1.55,
+                        ),
+                        children: [
+                          const TextSpan(
+                              text: "We've sent a verification code to\n"),
+                          TextSpan(
+                            text: '+91 $maskedNumber',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: kTextPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    _ChangeNumberLink(
+                      mobileNumber: mobileNumber,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── RIGHT form panel ─────────────────────────────────
+            Expanded(
+              flex: 5,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _OtpCard(
+                      controllers: controllers,
+                      focusNodes: focusNodes,
+                      hasError: hasError,
+                      shakeAnim: shakeAnim,
+                      onOtpChanged: onOtpChanged,
+                      onKeyEvent: onKeyEvent,
+                      secondsLeft: secondsLeft,
+                      onResend: onResend,
+                    ),
+                    const SizedBox(height: 18),
+                    _VerifyButton(
+                      isFilled: isFilled,
+                      isLoading: isLoading,
+                      onVerify: onVerify,
+                    ),
+                    const SizedBox(height: 18),
+                    const _SecureFooter(),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OTP HERO ICON (radial gradient circle with message icon)
+// ═════════════════════════════════════════════════════════════════════════════
+class _OtpHeroIcon extends StatelessWidget {
+  final bool small;
+  const _OtpHeroIcon({this.small = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final double outerSize = small ? 72 : 88;
+    final double iconSize = small ? 30 : 36;
+
+    return Container(
+      width: outerSize,
+      height: outerSize,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          colors: [kPrimaryLight, Colors.white],
+          stops: [0.0, 1.0],
+        ),
+        border: Border.all(color: kPrimary.withOpacity(0.3), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: kPrimary.withOpacity(0.18),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Container(
+          width: outerSize * 0.62,
+          height: outerSize * 0.62,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [kPrimary, kPrimaryDark],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: kPrimary.withOpacity(0.35),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Icon(
+            Icons.sms_outlined,
+            color: Colors.white,
+            size: iconSize,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OTP CARD (white surface containing the input row + resend)
+// ═════════════════════════════════════════════════════════════════════════════
+class _OtpCard extends StatelessWidget {
+  final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
+  final bool hasError;
+  final Animation<double> shakeAnim;
+  final void Function(int, String) onOtpChanged;
+  final void Function(int, KeyEvent) onKeyEvent;
+  final int secondsLeft;
+  final VoidCallback onResend;
+
+  const _OtpCard({
+    required this.controllers,
+    required this.focusNodes,
+    required this.hasError,
+    required this.shakeAnim,
+    required this.onOtpChanged,
+    required this.onKeyEvent,
+    required this.secondsLeft,
+    required this.onResend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: kBorder, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: kTextPrimary.withOpacity(0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Icon(Icons.lock_outline_rounded,
+                    color: kPrimaryDarker, size: 17),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Verification Code',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: kTextPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // OTP boxes
+          _OtpBoxRow(
+            controllers: controllers,
+            focusNodes: focusNodes,
+            hasError: hasError,
+            shakeAnim: shakeAnim,
+            onOtpChanged: onOtpChanged,
+            onKeyEvent: onKeyEvent,
+          ),
+
+          // Error / spacer
+          _ErrorText(hasError: hasError),
+
+          const Divider(color: kBorder, height: 18, thickness: 1),
+
+          // Resend row
+          _ResendRow(secondsLeft: secondsLeft, onResend: onResend),
+        ],
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// OTP BOX ROW
+// ═════════════════════════════════════════════════════════════════════════════
 class _OtpBoxRow extends StatelessWidget {
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
@@ -783,10 +903,11 @@ class _OtpBoxRow extends StatelessWidget {
       },
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final double totalGap = 5 * 8.0;
+          const double gap = 8.0;
+          final double totalGap = gap * 5;
           final double boxWidth =
-              ((constraints.maxWidth - totalGap) / 6).clamp(36.0, 54.0);
-          final double boxHeight = (boxWidth * 1.22).clamp(44.0, 66.0);
+              ((constraints.maxWidth - totalGap) / 6).clamp(36.0, 52.0);
+          final double boxHeight = (boxWidth * 1.22).clamp(46.0, 64.0);
 
           return Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -808,6 +929,9 @@ class _OtpBoxRow extends StatelessWidget {
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// ERROR TEXT
+// ═════════════════════════════════════════════════════════════════════════════
 class _ErrorText extends StatelessWidget {
   final bool hasError;
   const _ErrorText({required this.hasError});
@@ -820,83 +944,126 @@ class _ErrorText extends StatelessWidget {
           ? Padding(
               key: const ValueKey('error'),
               padding: const EdgeInsets.only(top: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.error_outline_rounded, color: kError, size: 15),
-                  SizedBox(width: 5),
-                  Text(
-                    'Incorrect OTP. Please try again.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: kError,
-                      fontWeight: FontWeight.w500,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                decoration: BoxDecoration(
+                  color: kRedLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kError.withOpacity(0.35)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.error_outline_rounded,
+                        color: kError, size: 15),
+                    SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Incorrect OTP. Please try again.',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFFC53030),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             )
-          : const SizedBox(key: ValueKey('no-error'), height: 12),
+          : const SizedBox(key: ValueKey('no-error'), height: 6),
     );
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// VERIFY BUTTON (gradient CTA)
+// ═════════════════════════════════════════════════════════════════════════════
 class _VerifyButton extends StatelessWidget {
   final bool isFilled;
   final bool isLoading;
-  final bool isDoctor;
   final VoidCallback onVerify;
 
   const _VerifyButton({
     required this.isFilled,
     required this.isLoading,
-    required this.isDoctor,
     required this.onVerify,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: isFilled ? 1.0 : 0.5,
-      duration: const Duration(milliseconds: 250),
-      child: SizedBox(
-        width: double.infinity,
-        height: 54,
-        child: ElevatedButton(
-          onPressed: (isFilled && !isLoading) ? onVerify : null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kPrimary,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: kPrimaryLight,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-          child: isLoading
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2.5,
-                  ),
-                )
-              : const Text(
-                  'Verify OTP',
-                  style: TextStyle(
-                    fontSize: 15.5,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                    letterSpacing: 0.2,
-                  ),
+    final bool enabled = isFilled && !isLoading;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: enabled
+            ? const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [kPrimary, kPrimaryDark],
+              )
+            : null,
+        color: enabled ? null : kBorderStrong,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: kPrimary.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
+              ]
+            : [],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onVerify : null,
+          borderRadius: BorderRadius.circular(14),
+          child: Center(
+            child: isLoading
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                : Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Verify & Continue',
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: enabled ? Colors.white : kTextMuted,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 19,
+                        color: enabled ? Colors.white : kTextMuted,
+                      ),
+                    ],
+                  ),
+          ),
         ),
       ),
     );
   }
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// RESEND ROW
+// ═════════════════════════════════════════════════════════════════════════════
 class _ResendRow extends StatelessWidget {
   final int secondsLeft;
   final VoidCallback onResend;
@@ -905,44 +1072,75 @@ class _ResendRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         const Text(
           "Didn't receive the code?",
-          style: TextStyle(fontSize: 13, color: kTextSecondary),
+          style: TextStyle(
+            fontSize: 12.5,
+            color: kTextSecondary,
+            fontWeight: FontWeight.w500,
+          ),
         ),
-        const SizedBox(height: 8),
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
           child: secondsLeft > 0
-              ? Row(
+              ? Container(
                   key: const ValueKey('timer'),
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.timer_outlined,
-                        size: 14, color: kTextMuted),
-                    const SizedBox(width: 5),
-                    Text(
-                      'Resend in ${secondsLeft}s',
-                      style: const TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                        color: kTextMuted,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: kBgSoft,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: kBorderStrong),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.timer_outlined,
+                          size: 12, color: kTextMuted),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${secondsLeft}s',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSecondary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 )
-              : GestureDetector(
+              : Material(
                   key: const ValueKey('resend'),
-                  onTap: onResend,
-                  child: const Text(
-                    'Resend OTP',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      color: kPrimary,
-                      decoration: TextDecoration.underline,
-                      decorationColor: kPrimary,
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onResend,
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 11, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: kPrimaryLight,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.refresh_rounded,
+                              size: 13, color: kPrimaryDarker),
+                          SizedBox(width: 4),
+                          Text(
+                            'Resend',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              color: kPrimaryDarker,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -952,9 +1150,84 @@ class _ResendRow extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
+// CHANGE NUMBER LINK
+// ═════════════════════════════════════════════════════════════════════════════
+class _ChangeNumberLink extends StatelessWidget {
+  final String mobileNumber;
+  final VoidCallback onTap;
+
+  const _ChangeNumberLink({
+    required this.mobileNumber,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: const [
+              Icon(Icons.edit_outlined, size: 14, color: kTextSecondary),
+              SizedBox(width: 5),
+              Text(
+                'Wrong number? ',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: kTextSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                'Change',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: kPrimaryDarker,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// SECURE FOOTER
+// ═════════════════════════════════════════════════════════════════════════════
+class _SecureFooter extends StatelessWidget {
+  const _SecureFooter();
+
+  @override
+  Widget build(BuildContext context) => const Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
+          SizedBox(width: 6),
+          Text(
+            'Protected by end-to-end encryption',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: kTextMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // SINGLE OTP BOX
-// ─────────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════════
 class _OtpBox extends StatefulWidget {
   const _OtpBox({
     required this.controller,
@@ -984,40 +1257,73 @@ class _OtpBoxState extends State<_OtpBox> {
   @override
   void initState() {
     super.initState();
-    widget.focusNode.addListener(() {
-      setState(() => _isFocused = widget.focusNode.hasFocus);
-    });
+    widget.focusNode.addListener(_handleFocus);
+  }
+
+  void _handleFocus() {
+    if (!mounted) return;
+    setState(() => _isFocused = widget.focusNode.hasFocus);
+  }
+
+  @override
+  void dispose() {
+    widget.focusNode.removeListener(_handleFocus);
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final filled = widget.controller.text.isNotEmpty;
-    final double fontSize = (widget.boxWidth * 0.48).clamp(16.0, 24.0);
+    final double fontSize = (widget.boxWidth * 0.46).clamp(16.0, 22.0);
+
+    final Color bg;
+    final Color borderColor;
+    final double borderWidth;
+    final Color textColor;
+
+    if (widget.hasError) {
+      bg = kRedLight;
+      borderColor = kError;
+      borderWidth = 1.6;
+      textColor = const Color(0xFFC53030);
+    } else if (_isFocused) {
+      bg = kPrimaryLight.withOpacity(0.5);
+      borderColor = kPrimary;
+      borderWidth = 1.8;
+      textColor = kPrimaryDarker;
+    } else if (filled) {
+      bg = kPrimaryLight;
+      borderColor = kPrimary.withOpacity(0.5);
+      borderWidth = 1.4;
+      textColor = kPrimaryDarker;
+    } else {
+      bg = kBgSoft;
+      borderColor = kBorderStrong;
+      borderWidth = 1;
+      textColor = kTextPrimary;
+    }
 
     return KeyboardListener(
       focusNode: FocusNode(),
       onKeyEvent: widget.onKeyEvent,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
         width: widget.boxWidth,
         height: widget.boxHeight,
         decoration: BoxDecoration(
-          color: widget.hasError
-              ? kRedLight
-              : filled
-                  ? kPrimaryLight
-                  : kBorder,
+          color: bg,
           borderRadius: BorderRadius.circular(13),
-          border: Border.all(
-            color: widget.hasError
-                ? kError
-                : _isFocused
-                    ? kPrimary
-                    : filled
-                        ? kPrimaryDark.withOpacity(0.4)
-                        : kDivider,
-            width: _isFocused ? 2 : 1.5,
-          ),
+          border: Border.all(color: borderColor, width: borderWidth),
+          boxShadow: _isFocused && !widget.hasError
+              ? [
+                  BoxShadow(
+                    color: kPrimary.withOpacity(0.15),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  ),
+                ]
+              : [],
         ),
         child: TextField(
           controller: widget.controller,
@@ -1029,7 +1335,7 @@ class _OtpBoxState extends State<_OtpBox> {
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w800,
-            color: widget.hasError ? kError : kPrimary,
+            color: textColor,
             height: 1,
           ),
           decoration: const InputDecoration(
