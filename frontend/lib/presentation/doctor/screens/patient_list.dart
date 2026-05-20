@@ -631,6 +631,37 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   }
 
   Future<void> _onQueueStop(int? queueId) async {
+    // Compute patients that will be cancelled on stop:
+    //   • queue's own pending (booked / in_progress)
+    //   • earlier-time slot patients still pending (booked / skipped)
+    final vmState     = ref.read(appointmentViewModelProvider);
+    final allPatients = vmState.patientAppointmentsList.value ?? <AppointmentList>[];
+    final sessions    = vmState.todayQueueResult?.value ?? [];
+
+    final matchingSession = sessions.where((s) => s.queueId == queueId).toList();
+    final queueStartTime  = matchingSession.isEmpty
+        ? null
+        : DateTime.tryParse(matchingSession.first.startTime ?? '');
+
+    final queuePending = allPatients.where((p) {
+      if (p.queueId != queueId) return false;
+      final st = (p.status?.toLowerCase() ?? '');
+      return st == 'booked' || st == 'in_progress';
+    }).length;
+
+    final earlierSlotPatients = queueStartTime == null
+        ? <AppointmentList>[]
+        : allPatients.where((p) {
+            if (p.bookingType != 2) return false;
+            final st = (p.status?.toLowerCase() ?? '');
+            if (st != 'booked' && st != 'skipped') return false;
+            final pTime = DateTime.tryParse(p.startTime ?? '');
+            return pTime != null && pTime.isBefore(queueStartTime);
+          }).toList();
+    final earlierSlotPending = earlierSlotPatients.length;
+
+    final totalCancel = queuePending + earlierSlotPending;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
@@ -651,6 +682,39 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
             const Text('Are you sure you want to close this queue?',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: kTextSecondary, height: 1.5)),
+            if (totalCancel > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kAmberLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kAmberBorder),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.warning_amber_rounded, size: 16, color: kAmberDark),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(
+                        '$totalCancel patient${totalCancel == 1 ? '' : 's'} will be cancelled',
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700, color: kAmberDark),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        queuePending > 0 && earlierSlotPending > 0
+                            ? '$queuePending from this queue · $earlierSlotPending from earlier slots'
+                            : queuePending > 0
+                                ? '$queuePending pending in this queue'
+                                : '$earlierSlotPending pending in earlier slots',
+                        style: const TextStyle(fontSize: 11, color: kAmberDark, height: 1.3),
+                      ),
+                    ]),
+                  ),
+                ]),
+              ),
+            ],
             const SizedBox(height: 20),
             Row(children: [
               Expanded(child: OutlinedButton(
@@ -1092,7 +1156,15 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleSessions = widget.allSessions.where(_shouldShow).toList();
+    final visibleSessions = widget.allSessions.where(_shouldShow).toList()
+      ..sort((a, b) {
+        final aTime = DateTime.tryParse(a.startTime as String? ?? '');
+        final bTime = DateTime.tryParse(b.startTime as String? ?? '');
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+        return aTime.compareTo(bTime);
+      });
 
     final slotPatients = widget.todayPatients
         .where((p) => p.bookingType == 2)
@@ -1116,8 +1188,40 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
       );
     }
 
-    final items = _buildItems(visibleSessions);
-    final itemCount = items.length + slotGroups.length;
+    final queueItems = _buildItems(visibleSessions);
+
+    // Merge queue items and slot-booking groups, then sort by earliest startTime
+    // so cards render in chronological order regardless of source type.
+    final unified = <Object>[...queueItems, ...slotGroups];
+
+    DateTime? startTimeOf(Object obj) {
+      if (obj is _StandaloneSessionItem) {
+        return DateTime.tryParse(obj.session.startTime as String? ?? '');
+      }
+      if (obj is _SlotGroupItem) {
+        DateTime? earliest;
+        for (final s in obj.sessions) {
+          final t = DateTime.tryParse(s.startTime as String? ?? '');
+          if (t != null && (earliest == null || t.isBefore(earliest))) earliest = t;
+        }
+        return earliest;
+      }
+      final g = obj as ({int? slotId, List<AppointmentList> patients});
+      if (g.patients.isEmpty) return null;
+      return DateTime.tryParse(g.patients.first.startTime ?? '');
+    }
+
+    unified.sort((a, b) {
+      final aT = startTimeOf(a);
+      final bT = startTimeOf(b);
+      if (aT == null && bT == null) return 0;
+      if (aT == null) return 1;
+      if (bT == null) return -1;
+      return aT.compareTo(bT);
+    });
+
+    // Index of the first queue item (slot bookings don't participate in lock chain)
+    final firstQueueIdx = unified.indexWhere((obj) => obj is _ListItem);
 
     return RefreshIndicator(
       color: kPrimary,
@@ -1125,41 +1229,19 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
       onRefresh: widget.onRefresh,
       child: ListView.builder(
         padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + widget.extraBottom),
-        itemCount: itemCount,
+        itemCount: unified.length,
         itemBuilder: (_, i) {
-          // One _SlotBookingsSection per slot group, rendered after queue-session items
-          if (i >= items.length) {
-            final group     = slotGroups[i - items.length];
-            final groupKey  = group.slotId ?? -1;
-            final isExpanded = _slotGroupExpanded[groupKey] ?? true;
-            return _SlotBookingsSection(
-              slotId: group.slotId,
-              patients: group.patients,
-              isExpanded: isExpanded,
-              onToggle: () => setState(
-                () => _slotGroupExpanded[groupKey] = !isExpanded,
-              ),
-              selected: widget.selected,
-              onStart: widget.onStart,
-              onSkip: widget.onSkip,
-              onPrescription: widget.onPrescription,
-              onCancel: widget.onCancel,
-              onSelect: widget.onSelect,
-              qs: widget.qs,
-            );
-          }
+          final obj = unified[i];
 
-          final item = items[i];
-
-          if (item is _SlotGroupItem) {
-            final isGroupExpanded = _slotGroupExpanded[item.slotId] ?? true;
+          if (obj is _SlotGroupItem) {
+            final isGroupExpanded = _slotGroupExpanded[obj.slotId] ?? true;
             return _QueueSlotSection(
-              key: ValueKey('qslot_${item.slotId}'),
-              slotId: item.slotId,
-              sessions: item.sessions,
+              key: ValueKey('qslot_${obj.slotId}'),
+              slotId: obj.slotId,
+              sessions: obj.sessions,
               isExpanded: isGroupExpanded,
               onToggle: () => setState(
-                () => _slotGroupExpanded[item.slotId] = !isGroupExpanded,
+                () => _slotGroupExpanded[obj.slotId] = !isGroupExpanded,
               ),
               todayPatients: widget.todayPatients,
               selected: widget.selected,
@@ -1172,15 +1254,36 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
               onQueueStart: widget.onQueueStart,
               onQueuePause: widget.onQueuePause,
               onQueueStop: widget.onQueueStop,
+              controlsEnabled: i == firstQueueIdx,
             );
           }
 
-          // Standalone session (no slotId)
-          final standaloneItem = item as _StandaloneSessionItem;
-          return _buildSessionAccordion(
-            session: standaloneItem.session,
-            sessionIndex: standaloneItem.globalIndex,
-            visibleSessions: visibleSessions,
+          if (obj is _StandaloneSessionItem) {
+            return _buildSessionAccordion(
+              session: obj.session,
+              sessionIndex: obj.globalIndex,
+              visibleSessions: visibleSessions,
+            );
+          }
+
+          // Slot bookings (bookingType == 2) — no queue controls
+          final group     = obj as ({int? slotId, List<AppointmentList> patients});
+          final groupKey  = group.slotId ?? -1;
+          final isExpanded = _slotGroupExpanded[groupKey] ?? true;
+          return _SlotBookingsSection(
+            slotId: group.slotId,
+            patients: group.patients,
+            isExpanded: isExpanded,
+            onToggle: () => setState(
+              () => _slotGroupExpanded[groupKey] = !isExpanded,
+            ),
+            selected: widget.selected,
+            onStart: widget.onStart,
+            onSkip: widget.onSkip,
+            onPrescription: widget.onPrescription,
+            onCancel: widget.onCancel,
+            onSelect: widget.onSelect,
+            qs: widget.qs,
           );
         },
       ),
@@ -1289,6 +1392,7 @@ class _QueueSlotSection extends StatelessWidget {
   final Future<void> Function(int? queueId) onQueueStart;
   final Future<void> Function(int? queueId) onQueuePause;
   final Future<void> Function(int? queueId) onQueueStop;
+  final bool controlsEnabled;
 
   const _QueueSlotSection({
     super.key,
@@ -1306,6 +1410,7 @@ class _QueueSlotSection extends StatelessWidget {
     required this.onQueueStart,
     required this.onQueuePause,
     required this.onQueueStop,
+    required this.controlsEnabled,
     this.onSelect,
   });
 
@@ -1472,7 +1577,7 @@ class _QueueSlotSection extends StatelessWidget {
                       qs: qs,
                       onStart: onStart,
                       onSkip: onSkip,
-                      controlsEnabled: true,
+                      controlsEnabled: controlsEnabled,
                       onQueueStart: () => onQueueStart(queueId),
                       onQueuePause: () => onQueuePause(queueId),
                       onQueueStop:  () => onQueueStop(queueId),
