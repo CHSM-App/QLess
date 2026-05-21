@@ -24,17 +24,19 @@ router.post('/insertMedicine', async (req, res) => {
   try {
     const request = db.request();
 
-    request.input('operation', 'Insert'); 
+    request.input('operation', 'Insert');
     request.input('doctor_id', doctor_id);
     request.input('medicine_name', medicine_name);
     request.input('medicine_type_id', medicine_type_id);
 
-    // Execute stored procedure
     const result = await request.execute('sp_Medicine_Master');
 
-    res.status(200).json({
-      success: 1,
-      message: 'Medicine inserted successfully',
+    const message = result.recordset?.[0]?.Message || 'Medicine inserted successfully';
+    const isDuplicate = message.toLowerCase().includes('already exists');
+
+    res.status(isDuplicate ? 409 : 200).json({
+      success: isDuplicate ? 0 : 1,
+      message,
       data: result.recordset,
     });
 
