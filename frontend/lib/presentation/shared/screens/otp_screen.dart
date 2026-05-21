@@ -265,27 +265,32 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: kBg,
-      appBar: _SimpleTitleBar(
-        title: 'Verify Your Number',
-        subtitle: 'Enter the code we just sent',
-        isDoctor: _isDoctor,
-        onBack: () => Navigator.pop(context),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
       ),
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.dark,
-        ),
-        child: SafeArea(
-          top: false,
-          child: FadeTransition(
-            opacity: _fadeAnim,
-            child: SlideTransition(
-              position: _slideAnim,
-              child: Builder(
-                builder: (context) {
+      child: Scaffold(
+        backgroundColor: kBg,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _SimpleTitleBar(
+                title: 'Verify Your Number',
+                subtitle: 'Enter the code we just sent',
+                isDoctor: _isDoctor,
+                onBack: () => Navigator.pop(context),
+              ),
+              Expanded(
+                child: FadeTransition(
+                  opacity: _fadeAnim,
+                  child: SlideTransition(
+                    position: _slideAnim,
+                    child: Builder(
+                      builder: (context) {
                   // Decide layout from the physical screen size, NOT the
                   // keyboard-shrunk viewport. Otherwise opening the number
                   // keypad shrinks the height below the width and flips
@@ -329,9 +334,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
                     onVerify: _verifyOtp,
                     onResend: _resendOtp,
                   );
-                },
+                      },
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
@@ -363,17 +371,15 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
     return Material(
       color: kSurface,
       elevation: 0,
-      child: SafeArea(
-        bottom: false,
-        child: Container(
-          height: 68,
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          decoration: const BoxDecoration(
-            color: kSurface,
-            border: Border(bottom: BorderSide(color: kBorder, width: 1)),
-          ),
-          child: Row(
-            children: [
+      child: Container(
+        height: 68,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        decoration: const BoxDecoration(
+          color: kSurface,
+          border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+        ),
+        child: Row(
+          children: [
               Material(
                 color: kBgSoft,
                 shape: RoundedRectangleBorder(
@@ -451,8 +457,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                   ],
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

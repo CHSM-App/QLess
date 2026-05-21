@@ -209,26 +209,37 @@ final showAppBar = false;
   // ── MOBILE layout: floating pill nav ──────────────────────────────────────
 
   Widget _buildMobileLayout(bool showAppBar) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      extendBody: true,
-      extendBodyBehindAppBar: true,
-appBar: null,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _pages,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        extendBody: true,
+        appBar: null,
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: SafeArea(
+                bottom: false,
+                child: IndexedStack(
+                  index: _currentIndex,
+                  children: _pages,
+                ),
+              ),
             ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _buildPillNav(),
-          ),
-        ],
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _buildPillNav(),
+            ),
+          ],
+        ),
       ),
     );
   }

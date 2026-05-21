@@ -390,7 +390,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  // ── Header — matches DoctorMedicinePage _buildHeader exactly ─────────────
+  // ── Header — compact, matched to home_screen aesthetic ──────────────────
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -401,24 +401,21 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: Row(
             children: [
-              // Icon badge — 34×34, same as medicine page
               Container(
-                width: 34,
-                height: 34,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: kPrimaryLight,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kPrimary.withOpacity(0.2)),
+                  gradient: kPrimaryGradient,
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: const Icon(Icons.settings_outlined,
-                    color: kPrimary, size: 17),
+                alignment: Alignment.center,
+                child: const Icon(Icons.settings_rounded,
+                    color: Colors.white, size: 15),
               ),
-              const SizedBox(width: 8),
-
-              // Title + subtitle — same font sizes (16 / 11) as medicine page
+              const SizedBox(width: 10),
               const Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -426,17 +423,20 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                     Text(
                       'Settings',
                       style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
                         color: kTextPrimary,
+                        letterSpacing: -0.2,
+                        height: 1.15,
                       ),
                     ),
                     SizedBox(height: 1),
                     Text(
                       'Manage your account & preferences',
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10.5,
                         color: kTextSecondary,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ],
@@ -459,9 +459,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     int? reviewCount,
     double? avgRating,
   }) {
-    final hPad = isTablet ? 20.0 : 14.0;
+    final hPad = isTablet ? 18.0 : 12.0;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(hPad, 14, hPad, 100),
+      padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 90),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -469,22 +469,16 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
               patientCount: patientCount,
               reviewCount: reviewCount,
               avgRating: avgRating),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           _sectionLabel('Account'),
           _buildAccountSection(s, d),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           _sectionLabel('Availability'),
           _buildAvailabilityCard(),
-          const SizedBox(height: 14),
-          // _sectionLabel('Notifications'),
-          // _buildNotificationsCard(),
-          // const SizedBox(height: 14),
-          // _sectionLabel('Appearance'),
-          // _buildAppearanceCard(),
-          // const SizedBox(height: 14),
+          const SizedBox(height: 10),
           _sectionLabel('Support'),
           _buildSupportCard(),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           _buildLogoutButton(),
         ],
       ),
@@ -506,101 +500,118 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       decoration: _cardDec(),
       clipBehavior: Clip.antiAlias,
       child: Column(children: [
-        // Teal gradient strip
+        // Gradient strip
         Container(
-          height: 60,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [kPrimary, kPrimaryDark],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
+          height: 48,
+          decoration: const BoxDecoration(gradient: kPrimaryGradient),
         ),
 
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           child: Column(children: [
             // Avatar overlapping strip
             Transform.translate(
-              offset: const Offset(0, -30),
+              offset: const Offset(0, -26),
               child: Stack(alignment: Alignment.bottomRight, children: [
                 Container(
-                  width: 60,
-                  height: 60,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                        colors: [kPrimary, kPrimaryDark],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
-                    border: Border.all(color: Colors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                          color: kPrimary.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3))
-                    ],
+                    gradient: kPrimaryGradient,
+                    border: Border.all(color: Colors.white, width: 2.5),
                   ),
                   alignment: Alignment.center,
-                  child: Text(initials,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
                 ),
                 Container(
-                  width: 18,
-                  height: 18,
+                  width: 16,
+                  height: 16,
                   decoration: BoxDecoration(
                       color: kSuccess,
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2)),
                   child: const Icon(Icons.edit_rounded,
-                      color: Colors.white, size: 9),
+                      color: Colors.white, size: 8),
                 ),
               ]),
             ),
 
-            // Name, spec, clinic — pulled up to close gap
             Transform.translate(
-              offset: const Offset(0, -20),
+              offset: const Offset(0, -16),
               child: Column(children: [
                 Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                  Text(name,
+                  Flexible(
+                    child: Text(
+                      name,
                       textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: kTextPrimary,
-                          letterSpacing: -0.2)),
-                  const SizedBox(width: 6),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        letterSpacing: -0.2,
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 5),
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                        color: kPrimaryLight,
-                        borderRadius: BorderRadius.circular(6)),
-                    child: const Text('Verified',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: kPrimary,
-                            fontWeight: FontWeight.w600)),
+                      color: kPrimaryLight,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: kPrimary.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.verified_rounded,
+                            color: kPrimaryDark, size: 10),
+                        SizedBox(width: 3),
+                        Text(
+                          'Verified',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: kPrimaryDark,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ]),
                 const SizedBox(height: 2),
                 Text(
-                  [spec, if (qual.isNotEmpty) qual].join('  ·  '),
+                  [spec, if (qual.isNotEmpty) qual].join(' · '),
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                      fontSize: 12, color: kTextSecondary),
+                    fontSize: 11,
+                    color: kTextSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 if (clinic.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(clinic,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 11, color: kTextMuted)),
+                  const SizedBox(height: 1),
+                  Text(
+                    clinic,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: kTextMuted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 10),
                 _statsRow(d,
@@ -612,47 +623,68 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                 Row(
                   children: [
                     Expanded(
-                      child: SizedBox(
-                        height: 36,
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              Navigator.of(context, rootNavigator: true).push(
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        const DoctorEditProfilePage()),
-                              ).then((_) {
-                                if (mounted) _refreshProfile();
-                              }),
-                          icon: const Icon(Icons.edit_outlined, size: 13),
-                          label: const Text('Edit Profile',
-                              style: TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: kPrimary,
-                            side: const BorderSide(color: kPrimary),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            padding: EdgeInsets.zero,
+                      child: GestureDetector(
+                        onTap: () => Navigator.of(context, rootNavigator: true)
+                            .push(MaterialPageRoute(
+                                builder: (_) => const DoctorEditProfilePage()))
+                            .then((_) {
+                          if (mounted) _refreshProfile();
+                        }),
+                        child: Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            gradient: kPrimaryGradient,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.edit_rounded,
+                                  size: 12, color: Colors.white),
+                              SizedBox(width: 5),
+                              Text(
+                                'Edit Profile',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: SizedBox(
-                        height: 36,
-                        child: OutlinedButton.icon(
-                          onPressed: _showReviewsSheet,
-                          icon: const Icon(Icons.star_outline_rounded, size: 13),
-                          label: const Text('Reviews',
-                              style: TextStyle(
-                                  fontSize: 12, fontWeight: FontWeight.w600)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: kWarning,
-                            side: const BorderSide(color: kWarning),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                            padding: EdgeInsets.zero,
+                      child: GestureDetector(
+                        onTap: _showReviewsSheet,
+                        child: Container(
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: kAmberLight,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kWarning.withOpacity(0.4)),
+                          ),
+                          alignment: Alignment.center,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(Icons.star_rounded,
+                                  size: 13, color: kAmberDark),
+                              SizedBox(width: 5),
+                              Text(
+                                'Reviews',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: kAmberDark,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -695,18 +727,30 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   }
 
   Widget _statItem(String v, String l) => Column(children: [
-        Text(v,
-            style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: kTextPrimary)),
+        Text(
+          v,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            color: kTextPrimary,
+            letterSpacing: -0.2,
+            height: 1.1,
+          ),
+        ),
         const SizedBox(height: 2),
-        Text(l,
-            style: const TextStyle(fontSize: 10, color: kTextMuted)),
+        Text(
+          l,
+          style: const TextStyle(
+            fontSize: 9.5,
+            color: kTextMuted,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+          ),
+        ),
       ]);
 
   Widget _vDiv() =>
-      Container(height: 26, width: 1, color: kBorder);
+      Container(height: 22, width: 1, color: kHairline);
 
   // ── Account Section ───────────────────────────────────────────────────────
 
@@ -1567,14 +1611,28 @@ Widget _buildAvailabilityCard() => Container(
       );
 
   Widget _sectionLabel(String title) => Padding(
-        padding: const EdgeInsets.only(left: 2, bottom: 8),
-        child: Text(
-          title.toUpperCase(),
-          style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: kTextMuted,
-              letterSpacing: 1.0),
+        padding: const EdgeInsets.only(left: 2, bottom: 6),
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: 12,
+              decoration: BoxDecoration(
+                gradient: kPrimaryGradient,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: kTextPrimary,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
         ),
       );
 }
@@ -2306,56 +2364,47 @@ class _SkeletonProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: kCardGlassGradient,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
+          border: Border.all(color: kHairline),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(children: [
-          // gradient strip placeholder
-          Container(height: 60, color: const Color(0xFFE2E8F0)),
+          Container(height: 48, color: const Color(0xFFE2E8F0)),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Column(children: [
               Transform.translate(
-                offset: const Offset(0, -30),
+                offset: const Offset(0, -26),
                 child: Container(
-                  width: 60,
-                  height: 60,
+                  width: 52,
+                  height: 52,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: const Color(0xFFE2E8F0),
-                    border: Border.all(color: Colors.white, width: 3),
+                    border: Border.all(color: Colors.white, width: 2.5),
                   ),
                 ),
               ),
               Transform.translate(
-                offset: const Offset(0, -20),
+                offset: const Offset(0, -16),
                 child: Column(children: const [
-                  _Shimmer(width: 140, height: 14),
-                  SizedBox(height: 8),
-                  _Shimmer(width: 100, height: 11),
+                  _Shimmer(width: 130, height: 13),
+                  SizedBox(height: 6),
+                  _Shimmer(width: 90, height: 10),
                   SizedBox(height: 4),
-                  _Shimmer(width: 80, height: 10),
-                  SizedBox(height: 14),
-                  // stats row
+                  _Shimmer(width: 70, height: 9),
+                  SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _Shimmer(width: 50, height: 30),
-                      _Shimmer(width: 50, height: 30),
-                      _Shimmer(width: 50, height: 30),
+                      _Shimmer(width: 44, height: 26),
+                      _Shimmer(width: 44, height: 26),
+                      _Shimmer(width: 44, height: 26),
                     ],
                   ),
-                  SizedBox(height: 14),
-                  _Shimmer(
-                      width: double.infinity, height: 36, radius: 10),
+                  SizedBox(height: 12),
+                  _Shimmer(width: double.infinity, height: 32, radius: 10),
                 ]),
               ),
             ]),
@@ -2387,15 +2436,9 @@ class _SkeletonTileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: kCardGlassGradient,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
+          border: Border.all(color: kHairline),
         ),
         child: Column(
           children: List.generate(rows, (i) {
