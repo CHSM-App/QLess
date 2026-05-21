@@ -48,6 +48,19 @@ const kInfo           = Color(0xFF3B82F6);
 const kInfoLight      = Color(0xFFDBEAFE);
 const kInfoDark       = Color(0xFF1E40AF);
 
+// ── Premium medical surface tokens (matched to home_screen) ─────────────────
+const kHairline       = Color(0xFFE8EEF1);
+const LinearGradient kPrimaryGradient = LinearGradient(
+  colors: [_kGradFrom, _kGradTo],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+const LinearGradient kCardGlassGradient = LinearGradient(
+  colors: [Colors.white, Color(0xFFFBFEFD)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
 const _kBottomClear = 100.0;
 const _kWideBreak   = 800.0;
 const _kDeskSide    = 240.0;
@@ -1228,7 +1241,7 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
       strokeWidth: 2.5,
       onRefresh: widget.onRefresh,
       child: ListView.builder(
-        padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + widget.extraBottom),
+        padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + widget.extraBottom),
         itemCount: unified.length,
         itemBuilder: (_, i) {
           final obj = unified[i];
@@ -1454,6 +1467,11 @@ class _QueueSlotSection extends StatelessWidget {
     final active  = _activeSession;
     final queueId = active != null ? (active.queueId as int?) : null;
     final allPts  = _allPatients;
+
+    // Defensive: never render a card for a closed/empty queue slot.
+    if (sessions.isEmpty || qs == QueueState.stopped) {
+      return const SizedBox.shrink();
+    }
 
     final (Color hBg, Color hFg, Color hDot) = switch (qs) {
       QueueState.running => (kPrimaryLighter, kPrimaryDark, kPrimary),
@@ -1726,6 +1744,10 @@ class _SessionAccordion extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Defensive: a closed (stopped) session should not be visible.
+    if (queueState == QueueState.stopped) {
+      return const SizedBox.shrink();
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
       child: Container(
@@ -2013,6 +2035,10 @@ class _LiveQueueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A closed queue should not show its live card at all.
+    if (qs == QueueState.stopped) {
+      return const SizedBox.shrink();
+    }
     final ip = patients.firstWhere(
       (p) => (p.status?.toLowerCase() ?? '') == 'in_progress',
       orElse: () => AppointmentList(),
@@ -2352,7 +2378,10 @@ class _PatientListBody extends ConsumerWidget {
         ? patients.where((p) => p.appointmentId != currentAppointmentId).toList()
         : patients;
 
-    final hdrCount = isToday ? 2 : 1;
+    // Hide the live queue card when the queue is stopped — a closed queue
+    // shouldn't keep showing its status header on the patient list.
+    final showLiveCard = isToday && qs != QueueState.stopped;
+    final hdrCount = isToday ? (showLiveCard ? 2 : 1) : 1;
 
     return RefreshIndicator(
       color: kPrimary,
@@ -2364,10 +2393,10 @@ class _PatientListBody extends ConsumerWidget {
         await Future.delayed(const Duration(milliseconds: 600));
       },
       child: ListView.builder(
-        padding: EdgeInsets.fromLTRB(14, 10, 14, 12 + extraBottom),
+        padding: EdgeInsets.fromLTRB(12, 8, 12, 10 + extraBottom),
         itemCount: displayPatients.length + hdrCount,
         itemBuilder: (ctx, i) {
-          if (i == 0 && isToday)
+          if (i == 0 && showLiveCard)
             return _LiveQueueCard(
               patients: patients, qs: qs,
               onStart: onStart, onSkip: onSkip,
@@ -2377,7 +2406,7 @@ class _PatientListBody extends ConsumerWidget {
               onQueueStop: () {},
             );
 
-          if ((isToday && i == 1) || (!isToday && i == 0)) {
+          if ((showLiveCard && i == 1) || (!showLiveCard && i == 0)) {
             final title = switch (tab) {
               _Tab.today     => 'Waiting',
               _Tab.upcoming  => 'Upcoming',
@@ -2410,17 +2439,20 @@ class _PatientListBody extends ConsumerWidget {
             }
           }
 
-          return _PatientCard(
-            key: ValueKey(p.appointmentId),
-            patient: p, tab: tab,
-            accessible: accessible,
-            selected: selected?.appointmentId == p.appointmentId,
-            onTap: onSelect != null ? () => onSelect!(p) : null,
-            onStart: () => onStart(p),
-            onSkip: accessible && tab == _Tab.today && status == 'booked' ? () => onSkip(p) : null,
-            onPrescription: () => onPrescription(p),
-            onCancel: () => onCancel(p),
-            onView: onView != null ? () => onView!(p) : null,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _PatientCard(
+              key: ValueKey(p.appointmentId),
+              patient: p, tab: tab,
+              accessible: accessible,
+              selected: selected?.appointmentId == p.appointmentId,
+              onTap: onSelect != null ? () => onSelect!(p) : null,
+              onStart: () => onStart(p),
+              onSkip: accessible && tab == _Tab.today && status == 'booked' ? () => onSkip(p) : null,
+              onPrescription: () => onPrescription(p),
+              onCancel: () => onCancel(p),
+              onView: onView != null ? () => onView!(p) : null,
+            ),
           );
         },
       ),
@@ -2442,42 +2474,34 @@ class _PillTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         color: Colors.white,
-        padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
         child: Container(
+          height: 38,
           decoration: BoxDecoration(
             color: const Color(0xFFF0F5F3),
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: kHairline),
           ),
           child: TabBar(
             controller: controller,
-            labelColor: kPrimaryDark,
+            labelColor: Colors.white,
             unselectedLabelColor: kTextSecondary,
-            // Each tab takes exactly 1/3 — indicator fills the full tab cell
             indicatorSize: TabBarIndicatorSize.tab,
             indicator: BoxDecoration(
-              color: Colors.white,
-              // Must be (outerRadius - padding) so it sits flush inside
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.07),
-                  blurRadius: 6,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+              gradient: kPrimaryGradient,
+              borderRadius: BorderRadius.circular(17),
             ),
-            // 4px inset on all sides keeps a visible outer pill gap
-            indicatorPadding: const EdgeInsets.all(4),
+            indicatorPadding: const EdgeInsets.all(3),
             labelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.1,
             ),
             unselectedLabelStyle: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
             ),
             dividerColor: Colors.transparent,
-            // Removes ripple that bleeds outside the pill shape
             splashFactory: NoSplash.splashFactory,
             overlayColor: WidgetStateProperty.all(Colors.transparent),
             tabs: [
@@ -2763,25 +2787,18 @@ class _PatientCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
-          color: kBg,
+          gradient: kCardGlassGradient,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? kPrimary : highlightBorder ? const Color(0xFF0E9384) : kBorder,
-            width: selected ? 1.5 : highlightBorder ? 2 : 1,
+            color: selected
+                ? kPrimary
+                : highlightBorder
+                    ? const Color(0xFF0E9384)
+                    : kHairline,
+            width: selected ? 1.5 : highlightBorder ? 1.5 : 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: selected
-                  ? kPrimary.withOpacity(0.10)
-                  : highlightBorder
-                      ? const Color(0xFF0E9384).withOpacity(0.14)
-                      : Colors.black.withOpacity(0.03),
-              blurRadius: selected || highlightBorder ? 10 : 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
-        padding: const EdgeInsets.all(11),
+        padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2789,13 +2806,26 @@ class _PatientCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(color: av.bg, borderRadius: BorderRadius.circular(11)),
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [av.bg, Colors.white],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(color: av.fg.withOpacity(0.18)),
+                  ),
                   alignment: Alignment.center,
                   child: Text(
                     _inits,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: av.fg),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: av.fg,
+                      letterSpacing: 0.4,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 9),
@@ -2805,11 +2835,24 @@ class _PatientCard extends StatelessWidget {
                     children: [
                       Text(
                         patient.patientName ?? 'Patient',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: kTextPrimary,
+                          letterSpacing: -0.1,
+                          height: 1.15,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 1),
-                      Text(_info, style: const TextStyle(fontSize: 10, color: kTextSecondary)),
+                      Text(
+                        _info,
+                        style: const TextStyle(
+                          fontSize: 9.5,
+                          color: kTextSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                       const SizedBox(height: 4),
                       Wrap(
                         spacing: 4,
@@ -2838,16 +2881,43 @@ class _PatientCard extends StatelessWidget {
                   ),
                 ),
                 if (!isSlotBooking) ...[
-                  const SizedBox(width: 6),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        (patient.queueNumber ?? 0).toString().padLeft(2, '0'),
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: av.fg, height: 1),
+                  const SizedBox(width: 7),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [av.bg, Colors.white],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                       ),
-                      const Text('Token', style: TextStyle(fontSize: 9, color: kTextMuted)),
-                    ],
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: av.fg.withOpacity(0.18)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'TOKEN',
+                          style: TextStyle(
+                            fontSize: 7.5,
+                            color: kTextMuted,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          (patient.queueNumber ?? 0).toString().padLeft(2, '0'),
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: av.fg,
+                            height: 1,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ],
@@ -3151,9 +3221,21 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-    child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: fg.withOpacity(0.15)),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        fontSize: 8.5,
+        fontWeight: FontWeight.w800,
+        color: fg,
+        letterSpacing: 0.2,
+      ),
+    ),
   );
 }
 
@@ -3164,12 +3246,24 @@ class _DotChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: dot.withOpacity(0.18)),
+    ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 6, height: 6, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+      Container(width: 5, height: 5, decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
       const SizedBox(width: 4),
-      Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
+      Text(
+        label,
+        style: TextStyle(
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          color: fg,
+          letterSpacing: 0.2,
+        ),
+      ),
     ]),
   );
 }
@@ -3190,19 +3284,23 @@ class _ActionBtn extends StatelessWidget {
     child: GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 9),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          gradient: isGrad
-              ? const LinearGradient(colors: [_kGradFrom, _kGradTo],
-                  begin: Alignment.topLeft, end: Alignment.bottomRight)
-              : null,
+          gradient: isGrad ? kPrimaryGradient : null,
           color: isGrad ? null : bg,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(11),
           border: border != null ? Border.all(color: border!) : null,
         ),
         alignment: Alignment.center,
-        child: Text(label,
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            color: fg,
+            letterSpacing: 0.2,
+          ),
+        ),
       ),
     ),
   );
