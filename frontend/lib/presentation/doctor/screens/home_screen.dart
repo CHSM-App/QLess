@@ -1,9 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
+import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
+import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
+import 'package:qless/presentation/doctor/screens/doctor_patient_history.dart';
+import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,6 +48,28 @@ const kPurpleDark     = Color(0xFF6B46C1);
 const kPurpleLight    = Color(0xFFFAF5FF);
 const kPurpleBorder   = Color(0xFFE9D5FF);
 
+// ── Premium medical surface tokens ──────────────────────────────────────────
+const kSurface         = Colors.white;
+const kSurfaceTinted   = Color(0xFFF7FDFC);
+const kBackgroundTop   = Color(0xFFEAF8F5);
+const kBackgroundBot   = Color(0xFFFBFDFC);
+const kHairline        = Color(0xFFE8EEF1);
+
+const List<BoxShadow> kSoftShadow  = <BoxShadow>[];
+const List<BoxShadow> kFloatShadow = <BoxShadow>[];
+const List<BoxShadow> kInsetShadow = <BoxShadow>[];
+
+const LinearGradient kPrimaryGradient = LinearGradient(
+  colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+const LinearGradient kCardGlassGradient = LinearGradient(
+  colors: [Colors.white, Color(0xFFFBFEFD)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // QUEUE HOME PAGE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -52,10 +81,45 @@ class QueueHomePage extends ConsumerStatefulWidget {
   ConsumerState<QueueHomePage> createState() => _QueueHomePageState();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// DOCTOR TIPS  (auto-rotating carousel)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _Tip {
+  final String emoji;
+  final String title;
+  final String body;
+  const _Tip(this.emoji, this.title, this.body);
+}
+
+const List<_Tip> _kDoctorTips = [
+  _Tip('⏸', 'Pause Queue',
+      'Tap Pause anytime to take a quick break — patients see the live status update instantly.'),
+  _Tip('⚠️', 'Emergency Pause',
+      'Use the warning icon for urgent breaks — the queue order stays intact when you resume.'),
+  _Tip('⏭', 'Skip a Patient',
+      'No-show? Tap Skip to move on. Skipped patients can rejoin with a fresh token.'),
+  _Tip('🗓', 'Set Your Schedule',
+      'Use Edit Schedule to add weekly time slots, max queue length and slot duration.'),
+  _Tip('💊', 'Build Medicine Library',
+      'Add common medicines once in Edit Medicine — pick them faster while prescribing.'),
+  _Tip('📋', 'Patient History',
+      'Open Patient History to review past visits, prescriptions and notes in one place.'),
+  _Tip('🔄', 'Pull to Refresh',
+      'Swipe down on the home screen to fetch the latest queue and appointment status.'),
+  _Tip('✕', 'Close the Queue',
+      'Tap Close at the end of a session — frees the slot and updates today\'s stats.'),
+];
+
 class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   bool _hasFetched = false;
   bool _showAllWaiting = false;
   late final ProviderSubscription<int?> _doctorIdSub;
+
+  // ── Tips carousel state ────────────────────────────────────────────────
+  final PageController _tipsController = PageController();
+  int _currentTip = 0;
+  Timer? _tipsTimer;
 
   @override
   void initState() {
@@ -69,10 +133,21 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _loadData();
     });
+    _tipsTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!mounted || !_tipsController.hasClients) return;
+      final next = (_currentTip + 1) % _kDoctorTips.length;
+      _tipsController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeInOut,
+      );
+    });
   }
 
   @override
   void dispose() {
+    _tipsTimer?.cancel();
+    _tipsController.dispose();
     _doctorIdSub.close();
     super.dispose();
   }
@@ -87,9 +162,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (_doctorId == 0) return;
     if (_hasFetched && !force) return;
     _hasFetched = true;
-    await ref
-        .read(appointmentViewModelProvider.notifier)
-        .fetchPatientAppointments(_doctorId);
+    await Future.wait([
+      ref
+          .read(appointmentViewModelProvider.notifier)
+          .fetchPatientAppointments(_doctorId),
+      ref
+          .read(doctorSettingsViewModelProvider.notifier)
+          .getDoctorSchedule(_doctorId),
+    ]);
   }
 
   Future<void> _refreshData() => _loadData(force: true);
@@ -138,6 +218,38 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }).toList();
   }
 
+  // All of today's appointments regardless of status (for "Total" stat).
+  int _todayTotalCount(List<AppointmentList> all) {
+    final today = DateTime.now();
+    return all.where((a) {
+      final d = DateTime.tryParse(a.appointmentDate ?? '');
+      if (d == null) return false;
+      return d.year == today.year &&
+          d.month == today.month &&
+          d.day == today.day;
+    }).length;
+  }
+
+  // Last 7 days completed-count series (oldest first, today last).
+  List<({DateTime date, int count})> _lastSevenDaysCompleted(
+      List<AppointmentList> all) {
+    final today = DateTime.now();
+    final start = DateTime(today.year, today.month, today.day)
+        .subtract(const Duration(days: 6));
+    final out = <({DateTime date, int count})>[];
+    for (int i = 0; i < 7; i++) {
+      final d = start.add(Duration(days: i));
+      final n = all.where((a) {
+        if ((a.status?.toLowerCase() ?? '') != 'completed') return false;
+        final ad = DateTime.tryParse(a.appointmentDate ?? '');
+        if (ad == null) return false;
+        return ad.year == d.year && ad.month == d.month && ad.day == d.day;
+      }).length;
+      out.add((date: d, count: n));
+    }
+    return out;
+  }
+
   // ── Snack ─────────────────────────────────────────────────────────────────
 
   void _snack(String msg) {
@@ -171,7 +283,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
-      _snack(res.message ?? 'Queue paused');
+      _snack(res.message ?? 'Queue paused'); 
       await _refreshData();
     } catch (_) {
       _snack('Failed to pause queue');
@@ -278,6 +390,44 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
+  // Format "HH:MM:SS" time-of-day strings from the schedule API.
+  String _fmtScheduleTime(String? raw) {
+    if (raw == null || raw.isEmpty) return '';
+    try {
+      final parts = raw.split(':');
+      final h = int.tryParse(parts[0]) ?? 0;
+      final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+      return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, m));
+    } catch (_) {
+      return raw;
+    }
+  }
+
+  String _bookingModeLabel(int? mode) {
+    switch (mode) {
+      case 2: return 'Slots';
+      case 3: return 'Queue + Slots';
+      default: return 'Queue';
+    }
+  }
+
+  // Today's enabled slots from the doctor's weekly schedule.
+  List<TimeSlotModel> _todayScheduledSlots() {
+    final schedule = ref.read(doctorSettingsViewModelProvider).doctorSchedule;
+    final days = schedule?.schedule;
+    if (days == null || days.isEmpty) return [];
+    final todayName = DateFormat('EEEE').format(DateTime.now()).toLowerCase();
+    for (final d in days) {
+      if ((d.day ?? '').toLowerCase() == todayName) {
+        if ((d.isEnabled ?? 0) != 1) return [];
+        final slots = d.slots ?? [];
+        return [...slots]..sort((a, b) =>
+            (a.startTime ?? '').compareTo(b.startTime ?? ''));
+      }
+    }
+    return [];
+  }
+
   // ── FILTER: which sessions to show as cards ───────────────────────────────
   // Hide a session when:
   //   • queue_status == 0 (idle) AND start_time == null  → no slot assigned yet, skip it
@@ -306,12 +456,16 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final vmState           = ref.watch(appointmentViewModelProvider);
     final appointmentsAsync = vmState.patientAppointmentsList;
 
+    // Watch settings so the page rebuilds when today's schedule loads.
+    ref.watch(doctorSettingsViewModelProvider
+        .select((s) => s.doctorSchedule));
+
     final doctorName = ref.watch(
       doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'),
     );
 
     return Scaffold(
-      backgroundColor:Colors.grey[50],
+      backgroundColor: Colors.white,
       body: appointmentsAsync.when(
         loading: () => _buildLoadingBody(greeting, doctorName),
         error: (e, _) => _buildErrorBody(e, greeting, doctorName),
@@ -334,6 +488,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               ? waiting
               : waiting.take(3).toList();
 
+          final totalToday = _todayTotalCount(list);
+
           return _buildRefreshableScrollView(
             slivers: [
               // ── HEADER ──────────────────────────────────────────────
@@ -341,10 +497,41 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                 child: _buildHeader(greeting, doctorName),
               ),
 
-              // ── SESSION QUEUE CARDS ─────────────────────────────────
-              if (visibleSessions.isNotEmpty)
+              // ── TODAY'S STATS STRIP ─────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                  child: _buildStatStrip(
+                    total:   totalToday,
+                    waiting: waiting.length + (current != null ? 1 : 0),
+                    done:    completed.length,
+                    skipped: skipped.length,
+                  ),
+                ),
+              ),
+
+              // ── TODAY'S SCHEDULE CARD  (always shown when slots exist)
+              if (_todayScheduledSlots().isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child:
+                        _buildTodayScheduleCard(_todayScheduledSlots()),
+                  ),
+                ),
+
+              // ── SESSION QUEUE CARDS / EMPTY STATE ───────────────────
+              if (visibleSessions.isEmpty) ...[
+                if (_todayScheduledSlots().isEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                      child: _buildNoLiveSessions(),
+                    ),
+                  ),
+              ] else
                 SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (_, i) {
@@ -370,7 +557,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
                         return Padding(
                           padding: EdgeInsets.only(
-                              bottom: i < visibleSessions.length - 1 ? 12 : 0),
+                              bottom: i < visibleSessions.length - 1 ? 8 : 0),
                           child: _buildQueueCard(
                             current:          currentPt,
                             nextQueueNo:      nextQNo,
@@ -390,55 +577,40 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   ),
                 ),
 
-              // // ── QUICK ACTIONS ────────────────────────────────────────
+              // ── WEEKLY PERFORMANCE CHART ─────────────────────────────
               // SliverToBoxAdapter(
               //   child: Padding(
-              //     padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-              //     child: _buildQuickActions(current),
+              //     padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+              //     child: _buildWeeklyPerformance(list),
               //   ),
               // ),
 
-              // ── WAITING LIST HEADER ──────────────────────────────────
+              // ── QUICK ACTIONS ────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 18, 14, 8),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 3,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: kPrimary,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'Waiting',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: kTextPrimary,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: kPrimaryLight,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${waiting.length}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: kPrimaryDark,
-                          ),
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                  child: _buildHomeQuickActions(),
+                ),
+              ),
+
+              // ── DOCTOR TIPS CAROUSEL ─────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                  child: _buildTipsCarousel(),
+                ),
+              ),
+
+              // ── UPCOMING LIST HEADER ─────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
+                  child: _sectionHeader(
+                    'Upcoming',
+                    waiting.length,
+                    kPrimary,
+                    kPrimaryLight,
+                    kPrimaryDark,
                   ),
                 ),
               ),
@@ -447,38 +619,65 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               waiting.isEmpty
                   ? SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 52,
-                                height: 52,
-                                decoration: BoxDecoration(
-                                    color: kPrimaryLighter,
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          decoration: BoxDecoration(
+                            gradient: kCardGlassGradient,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: kHairline),
+                            boxShadow: kSoftShadow,
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [kPrimaryLight, Colors.white],
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                    ),
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: kPrimaryLight)),
-                                child: const Icon(Icons.inbox_rounded,
-                                    color: kPrimary, size: 24),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text('No patients waiting',
+                                    border: Border.all(color: kPrimaryLight),
+                                  ),
+                                  child: const Icon(Icons.inbox_rounded,
+                                      color: kPrimary, size: 20),
+                                ),
+                                const SizedBox(height: 8),
+                                const Text(
+                                  'No Upcoming Patients',
                                   style: TextStyle(
-                                      color: kTextMuted,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500)),
-                            ],
+                                    color: kTextSecondary,
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.1,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                const Text(
+                                  'New bookings will appear here',
+                                  style: TextStyle(
+                                    color: kTextMuted,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     )
                   : SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate(
                           (_, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.only(bottom: 6),
                             child: _patientCard(visibleWaiting[i]),
                           ),
                           childCount: visibleWaiting.length,
@@ -490,16 +689,20 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               if (waiting.length > 3)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
                     child: GestureDetector(
                       onTap: () =>
                           setState(() => _showAllWaiting = !_showAllWaiting),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
                         decoration: BoxDecoration(
-                          color: kPrimaryLighter,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: kPrimaryLight),
+                          gradient: LinearGradient(
+                            colors: [kPrimaryLight, kPrimaryLighter],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: kPrimary.withOpacity(0.2)),
                         ),
                         alignment: Alignment.center,
                         child: Row(
@@ -511,8 +714,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                                   : 'Show All  (${waiting.length - 3} more)',
                               style: const TextStyle(
                                 fontSize: 12,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 color: kPrimaryDark,
+                                letterSpacing: 0.2,
                               ),
                             ),
                             const SizedBox(width: 4),
@@ -520,7 +724,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                               _showAllWaiting
                                   ? Icons.keyboard_arrow_up_rounded
                                   : Icons.keyboard_arrow_down_rounded,
-                              size: 16,
+                              size: 18,
                               color: kPrimaryDark,
                             ),
                           ],
@@ -530,7 +734,36 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   ),
                 ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              // ── RECENTLY SEEN ────────────────────────────────────────
+              if (completed.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
+                    child: _sectionHeader(
+                      'Recently Seen',
+                      completed.length,
+                      kGreen,
+                      kGreenLight,
+                      kGreenDark,
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (_, i) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _patientCard(completed.take(5).toList()[i]),
+                      ),
+                      childCount:
+                          completed.length > 5 ? 5 : completed.length,
+                    ),
+                  ),
+                ),
+              ],
+
+              const SliverToBoxAdapter(child: SizedBox(height: 80)),
             ],
           );
         },
@@ -606,75 +839,132 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(String greeting, String doctorName) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border:
-            Border(bottom: BorderSide(color: Color(0xFFEDF2F7), width: 1)),
-      ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      greeting,
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: kTextPrimary),
+    final initials = _initials(doctorName);
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(1.5),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: kPrimaryGradient,
+              ),
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: ShaderMask(
+                  shaderCallback: (b) => kPrimaryGradient.createShader(b),
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.4,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Dr. $doctorName',
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextSecondary),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: kPrimaryLight,
-                        borderRadius: BorderRadius.circular(20),
-                        border:
-                            Border.all(color: kPrimary.withOpacity(0.2)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.access_time_rounded,
-                              color: kPrimary, size: 10),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormat('EEEE, d MMMM yyyy')
-                                .format(DateTime.now()),
-                            style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: kPrimaryDark),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-              // _headerBtn(
-              //   icon: Icons.notifications_outlined,
-              //   badge: true,
-              //   onTap: () {},
-              // ),
-            ],
-          ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    greeting,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: kTextSecondary,
+                      letterSpacing: 0.1,
+                      height: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    'Dr. $doctorName',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary,
+                      letterSpacing: -0.3,
+                      height: 1.15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: kPrimary.withOpacity(0.18)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: const BoxDecoration(
+                      color: kPrimary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    DateFormat('d MMM').format(DateTime.now()),
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: kPrimaryDark,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                gradient: kPrimaryGradient,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.verified_rounded,
+                      color: Colors.white, size: 11),
+                  SizedBox(width: 3),
+                  Text(
+                    'Pro',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -727,32 +1017,37 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }) {
     return Row(children: [
       _statCard(
+          icon: Icons.groups_2_rounded,
           label: 'Total',
           value: total.toString().padLeft(2, '0'),
-          valueColor: kTextPrimary,
-          accent: kPrimary),
-      const SizedBox(width: 8),
+          accent: kPrimary,
+          valueColor: kTextPrimary),
+      const SizedBox(width: 7),
       _statCard(
+          icon: Icons.hourglass_top_rounded,
           label: 'Waiting',
           value: waiting.toString().padLeft(2, '0'),
-          valueColor: kPrimary,
-          accent: kPrimary),
-      const SizedBox(width: 8),
+          accent: kPrimary,
+          valueColor: kPrimaryDark),
+      const SizedBox(width: 7),
       _statCard(
+          icon: Icons.check_circle_rounded,
           label: 'Done',
           value: done.toString().padLeft(2, '0'),
-          valueColor: kGreenDark,
-          accent: kGreen),
-      const SizedBox(width: 8),
+          accent: kGreen,
+          valueColor: kGreenDark),
+      const SizedBox(width: 7),
       _statCard(
+          icon: Icons.skip_next_rounded,
           label: 'Skipped',
           value: skipped.toString().padLeft(2, '0'),
-          valueColor: kAmberDark,
-          accent: kAmber),
+          accent: kAmber,
+          valueColor: kAmberDark),
     ]);
   }
 
   Widget _statCard({
+    required IconData icon,
     required String label,
     required String value,
     required Color valueColor,
@@ -761,34 +1056,52 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     return Expanded(
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kBorder),
+          gradient: kCardGlassGradient,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: kHairline),
+          boxShadow: kSoftShadow,
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Column(children: [
-            Container(height: 3, color: accent),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(label,
-                        style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: kTextSecondary)),
-                    const SizedBox(height: 4),
-                    Text(value,
-                        style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.w800,
-                            color: valueColor,
-                            height: 1)),
-                  ]),
+        padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: accent.withOpacity(0.18)),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(icon, size: 11, color: accent),
+                ),
+                const Spacer(),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: kTextSecondary,
+                    letterSpacing: 0.1,
+                  ),
+                ),
+              ],
             ),
-          ]),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w800,
+                color: valueColor,
+                height: 1,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -818,64 +1131,41 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final isPaused  = queueState == QueueState.paused;
 
     // ── COMPACT CARD for Idle sessions with siblings present ──────────────
-    // If this is the ONLY remaining session (others closed), show full card
     if (isIdle && !isOnlySession) {
       return Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: kPrimaryLight.withOpacity(0.8)),
+          gradient: kCardGlassGradient,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: kHairline),
+          boxShadow: kSoftShadow,
         ),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row — badge left, slot label right
             Row(children: [
               _pulseDot(),
-              const SizedBox(width: 6),
+              const SizedBox(width: 5),
               _queueStateBadge(queueState),
               const Spacer(),
-              if (slotLabel != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    slotLabel,
-                    style: const TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                        color: kPrimaryDark),
-                  ),
-                ),
+              if (slotLabel != null) _slotPill(slotLabel),
             ]),
-
-            const SizedBox(height: 12),
-
-            // Progress row — no mini stats for idle (matches screenshot)
+            const SizedBox(height: 10),
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('Daily progress',
-                  style: TextStyle(fontSize: 10, color: kTextSecondary)),
+                  style: TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                      color: kTextSecondary,
+                      letterSpacing: 0.2)),
               Text('$done / $total seen',
                   style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: kPrimary)),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      color: kPrimaryDark)),
             ]),
             const SizedBox(height: 5),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: LinearProgressIndicator(
-                value: total == 0 ? 0 : (done / total).clamp(0.0, 1.0),
-                minHeight: 7,
-                backgroundColor: kPrimaryLight,
-                valueColor: const AlwaysStoppedAnimation<Color>(kPrimary),
-              ),
-            ),
-
+            _gradientProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
           ],
         ),
       );
@@ -884,139 +1174,104 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     // ── FULL CARD for Running / Paused sessions ────────────────────────────
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kPrimaryLight.withOpacity(0.8)),
+        gradient: kCardGlassGradient,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kHairline),
+        boxShadow: kSoftShadow,
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header row — badge left, slot label right
         Row(children: [
           _pulseDot(),
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           _queueStateBadge(queueState),
           const Spacer(),
-          if (slotLabel != null)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                slotLabel,
-                style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: kPrimaryDark),
-              ),
-            ),
+          if (slotLabel != null) _slotPill(slotLabel),
         ]),
-
-        const SizedBox(height: 12),
-
-        // Session mini stat strip
+        const SizedBox(height: 10),
         _buildSessionMiniStats(
           total:   total,
           waiting: sessionWaiting,
           done:    done,
           skipped: sessionSkipped,
         ),
-
-        const SizedBox(height: 12),
-
-        // Token row (Current / Up Next / Remaining)
-        // _buildTokenRow(
-        //   currentNo: current?.queueNumber ?? 0,
-        //   nextNo:    nextQueueNo ?? 0,
-        //   total:     total,
-        // ),
-
-        // const SizedBox(height: 12),
-
-        // // Current patient band
-        // _buildCurrentPatientBand(current),
-
-        // const SizedBox(height: 12),
-
-        // Progress
+        const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Daily progress',
-              style: TextStyle(fontSize: 10, color: kTextSecondary)),
+              style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w600,
+                  color: kTextSecondary,
+                  letterSpacing: 0.2)),
           Text('$done / $total seen',
               style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: kPrimary)),
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w800,
+                  color: kPrimaryDark)),
         ]),
         const SizedBox(height: 5),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: LinearProgressIndicator(
-            value: total == 0 ? 0 : (done / total).clamp(0.0, 1.0),
-            minHeight: 7,
-            backgroundColor: kPrimaryLight,
-            valueColor: const AlwaysStoppedAnimation<Color>(kPrimary),
-          ),
-        ),
+        _gradientProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
+        const SizedBox(height: 10),
 
-        const SizedBox(height: 12),
-
-        // Pause / Start + Emergency + Close Queue
         Row(children: [
-          // ── Start / Pause ──────────────────────────────────────────
-        Expanded(
-  child: _actionBtn(
-    label: isRunning ? '⏸  Pause' : '▶  Start',
-    onTap: isRunning
-        ? () => _onQueuePause(queueId)
-        : () => _onQueueStart(queueId),
-    isPrimary: !isRunning, 
-  ),
-),
-          const SizedBox(width: 8),
-
-          // ── Emergency ──────────────────────────────────────────────
-          
-          // ── Close Queue (with confirmation dialog) ─────────────────
+          Expanded(
+            child: _actionBtn(
+              label: isRunning ? 'Pause' : 'Start',
+              icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              onTap: isRunning
+                  ? () => _onQueuePause(queueId)
+                  : () => _onQueueStart(queueId),
+              isPrimary: !isRunning,
+            ),
+          ),
+          const SizedBox(width: 6),
           Expanded(
             child: Opacity(
               opacity: isStopped ? 0.4 : 1.0,
               child: GestureDetector(
                 onTap: isStopped ? null : () => _showCloseDialog(queueId),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  padding: const EdgeInsets.symmetric(vertical: 9),
                   decoration: BoxDecoration(
                     color: kRedLight,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(11),
                     border: Border.all(color: kRedBorder),
                   ),
                   alignment: Alignment.center,
-                  child: const Text('✕  Close',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: kRedDark)),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.close_rounded, size: 13, color: kRedDark),
+                      SizedBox(width: 4),
+                      Text(
+                        'Close',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: kRedDark,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-            const SizedBox(width: 8),
+          const SizedBox(width: 6),
           GestureDetector(
             onTap: () => _showEmergencyDialog(queueId),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 11),
               decoration: BoxDecoration(
-                color: kRedLight,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: kRedBorder),
+                color: kPurpleLight,
+                borderRadius: BorderRadius.circular(11),
+                border: Border.all(color: kPurpleBorder),
               ),
               child: const Icon(Icons.warning_amber_rounded,
-    color: kRedDark, size: 18),
+                  color: kPurpleDark, size: 16),
             ),
           ),
-          const SizedBox(width: 8),
-
         ]),
       ]),
     );
@@ -1203,11 +1458,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }) {
     return Row(children: [
       _miniStatChip(label: 'Total',   value: total,   accent: kPrimary,   textColor: kPrimaryDark),
-      const SizedBox(width: 6),
+      const SizedBox(width: 5),
       _miniStatChip(label: 'Waiting', value: waiting, accent: kPrimary,   textColor: kPrimaryDark),
-      const SizedBox(width: 6),
+      const SizedBox(width: 5),
       _miniStatChip(label: 'Done',    value: done,    accent: kGreen,     textColor: kGreenDark),
-      const SizedBox(width: 6),
+      const SizedBox(width: 5),
       _miniStatChip(label: 'Skipped', value: skipped, accent: kAmber,     textColor: kAmberDark),
     ]);
   }
@@ -1220,11 +1475,15 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 8),
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
         decoration: BoxDecoration(
-          color: accent.withOpacity(0.08),
+          gradient: LinearGradient(
+            colors: [accent.withOpacity(0.10), accent.withOpacity(0.04)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withOpacity(0.2)),
+          border: Border.all(color: accent.withOpacity(0.18)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1232,18 +1491,22 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             Text(
               label,
               style: TextStyle(
-                  fontSize: 8,
-                  fontWeight: FontWeight.w600,
-                  color: textColor.withOpacity(0.7)),
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                color: textColor.withOpacity(0.75),
+                letterSpacing: 0.3,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
               value.toString().padLeft(2, '0'),
               style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  height: 1),
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: textColor,
+                height: 1,
+                letterSpacing: -0.4,
+              ),
             ),
           ],
         ),
@@ -1255,6 +1518,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   Widget _actionBtn({
     required String label,
+    IconData? icon,
     required VoidCallback onTap,
     required bool isPrimary,
   }) {
@@ -1262,24 +1526,34 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(vertical: 11),
+        padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
-          gradient: isPrimary
-              ? const LinearGradient(
-                  colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight)
-              : null,
+          gradient: isPrimary ? kPrimaryGradient : null,
           color: isPrimary ? null : kAmberLight,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(11),
           border: isPrimary ? null : Border.all(color: kAmberBorder),
         ),
         alignment: Alignment.center,
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: isPrimary ? Colors.white : kAmberDark)),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 14,
+                  color: isPrimary ? Colors.white : kAmberDark),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: isPrimary ? Colors.white : kAmberDark,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1616,6 +1890,680 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
+  // HOME QUICK ACTIONS  (Edit Medicine, Schedule, History)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildHomeQuickActions() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: kCardGlassGradient,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kHairline),
+        boxShadow: kSoftShadow,
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 3,
+                height: 12,
+                decoration: BoxDecoration(
+                  gradient: kPrimaryGradient,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: 7),
+              const Text(
+                'Quick Actions',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                  color: kTextPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(children: [
+            _homeActionTile(
+              icon: Icons.medication_rounded,
+              label: 'Add\nMedicine',
+              accent: kPurple,
+              bg: kPurpleLight,
+              fg: kPurpleDark,
+              border: kPurpleBorder,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const AddMedicinePage()),
+              ),
+            ),
+            const SizedBox(width: 7),
+            _homeActionTile(
+              icon: Icons.calendar_today_rounded,
+              label: 'Edit\nSchedule',
+              accent: kAmber,
+              bg: kAmberLight,
+              fg: kAmberDark,
+              border: kAmberBorder,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const DoctorAvailabilityPage()),
+              ),
+            ),
+            const SizedBox(width: 7),
+            _homeActionTile(
+              icon: Icons.history_rounded,
+              label: 'Patient\nHistory',
+              accent: kGreen,
+              bg: kGreenLight,
+              fg: kGreenDark,
+              border: kGreenBorder,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const DoctorPatientHistoryScreen()),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _homeActionTile({
+    required IconData icon,
+    required String label,
+    required Color accent,
+    required Color bg,
+    required Color fg,
+    required Color border,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(6, 9, 6, 9),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [bg, Colors.white],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border),
+          ),
+          child: Column(children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: border),
+              ),
+              alignment: Alignment.center,
+              child: Icon(icon, size: 15, color: fg),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 9.5,
+                height: 1.15,
+                fontWeight: FontWeight.w800,
+                color: fg,
+                letterSpacing: 0.1,
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TODAY'S SCHEDULE CARD  (single unified card with day + slots + edit)
+  // Shown when no live queue sessions exist for today.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildTodayScheduleCard(List<TimeSlotModel> slots) {
+    final dayLabel =
+        DateFormat('EEEE, d MMMM').format(DateTime.now());
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: kCardGlassGradient,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kHairline),
+        boxShadow: kSoftShadow,
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Container(
+              width: 30,
+              height: 30,
+              decoration: BoxDecoration(
+                gradient: kPrimaryGradient,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.calendar_today_rounded,
+                  size: 14, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    dayLabel,
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary,
+                      letterSpacing: -0.1,
+                      height: 1.15,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    "${slots.length} slot${slots.length == 1 ? '' : 's'} scheduled",
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: kTextSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                    builder: (_) => const DoctorAvailabilityPage()),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [kPrimaryLight, kPrimaryLighter],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: kPrimary.withOpacity(0.22)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.edit_calendar_rounded,
+                        size: 11, color: kPrimaryDark),
+                    SizedBox(width: 3),
+                    Text(
+                      'Edit',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: kPrimaryDark,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Container(
+            height: 1,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  kHairline.withOpacity(0),
+                  kHairline,
+                  kHairline.withOpacity(0),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 9),
+          ...List.generate(slots.length, (i) {
+            final slot = slots[i];
+            final isLast = i == slots.length - 1;
+            return Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 6),
+              child: _scheduleSlotRow(slot),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _scheduleSlotRow(TimeSlotModel slot) {
+    final timeLabel = '${_fmtScheduleTime(slot.startTime)} – '
+        '${_fmtScheduleTime(slot.endTime)}';
+    final modeLbl = _bookingModeLabel(slot.bookingMode);
+    final isQueueMode = slot.bookingMode == 1 || slot.bookingMode == 3;
+    final detail = isQueueMode
+        ? (slot.maxQueueLength != null ? 'Max ${slot.maxQueueLength}' : null)
+        : (slot.slotDuration != null ? '${slot.slotDuration}m' : null);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [kPrimaryLighter, Colors.white],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: kPrimaryLight.withOpacity(0.7)),
+      ),
+      child: Row(children: [
+        Container(
+          width: 3,
+          height: 18,
+          decoration: BoxDecoration(
+            gradient: kPrimaryGradient,
+            borderRadius: BorderRadius.circular(3),
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Text(
+            timeLabel,
+            style: const TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w800,
+              color: kTextPrimary,
+              letterSpacing: -0.1,
+            ),
+          ),
+        ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          decoration: BoxDecoration(
+            color: kPrimary.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: kPrimary.withOpacity(0.15)),
+          ),
+          child: Text(
+            modeLbl,
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: kPrimaryDark,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        if (detail != null) ...[
+          const SizedBox(width: 5),
+          Text(
+            detail,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: kTextSecondary,
+            ),
+          ),
+        ],
+      ]),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // WEEKLY PERFORMANCE  (mini bar chart of last 7 days)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildWeeklyPerformance(List<AppointmentList> all) {
+    final series = _lastSevenDaysCompleted(all);
+    final maxVal =
+        series.fold<int>(0, (m, e) => e.count > m ? e.count : m);
+    final total = series.fold<int>(0, (s, e) => s + e.count);
+    final todayIdx = series.length - 1;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorder),
+      ),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Text('This Week',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                    color: kPrimary)),
+            const Spacer(),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text('$total seen',
+                  style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimaryDark)),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 84,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List.generate(series.length, (i) {
+                final e = series[i];
+                final ratio = maxVal == 0 ? 0.0 : e.count / maxVal;
+                final isToday = i == todayIdx;
+                final barH = (ratio * 60).clamp(4.0, 60.0);
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: i == 0 || i == series.length - 1
+                            ? 2
+                            : 3),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          e.count == 0 ? '·' : '${e.count}',
+                          style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: isToday ? kPrimaryDark : kTextMuted),
+                        ),
+                        const SizedBox(height: 3),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            height: barH,
+                            decoration: BoxDecoration(
+                              gradient: isToday
+                                  ? const LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Color(0xFF4DD9C8),
+                                        Color(0xFF2BB5A0),
+                                      ],
+                                    )
+                                  : null,
+                              color:
+                                  isToday ? null : kPrimaryLight,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          DateFormat('E').format(e.date)[0],
+                          style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: isToday ? kPrimaryDark : kTextMuted),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DOCTOR TIPS  (auto-rotating carousel)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildTipsCarousel() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFEAF8F5), Color(0xFFFAFEFD)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kPrimary.withOpacity(0.15)),
+        boxShadow: kSoftShadow,
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  gradient: kPrimaryGradient,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.tips_and_updates_rounded,
+                        size: 10, color: Colors.white),
+                    SizedBox(width: 3),
+                    Text(
+                      'TIP',
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${_currentTip + 1} / ${_kDoctorTips.length}',
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w700,
+                  color: kTextSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 64,
+            child: PageView.builder(
+              controller: _tipsController,
+              itemCount: _kDoctorTips.length,
+              onPageChanged: (i) => setState(() => _currentTip = i),
+              itemBuilder: (_, i) {
+                final tip = _kDoctorTips[i];
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: kPrimaryLight),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(tip.emoji,
+                          style: const TextStyle(fontSize: 18)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tip.title,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
+                              color: kPrimaryDark,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            tip.body,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 10.5,
+                              height: 1.35,
+                              color: kTextPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(_kDoctorTips.length, (i) {
+              final active = i == _currentTip;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOut,
+                margin: const EdgeInsets.symmetric(horizontal: 2.5),
+                width: active ? 18 : 5,
+                height: 5,
+                decoration: BoxDecoration(
+                  gradient: active ? kPrimaryGradient : null,
+                  color: active ? null : kPrimaryLight,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // NO LIVE SESSIONS EMPTY STATE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildNoLiveSessions() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+      decoration: BoxDecoration(
+        gradient: kCardGlassGradient,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kHairline),
+        boxShadow: kSoftShadow,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [kPrimaryLight, Colors.white],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(color: kPrimaryLight),
+            ),
+            child: const Icon(Icons.event_busy_rounded,
+                color: kPrimary, size: 22),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'No Schedule for Today',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w800,
+              color: kTextPrimary,
+              letterSpacing: -0.1,
+            ),
+          ),
+          const SizedBox(height: 3),
+          const Text(
+            'Set your weekly availability to start accepting patients.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: kTextSecondary,
+              fontWeight: FontWeight.w500,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => const DoctorAvailabilityPage()),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                gradient: kPrimaryGradient,
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.calendar_today_rounded,
+                      color: Colors.white, size: 13),
+                  SizedBox(width: 6),
+                  Text(
+                    'Set Schedule',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   // PATIENT CARD
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1636,67 +2584,114 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: avBd.withOpacity(0.6)),
+        gradient: kCardGlassGradient,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kHairline),
+        boxShadow: kSoftShadow,
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
       child: Row(children: [
         Container(
-          width: 44,
-          height: 44,
+          width: 38,
+          height: 38,
           decoration: BoxDecoration(
-            color: avBg,
-            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [avBg, Colors.white],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(11),
             border: Border.all(color: avBd),
           ),
           alignment: Alignment.center,
-          child: Text(initials,
-              style: TextStyle(
-                  fontSize: 13, fontWeight: FontWeight.w800, color: avFg)),
+          child: Text(
+            initials,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: avFg,
+              letterSpacing: 0.4,
+            ),
+          ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 9),
         Expanded(
           child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary),
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 1),
-                Text(
-                  [
-                    if (p.gender != null) p.gender!,
-                    if (age != null) '$age yrs'
-                  ].join(' · '),
-                  style:
-                      const TextStyle(fontSize: 10, color: kTextSecondary),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w800,
+                  color: kTextPrimary,
+                  letterSpacing: -0.1,
+                  height: 1.15,
                 ),
-                const SizedBox(height: 5),
-                Row(children: [
-                  _statusChip(status),
-                  if (p.specialization != null) ...[
-                    const SizedBox(width: 5),
-                    _tagChip(p.specialization!,
-                        bg: kPrimaryLighter, fg: kPrimaryDark),
-                  ],
-                ]),
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 1),
+              Text(
+                [
+                  if (p.gender != null) p.gender!,
+                  if (age != null) '$age yrs'
+                ].join(' · '),
+                style: const TextStyle(
+                  fontSize: 9.5,
+                  color: kTextSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(children: [
+                _statusChip(status),
+                if (p.specialization != null) ...[
+                  const SizedBox(width: 4),
+                  _tagChip(p.specialization!,
+                      bg: kPrimaryLighter, fg: kPrimaryDark),
+                ],
               ]),
+            ],
+          ),
         ),
-        const SizedBox(width: 8),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          Text((p.queueNumber ?? 0).toString().padLeft(2, '0'),
-              style: TextStyle(
-                  fontSize: 24,
+        const SizedBox(width: 7),
+        Container(
+          padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [avBg, Colors.white],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: avBd),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                'TOKEN',
+                style: TextStyle(
+                  fontSize: 7.5,
+                  color: kTextMuted,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 1),
+              Text(
+                (p.queueNumber ?? 0).toString().padLeft(2, '0'),
+                style: TextStyle(
+                  fontSize: 17,
                   fontWeight: FontWeight.w800,
                   color: avFg,
-                  height: 1)),
-          const Text('Token',
-              style: TextStyle(fontSize: 9, color: kTextMuted)),
-        ]),
+                  height: 1,
+                  letterSpacing: -0.4,
+                ),
+              ),
+            ],
+          ),
+        ),
       ]),
     );
   }
@@ -1746,33 +2741,148 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   Widget _badgeDot(String label, Color bg, Color fg, Color dot) =>
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-            color: bg, borderRadius: BorderRadius.circular(20)),
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: dot.withOpacity(0.18)),
+        ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              color: dot,
+              shape: BoxShape.circle,
+            ),
+          ),
           const SizedBox(width: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.2,
-                  color: fg)),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
+              color: fg,
+            ),
+          ),
         ]),
       );
 
   Widget _tagChip(String label, {required Color bg, required Color fg}) =>
       Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-        decoration:
-            BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: 9, fontWeight: FontWeight.w700, color: fg)),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: fg.withOpacity(0.15)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 8.5,
+            fontWeight: FontWeight.w800,
+            color: fg,
+            letterSpacing: 0.2,
+          ),
+        ),
       );
+
+  // ── Premium helpers ─────────────────────────────────────────────────────
+
+  Widget _slotPill(String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [kPrimaryLight, kPrimaryLighter],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: kPrimary.withOpacity(0.18)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.schedule_rounded, size: 9, color: kPrimaryDark),
+            const SizedBox(width: 3),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: kPrimaryDark,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
+        ),
+      );
+
+  Widget _gradientProgress(double value) => ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 6,
+          decoration: BoxDecoration(
+            color: kPrimaryLight.withOpacity(0.6),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: FractionallySizedBox(
+            widthFactor: value.clamp(0.0, 1.0),
+            alignment: Alignment.centerLeft,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: kPrimaryGradient,
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+          ),
+        ),
+      );
+
+  Widget _sectionHeader(String label, int count, Color accent, Color accentLight, Color accentDark) {
+    return Row(children: [
+      Container(
+        width: 3,
+        height: 14,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [accent, accent.withOpacity(0.5)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(3),
+        ),
+      ),
+      const SizedBox(width: 7),
+      Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12.5,
+          fontWeight: FontWeight.w800,
+          color: kTextPrimary,
+          letterSpacing: -0.1,
+        ),
+      ),
+      const SizedBox(width: 6),
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(
+          color: accentLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withOpacity(0.18)),
+        ),
+        child: Text(
+          '$count',
+          style: TextStyle(
+            fontSize: 9.5,
+            fontWeight: FontWeight.w800,
+            color: accentDark,
+          ),
+        ),
+      ),
+    ]);
+  }
 
   Widget _pulseDot() => TweenAnimationBuilder<double>(
         tween: Tween(begin: 0.4, end: 1.0),

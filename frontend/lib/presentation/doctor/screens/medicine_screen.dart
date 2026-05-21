@@ -42,6 +42,19 @@ const kInfoDark = Color(0xFF1E40AF);
 const kPageBg = Colors.white;
 const kCardBg = Color(0xFFF7F8FA);
 
+// ── Premium medical surface tokens (matched to home_screen) ─────────────────
+const kHairline = Color(0xFFE8EEF1);
+const LinearGradient kPrimaryGradient = LinearGradient(
+  colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+const LinearGradient kCardGlassGradient = LinearGradient(
+  colors: [Colors.white, Color(0xFFFBFEFD)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE TYPE STYLES
 // ════════════════════════════════════════════════════════════════════
@@ -405,21 +418,31 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
           opacity: _fabVisible ? 1.0 : 0.0,
           child: Padding(
             padding: const EdgeInsets.only(bottom: 80),
-            child: FloatingActionButton.extended(
-              onPressed: _fabVisible ? _goToAdd : null,
-              backgroundColor: kPrimary,
-              elevation: 3,
-              icon: const Icon(
-                Icons.add_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-              label: const Text(
-                'Add Medicine',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+            child: GestureDetector(
+              onTap: _fabVisible ? _goToAdd : null,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 11),
+                decoration: BoxDecoration(
+                  gradient: kPrimaryGradient,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: const [
+                    Icon(Icons.add_rounded,
+                        color: Colors.white, size: 18),
+                    SizedBox(width: 6),
+                    Text(
+                      'Add Medicine',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -439,7 +462,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -460,15 +483,15 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                 onChanged: (_) => setState(() {}),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
 
               // ── Filter chips ────────────────────────────────────────────
               SizedBox(
-                height: 32,
+                height: 28,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: _types.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  separatorBuilder: (_, __) => const SizedBox(width: 5),
                   itemBuilder: (_, i) {
                     final sel = _selectedType == i;
                     return GestureDetector(
@@ -476,20 +499,27 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 160),
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
+                          horizontal: 11,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: sel ? kPrimary : Colors.white,
-                          border: Border.all(color: sel ? kPrimary : kBorder),
+                          gradient: sel ? kPrimaryGradient : null,
+                          color: sel ? null : Colors.white,
+                          border: Border.all(
+                            color: sel
+                                ? kPrimary.withOpacity(0.0)
+                                : kHairline,
+                          ),
                           borderRadius: BorderRadius.circular(20),
                         ),
+                        alignment: Alignment.center,
                         child: Text(
                           _types[i],
                           style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
                             color: sel ? Colors.white : kTextSecondary,
+                            letterSpacing: 0.1,
                           ),
                         ),
                       ),
@@ -508,9 +538,9 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   Widget _buildList(List<Medicine> medicines, [ScrollController? controller]) =>
       ListView.separated(
         controller: controller,
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 140),
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 140),
         itemCount: medicines.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
+        separatorBuilder: (_, __) => const SizedBox(height: 6),
         itemBuilder: (_, i) => _MedicineCard(
           medicine: medicines[i],
           onDelete: () => _confirmDelete(medicines[i]),
@@ -519,12 +549,12 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
 
   // ── Grid (tablet / desktop) ───────────────────────────────────────────────
   Widget _buildGrid(List<Medicine> medicines) => GridView.builder(
-    padding: const EdgeInsets.fromLTRB(14, 8, 14, 120),
+    padding: const EdgeInsets.fromLTRB(12, 6, 12, 120),
     gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-      maxCrossAxisExtent: 340,
-      childAspectRatio: 3.4,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
+      maxCrossAxisExtent: 320,
+      childAspectRatio: 3.6,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
     ),
     itemCount: medicines.length,
     itemBuilder: (_, i) => _MedicineCard(
@@ -548,31 +578,30 @@ class _MedicineCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: kCardBg,
+        gradient: kCardGlassGradient,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kBorder),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(color: kHairline),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
       child: Row(
         children: [
-          // ── Icon badge ────────────────────────────────────────────
+          // ── Icon badge with gradient tint ─────────────────────────
           Container(
-            width: 40,
-            height: 40,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: style.bg,
+              gradient: LinearGradient(
+                colors: [style.bg, Colors.white],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: style.fg.withOpacity(0.18)),
             ),
-            child: Icon(style.icon, color: style.fg, size: 19),
+            alignment: Alignment.center,
+            child: Icon(style.icon, color: style.fg, size: 17),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 9),
 
           // ── Name + type badge ─────────────────────────────────────
           Expanded(
@@ -585,9 +614,11 @@ class _MedicineCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
                     color: kTextPrimary,
+                    letterSpacing: -0.1,
+                    height: 1.15,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -599,13 +630,15 @@ class _MedicineCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: style.bg,
                     borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: style.fg.withOpacity(0.18)),
                   ),
                   child: Text(
                     medicine.medTypeName ?? '—',
                     style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
                       color: style.fg,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ),
@@ -621,11 +654,12 @@ class _MedicineCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: kRedLight,
                 borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: kError.withOpacity(0.15)),
               ),
               child: const Icon(
                 Icons.delete_outline_rounded,
                 color: kError,
-                size: 16,
+                size: 15,
               ),
             ),
           ),
@@ -644,26 +678,33 @@ class _CountRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
     child: Row(
       children: [
         Text(
           '$count medicine${count != 1 ? 's' : ''}',
-          style: const TextStyle(fontSize: 12, color: kTextMuted),
+          style: const TextStyle(
+            fontSize: 10.5,
+            color: kTextSecondary,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
+          ),
         ),
         const Spacer(),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: kPrimaryLight,
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: kPrimary.withOpacity(0.18)),
           ),
           child: Text(
             '$total total',
             style: const TextStyle(
-              fontSize: 11,
-              color: kPrimary,
-              fontWeight: FontWeight.w600,
+              fontSize: 9.5,
+              color: kPrimaryDark,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.2,
             ),
           ),
         ),
@@ -778,12 +819,12 @@ class _SkeletonCountRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+    padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
     child: Row(
       children: [
-        const _Shimmer(width: 90, height: 12, radius: 6),
+        const _Shimmer(width: 80, height: 11, radius: 6),
         const Spacer(),
-        const _Shimmer(width: 56, height: 22, radius: 20),
+        const _Shimmer(width: 50, height: 20, radius: 20),
       ],
     ),
   );
@@ -798,34 +839,27 @@ class _SkeletonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: kCardBg,
+      gradient: kCardGlassGradient,
       borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: kBorder),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.04),
-          blurRadius: 8,
-          offset: const Offset(0, 2),
-        ),
-      ],
+      border: Border.all(color: kHairline),
     ),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
     child: Row(
       children: [
-        const _Shimmer(width: 40, height: 40, radius: 10),
-        const SizedBox(width: 10),
+        const _Shimmer(width: 36, height: 36, radius: 10),
+        const SizedBox(width: 9),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: const [
-              _Shimmer(width: 130, height: 13),
+              _Shimmer(width: 130, height: 12),
               SizedBox(height: 6),
-              _Shimmer(width: 60, height: 20, radius: 6),
+              _Shimmer(width: 56, height: 16, radius: 6),
             ],
           ),
         ),
-        const _Shimmer(width: 30, height: 30, radius: 9),
+        const _Shimmer(width: 29, height: 29, radius: 9),
       ],
     ),
   );
@@ -840,9 +874,9 @@ class _SkeletonList extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView.separated(
     physics: const NeverScrollableScrollPhysics(),
-    padding: const EdgeInsets.fromLTRB(14, 8, 14, 140),
+    padding: const EdgeInsets.fromLTRB(12, 6, 12, 140),
     itemCount: 7,
-    separatorBuilder: (_, __) => const SizedBox(height: 8),
+    separatorBuilder: (_, __) => const SizedBox(height: 6),
     itemBuilder: (_, __) => const _SkeletonCard(),
   );
 }

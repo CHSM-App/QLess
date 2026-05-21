@@ -210,7 +210,7 @@ final showAppBar = false;
 
   Widget _buildMobileLayout(bool showAppBar) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEEF2FF),
+      backgroundColor: Colors.white,
       extendBody: true,
       extendBodyBehindAppBar: true,
 appBar: null,

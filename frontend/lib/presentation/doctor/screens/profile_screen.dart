@@ -49,17 +49,24 @@ const kInfoDark       = Color(0xFF1E40AF);
 const kPageBg         = Colors.white;
 const kCardBg         = Color(0xFFF7F8FA);
 
-// ── Card decoration ───────────────────────────────────────────────────────────
+// ── Premium medical surface tokens (matched to home_screen) ─────────────────
+const kHairline       = Color(0xFFE8EEF1);
+const LinearGradient kPrimaryGradient = LinearGradient(
+  colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+const LinearGradient kCardGlassGradient = LinearGradient(
+  colors: [Colors.white, Color(0xFFFBFEFD)],
+  begin: Alignment.topLeft,
+  end: Alignment.bottomRight,
+);
+
+// ── Card decoration (glassy, no shadow — matches home_screen) ───────────────
 BoxDecoration _cardDec() => BoxDecoration(
-      color: kCardBg,
+      gradient: kCardGlassGradient,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: kBorder),
-      boxShadow: [
-        BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2)),
-      ],
+      border: Border.all(color: kHairline),
     );
 
 // ════════════════════════════════════════════════════════════════════
