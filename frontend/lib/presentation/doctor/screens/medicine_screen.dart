@@ -284,11 +284,22 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                     child: ElevatedButton(
                       onPressed: () async {
                         Navigator.pop(context);
-                        await ref
-                            .read(prescriptionViewModelProvider.notifier)
-                            .deleteMedicine(medicine.medicineId ?? 0);
-                        _refresh(force: true);
-                        _snack('Medicine removed');
+                        final notifier = ref.read(
+                          prescriptionViewModelProvider.notifier,
+                        );
+                        await notifier.deleteMedicine(
+                          medicine.medicineId ?? 0,
+                        );
+                        if (!mounted) return;
+                        final err = ref
+                            .read(prescriptionViewModelProvider)
+                            .error;
+                        if (err != null) {
+                          _snack(err, isError: true);
+                        } else {
+                          _refresh(force: true);
+                          _snack('Medicine removed');
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kError,
