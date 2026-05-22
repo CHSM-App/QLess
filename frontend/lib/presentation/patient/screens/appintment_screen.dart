@@ -179,15 +179,27 @@ Future<void> openMap(double lat, double lng, String? label) async {
 bool _isToday(AppointmentList a) {
   final p = DateTime.tryParse(a.appointmentDate ?? '');
   if (p == null) return false;
+  // Cancelled/completed appointments belong in their own tabs, not Today —
+  // Today shows what's actively happening today.
+  final s = a.status?.toLowerCase();
+  if (_isCancelStatus(s) || s == 'completed' || s == 'complete') return false;
   final n = DateTime.now();
   return p.year == n.year && p.month == n.month && p.day == n.day;
+}
+
+// All cancellation status variants — 'cancelled' (patient self-cancel),
+// 'cancled' (doctor cancel — 'CancleD' lowercased), and 'canceld' (legacy
+// typo from old 'cancelD' rows). Centralized so every filter agrees.
+bool _isCancelStatus(String? s) {
+  final l = s?.toLowerCase();
+  return l == 'cancelled' || l == 'cancled' || l == 'canceld';
 }
 
 bool _isUpcoming(AppointmentList a) {
   final p = DateTime.tryParse(a.appointmentDate ?? '');
   if (p == null) return false;
   final s = a.status?.toLowerCase();
-  if (s == 'cancelled' || s == 'completed' || s == 'complete') return false;
+  if (_isCancelStatus(s) || s == 'completed' || s == 'complete') return false;
   final n = DateTime.now();
   return DateTime(p.year, p.month, p.day).isAfter(DateTime(n.year, n.month, n.day));
 }
@@ -198,8 +210,7 @@ bool _isCompleted(AppointmentList a) {
 }
 
 bool _isCancelled(AppointmentList a) {
-  final s = a.status?.toLowerCase();
-  return s == 'cancelled' || s == 'cancled';
+  return _isCancelStatus(a.status);
 }
 
 // ── Date filter logic ─────────────────────────────────────────────────────────
@@ -265,6 +276,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool   _isFetching   = false;
   bool   _isWaiting    = false;
   bool   _idMissing    = false;
+  bool   _didReadRouteArgs = false; // honour route args (e.g. filter=cancelled) once
 
   // ── Date filter state ──────────────────────────────────────────────
   _DateFilter _dateFilter = _DateFilter.all;
@@ -281,6 +293,26 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     _tabCtrl.addListener(_syncFilterToSettledTab);
     _tabCtrl.animation?.addListener(_syncFilterToSwipeProgress);
     Future.microtask(_fetch);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Honour route args (e.g. notification tap with {'filter': 'cancelled'})
+    // — switch to that tab once on entry.
+    if (_didReadRouteArgs) return;
+    _didReadRouteArgs = true;
+
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map && args['filter'] is String) {
+      final filterKey = args['filter'] as String;
+      final idx = _filters.indexWhere((f) => f.key == filterKey);
+      if (idx != -1 && _tabCtrl.index != idx) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _tabCtrl.animateTo(idx);
+        });
+      }
+    }
   }
 
   @override
@@ -664,18 +696,8 @@ bool get _hasDateFilter =>
                 16, MediaQuery.of(context).padding.top + 12, 16, 0),
             child: Row(
               children: [
-                // ── Leading icon ──────────────────────────────────
-                Container(
-                  width: 42, height: 42,
-                  decoration: BoxDecoration(
-                    color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kPrimary.withOpacity(0.2)),
-                  ),
-                  child: const Icon(Icons.calendar_month_rounded,
-                      color: kPrimary, size: 20),
-                ),
-                const SizedBox(width: 10),
+                // AppExpandableHeaderSearch ne already leadingIcon render karta —
+                // ek separate Container dakhavla tar duplicate calendar disto.
                 Expanded(
                   child: AppExpandableHeaderSearch(
                     leadingIcon: Icons.calendar_month_rounded,

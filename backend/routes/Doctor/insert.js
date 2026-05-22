@@ -14,6 +14,86 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
+// ── Notifications inbox helpers ─────────────────────────────────────────────
+// Every FCM push is mirrored as a row in `notifications` via sp_notification
+// so the patient's in-app Notifications screen has a persistent history.
+// FCM alone is fire-and-forget — closed-app messages otherwise vanish.
+async function insertNotification(patient_id, title, body, type, ref_id = null) {
+  if (!patient_id || !title || !body || !type) return { success: 0 };
+  try {
+    const r = await db.request()
+      .input('operation', 'INSERT')
+      .input('patient_id', patient_id)
+      .input('title', title)
+      .input('body', body)
+      .input('type', type)
+      .input('ref_id', ref_id != null ? String(ref_id) : null)
+      .execute('sp_notification');
+    return r.recordset?.[0] ?? { success: 1 };
+  } catch (err) {
+    console.error('insertNotification failed:', err.message);
+    return { success: 0, message: err.message };
+  }
+}
+
+// Family-member appointments share the family head's FCM token, so the head's
+// `patients.patient_id` is the right inbox owner in both cases.
+async function insertNotificationForToken(token, title, body, type, ref_id = null) {
+  if (!token) return;
+  try {
+    const r = await db.request()
+      .input('token', token)
+      .query('SELECT TOP 1 patient_id FROM patients WHERE token = @token');
+    const patient_id = r.recordset?.[0]?.patient_id;
+    if (!patient_id) return;
+    await insertNotification(patient_id, title, body, type, ref_id);
+  } catch (err) {
+    console.error('insertNotificationForToken failed:', err.message);
+  }
+}
+
+// Format helpers for human-readable notification bodies. mssql returns TIME
+// as a Date pinned to 1970-01-01, so we extract just the time portion.
+function formatApptDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return dt.toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+
+function formatApptTime(t) {
+  if (!t) return '';
+  let s = String(t);
+  if (s.includes('T')) s = s.split('T')[1].split('.')[0];
+  const parts = s.split(':');
+  let h = parseInt(parts[0], 10);
+  const m = String(parts[1] || '00').padStart(2, '0');
+  if (isNaN(h)) return '';
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
+// Public endpoint — same logic, exposed for any caller wanting to drop a row
+// into the inbox directly (manual testing / future services).
+router.post('/insertNotification', async (req, res) => {
+  const { patient_id, title, body, type, ref_id } = req.body;
+  if (!patient_id || !title || !body || !type) {
+    return res.status(400).json({
+      success: false,
+      message: 'patient_id, title, body and type are required',
+    });
+  }
+  const row = await insertNotification(patient_id, title, body, type, ref_id ?? null);
+  return res.status(row.success === 1 ? 200 : 500).json({
+    success: row.success === 1,
+    notification_id: row.notification_id,
+    message: row.message || 'Notification stored',
+  });
+});
+
 router.post('/insertMedicine', async (req, res) => {
   const {
     doctor_id,
@@ -101,9 +181,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
   }));
 
   try {
-    // PASS 0 — validate incoming slots BEFORE any DB mutation (atomic-safe).
-    // Rejects start>=end and overlapping slots on the same enabled day, so a
-    // bad payload never leaves the schedule half-written.
+
     const toMin = (t) => {
       const [h, m] = String(t || '').split(':');
       return (parseInt(h, 10) || 0) * 60 + (parseInt(m, 10) || 0);
@@ -223,17 +301,11 @@ router.post('/saveDoctorSchedule', async (req, res) => {
       });
     }
 
-    // Notification text — used for BOTH the saved in-app row (sp inserts it
-    // into the notifications table) and the FCM push, so they always match.
-    const notifTitle = action === 'reschedule'
-      ? 'Please Reschedule'
-      : 'Appointment Cancelled';
-    const notifBody = action === 'reschedule'
-      ? "Doctor's schedule changed. Please book a new appointment time."
-      : 'Doctor has updated their schedule and your appointment has been cancelled. Please book again.';
-
     // ── PASS 2: actually apply the changes
-    const tokensToNotify = []; // FCM tokens of patients whose appts got cancelled
+    // Per-patient context for personalized notifications — patient needs to
+    // know WHICH appointment was cancelled so they can rebook the right one.
+    const affectedAppts = []; // [{patient_id, token, doctor_name, date, time, appointment_id}]
+
     for (const day of schedule) {
       // UPSERT DAY
       const dayResult = await db.request()
@@ -274,17 +346,47 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         : 'CANCEL_FUTURE_APPTS_FOR_SLOT';
 
       for (const slot_id of removedSlotIds) {
-        // Release future appointments on this slot first
-        // (force is implicit here — PASS 1 already gated)
-        const cancelResult = await db.request()
+        // Pre-fetch context before the SP changes statuses, so we can build
+        // personalized "Dr. X on 15 Jun at 10:30 AM" notifications.
+        const details = await db.request()
+          .input('operation', 'APPT_CONTEXT_SLOT')
+          .input('slot_id', slot_id)
+          .execute('sp_notification');
+
+        for (const row of (details.recordset || [])) {
+          if (!row.owner_id) continue;
+          affectedAppts.push({
+            patient_id:     row.owner_id,
+            token:          row.owner_token,
+            doctor_name:    row.doctor_name || 'your doctor',
+            date:           formatApptDate(row.appointment_date),
+            time:           formatApptTime(row.start_time),
+            appointment_id: row.appointment_id,
+          });
+        }
+
+        // Release future appointments on this slot
+        await db.request()
           .input('operation', releaseOp)
           .input('slot_id', slot_id)
           .execute('sp_doctor_schedule');
 
-        const tokens = (cancelResult.recordset || [])
-          .map(r => r.fcm_token || r.token)
-          .filter(t => t && t.trim() !== '');
-        tokensToNotify.push(...tokens);
+        // For 'cancel' mode, normalize status to 'CancleD' so the patient app
+        // shows "Cancelled by Doctor" (the release SP otherwise sets generic
+        // 'cancelled' which looks identical to a patient self-cancel).
+        // Reschedule mode leaves status='reschedule' — that's its own state.
+        if (action === 'cancel') {
+          const slotApptIds = (details.recordset || []).map(r => r.appointment_id);
+          await Promise.all(slotApptIds.map(aid =>
+            db.request()
+              .input('operation', 'MARK_APPT_DOCTOR_CANCELLED')
+              .input('appointment_id', aid)
+              .execute('sp_appointment')
+              .catch(err =>
+                console.error('status normalize err:', aid, err.message),
+              ),
+          ));
+        }
 
         // Now safe to delete the slot row
         await db.request()
@@ -309,37 +411,50 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         }
       }
     }
-    if (tokensToNotify.length > 0) {
-      const notification = action === 'reschedule'
-        ? {
-            title: 'Please Reschedule',
-            body: "Doctor's schedule changed. Please book a new appointment time.",
-          }
-        : {
-            title: 'Appointment Cancelled',
-            body: 'Doctor has updated their schedule and your appointment has been cancelled. Please book again.',
-          };
 
-      try {
-        await admin.messaging().sendEachForMulticast({
-          tokens: tokensToNotify,
-          notification,
-          data: {
-            type: 'appointment',
-            action: action === 'reschedule' ? 'rebook' : 'cancelled',
-            doctor_id: String(doctor_id),
-          },
-        });
-      } catch (err) {
-        console.error('FCM notify error in saveDoctorSchedule:', err);
-        // do not fail the save just because FCM failed
-      }
+    if (affectedAppts.length > 0) {
+      const isReschedule = action === 'reschedule';
+      const title = isReschedule ? 'Please Reschedule' : 'Appointment Cancelled';
+
+      const tasks = affectedAppts.map((a) => {
+        const when = a.date && a.time ? `${a.date} at ${a.time}`
+                    : a.date         ? a.date
+                    : a.time         ? `at ${a.time}`
+                    : '';
+        const body = isReschedule
+          ? `Dr. ${a.doctor_name}'s schedule changed. Your appointment${when ? ' on ' + when : ''} needs to be rebooked. Tap to book again.`
+          : `Your appointment with Dr. ${a.doctor_name}${when ? ' on ' + when : ''} has been cancelled. Tap to book again.`;
+        return { ...a, title, body };
+      });
+
+      // Inbox rows first so a device that refetches on push arrival sees them.
+      await Promise.all(tasks.map(t =>
+        insertNotification(t.patient_id, t.title, t.body, 'appointment', t.appointment_id),
+      ));
+
+      // Per-patient FCM (parallel). Generic multicast can't carry per-patient
+      // bodies, so we fan out one send per token.
+      await Promise.all(tasks
+        .filter(t => t.token && t.token.trim() !== '')
+        .map(t =>
+          admin.messaging().send({
+            token: t.token,
+            notification: { title: t.title, body: t.body },
+            data: {
+              type:           'appointment',
+              action:         isReschedule ? 'rebook' : 'cancelled',
+              doctor_id:      String(doctor_id),
+              appointment_id: String(t.appointment_id),
+            },
+          }).catch(err => console.error('FCM err (saveDoctorSchedule):', err.message)),
+        ),
+      );
     }
 
     return res.status(200).json({
       success: true,
       message: 'Schedule saved successfully',
-      cancelled_notifications: tokensToNotify.length,
+      cancelled_notifications: affectedAppts.length,
       error: null
     });
 
@@ -414,43 +529,90 @@ router.post('/addDoctorLeave', async (req, res) => {
     }
     const leave_id = row.leave_id;
 
-    // PASS 3 — cancel future appts in range + collect FCM tokens
-    const cancelRes = await db.request()
+    // Pre-fetch personalized context BEFORE the SP changes statuses, so each
+    // patient sees their own doctor + date in the notification.
+    const detailsRes = await db.request()
+      .input('operation', 'APPT_CONTEXT_DOCTOR_RANGE')
+      .input('doctor_id', doctor_id)
+      .input('from_date', from_date)
+      .input('to_date', to_date)
+      .execute('sp_notification');
+
+    const affectedAppts = [];
+    for (const row of (detailsRes.recordset || [])) {
+      if (!row.owner_id) continue;
+      affectedAppts.push({
+        patient_id:     row.owner_id,
+        token:          row.owner_token,
+        doctor_name:    row.doctor_name || 'your doctor',
+        date:           formatApptDate(row.appointment_date),
+        time:           formatApptTime(row.start_time),
+        appointment_id: row.appointment_id,
+      });
+    }
+
+    // PASS 3 — cancel future appts in range
+    await db.request()
       .input('operation', 'APPLY_LEAVE_CANCEL')
       .input('doctor_id', doctor_id)
       .input('from_date', from_date)
       .input('to_date', to_date)
       .execute('sp_doctor_leave');
 
-    const tokens = (cancelRes.recordset || [])
-      .map(r => r.fcm_token || r.token)
-      .filter(t => t && t.trim() !== '');
+    // PASS 3.5 — normalize status to 'CancleD' so the patient app shows
+    // "Cancelled by Doctor" (the leave SP otherwise sets generic 'cancelled'
+    // which looks the same as a patient self-cancel).
+    if (affectedAppts.length > 0) {
+      await Promise.all(affectedAppts.map(a =>
+        db.request()
+          .input('operation', 'MARK_APPT_DOCTOR_CANCELLED')
+          .input('appointment_id', a.appointment_id)
+          .execute('sp_appointment')
+          .catch(err =>
+            console.error('status normalize err:', a.appointment_id, err.message),
+          ),
+      ));
+    }
 
-    if (tokens.length > 0) {
-      try {
-        await admin.messaging().sendEachForMulticast({
-          tokens,
-          notification: {
-            title: 'Appointment Cancelled',
-            body: 'Doctor is unavailable on your appointment date. Please book again.',
-          },
-          data: {
-            type: 'appointment',
-            action: 'cancelled',
-            doctor_id: String(doctor_id),
-          },
-        });
-      } catch (err) {
-        console.error('FCM notify error in addDoctorLeave:', err);
-        // leave is already applied — don't fail the request on FCM error
-      }
+    if (affectedAppts.length > 0) {
+      const title = 'Appointment Cancelled';
+      const tasks = affectedAppts.map((a) => {
+        const when = a.date && a.time ? `${a.date} at ${a.time}`
+                    : a.date         ? a.date
+                    : a.time         ? `at ${a.time}`
+                    : '';
+        const body =
+          `Dr. ${a.doctor_name} is unavailable${when ? ' on ' + when : ''}. ` +
+          `Your appointment has been cancelled. Tap to book again.`;
+        return { ...a, title, body };
+      });
+
+      await Promise.all(tasks.map(t =>
+        insertNotification(t.patient_id, t.title, t.body, 'appointment', t.appointment_id),
+      ));
+
+      await Promise.all(tasks
+        .filter(t => t.token && t.token.trim() !== '')
+        .map(t =>
+          admin.messaging().send({
+            token: t.token,
+            notification: { title: t.title, body: t.body },
+            data: {
+              type:           'appointment',
+              action:         'cancelled',
+              doctor_id:      String(doctor_id),
+              appointment_id: String(t.appointment_id),
+            },
+          }).catch(err => console.error('FCM err (addDoctorLeave):', err.message)),
+        ),
+      );
     }
 
     return res.status(200).json({
       success: true,
       message: 'Leave applied successfully',
       leave_id,
-      cancelled_appointments: tokens.length,
+      cancelled_appointments: affectedAppts.length,
     });
 
   } catch (error) {
@@ -637,24 +799,25 @@ router.post('/insertPrescription', async (req, res) => {
     }
 
     // 🔔 SEND NOTIFICATION (ONLY ONCE)
+    const presTitle = 'Prescription Assigned';
+    const presBody  = 'Doctor has assigned prescription to you. Please review it.';
+
+    // Inbox row first — patient_id is already known here, no token lookup needed.
+    await insertNotification(patient_id, presTitle, presBody, 'prescription', prescription_id);
+
     if (patientToken) {
       try {
         const fcmResp = await admin.messaging().send({
           token: patientToken,
-          notification: {
-            title: "Prescription Assigned",
-            body: "Doctor has assigned prescription to you. Please review it."
-          },
-          data: {
-            type: "Prescription"
-          }
+          notification: { title: presTitle, body: presBody },
+          data: { type: 'prescription' },
         });
         console.log('[insertPrescription] FCM send OK:', fcmResp);
       } catch (err) {
         console.error('[insertPrescription] FCM send FAILED:', err.code, err.message);
       }
     } else {
-      console.warn('[insertPrescription] no patientToken — notification skipped');
+      console.warn('[insertPrescription] no patientToken — push skipped (inbox row saved)');
     }
 
     return res.status(200).json({
@@ -705,15 +868,15 @@ router.post('/appointment/queueNext', async (req, res) => {
 
     // 🔔 SEND NOTIFICATION TO NEXT PATIENT
     if (token) {
+      const nextTitle = 'Your Turn Now';
+      const nextBody  = 'Doctor is ready to see you. Please proceed.';
+
+      await insertNotificationForToken(token, nextTitle, nextBody, 'appointment', appointment_id);
+
       await admin.messaging().send({
         token: token,
-        notification: {
-          title: "Your Turn Now",
-          body: "Doctor is ready to see you. Please proceed."
-        },
-        data: {
-          type: "appointment"
-        }
+        notification: { title: nextTitle, body: nextBody },
+        data: { type: 'appointment' },
       });
     }
 
@@ -776,13 +939,18 @@ router.post('/appointment/queueStart', async (req, res) => {
       });
     }
 
+    const startTitle = 'Doctor Arrived';
+    const startBody  = 'Doctor has started serving. Please be ready.';
+
+    for (const tk of tokens) {
+      await insertNotificationForToken(tk, startTitle, startBody, 'queue', doctor_id);
+    }
+
     // 🔥 SEND NOTIFICATION
     const message = {
-      notification: {
-        title: "Doctor Arrived",
-        body: "Doctor has started serving. Please be ready."
-      },
-      tokens: tokens
+      notification: { title: startTitle, body: startBody },
+      data: { type: 'queue' },
+      tokens: tokens,
     };
 
     const response = await admin.messaging().sendEachForMulticast(message);
@@ -846,12 +1014,17 @@ router.post('/appointment/queuePause', async (req, res) => {
 
     // 🔔 SEND NOTIFICATION
     if (tokens.length > 0) {
+      const pauseTitle = 'Queue Paused';
+      const pauseBody  = 'Doctor has paused the queue. Please wait.';
+
+      for (const tk of tokens) {
+        await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', doctor_id);
+      }
+
       const message = {
-        notification: {
-          title: "Queue Paused",
-          body: "Doctor has paused the queue. Please wait."
-        },
-        tokens: tokens
+        notification: { title: pauseTitle, body: pauseBody },
+        data: { type: 'queue' },
+        tokens: tokens,
       };
 
       const response = await admin.messaging().sendEachForMulticast(message);
@@ -891,15 +1064,33 @@ router.post('/appointment/queueStop', async (req, res) => {
   }
 
   try {
+    // Pre-fetch personalized context BEFORE the SP cancels everything.
+    const detailsRes = await db.request()
+      .input('operation', 'APPT_CONTEXT_QUEUE')
+      .input('doctor_id', doctor_id)
+      .input('queue_id', queue_id)
+      .execute('sp_notification');
+
+    const affectedAppts = [];
+    for (const row of (detailsRes.recordset || [])) {
+      if (!row.owner_id) continue;
+      affectedAppts.push({
+        patient_id:     row.owner_id,
+        token:          row.owner_token,
+        doctor_name:    row.doctor_name || 'your doctor',
+        date:           formatApptDate(row.appointment_date),
+        time:           formatApptTime(row.start_time),
+        appointment_id: row.appointment_id,
+      });
+    }
+
     const result = await db.request()
       .input('operation', 'QUEUE_STOP')
-	  .input('queue_id', queue_id)
+      .input('queue_id', queue_id)
       .input('doctor_id', doctor_id)
       .execute('sp_appointment');
 
     const rows = result.recordset || [];
-
-    // 🔥 FIRST ROW = STATUS
     const statusRow = rows[0] || {};
 
     if (statusRow.success !== 1) {
@@ -909,36 +1100,41 @@ router.post('/appointment/queueStop', async (req, res) => {
       });
     }
 
-    // 🔥 REMAINING ROWS = TOKENS OF CANCELLED PATIENTS
-    const tokens = rows
-      .slice(1)
-      .map(r => r.token || r.fcm_token)
-      .filter(t => t && t.trim() !== '');
+    if (affectedAppts.length > 0) {
+      const title = 'Appointment Cancelled';
+      const tasks = affectedAppts.map((a) => {
+        const when = a.time ? `your ${a.time} appointment` : 'your appointment';
+        const body =
+          `Dr. ${a.doctor_name} has stopped today's queue. ${when} has been cancelled. ` +
+          `Tap to book again.`;
+        return { ...a, title, body };
+      });
 
-    console.log("CANCELLED PATIENT TOKENS:", tokens);
+      await Promise.all(tasks.map(t =>
+        insertNotification(t.patient_id, t.title, t.body, 'appointment', t.appointment_id),
+      ));
 
-    // 🔔 NOTIFY CANCELLED PATIENTS
-    if (tokens.length > 0) {
-      try {
-        await admin.messaging().sendEachForMulticast({
-          tokens,
-          notification: {
-            title: "Appointment Cancelled",
-            body: "Doctor has stopped the queue. Your appointment has been cancelled. Please book again."
-          },
-          data: {
-            type: "appointment"
-          }
-        });
-      } catch (err) {
-        console.error('FCM notify error in queueStop:', err);
-      }
+      await Promise.all(tasks
+        .filter(t => t.token && t.token.trim() !== '')
+        .map(t =>
+          admin.messaging().send({
+            token: t.token,
+            notification: { title: t.title, body: t.body },
+            data: {
+              type:           'appointment',
+              action:         'cancelled',
+              doctor_id:      String(doctor_id),
+              appointment_id: String(t.appointment_id),
+            },
+          }).catch(err => console.error('FCM err (queueStop):', err.message)),
+        ),
+      );
     }
 
     return res.json({
       success: true,
       message: statusRow.message || 'Queue stopped',
-      cancelled_notifications: tokens.length
+      cancelled_notifications: affectedAppts.length
     });
 
   } catch (error) {
@@ -984,15 +1180,15 @@ router.post('/appointment/queueSkip', async (req, res) => {
 
     // 🔔 SEND ONLY TO SKIPPED PATIENT
     if (token) {
+      const skipTitle = 'You were skipped';
+      const skipBody  = 'Doctor skipped your turn due to absence. Please contact clinic.';
+
+      await insertNotificationForToken(token, skipTitle, skipBody, 'appointment', appointment_id);
+
       await admin.messaging().send({
         token: token,
-        notification: {
-          title: "You were skipped",
-          body: "Doctor skipped your turn due to absence. Please contact clinic."
-        },
-		data:{
-			type: "appointment"
-		}
+        notification: { title: skipTitle, body: skipBody },
+        data: { type: 'appointment' },
       });
     }
 
@@ -1118,16 +1314,15 @@ router.post('/appointment/endSession', async (req, res) => {
     console.log("3rd PATIENT TOKEN:", token);
 
     if (token) {
+      const readyTitle = 'Be Ready';
+      const readyBody  = 'Your turn is coming soon. Please stay nearby.';
+
+      await insertNotificationForToken(token, readyTitle, readyBody, 'queue', doctor_id);
+
       await admin.messaging().send({
         token: token,
-        notification: {
-          title: "Be Ready",
-          body: "Your turn is coming soon. Please stay nearby."
-	
-        },
-		data:{
-			type: 'appointment'
-		}
+        notification: { title: readyTitle, body: readyBody },
+        data: { type: 'queue' },
       });
 
       return res.json({
@@ -1226,12 +1421,15 @@ cron.schedule('0 14 * * *', async () =>{
         minute: '2-digit'
       });
 
+      const remTitle = 'Appointment Reminder';
+      const remBody  = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
+
+      await insertNotificationForToken(token, remTitle, remBody, 'appointment', row.appointment_id);
+
       const message = {
         token: token,
-        notification: {
-          title: "Appointment Reminder",
-          body: `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`
-        }
+        notification: { title: remTitle, body: remBody },
+        data: { type: 'appointment' },
       };
 
       try {
@@ -1291,15 +1489,15 @@ cron.schedule('0 15 * * *', async () =>{
         minute: '2-digit'
       });
 
+      const remTitle = 'Appointment Reminder';
+      const remBody  = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
+
+      await insertNotificationForToken(token, remTitle, remBody, 'appointment', row.appointment_id);
+
       const message = {
         token: token,
-        notification: {
-          title: "Appointment Reminder",
-          body: `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`
-        },
-		 data:{
-			type: 'appointment'
-		} 
+        notification: { title: remTitle, body: remBody },
+        data: { type: 'appointment' },
       };
 
       try {
@@ -1351,16 +1549,18 @@ cron.schedule('0 16 * * *', async () =>{
 
       if (!token) continue;
 
+      const rateTitle = 'Rate Your Experience';
+      const rateBody  = `How was your consultation with Dr. ${doctorName}? Tap to rate.`;
+
+      await insertNotificationForToken(token, rateTitle, rateBody, 'rating', appointmentId);
+
       const message = {
         token: token,
-        notification: {
-          title: "Rate Your Experience",
-          body: `How was your consultation with Dr. ${doctorName}? Tap to rate.`
-        },
+        notification: { title: rateTitle, body: rateBody },
         data: {
           appointment_id: appointmentId.toString(),
-          type: "rating"
-        }
+          type: 'rating',
+        },
       };
 
       try {
