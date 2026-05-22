@@ -1,7 +1,14 @@
 name: qless
 description: "A new Flutter project."
 publish_to: 'none'
-version: 0.1.0
+# Version format: X.Y.Z+N
+#   X.Y.Z = versionName (semver, user-visible)
+#   N     = versionCode (strictly increasing integer per store upload)
+# Play and App Store reject uploads whose versionCode/CFBundleVersion is
+# not strictly greater than the previous build, so always bump N — even
+# for a hotfix that keeps the same X.Y.Z.
+# Bump via: scripts/bump-version.ps1 -Type patch (or minor/major).
+version: 1.0.0+1
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -27,8 +34,12 @@ dependencies:
   
 
   # Firebase
-  firebase_core: any
-  firebase_messaging: any
+  # Firebase plugins must move together: firebase_messaging depends on a
+  # specific firebase_core range. If you bump one major version, bump the
+  # rest in lockstep. Run `flutter pub outdated` before bumping to see
+  # current upstream and confirm the matrix.
+  firebase_core: ^4.6.0
+  firebase_messaging: ^16.1.3
 
 
   # Networking
@@ -50,20 +61,15 @@ dependencies:
 
   path: ^1.9.0
 
-  # print
+  # PDF generation (prescription printout — print_prescription_screen.dart)
   printing: ^5.12.0
   pdf: ^3.10.7
 
-  # excel
-  excel: ^2.1.0
-  
   image_picker: ^1.1.2         # For camera and gallery
   file_picker: ^8.1.2
-  flutter_pdfview: ^1.2.7
  
   open_file: ^3.3.2 
   share_plus: ^12.0.1
-  audioplayers: ^6.1.0
   path_provider: ^2.1.2
   flutter_local_notifications: ^17.2.0
 
@@ -72,7 +78,6 @@ dependencies:
   font_awesome_flutter: ^10.7.0
 
   geocoding: ^2.1.0
-  google_fonts: ^6.1.0
 
 
 dev_dependencies:

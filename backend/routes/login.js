@@ -6,25 +6,16 @@ const auth = require('./middleware/auth');
 const db = require('./db'); // your mssql pool wrapper
 const crypto = require('crypto');
 const path = require('path');
-const multer = require("multer");
 const fs = require("fs-extra");
+const { authLimiter, lookupLimiter } = require('./middleware/rateLimit');
+const { upload, uploadHandler, verifyImageFiles, cleanupFiles } = require('./middleware/upload');
 
-const storage = multer.diskStorage({
-	destination: async (req, file, cb) => {
-		const tempDir = path.join(__dirname, "..", "uploads", "temp");
-		await fs.ensureDir(tempDir);
-		cb(null, tempDir);
-	},
-	filename: (req, file, cb) => {
-		const name = file.originalname.replace(/\s+/g, "_");
-		cb(null, Date.now() + "-" + name);
-	}
-});
-
-const upload = multer({
-	storage
-});
-var bodyParser = require('body-parser');
+// Public base URL is required for returned image URLs to be reachable by
+// clients. Fail fast at startup rather than silently building broken links.
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || '').replace(/\/+$/, '');
+if (!PUBLIC_BASE_URL) {
+	throw new Error('Missing required env var: PUBLIC_BASE_URL');
+}
 
 function generateRefreshToken() {
 	return crypto.randomBytes(64).toString('hex');
@@ -33,8 +24,8 @@ function generateRefreshToken() {
 // Create tokens helper
 function createAccessToken(payload) {
 	return jwt.sign(payload, process.env.JWT_SECRET_KEY, {
-		expiresIn: '1m'
-	}); // production: 15m
+		expiresIn: process.env.JWT_ACCESS_TTL || '15m',
+	});
 }
 
 function createRefreshTokenPayload(mobile) {
@@ -42,7 +33,7 @@ function createRefreshTokenPayload(mobile) {
 	return token;
 }
 
-router.post('/Createlogin', async (req, res) => {
+router.post('/Createlogin', authLimiter, async (req, res) => {
 	try {
 		const {
 			mobile,
@@ -96,7 +87,7 @@ router.post('/Createlogin', async (req, res) => {
 });
 
 
-router.post('/refreshAccessToken', async (req, res) => {
+router.post('/refreshAccessToken', authLimiter, async (req, res) => {
 	console.log("inside the refreshAccessToken route");
 	try {
 		const {
@@ -248,7 +239,7 @@ router.post('/logout', async (req, res) => {
 });
 
 
-router.get('/checkPhoneDoctor', async (req, res) => {
+router.get('/checkPhoneDoctor', lookupLimiter, async (req, res) => {
 	try {
 		const {
 			mobile
@@ -267,7 +258,7 @@ router.get('/checkPhoneDoctor', async (req, res) => {
 	}
 });
 
-router.get('/checkPhonePatient', async (req, res) => {
+router.get('/checkPhonePatient', lookupLimiter, async (req, res) => {
 	try {
 		console.log('query:', req.query); // <-- add this
 		const mobile_no = req.query.mobile_no ?? req.query.mobileNo;
@@ -286,7 +277,7 @@ router.get('/checkPhonePatient', async (req, res) => {
 });
 
 
-router.get('/mobileExistDoctor', async (req, res) => {
+router.get('/mobileExistDoctor', lookupLimiter, async (req, res) => {
 	try {
 		const {
 			mobile
@@ -303,7 +294,7 @@ router.get('/mobileExistDoctor', async (req, res) => {
 	}
 });
 
-router.get('/mobileExistPatient', async (req, res) => {
+router.get('/mobileExistPatient', lookupLimiter, async (req, res) => {
 	try {
 		const {
 			mobile_no
@@ -321,7 +312,7 @@ router.get('/mobileExistPatient', async (req, res) => {
 });
 
 
-router.post('/doctor', upload.fields([{
+router.post('/doctor', uploadHandler(upload.fields([{
 		name: "doctor_image",
 		maxCount: 1
 	},
@@ -329,8 +320,12 @@ router.post('/doctor', upload.fields([{
 		name: "clinic_image",
 		maxCount: 1
 	}
-]), async (req, res) => {
+])), async (req, res) => {
 	try {
+
+		// Magic-byte check: confirm the bytes really are JPEG/PNG/WebP, not a
+		// polyglot file with a spoofed mime. 415 + temp cleanup on mismatch.
+		if (!(await verifyImageFiles(req, res))) return;
 
 		const {
 			doctor_id,
@@ -412,7 +407,7 @@ router.post('/doctor', upload.fields([{
 				overwrite: true
 			});
 
-			doctorImageUrl = `https://qless.vengurlatech.com/uploads/doctor_images/${returnedDoctorId}/${file.filename}`;
+			doctorImageUrl = `${PUBLIC_BASE_URL}/uploads/doctor_images/${returnedDoctorId}/${file.filename}`;
 
 			await db.request()
 				.input("operation", "uploadDoctorImg")
@@ -436,7 +431,7 @@ router.post('/doctor', upload.fields([{
 				overwrite: true
 			});
 
-			clinicImageUrl = `https://qless.vengurlatech.com/uploads/clinic_images/${returnedClinicId}/${file.filename}`;
+			clinicImageUrl = `${PUBLIC_BASE_URL}/uploads/clinic_images/${returnedClinicId}/${file.filename}`;
 
 			await db.request()
 				.input("operation", "uploadClinicImg")
@@ -456,6 +451,9 @@ router.post('/doctor', upload.fields([{
 
 	} catch (err) {
 		console.error(err);
+		// Drop any orphaned temp file the upload left behind so /uploads/temp
+		// doesn't grow forever when the SP / move step fails mid-request.
+		await cleanupFiles(req).catch(() => {});
 		res.status(500).json({
 			success: false,
 			error: err.message
@@ -463,8 +461,11 @@ router.post('/doctor', upload.fields([{
 	}
 });
 
-router.post('/patient', upload.single("image"), async (req, res) => {
+router.post('/patient', uploadHandler(upload.single("image")), async (req, res) => {
 	try {
+
+		// Magic-byte check: confirm bytes match the claimed image format.
+		if (!(await verifyImageFiles(req, res))) return;
 
 		const {
 			patient_id,
@@ -519,7 +520,7 @@ router.post('/patient', upload.single("image"), async (req, res) => {
 				overwrite: true
 			});
 
-			imageUrl = `https://qless.vengurlatech.com/uploads/patient_images/${returnedPatientId}/${req.file.filename}`;
+			imageUrl = `${PUBLIC_BASE_URL}/uploads/patient_images/${returnedPatientId}/${req.file.filename}`;
 
 			await db.request()
 				.input("operation", "uploadPatientImg")
@@ -536,6 +537,7 @@ router.post('/patient', upload.single("image"), async (req, res) => {
 		});
 
 	} catch (err) {
+		await cleanupFiles(req).catch(() => {});
 		res.status(500).json({
 			success: false,
 			error: err.message

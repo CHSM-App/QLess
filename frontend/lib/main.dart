@@ -16,11 +16,8 @@ import 'package:qless/presentation/patient/screens/patient_prescription_list.dar
 import 'package:qless/presentation/shared/controllers/sync_controller.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/presentation/shared/screens/splash_screen.dart';
-
-final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>(); //Global navigator access
-final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
-    GlobalKey<ScaffoldMessengerState>(); //Global scaffold messenger access
+import 'package:qless/core/navigation/navigator_key.dart';
+export 'package:qless/core/navigation/navigator_key.dart';
 
 // Step 1 — Background / terminated message handler (must be top-level)
 @pragma('vm:entry-point')
@@ -131,6 +128,12 @@ class HealthcareApp extends StatelessWidget {
         '/notifications': (_) => const NotificationsScreen(),
         '/appointment':   (_) => const AppointmentScreen(),
         '/prescription':  (_) => const PatientPrescriptionListScreen(),
+        // Auth landing — used by TokenInterceptor when refresh fails and we
+        // must drop the user back to a clean state. ContinueAsScreen (role
+        // picker) is the right target rather than LoginScreen directly,
+        // because after a forced logout we no longer know which role the
+        // returning user will choose.
+        '/auth':          (_) => const ContinueAsScreen(),
       },
       home: QlessSplashScreen(
         nextScreen: const ContinueAsScreen(), // your existing role-select screen

@@ -251,7 +251,11 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Path("patient_id") int patientId,
   );
 
-  @GET("patient/insert/appointment/getAvailability")
+  // Was @GET with @Body() — invalid REST and crashes retrofit_generator
+  // (`_displayString` null check). The backend reads req.body, so POST is
+  // the semantically correct verb anyway. Backend route also needs to flip
+  // from router.get → router.post (Patient/users.js).
+  @POST("patient/users/appointment/getAvailability")
   Future<AppointmentResponseModel> getAppointmentAvailability(
     @Body() AppointmentRequestModel appointmentRequest,
   );
@@ -268,8 +272,15 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   Future<List<ReviewModel>> getDoctorReviews(@Path("doctor_id") int doctorId);
 
   // ── Notifications inbox ─────────────────────────────────────────────────
+  // Return type kept as Future<dynamic> (caller casts to List). Two avoided
+  // traps in retrofit_generator 10.x:
+  //   - Future<List<dynamic>>      → crashes the generator (`_displayString`
+  //                                  null check on the inner `dynamic`).
+  //   - Future<List<Map<String,…>> → generator emits `Map.fromJson(...)`,
+  //                                  which doesn't compile (no such ctor).
+  // Future<dynamic> sidesteps the deserialization machinery entirely.
   @GET("patient/users/getNotifications/{patient_id}")
-  Future<List<dynamic>> getNotifications(@Path("patient_id") int patientId);
+  Future<dynamic> getNotifications(@Path("patient_id") int patientId);
 
   @POST("patient/users/markNotificationRead")
   Future<dynamic> markNotificationRead(@Body() Map<String, dynamic> body);

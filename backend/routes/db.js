@@ -1,23 +1,49 @@
-const express = require('express');
-const mssql = require('mssql');
+const sql = require('mssql');
+require('dotenv').config();
+
+const required = ['DB_USER', 'DB_PASSWORD', 'DB_SERVER', 'DB_NAME'];
+for (const k of required) {
+  if (!process.env[k]) {
+    throw new Error(`Missing required env var: ${k}. Copy .env.example to .env and fill in values.`);
+  }
+}
+
 const sqlConfig = {
-    user: 'QlessAdmin',      // Replace with your username
-    password:  'QLess#321',//'@x8#H8$?hEQJU',   // Replace with your password
-    server: 'winsome.grabweb.in' ,        // Replace with your server
-    database: 'QLess',
-    port:5691,
-      // Replace with your database
-    options: {
-        encrypt: true, // Use this if you're on Windows Azure
-        trustServerCertificate: true // Change to true for local dev / self-signed certs
-    }
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER,
+  database: process.env.DB_NAME,
+  port: parseInt(process.env.DB_PORT, 10) || 1433,
+  options: {
+    encrypt: true,
+    // Self-signed certs only acceptable outside production.
+    trustServerCertificate: process.env.NODE_ENV !== 'production',
+  },
+  pool: {
+    max: parseInt(process.env.DB_POOL_MAX, 10) || 20,
+    min: parseInt(process.env.DB_POOL_MIN, 10) || 0,
+    idleTimeoutMillis: 30000,
+  },
 };
-const db = mssql.connect(sqlConfig,function(err){
-    if(err)
-        console.log(err);
-    else
-    console.log("Success")
 
+const pool = new sql.ConnectionPool(sqlConfig);
 
+// Eagerly start connecting; routes that call pool.request() before the
+// connection resolves will queue, not crash. bin/www awaits ready() before
+// binding the HTTP port so the first request always finds a live pool.
+const readyPromise = pool.connect()
+  .then(() => {
+    console.log('MSSQL connected');
+    return pool;
+  })
+  .catch((err) => {
+    console.error('MSSQL connection failed:', err.message);
+    throw err;
+  });
+
+pool.on('error', (err) => {
+  console.error('MSSQL pool error:', err.message);
 });
-module.exports = db;
+
+module.exports = pool;
+module.exports.ready = () => readyPromise;
