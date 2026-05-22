@@ -26,7 +26,14 @@ final dioProvider = FutureProvider<Dio>((ref) {
     },
   ));
 
-  dio.interceptors.add(LogInterceptor(requestBody: true, responseBody: true));
+  // Body logging in DEBUG only. In release this would print JWTs, OTPs,
+  // phone numbers, and prescription data to logcat — readable by any app
+  // with READ_LOGS, any USB-attached debugger, or any crash reporter that
+  // captures device logs. kDebugMode is a const, so the whole branch is
+  // dead-code-eliminated from release builds.
+  if (kDebugMode) {
+    dio.interceptors.add(LogInterceptor(requestBody: true, responseBody: true));
+  }
 
   // Add your token interceptor if needed
   dio.interceptors.add(TokenInterceptor(dio:dio, ref:ref,authRepository: ref.watch(authRepoProvider))); // Create this file if needed

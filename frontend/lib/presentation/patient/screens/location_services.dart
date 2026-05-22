@@ -86,10 +86,7 @@ class LocationService {
     } catch (e) {
       final ip = await _maybeIpFallback();
       if (ip != null) return ip;
-      if (kDebugMode) {
-        // ignore: avoid_print
-        print("Location error: $e");
-      }
+      debugPrint('Location error: $e');
       return "Location Unavailable";
     }
   }

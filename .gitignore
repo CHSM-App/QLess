@@ -48,3 +48,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android release signing — NEVER commit these. Loss of the keystore means
+# you can never push an update to the same Play listing. Back it up
+# offline (USB / password manager / 1Password vault).
+**/key.properties
+**/*.jks
+**/*.keystore
+**/keystore/

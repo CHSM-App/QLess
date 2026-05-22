@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/navigation/navigator_key.dart';
 import 'package:qless/domain/models/token_response.dart';
 
 import '../../data/repositories/auth_impl.dart';
@@ -96,21 +98,33 @@ class TokenInterceptor extends Interceptor {
     }
   }
 
-  // void _goToLogin() {
-  //   print("Redirecting to login screen due to authentication failure.");
-  //   Future.microtask(() {
-  //     navigatorKey.curr entState?.pushAndRemoveUntil(
-  //       MaterialPageRoute(builder: (context) => LoginScreen()),
-  //       (route) => false, // remove all previous screens
-  //     );
-  //   });
-  // }
+  void _goToLogin() {
+    // Microtask defers navigation out of the interceptor callback so we
+    // don't push routes mid-error-handling. pushNamedAndRemoveUntil with
+    // a false predicate wipes the back stack — the user cannot swipe
+    // back into the now-tokenless authenticated screens.
+    Future.microtask(() {
+      navigatorKey.currentState?.pushNamedAndRemoveUntil(
+        '/auth',
+        (_) => false,
+      );
+    });
+  }
 
   Future<void> _forceLogout() async {
     if (_isLoggingOut) return;
     _isLoggingOut = true;
-    await ref.read(tokenProvider.notifier).clearTokens();
-   // _goToLogin();
+    try {
+      await ref.read(tokenProvider.notifier).clearTokens();
+      _goToLogin();
+    } finally {
+      // Reset the latch. Without this, a future logout after the user
+      // re-logs in within the same TokenInterceptor lifetime is silently
+      // skipped — tokens stay populated with bad values and the user
+      // gets stuck. clearTokens and pushNamedAndRemoveUntil are both
+      // idempotent, so racing 401s in the brief reset window are safe.
+      _isLoggingOut = false;
+    }
   }
 
   Future<void> _refreshTokens(String refreshToken) async {
@@ -120,7 +134,7 @@ class TokenInterceptor extends Interceptor {
 
     _isRefreshing = true;
     _refreshFuture = () async {
-      print("Refreshing access token...");
+      debugPrint('Refreshing access token...');
       final tokenResponse = await authRepository.refreshAccessToken(
         TokenResponse(refreshToken: refreshToken),
       );

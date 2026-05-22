@@ -103,7 +103,9 @@ class NotificationNotifier extends StateNotifier<List<NotificationItem>> {
     if (pid == null || pid == 0) return;
     try {
       final api = _ref.read(apiServiceProvider);
-      final raw = await api.getNotifications(pid);
+      // getNotifications returns Future<dynamic> (see api_service.dart for
+      // why) — cast to List<dynamic> before iterating.
+      final raw = (await api.getNotifications(pid)) as List<dynamic>;
       state = raw
           .map((e) => NotificationItem.fromJson(e as Map<String, dynamic>))
           .toList();
