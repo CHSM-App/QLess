@@ -301,6 +301,68 @@ router.get('/review/appointment/:appointment_id', async (req, res) => {
   }
 });
 
+// ── In-app notifications inbox ─────────────────────────────────────────────
+// Backed by sp_notification (INSERT/LIST/MARK_READ/MARK_ALL_READ). Doctor-side
+// FCM routes call insertNotification(...) to drop rows; the patient app reads
+// them here on screen open and on every FCM refresh.
+router.get('/getNotifications/:patient_id', async (req, res) => {
+  const { patient_id } = req.params;
+  try {
+    const result = await db.request()
+      .input('operation', 'LIST')
+      .input('patient_id', patient_id)
+      .execute('sp_notification');
+    res.status(200).json(result.recordset || []);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching notifications',
+      error: error.message,
+    });
+  }
+});
+
+router.post('/markNotificationRead', async (req, res) => {
+  const { notification_id, patient_id } = req.body;
+  if (!notification_id || !patient_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'notification_id and patient_id are required',
+    });
+  }
+  try {
+    await db.request()
+      .input('operation', 'MARK_READ')
+      .input('notification_id', notification_id)
+      .input('patient_id', patient_id)
+      .execute('sp_notification');
+    res.status(200).json({ success: true, message: 'Marked as read' });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error marking notification',
+      error: error.message,
+    });
+  }
+});
+
+router.post('/markAllNotificationsRead/:patient_id', async (req, res) => {
+  const { patient_id } = req.params;
+  try {
+    await db.request()
+      .input('operation', 'MARK_ALL_READ')
+      .input('patient_id', patient_id)
+      .execute('sp_notification');
+    res.status(200).json({ success: true, message: 'All marked as read' });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Error marking notifications',
+      error: error.message,
+    });
+  }
+});
+
 // GET all reviews for doctor
 router.get('/review/doctor/:doctor_id', async (req, res) => {
   try {

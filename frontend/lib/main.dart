@@ -28,21 +28,30 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
-// Step 2 — Notification tap router
+// Step 2 — Notification tap router (FCM tray tap, foreground or background)
 void _handleNotificationTap(Map<String, dynamic> data) {
-  final type = data['type']?.toString();
-  final id   = data['id']?.toString();
-  final nav  = navigatorKey.currentState;
+  final type   = data['type']?.toString();
+  final action = data['action']?.toString();
+  final nav    = navigatorKey.currentState;
   if (nav == null) return;
+
+  // Cancellation / reschedule pushes land on the Cancelled tab so the patient
+  // can immediately see the affected appointment and rebook it.
+  final isCancellation = action == 'cancelled' || action == 'rebook';
+
   switch (type) {
     case 'appointment':
-      nav.pushNamed('/appointment', arguments: id);
-      break;
     case 'queue':
-      nav.pushNamed('/queue', arguments: id);
+      nav.pushNamed(
+        '/appointment',
+        arguments: isCancellation ? {'filter': 'cancelled'} : null,
+      );
       break;
     case 'prescription':
-      nav.pushNamed('/prescription', arguments: id);
+      nav.pushNamed('/prescription');
+      break;
+    case 'rating':
+      nav.pushNamed('/appointment');
       break;
     default:
       nav.pushNamed('/notifications');
@@ -207,7 +216,9 @@ Future<void> _setupNotifications() async {
       payload: jsonEncode(data),
     );
 
-    // Step 5 — add to in-app notification list
+    // Step 5 — optimistic local insert so the row shows up instantly,
+    // then refresh from server to pick up the canonical row (with id/is_read)
+    // that the backend wrote alongside the FCM push.
     _notificationNotifier?.add(NotificationItem(
       title:      title ?? 'Notification',
       body:       body  ?? '',
@@ -215,5 +226,6 @@ Future<void> _setupNotifications() async {
       refId:      data['id']?.toString(),
       receivedAt: DateTime.now(),
     ));
+    _notificationNotifier?.loadFromServer();
   });
 }

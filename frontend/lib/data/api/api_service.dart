@@ -267,6 +267,16 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   @GET("patient/users/review/doctor/{doctor_id}")
   Future<List<ReviewModel>> getDoctorReviews(@Path("doctor_id") int doctorId);
 
+  // ── Notifications inbox ─────────────────────────────────────────────────
+  @GET("patient/users/getNotifications/{patient_id}")
+  Future<List<dynamic>> getNotifications(@Path("patient_id") int patientId);
+
+  @POST("patient/users/markNotificationRead")
+  Future<dynamic> markNotificationRead(@Body() Map<String, dynamic> body);
+
+  @POST("patient/users/markAllNotificationsRead/{patient_id}")
+  Future<dynamic> markAllNotificationsRead(@Path("patient_id") int patientId);
+
   // // POST API
   // @POST("login/addPatientDetails")
   // Future<dynamic> addPatient(@Body() Patients patient);
