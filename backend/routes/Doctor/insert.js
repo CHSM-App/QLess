@@ -282,7 +282,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
           .execute('sp_doctor_schedule');
 
         const tokens = (cancelResult.recordset || [])
-          .map(r => r.fcm_token)
+          .map(r => r.fcm_token || r.token)
           .filter(t => t && t.trim() !== '');
         tokensToNotify.push(...tokens);
 
@@ -423,7 +423,7 @@ router.post('/addDoctorLeave', async (req, res) => {
       .execute('sp_doctor_leave');
 
     const tokens = (cancelRes.recordset || [])
-      .map(r => r.fcm_token)
+      .map(r => r.fcm_token || r.token)
       .filter(t => t && t.trim() !== '');
 
     if (tokens.length > 0) {
@@ -607,7 +607,10 @@ router.post('/insertPrescription', async (req, res) => {
       // ✅ FIRST CALL → GET ID + TOKEN
       if (i === 0) {
         prescription_id = row.prescription_id;
-        patientToken = row.token;
+        // SP may return the FCM token under either alias; accept both.
+        patientToken = row.token || row.fcm_token;
+        console.log('[insertPrescription] SP row keys:', Object.keys(row));
+        console.log('[insertPrescription] patientToken:', patientToken);
 
         if (!prescription_id) {
           return res.status(500).json({
@@ -618,22 +621,40 @@ router.post('/insertPrescription', async (req, res) => {
       }
     }
 
+    // 🔔 If SP didn't return a token, look it up via SP so the patient still gets notified.
+    if (!patientToken) {
+      try {
+        const tokenLookup = await db.request()
+          .input('operation', 'getFirebaseToken')
+          .input('patient_id', patient_id)
+          .execute('sp_doctor_login');
+        const lookupRow = tokenLookup.recordset?.[0];
+        patientToken = lookupRow?.fcm_token || lookupRow?.token || null;
+        console.log('[insertPrescription] token fetched via SP fallback:', patientToken);
+      } catch (lookupErr) {
+        console.error('[insertPrescription] token lookup failed:', lookupErr.message);
+      }
+    }
+
     // 🔔 SEND NOTIFICATION (ONLY ONCE)
     if (patientToken) {
       try {
-        await admin.messaging().send({
+        const fcmResp = await admin.messaging().send({
           token: patientToken,
           notification: {
             title: "Prescription Assigned",
             body: "Doctor has assigned prescription to you. Please review it."
           },
-		    data: {
-          		type: "Prescription"
-        }
+          data: {
+            type: "Prescription"
+          }
         });
+        console.log('[insertPrescription] FCM send OK:', fcmResp);
       } catch (err) {
-        console.error("Notification error:", err);
+        console.error('[insertPrescription] FCM send FAILED:', err.code, err.message);
       }
+    } else {
+      console.warn('[insertPrescription] no patientToken — notification skipped');
     }
 
     return res.status(200).json({
@@ -670,12 +691,39 @@ router.post('/appointment/queueNext', async (req, res) => {
       .execute('sp_appointment');
 
     const row = result.recordset?.[0] ?? {};
+
+    if (row.success !== 1) {
+      return res.json({
+        success: false,
+        message: row.message || 'Queue next failed'
+      });
+    }
+
+    const token = row.token;
+
+    console.log("NEXT PATIENT TOKEN:", token);
+
+    // 🔔 SEND NOTIFICATION TO NEXT PATIENT
+    if (token) {
+      await admin.messaging().send({
+        token: token,
+        notification: {
+          title: "Your Turn Now",
+          body: "Doctor is ready to see you. Please proceed."
+        },
+        data: {
+          type: "appointment"
+        }
+      });
+    }
+
     return res.json({
-      success: row.success === 1,
+      success: true,
       message: row.message ?? 'Queue next done'
     });
 
   } catch (error) {
+    console.error(error);
     return res.status(500).json({
       success: false,
       message: 'Queue next failed',
@@ -849,13 +897,52 @@ router.post('/appointment/queueStop', async (req, res) => {
       .input('doctor_id', doctor_id)
       .execute('sp_appointment');
 
-    const row = result.recordset?.[0] ?? {};
+    const rows = result.recordset || [];
+
+    // 🔥 FIRST ROW = STATUS
+    const statusRow = rows[0] || {};
+
+    if (statusRow.success !== 1) {
+      return res.json({
+        success: false,
+        message: statusRow.message || 'Queue stop failed'
+      });
+    }
+
+    // 🔥 REMAINING ROWS = TOKENS OF CANCELLED PATIENTS
+    const tokens = rows
+      .slice(1)
+      .map(r => r.token || r.fcm_token)
+      .filter(t => t && t.trim() !== '');
+
+    console.log("CANCELLED PATIENT TOKENS:", tokens);
+
+    // 🔔 NOTIFY CANCELLED PATIENTS
+    if (tokens.length > 0) {
+      try {
+        await admin.messaging().sendEachForMulticast({
+          tokens,
+          notification: {
+            title: "Appointment Cancelled",
+            body: "Doctor has stopped the queue. Your appointment has been cancelled. Please book again."
+          },
+          data: {
+            type: "appointment"
+          }
+        });
+      } catch (err) {
+        console.error('FCM notify error in queueStop:', err);
+      }
+    }
+
     return res.json({
-      success: row.success === 1,
-      message: row.message ?? 'Queue stopped'
+      success: true,
+      message: statusRow.message || 'Queue stopped',
+      cancelled_notifications: tokens.length
     });
 
   } catch (error) {
+    console.error(error);
     return res.status(500).json({ success: false, message: 'Queue stop failed', error: error.message });
   }
 });
