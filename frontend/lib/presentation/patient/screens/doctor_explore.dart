@@ -7,6 +7,7 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour palette (mirrors home_screen.dart) ─────────────────────────────────
 const _kPrimary      = Color(0xFF26C6B0);
@@ -111,16 +112,17 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animCtrl;
   late List<Animation<double>> _anims;
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _animCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 800));
-    _anims = List.generate(5, (i) => Tween<double>(begin: 0, end: 1).animate(
+    _anims = List.generate(6, (i) => Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(
         parent: _animCtrl,
-        curve: Interval(i * 0.08, 0.55 + i * 0.07, curve: Curves.easeOut),
+        curve: Interval(i * 0.07, 0.55 + i * 0.06, curve: Curves.easeOut),
       ),
     ));
     _animCtrl.forward();
@@ -130,12 +132,28 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   @override
   void dispose() {
     _animCtrl.dispose();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _loadData() async {
     final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     await ref.read(doctorsViewModelProvider.notifier).fetchDoctors(patientId);
+    if (!mounted) return;
+
+    // Fetch favorites for the loaded doctors so the Favorites section can populate
+    if (patientId > 0) {
+      final doctorIds = ref
+          .read(doctorsViewModelProvider)
+          .doctors
+          .map((d) => d.doctorId)
+          .whereType<int>()
+          .toList();
+      ref
+          .read(favoriteViewModelProvider.notifier)
+          .fetchFavoritesForDoctors(patientId, doctorIds);
+    }
+
     // If no location has been set yet, fall back to device GPS
     if (ref.read(selectedPositionProvider) == null) {
       final pos = await LocationService.getCurrentPosition();
@@ -144,6 +162,32 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
       }
     }
   }
+
+  // ── Search filter ───────────────────────────────────────────────────
+  List<DoctorDetails> _applySearch(List<DoctorDetails> docs) {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    if (q.isEmpty) return docs;
+    return docs.where((d) =>
+        (d.name?.toLowerCase().contains(q) ?? false) ||
+        (d.specialization?.toLowerCase().contains(q) ?? false) ||
+        (d.clinicName?.toLowerCase().contains(q) ?? false) ||
+        (d.clinicAddress?.toLowerCase().contains(q) ?? false)
+    ).toList();
+  }
+
+  void _openBook(BuildContext context, DoctorDetails d) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => BookAppointmentScreen(doctor: d)),
+    );
+  }
+
+  List<DoctorDetails> _favoriteDoctors(
+      List<DoctorDetails> all, Map<int, bool> favMap) =>
+      all
+          .where((d) => d.doctorId != null && favMap[d.doctorId] == true)
+          .take(10)
+          .toList();
 
   void _goToSearch(BuildContext context, {String? specialty}) {
     Navigator.push(
@@ -202,10 +246,13 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   Widget build(BuildContext context) {
     final state       = ref.watch(doctorsViewModelProvider);
     final position    = ref.watch(selectedPositionProvider);
-    final doctors     = state.doctors;
+    final favMap      = ref.watch(favoriteViewModelProvider).doctorFavorites;
+    final allDoctors  = state.doctors;
+    final doctors     = _applySearch(allDoctors);
     final isLoading   = state.isLoading;
     final recent      = _recentDoctors(doctors);
     final nearby      = _nearbyDoctors(doctors, position);
+    final favorites   = _favoriteDoctors(doctors, favMap);
     final specialties = _uniqueSpecialties(doctors);
 
     return Scaffold(
@@ -227,43 +274,53 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
             sliver: SliverList(
               delegate: SliverChildListDelegate([
 
-                // Recent Doctors
-             // Recent Doctors
-if (isLoading || recent.isNotEmpty) ...[
-  _fade(1, _SectionTitle(
-    'Recent Doctors',
-    subtitle: 'Your last visits',
-  )),
-  const SizedBox(height: 10),
-  _fade(1, isLoading
-      ? const _HorizontalShimmer(height: 170, isRecent: true)
-      : _buildRecentDoctors(context, recent)),
-  const SizedBox(height: 22),
-],
+                // Favorite Doctors
+                if (favorites.isNotEmpty) ...[
+                  _fade(1, _SectionTitle(
+                    'Favorite Doctors',
+                    subtitle: 'Your saved doctors',
+                  )),
+                  const SizedBox(height: 10),
+                  _fade(1, _buildFavoriteDoctors(context, favorites)),
+                  const SizedBox(height: 22),
+                ],
 
-// Nearby Doctors
-if (position != null && (isLoading || nearby.isNotEmpty)) ...[
-  _fade(2, _SectionTitle(
-    'Nearby Doctors',
-    subtitle: 'Doctors close to you',
-    action: 'See All',
-    onAction: () => _goToSearch(context),
-  )),
-  const SizedBox(height: 10),
-  _fade(2, isLoading
-      ? const _HorizontalShimmer(height: 148, isRecent: false)
-      : _buildNearbyDoctors(context, nearby, position)),
-  const SizedBox(height: 22),
-],
+                // Recent Doctors
+                if (isLoading || recent.isNotEmpty) ...[
+                  _fade(2, _SectionTitle(
+                    'Recent Doctors',
+                    subtitle: 'Your last visits',
+                  )),
+                  const SizedBox(height: 10),
+                  _fade(2, isLoading
+                      ? const _HorizontalShimmer(height: 200, isRecent: true)
+                      : _buildRecentDoctors(context, recent)),
+                  const SizedBox(height: 22),
+                ],
+
+                // Nearby Doctors
+                if (position != null && (isLoading || nearby.isNotEmpty)) ...[
+                  _fade(3, _SectionTitle(
+                    'Nearby Doctors',
+                    subtitle: 'Doctors close to you',
+                    action: 'See All',
+                    onAction: () => _goToSearch(context),
+                  )),
+                  const SizedBox(height: 10),
+                  _fade(3, isLoading
+                      ? const _HorizontalShimmer(height: 148, isRecent: false)
+                      : _buildNearbyDoctors(context, nearby, position)),
+                  const SizedBox(height: 22),
+                ],
 
                 // Browse by Specialty
                 if (isLoading || specialties.isNotEmpty) ...[
-                  _fade(3, _SectionTitle(
+                  _fade(4, _SectionTitle(
                     'Browse by Specialty',
                     subtitle: 'Find the right specialist',
                   )),
                   const SizedBox(height: 10),
-                  _fade(3, isLoading
+                  _fade(4, isLoading
                       ? _buildSpecialtyShimmerGrid()
                       : _buildSpecialtyGrid(context, specialties)),
                 ],
@@ -271,7 +328,7 @@ if (position != null && (isLoading || nearby.isNotEmpty)) ...[
                 // Empty state
                 if (!isLoading && doctors.isEmpty) ...[
                   const SizedBox(height: 60),
-                  _fade(4, Center(
+                  _fade(5, Center(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
                       Container(
                         width: 60, height: 60,
@@ -318,47 +375,22 @@ if (position != null && (isLoading || nearby.isNotEmpty)) ...[
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: const BoxDecoration(
-                  color: _kPrimaryLight,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.explore_rounded,
-                  color: _kPrimary,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Find a Doctor',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: _kTextPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Book appointments near you',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _kTextSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+          child: AppExpandableHeaderSearch(
+            controller: _searchCtrl,
+            leadingIcon: Icons.explore_rounded,
+            title: 'Find a Doctor',
+            subtitle: 'Book appointments near you',
+            hintText: 'Search doctor, specialty, clinic...',
+            accentColor: _kPrimary,
+            leadingBackgroundColor: _kPrimaryLight,
+            titleColor: _kTextPrimary,
+            subtitleColor: _kTextSecondary,
+            fieldColor: const Color(0xFFF7F8FA),
+            borderColor: _kBorder,
+            iconColor: _kTextMuted,
+            textColor: _kTextPrimary,
+            onChanged: (_) => setState(() {}),
           ),
         ),
       ),
@@ -369,18 +401,33 @@ if (position != null && (isLoading || nearby.isNotEmpty)) ...[
   Widget _buildRecentDoctors(
       BuildContext context, List<DoctorDetails> docs) {
     return SizedBox(
-      height: 170,
+      height: 200,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: docs.length,
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (_, i) => _RecentDoctorCard(
           doctor: docs[i],
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (_) => BookAppointmentScreen(doctor: docs[i])),
-          ),
+          onTap: () => _openBook(context, docs[i]),
+          onBook: () => _openBook(context, docs[i]),
+        ),
+      ),
+    );
+  }
+
+  // ── Favorite Doctors horizontal list ────────────────────────────────
+  Widget _buildFavoriteDoctors(
+      BuildContext context, List<DoctorDetails> docs) {
+    return SizedBox(
+      height: 200,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: docs.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (_, i) => _RecentDoctorCard(
+          doctor: docs[i],
+          onTap: () => _openBook(context, docs[i]),
+          onBook: () => _openBook(context, docs[i]),
         ),
       ),
     );
@@ -546,7 +593,12 @@ class _SectionTitle extends StatelessWidget {
 class _RecentDoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
   final VoidCallback onTap;
-  const _RecentDoctorCard({required this.doctor, required this.onTap});
+  final VoidCallback onBook;
+  const _RecentDoctorCard({
+    required this.doctor,
+    required this.onTap,
+    required this.onBook,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -625,6 +677,31 @@ class _RecentDoctorCard extends StatelessWidget {
                       color: _kTextSecondary),
                 ),
               ],
+            ),
+            const Spacer(),
+            // Book button
+            GestureDetector(
+              onTap: onBook,
+              child: Container(
+                width: double.infinity,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _kPrimary,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _kPrimary.withOpacity(0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: const Text('Book',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+              ),
             ),
           ],
         ),
@@ -893,7 +970,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
       );
 }
 
-// Skeleton for Recent Doctor card (130×170)
+// Skeleton for Recent Doctor card (130×200, includes Book button)
 class _RecentDoctorSkeleton extends StatelessWidget {
   const _RecentDoctorSkeleton();
 
@@ -922,6 +999,9 @@ class _RecentDoctorSkeleton extends StatelessWidget {
           const SizedBox(height: 10),
           // Experience row
           _ShimmerBox(width: 70, height: 9, borderRadius: BorderRadius.circular(6)),
+          const Spacer(),
+          // Book button placeholder
+          _ShimmerBox(height: 28, borderRadius: BorderRadius.circular(8)),
         ],
       ),
     );

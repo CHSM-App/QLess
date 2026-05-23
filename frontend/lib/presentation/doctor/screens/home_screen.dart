@@ -560,14 +560,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               ),
 
               // ── TODAY'S SCHEDULE CARD  (always shown when slots exist)
-              if (_todayScheduledSlots().isNotEmpty)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                    child:
-                        _buildTodayScheduleCard(_todayScheduledSlots()),
-                  ),
-                ),
+              // if (_todayScheduledSlots().isNotEmpty)
+              //   SliverToBoxAdapter(
+              //     child: Padding(
+              //       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              //       child:
+              //           _buildTodayScheduleCard(_todayScheduledSlots()),
+              //     ),
+              //   ),
 
               // ── SESSION QUEUE CARDS / EMPTY STATE ───────────────────
               if (visibleSessions.isEmpty) ...[
@@ -988,31 +988,31 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                 ],
               ),
             ),
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                gradient: kPrimaryGradient,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.verified_rounded,
-                      color: Colors.white, size: 11),
-                  SizedBox(width: 3),
-                  Text(
-                    'Pro',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // const SizedBox(width: 6),
+            // Container(
+            //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            //   decoration: BoxDecoration(
+            //     gradient: kPrimaryGradient,
+            //     borderRadius: BorderRadius.circular(20),
+            //   ),
+            //   child: Row(
+            //     mainAxisSize: MainAxisSize.min,
+            //     children: const [
+            //       Icon(Icons.verified_rounded,
+            //           color: Colors.white, size: 11),
+            //       SizedBox(width: 3),
+            //       Text(
+            //         'Pro',
+            //         style: TextStyle(
+            //           fontSize: 10,
+            //           fontWeight: FontWeight.w800,
+            //           color: Colors.white,
+            //           letterSpacing: 0.3,
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -1179,14 +1179,42 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final isStopped = queueState == QueueState.stopped;
     final isPaused  = queueState == QueueState.paused;
 
+    // Highlighted border so the live queue card stands out from
+    // surrounding stat strips / sections — state-driven accent.
+    final Color borderColor = isRunning
+        ? kPrimary.withOpacity(0.55)
+        : isPaused
+            ? kAmber.withOpacity(0.65)
+            : isStopped
+                ? kHairline
+                : kPrimary.withOpacity(0.25); // idle
+    final double borderWidth = (isRunning || isPaused) ? 1.6 : 1.0;
+    final List<BoxShadow> cardShadow = isRunning
+        ? [
+            BoxShadow(
+              color: kPrimary.withOpacity(0.12),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ]
+        : isPaused
+            ? [
+                BoxShadow(
+                  color: kAmber.withOpacity(0.14),
+                  blurRadius: 12,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : kSoftShadow;
+
     // ── COMPACT CARD for Idle sessions with siblings present ──────────────
     if (isIdle && !isOnlySession) {
       return Container(
         decoration: BoxDecoration(
           gradient: kCardGlassGradient,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: kHairline),
-          boxShadow: kSoftShadow,
+          border: Border.all(color: borderColor, width: borderWidth),
+          boxShadow: cardShadow,
         ),
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
         child: Column(
@@ -1225,8 +1253,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       decoration: BoxDecoration(
         gradient: kCardGlassGradient,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kHairline),
-        boxShadow: kSoftShadow,
+        border: Border.all(color: borderColor, width: borderWidth),
+        boxShadow: cardShadow,
       ),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
