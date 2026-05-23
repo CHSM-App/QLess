@@ -52,6 +52,106 @@ async function insertNotificationForToken(token, title, body, type, ref_id = nul
   }
 }
 
+// Idempotency check for proximity notifications. As the queue moves, the same
+// patient would cross the same threshold across multiple endSession events —
+// we send the "30 min" / "10 min" notification ONCE per stage per appointment.
+// ref_id is namespaced as "<appointment_id>:<stage>" to allow one row per stage
+// without conflicting with single-stage notifications used elsewhere.
+async function hasNotificationBeenSent(patient_id, type, ref_id) {
+  if (!patient_id || !type || !ref_id) return false;
+  try {
+    const r = await db.request()
+      .input('patient_id', patient_id)
+      .input('type', type)
+      .input('ref_id', String(ref_id))
+      .query(`SELECT TOP 1 1 AS hit FROM notifications
+              WHERE patient_id = @patient_id
+                AND type = @type
+                AND ref_id = @ref_id`);
+    return (r.recordset?.[0]?.hit === 1);
+  } catch (err) {
+    console.error('hasNotificationBeenSent failed:', err.message);
+    return false;
+  }
+}
+
+// Proximity notifications — fired on every queue movement (queueStart,
+// endSession, queueSkip, cancelByDoctor). For each waiting patient, the SP
+// returns estimated minutes-to-turn based on (position-1) * avg consultation
+// time. We send:
+//   Stage 2 ("queue_far",  25–35 min away) — "Head to the clinic now"
+//   Stage 3 ("queue_near",  5–15 min away) — "Almost your turn"
+// Stage 4 ("Be Ready", 3rd in queue) and Stage 5 ("Your Turn Now") are already
+// covered by endSession's existing rows[1] token and queueNext respectively.
+//
+// REQUIRED SP OPERATION — sp_appointment @operation = 'QUEUE_PROXIMITY_LIST':
+//   IN : @doctor_id
+//   OUT (one row per still-waiting appt today for this doctor, EXCLUDING
+//        positions 1–3 since those are covered by existing notifications):
+//     appointment_id        INT
+//     owner_id              INT     -- family head's patients.patient_id
+//     owner_token           NVARCHAR(MAX)
+//     doctor_name           NVARCHAR
+//     est_minutes_to_turn   INT     -- (position - 1) * avg_consultation_minutes
+//
+// Fire-and-forget — failures here must not break the calling endpoint.
+async function sendProximityNotifications(doctor_id) {
+  if (!doctor_id) return;
+  try {
+    const r = await db.request()
+      .input('operation', 'QUEUE_PROXIMITY_LIST')
+      .input('doctor_id', doctor_id)
+      .execute('sp_appointment');
+
+    const rows = r.recordset || [];
+    if (rows.length === 0) return;
+
+    await Promise.all(rows.map(async (row) => {
+      const minutes = row.est_minutes_to_turn;
+      const patient_id = row.owner_id;
+      const token = row.owner_token;
+      const aptId = row.appointment_id;
+      const doctor = row.doctor_name || 'your doctor';
+      if (!patient_id || !aptId || minutes == null) return;
+
+      let stage = null, title = null, body = null;
+      if (minutes >= 25 && minutes <= 35) {
+        stage = 'queue_far';
+        title = 'Your turn is approaching';
+        body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please head to the clinic now.`;
+      } else if (minutes >= 5 && minutes <= 15) {
+        stage = 'queue_near';
+        title = 'Almost your turn';
+        body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please be at the clinic.`;
+      } else {
+        return;
+      }
+
+      const refId = `${aptId}:${stage}`;
+      if (await hasNotificationBeenSent(patient_id, 'queue', refId)) return;
+
+      await insertNotification(patient_id, title, body, 'queue', refId);
+
+      if (token && token.trim() !== '') {
+        await admin.messaging().send({
+          token,
+          notification: { title, body },
+          data: {
+            type: 'queue',
+            stage,
+            doctor_id: String(doctor_id),
+            appointment_id: String(aptId),
+          },
+        }).catch(err =>
+          console.error('FCM err (proximity):', err.code || err.message),
+        );
+      }
+    }));
+  } catch (err) {
+    console.error('sendProximityNotifications failed:', err.message);
+  }
+}
+
 // Format helpers for human-readable notification bodies. mssql returns TIME
 // as a Date pinned to 1970-01-01, so we extract just the time portion.
 function formatApptDate(d) {
@@ -219,7 +319,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
       if (r.slot_id != null) {
         curTiming[r.slot_id] = {
           start: String(r.start_time || '').slice(0, 5),
-          end:   String(r.end_time   || '').slice(0, 5),
+          end: String(r.end_time || '').slice(0, 5),
         };
       }
     }
@@ -273,7 +373,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
           const prev = curTiming[s.slot_id];
           if (!prev) continue;
           const changed = norm(s.start_time) !== prev.start ||
-                          norm(s.end_time)   !== prev.end;
+            norm(s.end_time) !== prev.end;
           if (changed && (await todayCount(s.slot_id)) > 0) {
             todayBlocked.push(day.day);
           }
@@ -356,11 +456,11 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         for (const row of (details.recordset || [])) {
           if (!row.owner_id) continue;
           affectedAppts.push({
-            patient_id:     row.owner_id,
-            token:          row.owner_token,
-            doctor_name:    row.doctor_name || 'your doctor',
-            date:           formatApptDate(row.appointment_date),
-            time:           formatApptTime(row.start_time),
+            patient_id: row.owner_id,
+            token: row.owner_token,
+            doctor_name: row.doctor_name || 'your doctor',
+            date: formatApptDate(row.appointment_date),
+            time: formatApptTime(row.start_time),
             appointment_id: row.appointment_id,
           });
         }
@@ -418,9 +518,9 @@ router.post('/saveDoctorSchedule', async (req, res) => {
 
       const tasks = affectedAppts.map((a) => {
         const when = a.date && a.time ? `${a.date} at ${a.time}`
-                    : a.date         ? a.date
-                    : a.time         ? `at ${a.time}`
-                    : '';
+          : a.date ? a.date
+            : a.time ? `at ${a.time}`
+              : '';
         const body = isReschedule
           ? `Dr. ${a.doctor_name}'s schedule changed. Your appointment${when ? ' on ' + when : ''} needs to be rebooked. Tap to book again.`
           : `Your appointment with Dr. ${a.doctor_name}${when ? ' on ' + when : ''} has been cancelled. Tap to book again.`;
@@ -441,9 +541,9 @@ router.post('/saveDoctorSchedule', async (req, res) => {
             token: t.token,
             notification: { title: t.title, body: t.body },
             data: {
-              type:           'appointment',
-              action:         isReschedule ? 'rebook' : 'cancelled',
-              doctor_id:      String(doctor_id),
+              type: 'appointment',
+              action: isReschedule ? 'rebook' : 'cancelled',
+              doctor_id: String(doctor_id),
               appointment_id: String(t.appointment_id),
             },
           }).catch(err => console.error('FCM err (saveDoctorSchedule):', err.message)),
@@ -542,11 +642,11 @@ router.post('/addDoctorLeave', async (req, res) => {
     for (const row of (detailsRes.recordset || [])) {
       if (!row.owner_id) continue;
       affectedAppts.push({
-        patient_id:     row.owner_id,
-        token:          row.owner_token,
-        doctor_name:    row.doctor_name || 'your doctor',
-        date:           formatApptDate(row.appointment_date),
-        time:           formatApptTime(row.start_time),
+        patient_id: row.owner_id,
+        token: row.owner_token,
+        doctor_name: row.doctor_name || 'your doctor',
+        date: formatApptDate(row.appointment_date),
+        time: formatApptTime(row.start_time),
         appointment_id: row.appointment_id,
       });
     }
@@ -578,9 +678,9 @@ router.post('/addDoctorLeave', async (req, res) => {
       const title = 'Appointment Cancelled';
       const tasks = affectedAppts.map((a) => {
         const when = a.date && a.time ? `${a.date} at ${a.time}`
-                    : a.date         ? a.date
-                    : a.time         ? `at ${a.time}`
-                    : '';
+          : a.date ? a.date
+            : a.time ? `at ${a.time}`
+              : '';
         const body =
           `Dr. ${a.doctor_name} is unavailable${when ? ' on ' + when : ''}. ` +
           `Your appointment has been cancelled. Tap to book again.`;
@@ -598,9 +698,9 @@ router.post('/addDoctorLeave', async (req, res) => {
             token: t.token,
             notification: { title: t.title, body: t.body },
             data: {
-              type:           'appointment',
-              action:         'cancelled',
-              doctor_id:      String(doctor_id),
+              type: 'appointment',
+              action: 'cancelled',
+              doctor_id: String(doctor_id),
               appointment_id: String(t.appointment_id),
             },
           }).catch(err => console.error('FCM err (addDoctorLeave):', err.message)),
@@ -707,6 +807,7 @@ router.post('/insertPrescription', async (req, res) => {
   try {
     let prescription_id = null;
     let patientToken = null;
+    let doctorName = null;
 
     const rows = medicines.length > 0 ? medicines : [null];
 
@@ -729,31 +830,31 @@ router.post('/insertPrescription', async (req, res) => {
       request.input('user_type', user_type);
       request.input('appointment_id', appointment_id);
 
-      request.input('medicine_id',       med?.medicine_id ?? null);
-      request.input('medicine_type_id',  med?.medicine_type_id ?? null);
-      request.input('frequency',         clean(med?.frequency));
-      request.input('duration',          clean(med?.duration));
-      request.input('timing',            clean(med?.timing));
-      request.input('tablet_dosage',     clean(med?.tablet_dosage));
-      request.input('syrup_dosage_ml',   clean(med?.syrup_dosage_ml));
-      request.input('inj_dosage',        clean(med?.inj_dosage));
-      request.input('inj_route',         clean(med?.inj_route));
-      request.input('drops_count',       clean(med?.drops_count));
+      request.input('medicine_id', med?.medicine_id ?? null);
+      request.input('medicine_type_id', med?.medicine_type_id ?? null);
+      request.input('frequency', clean(med?.frequency));
+      request.input('duration', clean(med?.duration));
+      request.input('timing', clean(med?.timing));
+      request.input('tablet_dosage', clean(med?.tablet_dosage));
+      request.input('syrup_dosage_ml', clean(med?.syrup_dosage_ml));
+      request.input('inj_dosage', clean(med?.inj_dosage));
+      request.input('inj_route', clean(med?.inj_route));
+      request.input('drops_count', clean(med?.drops_count));
       request.input('drops_application', clean(med?.drops_application));
       request.input('lotion_apply_area', clean(med?.lotion_apply_area));
-      request.input('spray_puffs',       clean(med?.spray_puffs));
-      request.input('spray_usage',       clean(med?.spray_usage));
-      request.input('lotion_usage',      clean(med?.lotion_usage));
-		
+      request.input('spray_puffs', clean(med?.spray_puffs));
+      request.input('spray_usage', clean(med?.spray_usage));
+      request.input('lotion_usage', clean(med?.lotion_usage));
+
       // ── Powders ───────────────────────────────────────────────
-      request.input('powder_dosage',      clean(med?.powder_dosage));
-      request.input('powder_form',        clean(med?.powder_form));
+      request.input('powder_dosage', clean(med?.powder_dosage));
+      request.input('powder_form', clean(med?.powder_form));
 
       // ── Inhalers ──────────────────────────────────────────────
-      request.input('inhaler_puffs',      clean(med?.inhaler_puffs));
-      request.input('inhaler_type',       clean(med?.inhaler_type));
-      request.input('inhaler_technique',  clean(med?.inhaler_technique));
-      request.input('inhaler_usage',      clean(med?.inhaler_usage));
+      request.input('inhaler_puffs', clean(med?.inhaler_puffs));
+      request.input('inhaler_type', clean(med?.inhaler_type));
+      request.input('inhaler_technique', clean(med?.inhaler_technique));
+      request.input('inhaler_usage', clean(med?.inhaler_usage));
 
       const result = await request.execute('sp_prescription');
 
@@ -771,6 +872,10 @@ router.post('/insertPrescription', async (req, res) => {
         prescription_id = row.prescription_id;
         // SP may return the FCM token under either alias; accept both.
         patientToken = row.token || row.fcm_token;
+        // Doctor name is optional — used to personalise the "Appointment
+        // Complete — review it" body. Falls back below if the SP doesn't
+        // return it.
+        doctorName = row.doctor_name || row.doctorName || null;
         console.log('[insertPrescription] SP row keys:', Object.keys(row));
         console.log('[insertPrescription] patientToken:', patientToken);
 
@@ -798,9 +903,49 @@ router.post('/insertPrescription', async (req, res) => {
       }
     }
 
-    // 🔔 SEND NOTIFICATION (ONLY ONCE)
+    // 🔔 SEND TWO NOTIFICATIONS — completing a consultation triggers both:
+    //   1) "Appointment Complete — review it"  → opens the review dialog
+    //   2) "Prescription Assigned — tap to view" → opens the prescription
+    // The review one fires only when we have an appointment_id to attach
+    // to (the dialog needs it). Both share the cached patientToken so we
+    // don't double-lookup.
+    const drLabel = doctorName ? `Dr. ${doctorName}` : 'the doctor';
+
+    if (appointment_id) {
+      const reviewTitle = 'Appointment Complete';
+      const reviewBody  =
+        `Your appointment with ${drLabel} is complete. Tap to leave a review.`;
+
+      await insertNotification(
+        patient_id, reviewTitle, reviewBody, 'rating', appointment_id,
+      );
+
+      if (patientToken) {
+        try {
+          await admin.messaging().send({
+            token: patientToken,
+            notification: { title: reviewTitle, body: reviewBody },
+            // appointment_id lets the frontend look up the row and pop the
+            // review dialog with doctor/patient context already populated.
+            data: {
+              type: 'rating',
+              appointment_id: String(appointment_id),
+            },
+          });
+        } catch (err) {
+          console.error(
+            '[insertPrescription] review FCM FAILED:', err.code, err.message,
+          );
+        }
+      }
+    } else {
+      console.warn(
+        '[insertPrescription] appointment_id missing — review notification skipped',
+      );
+    }
+
     const presTitle = 'Prescription Assigned';
-    const presBody  = 'Doctor has assigned prescription to you. Please review it.';
+    const presBody = 'Doctor has assigned prescription to you. Please review it.';
 
     // Inbox row first — patient_id is already known here, no token lookup needed.
     await insertNotification(patient_id, presTitle, presBody, 'prescription', prescription_id);
@@ -810,7 +955,10 @@ router.post('/insertPrescription', async (req, res) => {
         const fcmResp = await admin.messaging().send({
           token: patientToken,
           notification: { title: presTitle, body: presBody },
-          data: { type: 'prescription' },
+          data: {
+            type: 'prescription',
+            prescription_id: String(prescription_id),
+          },
         });
         console.log('[insertPrescription] FCM send OK:', fcmResp);
       } catch (err) {
@@ -869,14 +1017,16 @@ router.post('/appointment/queueNext', async (req, res) => {
     // 🔔 SEND NOTIFICATION TO NEXT PATIENT
     if (token) {
       const nextTitle = 'Your Turn Now';
-      const nextBody  = 'Doctor is ready to see you. Please proceed.';
+      const nextBody = 'Doctor is ready to see you. Please proceed.';
 
       await insertNotificationForToken(token, nextTitle, nextBody, 'appointment', appointment_id);
 
       await admin.messaging().send({
         token: token,
         notification: { title: nextTitle, body: nextBody },
-        data: { type: 'appointment' },
+        // appointment_id lets the killed-app FCM tap auto-open this exact
+        // appointment's detail sheet (otherwise patient just lands on list).
+        data: { type: 'appointment', appointment_id: String(appointment_id) },
       });
     }
 
@@ -910,7 +1060,7 @@ router.post('/appointment/queueStart', async (req, res) => {
   try {
     const result = await db.request()
       .input('operation', 'QUEUE_START')
-	  .input('queue_id', queue_id)
+      .input('queue_id', queue_id)
       .input('doctor_id', doctor_id)
       .execute('sp_appointment');
 
@@ -919,12 +1069,12 @@ router.post('/appointment/queueStart', async (req, res) => {
     // 🔥 FIRST ROW = STATUS
     const statusRow = rows[0] || {};
 
- /* if (statusRow.success !== 1) {
-      return res.json({
-        success: false,
-        message: statusRow|| 'Queue start failed'
-      });
-    }*/
+    /* if (statusRow.success !== 1) {
+         return res.json({
+           success: false,
+           message: statusRow|| 'Queue start failed'
+         });
+       }*/
 
     // 🔥 REMAINING ROWS = TOKENS
     const tokens = rows
@@ -940,7 +1090,7 @@ router.post('/appointment/queueStart', async (req, res) => {
     }
 
     const startTitle = 'Doctor Arrived';
-    const startBody  = 'Doctor has started serving. Please be ready.';
+    const startBody = 'Doctor has started serving. Please be ready.';
 
     for (const tk of tokens) {
       await insertNotificationForToken(tk, startTitle, startBody, 'queue', doctor_id);
@@ -954,6 +1104,10 @@ router.post('/appointment/queueStart', async (req, res) => {
     };
 
     const response = await admin.messaging().sendEachForMulticast(message);
+
+    // Catch patients who are already within 5–15 min of their turn at the
+    // moment the doctor starts (e.g. doctor opened the queue late).
+    sendProximityNotifications(doctor_id);
 
     return res.json({
       success: true,
@@ -975,7 +1129,7 @@ router.post('/appointment/queueStart', async (req, res) => {
 
 // QUEUE PAUSE
 router.post('/appointment/queuePause', async (req, res) => {
-  const { doctor_id , queue_id} = req.body;
+  const { doctor_id, queue_id } = req.body;
 
   if (!doctor_id) {
     return res.status(400).json({
@@ -987,14 +1141,16 @@ router.post('/appointment/queuePause', async (req, res) => {
   try {
     const result = await db.request()
       .input('operation', 'QUEUE_PAUSE')
-	  .input('queue_id', queue_id)
+      .input('queue_id', queue_id)
       .input('doctor_id', doctor_id)
       .execute('sp_appointment');
 
-    const rows = result.recordset || [];
-
-    // 🔥 FIRST ROW = STATUS
-    const statusRow = rows[0] || {};
+    // SP returns 2 separate result sets: [0] = status, [1] = token rows.
+    // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
+    // live in `result.recordsets[1]`.
+    const recordsets = result.recordsets || [];
+    const statusRow  = recordsets[0]?.[0] || {};
+    const tokenRows  = recordsets[1] || [];
 
     // ✅ CHECK SUCCESS
     if (statusRow.success !== 1) {
@@ -1004,9 +1160,7 @@ router.post('/appointment/queuePause', async (req, res) => {
       });
     }
 
-    // 🔥 REMAINING ROWS = TOKENS
-    const tokens = rows
-      .slice(1) // skip first row
+    const tokens = tokenRows
       .map(r => r.token)
       .filter(t => t && t.trim() !== '');
 
@@ -1015,7 +1169,7 @@ router.post('/appointment/queuePause', async (req, res) => {
     // 🔔 SEND NOTIFICATION
     if (tokens.length > 0) {
       const pauseTitle = 'Queue Paused';
-      const pauseBody  = 'Doctor has paused the queue. Please wait.';
+      const pauseBody = 'Doctor has paused the queue. Please wait.';
 
       for (const tk of tokens) {
         await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', doctor_id);
@@ -1075,11 +1229,11 @@ router.post('/appointment/queueStop', async (req, res) => {
     for (const row of (detailsRes.recordset || [])) {
       if (!row.owner_id) continue;
       affectedAppts.push({
-        patient_id:     row.owner_id,
-        token:          row.owner_token,
-        doctor_name:    row.doctor_name || 'your doctor',
-        date:           formatApptDate(row.appointment_date),
-        time:           formatApptTime(row.start_time),
+        patient_id: row.owner_id,
+        token: row.owner_token,
+        doctor_name: row.doctor_name || 'your doctor',
+        date: formatApptDate(row.appointment_date),
+        time: formatApptTime(row.start_time),
         appointment_id: row.appointment_id,
       });
     }
@@ -1121,9 +1275,9 @@ router.post('/appointment/queueStop', async (req, res) => {
             token: t.token,
             notification: { title: t.title, body: t.body },
             data: {
-              type:           'appointment',
-              action:         'cancelled',
-              doctor_id:      String(doctor_id),
+              type: 'appointment',
+              action: 'cancelled',
+              doctor_id: String(doctor_id),
               appointment_id: String(t.appointment_id),
             },
           }).catch(err => console.error('FCM err (queueStop):', err.message)),
@@ -1146,7 +1300,7 @@ router.post('/appointment/queueStop', async (req, res) => {
 
 //QUEUE SKIP
 router.post('/appointment/queueSkip', async (req, res) => {
-  const { doctor_id, appointment_id,is_next } = req.body;
+  const { doctor_id, appointment_id, is_next } = req.body;
 
   if (!doctor_id) {
     return res.status(400).json({ success: false, message: 'doctor_id is required' });
@@ -1161,7 +1315,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
       .input('operation', 'SKIP_SESSION')
       .input('doctor_id', doctor_id)
       .input('appointment_id', appointment_id)
-	      .input('is_next', is_next)
+      .input('is_next', is_next)
       .execute('sp_appointment');
 
     const row = result.recordset?.[0] ?? {};
@@ -1181,16 +1335,30 @@ router.post('/appointment/queueSkip', async (req, res) => {
     // 🔔 SEND ONLY TO SKIPPED PATIENT
     if (token) {
       const skipTitle = 'You were skipped';
-      const skipBody  = 'Doctor skipped your turn due to absence. Please contact clinic.';
+      const skipBody = 'Doctor skipped your turn due to absence. Please contact clinic.';
 
-      await insertNotificationForToken(token, skipTitle, skipBody, 'appointment', appointment_id);
+      try {
+        await insertNotificationForToken(token, skipTitle, skipBody, 'appointment', appointment_id);
+      } catch (notifErr) {
+        console.error('insertNotificationForToken failed:', notifErr.message);
+      }
 
-      await admin.messaging().send({
-        token: token,
-        notification: { title: skipTitle, body: skipBody },
-        data: { type: 'appointment' },
-      });
+      try {
+        await admin.messaging().send({
+          token: token,
+          notification: { title: skipTitle, body: skipBody },
+          // appointment_id lets the killed-app FCM tap auto-open the detail
+          // sheet for the skipped appointment so the patient can act on it.
+          data: { type: 'appointment', appointment_id: String(appointment_id) },
+        });
+      } catch (fcmErr) {
+        // Stale/unregistered tokens must not fail the skip operation
+        console.error('FCM send failed for skip notification:', fcmErr.code || fcmErr.message);
+      }
     }
+
+    // Skipping a patient moves everyone behind them up — re-scan proximity.
+    sendProximityNotifications(doctor_id);
 
     return res.json({
       success: true,
@@ -1313,9 +1481,13 @@ router.post('/appointment/endSession', async (req, res) => {
 
     console.log("3rd PATIENT TOKEN:", token);
 
+    // Re-evaluate proximity for everyone further back in the queue — every
+    // consultation that ends shifts each waiting patient one slot closer.
+    sendProximityNotifications(doctor_id);
+
     if (token) {
       const readyTitle = 'Be Ready';
-      const readyBody  = 'Your turn is coming soon. Please stay nearby.';
+      const readyBody = 'Your turn is coming soon. Please stay nearby.';
 
       await insertNotificationForToken(token, readyTitle, readyBody, 'queue', doctor_id);
 
@@ -1348,6 +1520,9 @@ router.post('/appointment/endSession', async (req, res) => {
 
 
 // QUEUE PAUSE (EMERGENCY)
+// Mirrors QUEUE_PAUSE convention: SP returns row[0] = status, rows[1..] = { token }
+// for every still-waiting patient on this queue. Each remaining patient gets an
+// "emergency pause" notification so they don't keep waiting in the dark.
 router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
   const { queue_id } = req.params;
 
@@ -1364,21 +1539,63 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
       .input('queue_id', queue_id)
       .execute('sp_appointment');
 
-    const row = result.recordset?.[0] || {};
+    // SP returns 2 separate result sets: [0] = status, [1] = token rows.
+    // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
+    // live in `result.recordsets[1]`.
+    const recordsets = result.recordsets || [];
+    const statusRow  = recordsets[0]?.[0] || {};
+    const tokenRows  = recordsets[1] || [];
 
-    if (row.success !== 1) {
+    console.log('[queuePauseEmergency] recordsets count:', recordsets.length);
+    console.log('[queuePauseEmergency] status row:', JSON.stringify(statusRow));
+    console.log('[queuePauseEmergency] token rows count:', tokenRows.length);
+
+    if (statusRow.success !== 1) {
       return res.json({
         success: false,
-        message: row.message || 'Queue pause failed'
+        message: statusRow.message || 'Queue pause failed'
+      });
+    }
+
+    const tokens = tokenRows
+      .map(r => r.token)
+      .filter(t => t && t.trim() !== '');
+
+    console.log('[queuePauseEmergency] tokens extracted:', tokens.length);
+
+    if (tokens.length > 0) {
+      const pauseTitle = 'Queue Paused (Emergency)';
+      const pauseBody = 'Doctor has paused the queue due to an emergency. Please wait — we will notify you when it resumes.';
+
+      for (const tk of tokens) {
+        await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', queue_id);
+      }
+
+      const message = {
+        notification: { title: pauseTitle, body: pauseBody },
+        data: { type: 'queue' },
+        tokens: tokens,
+      };
+
+      const response = await admin.messaging().sendEachForMulticast(message);
+      console.log('[queuePauseEmergency] FCM result:', response.successCount, '/', tokens.length);
+
+      return res.json({
+        success: true,
+        message: statusRow.message || 'Queue paused successfully',
+        total_tokens: tokens.length,
+        success_count: response.successCount,
+        failure_count: response.failureCount
       });
     }
 
     return res.json({
       success: true,
-      message: row.message || 'Queue paused successfully'
+      message: statusRow.message || 'Queue paused, no patients to notify'
     });
 
   } catch (error) {
+    console.error('[queuePauseEmergency] error:', error);
     return res.status(500).json({
       success: false,
       message: 'Queue pause failed',
@@ -1389,8 +1606,8 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
 
 
 //cron job ---------------------------------------------------------------------------------------------------------------------------------
-cron.schedule('0 14 * * *', async () =>{
- try {
+cron.schedule('0 14 * * *', async () => {
+  try {
     const result = await db.request()
       .input('operation', 'TOMORROW_PATIENT_APPOINTMENTS')
       .execute('sp_appointment');
@@ -1422,14 +1639,16 @@ cron.schedule('0 14 * * *', async () =>{
       });
 
       const remTitle = 'Appointment Reminder';
-      const remBody  = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
+      const remBody = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
 
       await insertNotificationForToken(token, remTitle, remBody, 'appointment', row.appointment_id);
 
       const message = {
         token: token,
         notification: { title: remTitle, body: remBody },
-        data: { type: 'appointment' },
+        // appointment_id lets the killed-app FCM tap auto-open the detail
+        // sheet for the reminded appointment.
+        data: { type: 'appointment', appointment_id: String(row.appointment_id) },
       };
 
       try {
@@ -1460,10 +1679,10 @@ cron.schedule('0 14 * * *', async () =>{
 });
 
 
-cron.schedule('0 15 * * *', async () =>{
- try {
+cron.schedule('0 15 * * *', async () => {
+  try {
     const result = await db.request()
-		  .input('operation', 'TOMORROW_PATIENT_APPOINTMENTS')
+      .input('operation', 'TOMORROW_PATIENT_APPOINTMENTS')
       .execute('sp_appointment');
 
     const rows = result.recordset || [];
@@ -1490,14 +1709,16 @@ cron.schedule('0 15 * * *', async () =>{
       });
 
       const remTitle = 'Appointment Reminder';
-      const remBody  = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
+      const remBody = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
 
       await insertNotificationForToken(token, remTitle, remBody, 'appointment', row.appointment_id);
 
       const message = {
         token: token,
         notification: { title: remTitle, body: remBody },
-        data: { type: 'appointment' },
+        // appointment_id lets the killed-app FCM tap auto-open the detail
+        // sheet for the reminded appointment.
+        data: { type: 'appointment', appointment_id: String(row.appointment_id) },
       };
 
       try {
@@ -1524,8 +1745,8 @@ cron.schedule('0 15 * * *', async () =>{
 });
 
 
-cron.schedule('0 16 * * *', async () =>{
-	  try {
+cron.schedule('0 16 * * *', async () => {
+  try {
     const result = await db.request()
       .input('operation', 'YESTERDAY_COMPLETED_PATIENTS')
       .execute('sp_appointment');
@@ -1550,7 +1771,7 @@ cron.schedule('0 16 * * *', async () =>{
       if (!token) continue;
 
       const rateTitle = 'Rate Your Experience';
-      const rateBody  = `How was your consultation with Dr. ${doctorName}? Tap to rate.`;
+      const rateBody = `How was your consultation with Dr. ${doctorName}? Tap to rate.`;
 
       await insertNotificationForToken(token, rateTitle, rateBody, 'rating', appointmentId);
 
@@ -1619,6 +1840,9 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
         message: row.message || 'Cancel failed'
       });
     }
+
+    // Cancelling a patient shifts everyone behind them up — re-scan proximity.
+    sendProximityNotifications(doctor_id);
 
     return res.json({
       success: true,

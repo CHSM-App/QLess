@@ -115,6 +115,7 @@ class _QlessSplashScreenState extends ConsumerState<QlessSplashScreen>
           context,
           MaterialPageRoute(
             builder: (_) => PatientBottomNav(
+              key: patientShellKey,
               onToggleTheme: () {},
               themeMode: ThemeMode.light,
             ),

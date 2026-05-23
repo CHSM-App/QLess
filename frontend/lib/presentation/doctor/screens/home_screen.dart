@@ -264,6 +264,43 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     ));
   }
 
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+    Color confirmColor = kPrimaryDark,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+        content: Text(message,
+            style: const TextStyle(fontSize: 13.5, color: kTextSecondary, height: 1.4)),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel',
+                style: TextStyle(color: kTextSecondary, fontWeight: FontWeight.w600)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: confirmColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(confirmLabel,
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    return ok == true;
+  }
+
   // ── Queue actions ─────────────────────────────────────────────────────────
 
   Future<void> _onQueueStart(int? queueId) async {
@@ -279,11 +316,20 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   Future<void> _onQueuePause(int? queueId) async {
+    final ok = await _confirm(
+      title: 'Pause Queue?',
+      message: 'Waiting patients will be notified that the queue is paused. '
+               'You can resume any time.',
+      confirmLabel: 'Pause',
+      confirmColor: kAmberDark,
+    );
+    if (!ok) return;
+
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
-      _snack(res.message ?? 'Queue paused'); 
+      _snack(res.message ?? 'Queue paused');
       await _refreshData();
     } catch (_) {
       _snack('Failed to pause queue');
@@ -330,11 +376,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
+  // Confirmation happens in the custom dialog at the caller site
+  // (see "Emergency Pause?" dialog below). No second confirm here.
   Future<void> _onQueuePauseEmergency(int? queueId) async {
     if (queueId == null) {
       _snack('Queue ID not available');
       return;
     }
+
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)

@@ -1282,6 +1282,104 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  NOTIFICATION DEEP-LINK ENTRY
+//  Mirrors appointment_screen.dart#_handleViewPrescription: pre-loads
+//  prescription details, shows a spinner while loading, then renders
+//  PatientPrescriptionViewScreen with the real data as fallback so the
+//  patient lands directly on the populated review UI — same as tapping
+//  "View Prescription" on a completed appointment.
+// ════════════════════════════════════════════════════════════════════
+class PrescriptionDetailEntry extends ConsumerStatefulWidget {
+  final int prescriptionId;
+  const PrescriptionDetailEntry({super.key, required this.prescriptionId});
+  @override
+  ConsumerState<PrescriptionDetailEntry> createState() =>
+      _PrescriptionDetailEntryState();
+}
+
+class _PrescriptionDetailEntryState
+    extends ConsumerState<PrescriptionDetailEntry> {
+  bool _loading = true;
+  List<PrescriptionModel>? _details;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetch());
+  }
+
+  Future<void> _fetch() async {
+    try {
+      await ref
+          .read(prescriptionViewModelProvider.notifier)
+          .patientPrescriptionDetails(widget.prescriptionId);
+      if (!mounted) return;
+      final loaded =
+          ref.read(prescriptionViewModelProvider).prescriptionDetailsPatient;
+      setState(() {
+        _details = loaded;
+        _loading = false;
+        _error   = (loaded == null || loaded.isEmpty)
+            ? 'Prescription not found'
+            : null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error   = 'Failed to load prescription';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(child: CircularProgressIndicator(color: kPrimary)),
+      );
+    }
+
+    if (_error != null || _details == null || _details!.isEmpty) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                color: kPrimary, size: 16),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: Center(
+          child: Text(
+            _error ?? 'Prescription not found',
+            style: const TextStyle(color: kTextSecondary, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    final st   = ref.read(patientLoginViewModelProvider);
+    final pid  = st.patientId ?? 0;
+    final name = st.name ?? 'Patient';
+    final rx = PatientPrescription.fromFlatList(
+      _details!,
+      fallbackPatientId:   pid,
+      fallbackPatientName: name,
+    );
+    return PatientPrescriptionViewScreen(
+      prescriptionId: widget.prescriptionId,
+      fallback:       rx,
+      patientId:      pid,
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  PRESCRIPTION VIEW SCREEN
 // ════════════════════════════════════════════════════════════════════
 class PatientPrescriptionViewScreen extends ConsumerStatefulWidget {

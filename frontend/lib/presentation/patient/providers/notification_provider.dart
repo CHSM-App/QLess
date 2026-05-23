@@ -24,19 +24,41 @@ class NotificationItem {
     this.isRead = false,
   });
 
-  // SP returns: notification_id, title, body, type, ref_id, is_read, created_at
+  // SP returns: notification_id, title, body, type, ref_id, is_read, created_at.
+  // The timestamp column has shown up under several casings depending on how
+  // the SP aliases it — try common variants so we don't silently fall back to
+  // DateTime.now() (which makes every row read as "Just now").
   factory NotificationItem.fromJson(Map<String, dynamic> json) {
     final readRaw = json['is_read'];
-    final created = json['created_at']?.toString();
+    final createdRaw = json['created_at']
+        ?? json['createdAt']
+        ?? json['CreatedAt']
+        ?? json['Created_at']
+        ?? json['created_date']
+        ?? json['received_at']
+        ?? json['receivedAt'];
+    DateTime? parsed;
+    if (createdRaw != null) {
+      final s = createdRaw.toString();
+      // SQL Server often returns datetime without a 'Z' suffix even when the
+      // column stores UTC — append one if missing so tryParse treats it as UTC
+      // and .toLocal() shifts it correctly. Skip if it already has an offset.
+      final needsZ = !s.endsWith('Z') &&
+          !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
+      parsed = DateTime.tryParse(needsZ ? '${s}Z' : s)?.toLocal();
+    }
+    if (parsed == null && kDebugMode) {
+      debugPrint(
+        'NotificationItem: no timestamp parsed — keys=${json.keys.toList()}',
+      );
+    }
     return NotificationItem(
       id: (json['notification_id'] as num?)?.toInt(),
       title: (json['title'] ?? '').toString(),
       body:  (json['body']  ?? '').toString(),
       type:  (json['type']  ?? 'general').toString(),
       refId: json['ref_id']?.toString(),
-      receivedAt: created != null
-          ? DateTime.tryParse(created)?.toLocal() ?? DateTime.now()
-          : DateTime.now(),
+      receivedAt: parsed ?? DateTime.now(),
       isRead: readRaw == true || readRaw == 1 || readRaw == '1',
     );
   }

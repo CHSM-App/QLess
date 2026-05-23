@@ -199,6 +199,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
         context,
         MaterialPageRoute(
           builder: (_) => PatientBottomNav(
+            key: patientShellKey,
             onToggleTheme: () {},
             themeMode: ThemeMode.light,
           ),

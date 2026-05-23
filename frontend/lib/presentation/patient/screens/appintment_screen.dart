@@ -277,6 +277,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool   _isWaiting    = false;
   bool   _idMissing    = false;
   bool   _didReadRouteArgs = false; // honour route args (e.g. filter=cancelled) once
+  int?   _pendingDetailApptId;      // notification tap: auto-open this appt's detail
+  int?   _pendingRatingApptId;      // 'Appointment Complete' notification: open review dialog
 
   // ── Date filter state ──────────────────────────────────────────────
   _DateFilter _dateFilter = _DateFilter.all;
@@ -304,14 +306,21 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     _didReadRouteArgs = true;
 
     final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map && args['filter'] is String) {
-      final filterKey = args['filter'] as String;
-      final idx = _filters.indexWhere((f) => f.key == filterKey);
-      if (idx != -1 && _tabCtrl.index != idx) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _tabCtrl.animateTo(idx);
-        });
+    if (args is Map) {
+      if (args['filter'] is String) {
+        final filterKey = args['filter'] as String;
+        final idx = _filters.indexWhere((f) => f.key == filterKey);
+        if (idx != -1 && _tabCtrl.index != idx) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _tabCtrl.animateTo(idx);
+          });
+        }
       }
+      // Notification-tap deep link: auto-open the detail sheet for this
+      // specific appointment once the list finishes loading.
+      final rawId = args['appointment_id'];
+      final apptId = rawId is int ? rawId : int.tryParse('$rawId');
+      if (apptId != null && apptId > 0) _pendingDetailApptId = apptId;
     }
   }
 
@@ -386,6 +395,90 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         onReschedule: _canReschedule(a) ? () { Navigator.pop(context); _handleReschedule(a); } : null,
       ),
     );
+  }
+
+  // Auto-open the detail sheet for an appointment_id passed in via route
+  // arguments or applyDeepLink. Only consume the pending id when we actually
+  // find the matching row — otherwise the FIRST rebuild (which happens
+  // before the appointments fetch resolves) would swallow the id and the
+  // subsequent rebuild with the loaded list would no-op.
+  void _maybeOpenPendingDetail(List<AppointmentList> list) {
+    final targetId = _pendingDetailApptId;
+    if (targetId == null) return;
+    AppointmentList? found;
+    for (final a in list) {
+      if (a.appointmentId == targetId) { found = a; break; }
+    }
+    if (found == null) return;
+    _pendingDetailApptId = null;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openDetail(found!);
+    });
+  }
+
+  // Called by the patient shell (PatientBottomNav) when a notification tap
+  // drops the user on the in-shell Appointments tab with deep-link args.
+  // Unlike the route-args path in didChangeDependencies (which fires once),
+  // this is replayable so the same screen instance handles repeated taps.
+  void applyDeepLink({String? filter, int? appointmentId}) {
+    if (filter != null) {
+      final idx = _filters.indexWhere((f) => f.key == filter);
+      if (idx != -1 && _tabCtrl.index != idx) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _tabCtrl.animateTo(idx);
+        });
+      }
+    }
+    if (appointmentId != null && appointmentId > 0) {
+      setState(() => _pendingDetailApptId = appointmentId);
+      // Force a refetch so the new appointment id is in the list when the
+      // next build calls _maybeOpenPendingDetail.
+      refreshOnVisible();
+    }
+  }
+
+  // 'Appointment Complete — review it' notification: jump straight to the
+  // review dialog for this appointment, skipping the detail sheet. We need
+  // the appointment row (doctor name, doctor_id, patient_id) which we look
+  // up from the loaded list in _maybeOpenRatingDialog on the next build.
+  //
+  // Also switch the underlying tab to Completed — the appointment must be
+  // completed for the Rate action to be valid, and landing on the right
+  // tab gives the patient correct context when they close the dialog
+  // (otherwise they see "Today" with no sign of the appointment they just
+  // reviewed, which feels broken).
+  void applyRatingDeepLink(int appointmentId) {
+    if (appointmentId <= 0) return;
+    final idx = _filters.indexWhere((f) => f.key == 'completed');
+    if (idx != -1 && _tabCtrl.index != idx) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _tabCtrl.animateTo(idx);
+      });
+    }
+    setState(() => _pendingRatingApptId = appointmentId);
+    refreshOnVisible();
+  }
+
+  // Mirror of _maybeOpenPendingDetail but for the rating dialog. Fires from
+  // build's data callback once the list contains the matched appointment.
+  // Skips silently if the patient already submitted a review for it.
+  void _maybeOpenRatingDialog(List<AppointmentList> list) {
+    final targetId = _pendingRatingApptId;
+    if (targetId == null) return;
+    AppointmentList? found;
+    for (final a in list) {
+      if (a.appointmentId == targetId) { found = a; break; }
+    }
+    if (found == null) return;
+    _pendingRatingApptId = null;
+    // Defer to next frame so the build that invoked us has settled before
+    // the modal pushes another route on top.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (_canReview(found!)) {
+        _handleReview(context, found);
+      }
+    });
   }
 
   bool _canReview(AppointmentList a) {
@@ -655,7 +748,11 @@ bool get _hasDateFilter =>
                           : async.when(
                               loading: () => _buildLoading('Fetching appointments…'),
                               error: (_, __) => _buildError(),
-                              data: (list) => _buildTabContent(list),
+                              data: (list) {
+                                _maybeOpenPendingDetail(list);
+                                _maybeOpenRatingDialog(list);
+                                return _buildTabContent(list);
+                              },
                             ),
             ),
           ],
