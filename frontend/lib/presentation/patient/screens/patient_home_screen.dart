@@ -15,6 +15,7 @@ import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
+import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 
@@ -260,6 +261,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       }
       if (pid == 0) return;
       _didFetch = true;
+      // Refresh the notification inbox in parallel so the header bell's unread
+      // count is accurate on cold start — without this, the badge stays empty
+      // until an FCM arrives or the user opens the Notifications screen.
+      ref.read(notificationProvider.notifier).loadFromServer();
       await Future.wait([
         ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(pid),
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
@@ -1406,7 +1411,11 @@ class _LocationSheetState extends State<_LocationSheet> {
 // ════════════════════════════════════════════════════════════════════
 //  HEADER BUTTON
 // ════════════════════════════════════════════════════════════════════
-class _HeaderBtn extends StatelessWidget {
+// When `badge: true`, the button watches `notificationProvider` and shows the
+// unread count as a numeric badge. The bell icon also performs a periodic
+// shake animation while there are unread notifications — borrowed from the
+// Instagram/Practo header pattern — and falls silent once everything is read.
+class _HeaderBtn extends ConsumerStatefulWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool badge;
@@ -1414,31 +1423,112 @@ class _HeaderBtn extends StatelessWidget {
       {required this.icon, required this.onTap, this.badge = false});
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Stack(children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF7F8FA),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kBorder),
-            ),
-            child: Icon(icon, color: kTextPrimary, size: 17),
+  ConsumerState<_HeaderBtn> createState() => _HeaderBtnState();
+}
+
+class _HeaderBtnState extends ConsumerState<_HeaderBtn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _shake;
+
+  @override
+  void initState() {
+    super.initState();
+    // ~3s cycle. The actual shake plays in the first ~25% of the timeline
+    // (a TweenSequence wobble), the remaining ~75% is a flat 0 hold so the
+    // bell pulses every few seconds instead of wobbling continuously — same
+    // cadence Instagram uses for its activity bell.
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    );
+    _shake = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0,  end:  0.25), weight: 4),
+      TweenSequenceItem(tween: Tween(begin: 0.25, end: -0.25), weight: 6),
+      TweenSequenceItem(tween: Tween(begin:-0.25, end:  0.18), weight: 6),
+      TweenSequenceItem(tween: Tween(begin: 0.18, end: -0.12), weight: 5),
+      TweenSequenceItem(tween: Tween(begin:-0.12, end:  0.0 ), weight: 4),
+      TweenSequenceItem(tween: ConstantTween(0.0),             weight: 75),
+    ]).animate(_ctrl);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  // Start/stop the loop based on unread count. Run after the current frame
+  // so we don't mutate animation state from inside build().
+  void _syncAnimation(int unread) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (unread > 0 && !_ctrl.isAnimating) {
+        _ctrl.repeat();
+      } else if (unread == 0 && _ctrl.isAnimating) {
+        _ctrl.stop();
+        _ctrl.value = 0;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final unread = widget.badge
+        ? ref.watch(notificationProvider).where((n) => !n.isRead).length
+        : 0;
+    _syncAnimation(unread);
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Stack(clipBehavior: Clip.none, children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF7F8FA),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kBorder),
           ),
-          if (badge)
-            Positioned(
-              right: 7,
-              top: 7,
-              child: Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                      color: kWarning, shape: BoxShape.circle)),
+          alignment: Alignment.center,
+          child: AnimatedBuilder(
+            animation: _shake,
+            builder: (_, child) => Transform.rotate(
+              angle: _shake.value,
+              // Pivot from the top so the bell swings like it's hanging.
+              alignment: Alignment.topCenter,
+              child: child,
             ),
-        ]),
-      );
+            child: Icon(widget.icon, color: kTextPrimary, size: 17),
+          ),
+        ),
+        if (unread > 0)
+          Positioned(
+            right: -3,
+            top: -3,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: kWarning,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                unread > 99 ? '99+' : '$unread',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
+                ),
+              ),
+            ),
+          ),
+      ]),
+    );
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════

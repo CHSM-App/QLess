@@ -40,12 +40,20 @@ class NotificationItem {
     DateTime? parsed;
     if (createdRaw != null) {
       final s = createdRaw.toString();
-      // SQL Server often returns datetime without a 'Z' suffix even when the
-      // column stores UTC — append one if missing so tryParse treats it as UTC
-      // and .toLocal() shifts it correctly. Skip if it already has an offset.
-      final needsZ = !s.endsWith('Z') &&
-          !RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
-      parsed = DateTime.tryParse(needsZ ? '${s}Z' : s)?.toLocal();
+      // The `notifications.created_at` column is SQL Server `datetime` with
+      // default `GETDATE()` — i.e. server LOCAL time, no timezone metadata.
+      // node-mssql still tacks on a 'Z' during JSON serialization, which would
+      // make Dart treat the value as UTC and .toLocal() would shift it +5:30
+      // into the future (every row then reads as "Just now"). Strip a bare
+      // trailing 'Z' so we parse as local; preserve explicit offsets like
+      // +05:30 if the SP is ever changed to emit them.
+      final hasExplicitOffset =
+          RegExp(r'[+-]\d{2}:?\d{2}$').hasMatch(s);
+      final cleaned = (!hasExplicitOffset && s.endsWith('Z'))
+          ? s.substring(0, s.length - 1)
+          : s;
+      parsed = DateTime.tryParse(cleaned);
+      if (parsed != null && parsed.isUtc) parsed = parsed.toLocal();
     }
     if (parsed == null && kDebugMode) {
       debugPrint(
