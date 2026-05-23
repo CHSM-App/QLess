@@ -4,10 +4,26 @@
 // sync via the foreground FCM listener (main.dart → loadFromServer). The
 // screen handles its own tap routing into appointments / prescription.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/navigation/navigator_key.dart';
 import 'package:qless/core/theme/patient_theme.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
+import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
+
+// Clinic-wide queue announcements (Doctor Arrived / Queue Paused / Queue
+// Paused (Emergency)) carry no per-patient destination — backend mirrors
+// them with ref_id=doctor_id|queue_id, so any "open this appointment" deep
+// link would silently no-op. Treat them as informational: tap = mark read,
+// hide the forward-arrow so the card doesn't falsely advertise a deep link.
+bool _isInformationalQueueAnnouncement(NotificationItem n) {
+  if (n.type != 'queue') return false;
+  final t = n.title.trim().toLowerCase();
+  return t == 'doctor arrived' ||
+      t == 'queue paused' ||
+      t == 'queue paused (emergency)';
+}
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -31,26 +47,72 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   // Route each notification to the screen it's about. Tap also marks it read.
   // Cancellation / reschedule notifications jump straight to the "Cancelled"
   // filter so the patient sees the affected appointment and can rebook it.
+  //
+  // Architecture note: we pop this screen first, then drive the patient
+  // shell (PatientBottomNav) via `patientShellKey` instead of pushing
+  // standalone routes. Pushing /appointment as a top-level route hides the
+  // bottom bar and creates a screen instance outside the shell — switching
+  // tabs IN the shell keeps the bottom bar visible and back-stack clean.
   void _handleTap(BuildContext context, NotificationItem n) {
+    // Clinic-wide queue announcements have no actionable destination — the
+    // tap is just an ack. Returning early leaves the user on the inbox.
+    if (_isInformationalQueueAnnouncement(n)) return;
+
     final titleLower = n.title.toLowerCase();
-    final isCancellation =
-        titleLower.contains('cancel') || titleLower.contains('reschedule');
+    // Cancel and reschedule land on DIFFERENT tabs: cancellation goes to
+    // the Cancelled tab (status='cancelled' shows there), but reschedule
+    // keeps status='reschedule' which the Cancelled filter explicitly
+    // excludes — so route reschedule to 'all' where it's visible.
+    final isCancel     = titleLower.contains('cancel');
+    final isReschedule = titleLower.contains('reschedule');
+
+    // Drop the inbox screen so a back press from the destination lands on
+    // the shell (home tab) rather than re-opening notifications.
+    Navigator.pop(context);
 
     switch (n.type) {
       case 'prescription':
-        Navigator.pushNamed(context, '/prescription');
+        // Inbox row stores prescription_id in ref_id. If present, open the
+        // specific prescription detail; otherwise fall back to the list.
+        final pid = int.tryParse(n.refId ?? '');
+        if (kDebugMode) {
+          debugPrint(
+            '[NotifInbox] prescription tap → refId="${n.refId}" parsed=$pid '
+            '(title="${n.title}")',
+          );
+        }
+        if (pid != null && pid > 0) {
+          navigatorKey.currentState
+              ?.pushNamed('/prescription-detail', arguments: pid);
+        } else {
+          navigatorKey.currentState?.pushNamed('/prescription');
+        }
+        break;
+      case 'rating':
+        // 'Appointment Complete — review it' notification: jump straight to
+        // the review dialog (Practo-style direct action) rather than the
+        // detail sheet. ref_id carries appointment_id.
+        final ratingApptId = int.tryParse(n.refId ?? '');
+        if (ratingApptId != null && ratingApptId > 0) {
+          requestAppointmentsRatingDialog(ratingApptId);
+        }
         break;
       case 'appointment':
       case 'queue':
-      case 'rating':
-        Navigator.pushNamed(
-          context,
-          '/appointment',
-          arguments: isCancellation ? {'filter': 'cancelled'} : null,
+        // Inbox row's ref_id is the appointment_id for these types.
+        final apptId = int.tryParse(n.refId ?? '');
+        patientShellKey.currentState?.openAppointmentsDeepLink(
+          filter: isCancel
+              ? 'cancelled'
+              : isReschedule
+                  ? 'all'
+                  : null,
+          appointmentId: (apptId != null && apptId > 0) ? apptId : null,
         );
         break;
       default:
-        // 'general' or unknown — stay on the inbox.
+        // 'general' or unknown — stay on the inbox (already popped above —
+        // user lands on shell home, acceptable).
         break;
     }
   }
@@ -337,7 +399,8 @@ class _NotificationCard extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        if (item.type != 'general')
+                        if (item.type != 'general' &&
+                            !_isInformationalQueueAnnouncement(item))
                           Icon(
                             Icons.arrow_forward_ios_rounded,
                             size: 11,

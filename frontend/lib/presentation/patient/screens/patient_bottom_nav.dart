@@ -6,6 +6,48 @@ import 'package:qless/presentation/patient/screens/doctor_explore.dart';
 import 'package:qless/presentation/patient/screens/patient_home_screen.dart';
 import 'package:qless/presentation/patient/screens/profile.dart';
 
+// Global handle so notification taps can drive the patient shell from
+// anywhere (in-app inbox, FCM tray) — they switch the active tab and pass
+// deep-link args to the in-shell AppointmentScreen, which keeps the bottom
+// bar visible and avoids pushing standalone screens on top of the shell.
+final GlobalKey<PatientBottomNavState> patientShellKey =
+    GlobalKey<PatientBottomNavState>();
+
+// Cold-start FCM tap fires before the shell mounts (getInitialMessage runs
+// in main() pre-runApp). Queue the deep link here; the shell's initState
+// drains it on mount.
+({String? filter, int? appointmentId})? _pendingAppointmentsDeepLink;
+int? _pendingRatingAppointmentId;
+
+/// Apply an Appointments deep link now if the shell is mounted, otherwise
+/// queue it for when the shell mounts. Safe to call from FCM handlers that
+/// may fire before the UI exists.
+void requestAppointmentsDeepLink({String? filter, int? appointmentId}) {
+  final state = patientShellKey.currentState;
+  if (state != null) {
+    state.openAppointmentsDeepLink(
+      filter: filter,
+      appointmentId: appointmentId,
+    );
+  } else {
+    _pendingAppointmentsDeepLink =
+        (filter: filter, appointmentId: appointmentId);
+  }
+}
+
+/// Jump directly to the review dialog for [appointmentId] (used by the
+/// "Appointment Complete — review it" notification). Queues for shell
+/// mount if FCM tap fired on cold start.
+void requestAppointmentsRatingDialog(int appointmentId) {
+  if (appointmentId <= 0) return;
+  final state = patientShellKey.currentState;
+  if (state != null) {
+    state.openAppointmentsRatingDialog(appointmentId);
+  } else {
+    _pendingRatingAppointmentId = appointmentId;
+  }
+}
+
 class PatientBottomNav extends StatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
@@ -19,10 +61,10 @@ class PatientBottomNav extends StatefulWidget {
   });
 
   @override
-  State<PatientBottomNav> createState() => _PatientBottomNavState();
+  State<PatientBottomNav> createState() => PatientBottomNavState();
 }
 
-class _PatientBottomNavState extends State<PatientBottomNav>
+class PatientBottomNavState extends State<PatientBottomNav>
     with TickerProviderStateMixin {
   int _tab = 0;
   bool _isDragging = false;
@@ -80,6 +122,32 @@ static const _regularNavHeight = 56.0;
     }
   }
 
+  // Called by notification tap handlers (in-app inbox + FCM tray) to drop
+  // the patient on the Appointments tab with a specific filter / detail
+  // sheet pre-opened. Keeps the bottom bar visible — pushing /appointment
+  // as a standalone route hides it.
+  void openAppointmentsDeepLink({String? filter, int? appointmentId}) {
+    _setTab(2);
+    // Defer so the IndexedStack swap has finished and the in-shell
+    // AppointmentScreen's state is available.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _appointmentsKey.currentState?.applyDeepLink(
+        filter: filter,
+        appointmentId: appointmentId,
+      );
+    });
+  }
+
+  // 'Appointment Complete — review it' notification: switch to Appointments
+  // tab (so the review submission has list context to refresh on) and ask
+  // the in-shell screen to pop the rating dialog as soon as the row loads.
+  void openAppointmentsRatingDialog(int appointmentId) {
+    _setTab(2);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _appointmentsKey.currentState?.applyRatingDeepLink(appointmentId);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +186,30 @@ static const _regularNavHeight = 56.0;
     if (_tab == 2) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _appointmentsKey.currentState?.refreshOnVisible();
+      });
+    }
+
+    // Drain any FCM deep link queued before the shell mounted (cold-start
+    // notification tap). Done after first frame so the IndexedStack screens
+    // have their states ready to receive applyDeepLink.
+    final pending = _pendingAppointmentsDeepLink;
+    if (pending != null) {
+      _pendingAppointmentsDeepLink = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openAppointmentsDeepLink(
+          filter: pending.filter,
+          appointmentId: pending.appointmentId,
+        );
+      });
+    }
+
+    final pendingRating = _pendingRatingAppointmentId;
+    if (pendingRating != null) {
+      _pendingRatingAppointmentId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        openAppointmentsRatingDialog(pendingRating);
       });
     }
   }

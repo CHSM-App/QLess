@@ -11,6 +11,7 @@ import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/shared/controllers/sync_controller.dart';
@@ -26,32 +27,80 @@ Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
 }
 
 // Step 2 — Notification tap router (FCM tray tap, foreground or background)
+//
+// Architecture: appointment / queue / rating taps drive the patient shell
+// via `requestAppointmentsDeepLink` so the bottom bar stays visible and
+// the in-shell AppointmentScreen handles the deep link (filter + id). The
+// helper queues the link if the shell isn't mounted yet (cold-start case
+// where getInitialMessage fires before runApp).
+//
+// Prescription has no shell tab, so it stays a standalone push — but we
+// pop down to the shell root first so back from the prescription detail
+// lands on the home tab rather than a deeply-nested route.
 void _handleNotificationTap(Map<String, dynamic> data) {
   final type   = data['type']?.toString();
   final action = data['action']?.toString();
   final nav    = navigatorKey.currentState;
-  if (nav == null) return;
 
-  // Cancellation / reschedule pushes land on the Cancelled tab so the patient
-  // can immediately see the affected appointment and rebook it.
-  final isCancellation = action == 'cancelled' || action == 'rebook';
+  // Cancel and reschedule land on DIFFERENT tabs: cancellation goes to
+  // Cancelled (where status='cancelled' shows), but reschedule keeps
+  // status='reschedule' which the Cancelled filter excludes — so route
+  // reschedule to 'all' where it's actually visible.
+  final isCancel     = action == 'cancelled';
+  final isReschedule = action == 'rebook';
+
+  void popToRoot() {
+    nav?.popUntil((r) => r.isFirst);
+  }
 
   switch (type) {
     case 'appointment':
-    case 'queue':
-      nav.pushNamed(
-        '/appointment',
-        arguments: isCancellation ? {'filter': 'cancelled'} : null,
+    case 'queue': {
+      final apptId = int.tryParse(data['appointment_id']?.toString() ?? '');
+      popToRoot();
+      requestAppointmentsDeepLink(
+        filter: isCancel
+            ? 'cancelled'
+            : isReschedule
+                ? 'all'
+                : null,
+        appointmentId: (apptId != null && apptId > 0) ? apptId : null,
       );
       break;
-    case 'prescription':
-      nav.pushNamed('/prescription');
+    }
+    case 'rating': {
+      // 'Appointment Complete — review it' (fires immediately from
+      // /insertPrescription) and the next-day rating cron both use this
+      // path: open the review dialog directly rather than the detail
+      // sheet, so the patient can rate in one tap.
+      final apptId = int.tryParse(data['appointment_id']?.toString() ?? '');
+      popToRoot();
+      if (apptId != null && apptId > 0) {
+        requestAppointmentsRatingDialog(apptId);
+      }
       break;
-    case 'rating':
-      nav.pushNamed('/appointment');
+    }
+    case 'prescription': {
+      // Practo-style deep link: open the specific prescription detail when
+      // the push carries prescription_id. Fall back to the list if missing.
+      final pidRaw = data['prescription_id']?.toString();
+      final pid    = int.tryParse(pidRaw ?? '');
+      if (kDebugMode) {
+        debugPrint(
+          '[FCMTap] prescription tap → prescription_id="$pidRaw" parsed=$pid',
+        );
+      }
+      if (nav == null) return;
+      popToRoot();
+      if (pid != null && pid > 0) {
+        nav.pushNamed('/prescription-detail', arguments: pid);
+      } else {
+        nav.pushNamed('/prescription');
+      }
       break;
+    }
     default:
-      nav.pushNamed('/notifications');
+      nav?.pushNamed('/notifications');
   }
 }
 
@@ -128,6 +177,15 @@ class HealthcareApp extends StatelessWidget {
         '/notifications': (_) => const NotificationsScreen(),
         '/appointment':   (_) => const AppointmentScreen(),
         '/prescription':  (_) => const PatientPrescriptionListScreen(),
+        // Deep link from notification tap → specific prescription detail.
+        // The prescription_id arrives via Navigator arguments (int).
+        '/prescription-detail': (ctx) {
+          final args = ModalRoute.of(ctx)?.settings.arguments;
+          final pid  = args is int ? args : int.tryParse('$args') ?? 0;
+          return pid > 0
+              ? PrescriptionDetailEntry(prescriptionId: pid)
+              : const PatientPrescriptionListScreen();
+        },
         // Auth landing — used by TokenInterceptor when refresh fails and we
         // must drop the user back to a clean state. ContinueAsScreen (role
         // picker) is the right target rather than LoginScreen directly,
