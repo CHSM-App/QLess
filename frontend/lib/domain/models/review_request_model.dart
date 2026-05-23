@@ -13,8 +13,11 @@ class ReviewRequestModel {
   @JsonKey(name: 'patient_id')
   int patientId;
 
+  // Stored as decimal so half-star reviews (e.g. 3.5) round-trip cleanly.
+  // Backend rating column should be DECIMAL(2,1) (or FLOAT) — INT will
+  // silently truncate 3.5 to 3.
   @JsonKey(name: 'rating')
-  int rating;
+  double rating;
 
   @JsonKey(name: 'comment')
   String? comment;

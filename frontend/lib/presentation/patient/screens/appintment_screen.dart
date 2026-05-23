@@ -2547,10 +2547,19 @@ class _DetailSheet extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  REVIEW DIALOG  (unchanged)
+//  REVIEW DIALOG — responsive + half-star (Practo/Google-style)
+//
+//  - Rating is a `double` so half-stars round-trip end-to-end (UI →
+//    ReviewRequestModel → API → DB DECIMAL).
+//  - Tap detection: tap on the LEFT half of a star sets rating to N.5,
+//    RIGHT half sets it to N.0.
+//  - Width is clamped responsive so the dialog feels right on phones,
+//    tablets, and desktop without overflowing.
+//  - Wrapped in SingleChildScrollView so the keyboard never pushes the
+//    Submit button off-screen on short devices.
 // ════════════════════════════════════════════════════════════════════
 class AppointmentReviewInput {
-  final int rating;
+  final double rating;
   final String comment;
   const AppointmentReviewInput({required this.rating, required this.comment});
 }
@@ -2562,188 +2571,320 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
   String? doctorInitials,
 }) {
   final commentCtrl = TextEditingController();
-  int rating = 0, hovered = 0;
-  const starColors = [
+  double rating = 0.0;
+
+  const starColors = <Color>[
     Colors.transparent,
     Color(0xFFE24B4A), Color(0xFFEF9F27),
     Color(0xFF639922), Color(0xFF1D9E75), Color(0xFF378ADD),
   ];
   const starLabels = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
+  const starSize = 40.0;
+  const starGap = 6.0;
+
+  String fmtRating(double r) =>
+      r == r.truncateToDouble() ? r.toStringAsFixed(0) : r.toStringAsFixed(1);
 
   return showDialog<AppointmentReviewInput>(
     context: context,
-    barrierColor: Colors.black54,
+    barrierColor: Colors.black.withValues(alpha: 0.55),
     barrierDismissible: false,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) {
-        final active = hovered > 0 ? hovered : rating;
-        return Dialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(
-                          color: kPrimaryLight,
-                          borderRadius: BorderRadius.circular(12)),
-                      alignment: Alignment.center,
-                      child: Text(
-                        (doctorInitials ?? doctorName.substring(0, 2))
-                            .toUpperCase(),
-                        style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: kPrimary),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+    builder: (ctx) {
+      final mq = MediaQuery.of(ctx);
+      // Phones: 92% width; tablets/desktop: cap at 420 so the row of stars
+      // doesn't sprawl across a wide screen.
+      final maxDialogWidth =
+          mq.size.width >= 600 ? 420.0 : (mq.size.width * 0.92);
+
+      return StatefulBuilder(
+        builder: (ctx, setState) {
+          // Whole-star "bucket" used for label/colour (3.5 → "Very good").
+          final activeIdx   = rating.ceil().clamp(0, 5);
+          final activeColor =
+              activeIdx > 0 ? starColors[activeIdx] : kTextMuted;
+
+          return Dialog(
+            insetPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            backgroundColor: Colors.white,
+            elevation: 12,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: maxDialogWidth,
+                minWidth: 280,
+              ),
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ── Header ────────────────────────────────────────
+                      Row(
                         children: [
-                          const Text('Rate your visit',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                  color: kTextPrimary)),
-                          Text(
-                            'Dr. $doctorName${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
-                            style: const TextStyle(
-                                fontSize: 11, color: kTextSecondary),
+                          Container(
+                            width: 46, height: 46,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [kPrimary, kPrimaryDark],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(13),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: kPrimary.withValues(alpha: 0.25),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              (doctorInitials ??
+                                      (doctorName.length >= 2
+                                          ? doctorName.substring(0, 2)
+                                          : doctorName))
+                                  .toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Rate your visit',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: kTextPrimary,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Dr. $doctorName${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: kTextSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: 'Close',
+                            visualDensity: VisualDensity.compact,
+                            icon: const Icon(Icons.close_rounded,
+                                size: 20, color: kTextMuted),
+                            onPressed: () => Navigator.pop(ctx),
                           ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                const Divider(height: 1, color: kBorder),
-                const SizedBox(height: 14),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('How was your experience?',
-                      style: TextStyle(fontSize: 12, color: kTextSecondary)),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: List.generate(5, (i) {
-                    final idx    = i + 1;
-                    final filled = idx <= active;
-                    final color  = active > 0 ? starColors[active] : kBorder;
-                    return GestureDetector(
-                      onTap: () =>
-                          setState(() { rating = idx; hovered = 0; }),
-                      child: MouseRegion(
-                        onEnter: (_) => setState(() => hovered = idx),
-                        onExit:  (_) => setState(() => hovered = 0),
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Icon(
-                            filled
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            size: 32,
-                            color: filled ? color : kBorder,
+
+                      const SizedBox(height: 16),
+                      Container(height: 1, color: kBorder),
+                      const SizedBox(height: 16),
+
+                      // ── Prompt + stars ────────────────────────────────
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'How was your experience?',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: kTextSecondary,
                           ),
                         ),
                       ),
-                    );
-                  }),
-                ),
-                const SizedBox(height: 4),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 150),
-                  child: active > 0
-                      ? Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(starLabels[active],
-                              key: ValueKey(active),
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: starColors[active])),
-                        )
-                      : const SizedBox(height: 16),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: commentCtrl,
-                  maxLines: 3,
-                  style: const TextStyle(fontSize: 13, color: kTextPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Write a short review (optional)',
-                    hintStyle: const TextStyle(fontSize: 13, color: kTextMuted),
-                    filled: true,
-                    fillColor: const Color(0xFFF7F8FA),
-                    contentPadding: const EdgeInsets.all(12),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: kBorder),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide:
-                          const BorderSide(color: kPrimary, width: 1.5),
-                    ),
+                      const SizedBox(height: 12),
+
+                      // Stars row — each star detects left/right-half tap
+                      // for .5 vs .0 precision (industry-standard pattern).
+                      Center(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: List.generate(5, (i) {
+                            final idx = i + 1; // 1..5
+                            final fill =
+                                (rating - (idx - 1)).clamp(0.0, 1.0);
+
+                            IconData icon;
+                            if (fill >= 1.0) {
+                              icon = Icons.star_rounded;
+                            } else if (fill >= 0.5) {
+                              icon = Icons.star_half_rounded;
+                            } else {
+                              icon = Icons.star_outline_rounded;
+                            }
+
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                  right: i == 4 ? 0 : starGap),
+                              child: GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTapDown: (details) {
+                                  final leftHalf =
+                                      details.localPosition.dx <
+                                          starSize / 2;
+                                  setState(() {
+                                    rating = idx - (leftHalf ? 0.5 : 0.0);
+                                  });
+                                },
+                                child: AnimatedSwitcher(
+                                  duration:
+                                      const Duration(milliseconds: 120),
+                                  transitionBuilder: (c, anim) =>
+                                      ScaleTransition(
+                                          scale: anim, child: c),
+                                  child: Icon(
+                                    icon,
+                                    key: ValueKey(
+                                        '$idx-${icon.codePoint}'),
+                                    size: starSize,
+                                    color: fill > 0 ? activeColor : kBorder,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Live label — "3.5 — Very good"
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: rating > 0
+                            ? Padding(
+                                key: ValueKey(rating),
+                                padding: const EdgeInsets.only(top: 2),
+                                child: Text(
+                                  '${fmtRating(rating)}  ·  ${starLabels[activeIdx]}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: activeColor,
+                                    letterSpacing: 0.1,
+                                  ),
+                                ),
+                              )
+                            : const SizedBox(height: 17),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      // ── Comment ───────────────────────────────────────
+                      TextField(
+                        controller: commentCtrl,
+                        maxLines: 3,
+                        minLines: 3,
+                        textInputAction: TextInputAction.newline,
+                        style: const TextStyle(
+                            fontSize: 13, color: kTextPrimary),
+                        decoration: InputDecoration(
+                          hintText: 'Write a short review (optional)',
+                          hintStyle: const TextStyle(
+                              fontSize: 13, color: kTextMuted),
+                          filled: true,
+                          fillColor: const Color(0xFFF7F8FA),
+                          contentPadding: const EdgeInsets.all(12),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: kBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                                color: kPrimary, width: 1.5),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      // ── Actions ───────────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12),
+                                side: const BorderSide(color: kBorder),
+                                foregroundColor: kTextSecondary,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              onPressed: rating <= 0
+                                  ? null
+                                  : () => Navigator.pop(
+                                        ctx,
+                                        AppointmentReviewInput(
+                                          rating: rating,
+                                          comment:
+                                              commentCtrl.text.trim(),
+                                        ),
+                                      ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimary,
+                                disabledBackgroundColor: kPrimaryLight,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(12)),
+                              ),
+                              child: Text(
+                                rating <= 0
+                                    ? 'Submit'
+                                    : 'Submit ${fmtRating(rating)} stars',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          side: const BorderSide(color: kBorder),
-                          foregroundColor: kTextSecondary,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Cancel',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: rating <= 0
-                            ? null
-                            : () => Navigator.pop(
-                                ctx,
-                                AppointmentReviewInput(
-                                    rating: rating,
-                                    comment: commentCtrl.text.trim())),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimary,
-                          disabledBackgroundColor: kPrimaryLight,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 11),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text('Submit',
-                            style: TextStyle(
-                                fontSize: 13, fontWeight: FontWeight.w700)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
-        );
-      },
-    ),
+          );
+        },
+      );
+    },
   );
 }
 

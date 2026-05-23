@@ -11,7 +11,7 @@ ReviewRequestModel _$ReviewRequestModelFromJson(Map<String, dynamic> json) =>
       appointmentId: (json['appointment_id'] as num).toInt(),
       doctorId: (json['doctor_id'] as num).toInt(),
       patientId: (json['patient_id'] as num).toInt(),
-      rating: (json['rating'] as num).toInt(),
+      rating: (json['rating'] as num).toDouble(),
       comment: json['comment'] as String?,
       patientName: json['patient_name'] as String?,
       reviewedByUserId: (json['reviewed_by_user_id'] as num?)?.toInt(),
