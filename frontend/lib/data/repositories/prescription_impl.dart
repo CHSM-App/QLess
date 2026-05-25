@@ -18,8 +18,8 @@ class Prescriptionmpl implements PrescriptionRepository {
   }
 
   @override
-  Future<Medicine> deleteMedicine(int medicineId) {
-    return apiService.deleteMedicine(medicineId);
+  Future<Medicine> deleteMedicine(int doctorId, int medicineId) {
+    return apiService.deleteMedicine(doctorId, medicineId);
   }
 
 

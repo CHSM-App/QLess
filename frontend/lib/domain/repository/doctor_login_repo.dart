@@ -18,6 +18,8 @@ abstract class DoctorLoginRepository {
 
     Future<List<Medicine>> fetchAllMedicines(int doctId);
 
+    Future<List<Medicine>> getMedicineSuggestions(String query);
+
   Future<dynamic> updateLeadTime(DoctorDetails doctor);
 
   Future<List<DoctorDetails>> mobileExistDoctor(String mobile);

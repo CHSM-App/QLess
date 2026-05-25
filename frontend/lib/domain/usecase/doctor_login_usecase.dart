@@ -37,6 +37,10 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.fetchAllMedicines(doctorId);
   }
 
+    Future<List<Medicine>> getMedicineSuggestions(String query) {
+    return doctorLoginRepository.getMedicineSuggestions(query);
+  }
+
   Future<dynamic> updateLeadTime(DoctorDetails doctor) {
     return doctorLoginRepository.updateLeadTime(doctor);
   }

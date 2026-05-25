@@ -284,20 +284,32 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                     child: ElevatedButton(
                       onPressed: () async {
                         Navigator.pop(context);
+                        final docVm = ref.read(
+                          doctorLoginViewModelProvider.notifier,
+                        );
+                        final docId = ref
+                                .read(doctorLoginViewModelProvider)
+                                .doctorId ??
+                            0;
+                        final medId = medicine.medicineId ?? 0;
+
+                        // Optimistic UI: list madhun lagech kadha
+                        docVm.removeMedicineLocally(medId);
+
                         final notifier = ref.read(
                           prescriptionViewModelProvider.notifier,
                         );
-                        await notifier.deleteMedicine(
-                          medicine.medicineId ?? 0,
-                        );
+                        await notifier.deleteMedicine(docId, medId);
                         if (!mounted) return;
+
                         final err = ref
                             .read(prescriptionViewModelProvider)
                             .error;
                         if (err != null) {
+                          // Failed → server state ne parat refresh kara
                           _snack(err, isError: true);
-                        } else {
                           _refresh(force: true);
+                        } else {
                           _snack('Medicine removed');
                         }
                       },

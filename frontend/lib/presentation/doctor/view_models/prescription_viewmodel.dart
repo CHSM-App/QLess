@@ -68,10 +68,10 @@ class PrescriptionViewmodel extends StateNotifier<PrescriptionState> {
     }
   }
 
-  Future<void> deleteMedicine(int medicineId) async {
+  Future<void> deleteMedicine(int doctorId, int medicineId) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      await usecase.deleteMedicine(medicineId);
+      await usecase.deleteMedicine(doctorId, medicineId);
       state = state.copyWith(isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractError(e));

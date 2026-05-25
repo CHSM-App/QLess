@@ -266,6 +266,25 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     }
   }
 
+  void removeMedicineLocally(int medicineId) {
+    final current = state.medicines;
+    if (current is AsyncData<List<Medicine>>) {
+      final updated = current.value
+          .where((m) => m.medicineId != medicineId)
+          .toList();
+      state = state.copyWith(medicines: AsyncValue.data(updated));
+    }
+  }
+
+  Future<List<Medicine>> getMedicineSuggestions(String query) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      return await usecase.getMedicineSuggestions(query.trim());
+    } catch (_) {
+      return [];
+    }
+  }
+
   Future<void> logout() async {
     await TokenStorage.clear();
     state = const DoctorLoginState();
