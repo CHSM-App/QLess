@@ -3,29 +3,30 @@ var router = express.Router();
 var db = require('../db'); 
 var sql = require('mssql');
 
-// DELETE Medicine
-router.delete("/deleteMedicine/:medicine_id", async (req, res) => {
+// DELETE Medicine (per-doctor link unlink)
+router.delete("/deleteMedicine/:doctor_id/:medicine_id", async (req, res) => {
   try {
-    const { medicine_id } = req.params;
+    const { doctor_id, medicine_id } = req.params;
 
-    if (!medicine_id) {
+    if (!medicine_id || !doctor_id) {
       return res.status(400).json({
         success: false,
-        message: "medicine_id is required"
+        message: "doctor_id and medicine_id are required"
       });
     }
 
     const request = db.request();
     request.input("operation", "Delete");
+    request.input("doctor_id", sql.Int, parseInt(doctor_id));
     request.input("medicine_id", sql.Int, parseInt(medicine_id));
 
     const result = await request.execute("sp_Medicine_Master");
 
-    // The SP returns a message like 'Medicine deleted successfully.' or error message
+    // SP returns 'Medicine removed from your list.' on success
+    // OR 'No medicine found to delete.' on failure
     const message = result.recordset?.[0]?.Message || "Operation completed";
-
-    // Determine success based on message
-    const success = message.toLowerCase().includes("successfully");
+    const lower = message.toLowerCase();
+    const success = lower.includes("removed") || lower.includes("successfully");
 
     return res.status(success ? 200 : 400).json({
       success,

@@ -28,6 +28,29 @@ router.get('/getMedicineTypes', async (req, res) => {
 });
 
 
+router.get('/getMedicineSuggestions', async (req, res) => {
+  const { q } = req.query;
+
+  if (!q || q.toString().trim().length === 0) {
+    return res.status(200).json([]);
+  }
+
+  try {
+    const request = db.request();
+    request.input('operation', 'getSuggestions');
+    request.input('search_query', q.toString().trim());
+
+    const result = await request.execute('sp_Medicine_Master');
+    res.status(200).json(result.recordset);
+  } catch (error) {
+    res.status(500).json({
+      success: 0,
+      message: `Failed to fetch suggestions ${error}`
+    });
+  }
+});
+
+
 router.get('/getAllMedicines/:doctor_id', async (req, res) => {
   const { doctor_id } = req.params;
 

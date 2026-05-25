@@ -55,6 +55,9 @@ abstract class ApiService {
   @GET("doctor/users/getAllMedicines/{doctor_id}")
   Future<List<Medicine>> fetchAllMedicines(@Path("doctor_id") int doctorId);
 
+  @GET("doctor/users/getMedicineSuggestions")
+  Future<List<Medicine>> getMedicineSuggestions(@Query("q") String query);
+
   @GET("doctor/users/getDoctorSchedule/{doctor_id}")
   Future<DoctorScheduleModel> getDoctorSchedule(
     @Path("doctor_id") int doctorId,
@@ -205,8 +208,11 @@ Future<AppointmentResponseModel> queuePauseEmergency(
 
 
   // DELETE API
-  @DELETE("doctor/index/deleteMedicine/{medicine_id}")
-  Future<Medicine> deleteMedicine(@Path("medicine_id") int medicineId);
+  @DELETE("doctor/index/deleteMedicine/{doctor_id}/{medicine_id}")
+  Future<Medicine> deleteMedicine(
+    @Path("doctor_id") int doctorId,
+    @Path("medicine_id") int medicineId,
+  );
 
   //------------------------------------------------------------------------------------------------------------------------//
   //-------------------------------------------//PATIENT API//----------------------------------------------

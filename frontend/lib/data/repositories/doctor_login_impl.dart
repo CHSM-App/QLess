@@ -96,6 +96,11 @@ class DoctorLoginImpl implements DoctorLoginRepository {
     return apiService.fetchAllMedicines(doctorId);
   }
 
+  @override
+  Future<List<Medicine>> getMedicineSuggestions(String query) {
+    return apiService.getMedicineSuggestions(query);
+  }
+
    @override
   Future<dynamic> updateLeadTime(DoctorDetails doctor ) {
     return apiService.updateLeadTime(doctor);

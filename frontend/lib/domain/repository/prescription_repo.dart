@@ -6,7 +6,7 @@ abstract class PrescriptionRepository {
   //DOCTOR PRESCRIPTION API
   Future<dynamic> insertPrescription(PrescriptionModel prescription);
 
-  Future<Medicine> deleteMedicine(int medicineId);
+  Future<Medicine> deleteMedicine(int doctorId, int medicineId);
 
 
 

@@ -12,8 +12,8 @@ class PrescriptionUsecase {
     return prescriptionRepository.insertPrescription(prescription);
   }
 
-  Future<Medicine> deleteMedicine(int medicineId) {
-    return prescriptionRepository.deleteMedicine(medicineId);
+  Future<Medicine> deleteMedicine(int doctorId, int medicineId) {
+    return prescriptionRepository.deleteMedicine(doctorId, medicineId);
   }
 
   //PATIENT PRESCRIPTION API

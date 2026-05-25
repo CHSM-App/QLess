@@ -260,6 +260,35 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<List<Medicine>> getMedicineSuggestions(String query) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'q': query};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<Medicine>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'doctor/users/getMedicineSuggestions',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<Medicine> _value;
+    try {
+      _value = _result.data!
+          .map((dynamic i) => Medicine.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<DoctorScheduleModel> getDoctorSchedule(int doctorId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -979,7 +1008,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<Medicine> deleteMedicine(int medicineId) async {
+  Future<Medicine> deleteMedicine(int doctorId, int medicineId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -988,7 +1017,7 @@ class _ApiService implements ApiService {
       Options(method: 'DELETE', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'doctor/index/deleteMedicine/${medicineId}',
+            'doctor/index/deleteMedicine/${doctorId}/${medicineId}',
             queryParameters: queryParameters,
             data: _data,
           )

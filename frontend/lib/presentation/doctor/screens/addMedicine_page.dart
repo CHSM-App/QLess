@@ -330,47 +330,136 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
   // Name Field
   // ---------------------------------------------------------------------------
 
-  Widget _nameField() => TextFormField(
-        controller: _nameCtrl,
-        textCapitalization: TextCapitalization.words,
-        style: const TextStyle(
-            fontSize: 13, color: kTextPrimary, fontWeight: FontWeight.w500),
-        decoration: InputDecoration(
-          hintText: 'e.g. Paracetamol',
-          hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
-          prefixIcon: Container(
-            margin: const EdgeInsets.fromLTRB(12, 0, 8, 0),
-            width: 32, height: 32,
-            decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(8)),
-            child: const Icon(Icons.medication_outlined,
-                color: kPrimary, size: 16),
+  Widget _nameField() {
+    return Autocomplete<Medicine>(
+      displayStringForOption: (m) => m.medicineName ?? '',
+      optionsBuilder: (TextEditingValue value) async {
+        final q = value.text.trim();
+        if (q.isEmpty) return const Iterable<Medicine>.empty();
+        final results = await ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .getMedicineSuggestions(q);
+        return results;
+      },
+      onSelected: (m) {
+        _nameCtrl.text = m.medicineName ?? '';
+        setState(() => _selectedType = m);
+      },
+      fieldViewBuilder: (context, controller, focusNode, onSubmit) {
+        // Keep _nameCtrl synced with the autocomplete controller
+        if (controller.text != _nameCtrl.text) {
+          controller.text = _nameCtrl.text;
+        }
+        controller.addListener(() {
+          if (_nameCtrl.text != controller.text) {
+            _nameCtrl.text = controller.text;
+          }
+        });
+        return TextFormField(
+          controller: controller,
+          focusNode: focusNode,
+          textCapitalization: TextCapitalization.words,
+          style: const TextStyle(
+              fontSize: 13, color: kTextPrimary, fontWeight: FontWeight.w500),
+          decoration: InputDecoration(
+            hintText: 'e.g. Paracetamol',
+            hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+            prefixIcon: Container(
+              margin: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+              width: 32, height: 32,
+              decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(8)),
+              child: const Icon(Icons.medication_outlined,
+                  color: kPrimary, size: 16),
+            ),
+            prefixIconConstraints: const BoxConstraints(minWidth: 52),
+            filled: true,
+            fillColor: const Color(0xFFF7F8FA),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kBorder)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kBorder)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+            errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kError)),
+            focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: kError, width: 1.5)),
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            errorStyle: const TextStyle(fontSize: 11, color: kError),
           ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 52),
-          filled: true,
-          fillColor: const Color(0xFFF7F8FA),
-          border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kBorder)),
-          enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kBorder)),
-          focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kPrimary, width: 1.5)),
-          errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kError)),
-          focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
-              borderSide: const BorderSide(color: kError, width: 1.5)),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-          errorStyle: const TextStyle(fontSize: 11, color: kError),
-        ),
-        validator: (v) =>
-            (v == null || v.trim().isEmpty) ? 'Medicine name is required' : null,
-      );
+          validator: (v) => (v == null || v.trim().isEmpty)
+              ? 'Medicine name is required'
+              : null,
+        );
+      },
+      optionsViewBuilder: (context, onSelected, options) {
+        return Align(
+          alignment: Alignment.topLeft,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(10),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 240, maxWidth: 360),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                itemCount: options.length,
+                separatorBuilder: (_, __) =>
+                    const Divider(height: 1, color: kDivider),
+                itemBuilder: (_, i) {
+                  final m = options.elementAt(i);
+                  return InkWell(
+                    onTap: () => onSelected(m),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.medication_outlined,
+                              size: 16, color: kPrimary),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              m.medicineName ?? '',
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  color: kTextPrimary,
+                                  fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                                color: kPrimaryLight,
+                                borderRadius: BorderRadius.circular(6)),
+                            child: Text(
+                              m.medTypeName ?? '',
+                              style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: kPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Type Selector
