@@ -269,6 +269,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(pid),
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
       ]);
+      if (!mounted) return;
       final doctorIds = ref
           .read(doctorsViewModelProvider)
           .doctors
