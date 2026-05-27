@@ -596,13 +596,16 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                             : null;
 
                         // ── Per-session stat strip ───────────────────
-                        // Waiting for this session = totalQueue - completedCount - (currentServing > 0 ? 1 : 0)
+                        // Skipped count not in TodayQueueModel — derive from
+                        // today's appointments filtered by this session's queueId.
+                        final sessionSkipped   = skipped
+                            .where((a) => a.queueId == session.queueId)
+                            .length;
                         final sessionTotal     = session.totalQueue ?? 0;
                         final sessionDone      = session.completedCount ?? 0;
                         final sessionServing   = (session.currentServing ?? 0) > 0 ? 1 : 0;
-                        final sessionWaiting   = (sessionTotal - sessionDone - sessionServing).clamp(0, sessionTotal);
-                        // Skipped not available per session from API, show dash/0
-                        final sessionSkipped   = 0;
+                        final sessionWaiting   = (sessionTotal - sessionDone - sessionServing - sessionSkipped)
+                            .clamp(0, sessionTotal);
 
                         return Padding(
                           padding: EdgeInsets.only(

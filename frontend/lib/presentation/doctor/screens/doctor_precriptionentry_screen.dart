@@ -58,63 +58,72 @@ const _kDesktopBreak = 1050.0;
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE TYPE
 // ════════════════════════════════════════════════════════════════════
-enum MedicineType { tablet, syrups, injections, drops, lotions,sprays,powders,inhalers }
+enum MedicineType { tablet, syrups, drops,injections, lotions,inhalers,sprays,powders}
 
 extension MedTypeX on MedicineType {
   String get label => const {
     MedicineType.tablet:    'Tablet',
     MedicineType.syrups:     'Syrups',
+      MedicineType.drops:     'Drops',
     MedicineType.injections: 'Injections',
-    MedicineType.drops:     'Drops',
     MedicineType.lotions:    'Lotions',
+     MedicineType.inhalers:  'Inhalers',
     MedicineType.sprays:     'Sprays',
     MedicineType.powders:   'Powders',
-    MedicineType.inhalers:  'Inhalers',
+   
 
   }[this]!;
 
   IconData get icon => const {
     MedicineType.tablet:    Icons.medication_rounded,
     MedicineType.syrups:     Icons.local_drink_rounded,
+      MedicineType.drops:     Icons.water_drop_rounded,
     MedicineType.injections: Icons.vaccines_rounded,
-    MedicineType.drops:     Icons.water_drop_rounded,
+  
     MedicineType.lotions:    Icons.soap_rounded,
+     MedicineType.inhalers:  Icons.air_rounded,
     MedicineType.sprays:     Icons.air_rounded,
     MedicineType.powders:   Icons.grain_rounded,
-    MedicineType.inhalers:  Icons.air_rounded,
+   
   }[this]!;
 
   Color get color => const {
     MedicineType.tablet:    Color(0xFF26C6B0),
     MedicineType.syrups:     Color(0xFF9F7AEA),
+        MedicineType.drops:     Color(0xFF3B82F6),
     MedicineType.injections: Color(0xFFFC8181),
-    MedicineType.drops:     Color(0xFF3B82F6),
+
     MedicineType.lotions:    Color(0xFF68D391),
+        MedicineType.inhalers:  Color(0xFF1E40AF),
     MedicineType.sprays:     Color(0xFFF6AD55),
     MedicineType.powders:   Color(0xFF4DD9C8),
-    MedicineType.inhalers:  Color(0xFF1E40AF),
+
   }[this]!;
 
   Color get colorLight => const {
     MedicineType.tablet:    Color(0xFFD9F5F1),
     MedicineType.syrups:     Color(0xFFEDE9FE),
+     MedicineType.drops:     Color(0xFFDBEAFE),
     MedicineType.injections: Color(0xFFFEE2E2),
-    MedicineType.drops:     Color(0xFFDBEAFE),
+   
     MedicineType.lotions:    Color(0xFFDCFCE7),
+        MedicineType.inhalers:  Color(0xFFEBF8FF),
     MedicineType.sprays:     Color(0xFFFEF3C7),
     MedicineType.powders:   Color(0xFFE0F2F1),
-    MedicineType.inhalers:  Color(0xFFEBF8FF),
+
   }[this]!;
 
   Color get colorDark => const {
     MedicineType.tablet:    Color(0xFF2BB5A0),
     MedicineType.syrups:     Color(0xFF6B46C1),
+        MedicineType.drops:     Color(0xFF1E40AF),
     MedicineType.injections: Color(0xFFC53030),
-    MedicineType.drops:     Color(0xFF1E40AF),
+
     MedicineType.lotions:    Color(0xFF276749),
+      MedicineType.inhalers:  Color(0xFF2D3748),
     MedicineType.sprays:     Color(0xFF975A16),
     MedicineType.powders:   Color(0xFF1A5643),
-    MedicineType.inhalers:  Color(0xFF2D3748),
+  
   }[this]!;
 
   int get typeId => index + 1;
@@ -126,12 +135,14 @@ extension MedTypeX on MedicineType {
 const _kDosageOpts = {
   'tablet':    ['0', '¼', '½', '¾', '1', '1½', '2', '3'],
   'syrups':     ['0', '2.5ml', '5ml', '7.5ml', '10ml', '15ml', '20ml'],
-  'injections': ['0', '0.5', '1', '2', '4', '5', '10'],
   'drops':     ['0', '1', '2', '3', '4', '5', '6'],
+  'injections': ['0', '0.5', '1', '2', '4', '5', '10'],
+  
   'lotions':    ['0', 'Apply', 'Thin layer', 'Thick layer'],
+  'inhalers':  ['0', '1 puff', '2 puffs', '3 puffs', '4 puffs', '5 puffs'],
   'sprays':     ['0', '1 puff', '2 puffs', '3 puffs', '4 puffs'],
     'powders':   ['0', '½ tsp', '1 tsp', '1½ tsp', '2 tsp', '1 sachet', '2 sachets'],
-  'inhalers':  ['0', '1 puff', '2 puffs', '3 puffs', '4 puffs', '5 puffs'],
+  
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -717,9 +728,15 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       final isSkipped = widget.patientStatus.toLowerCase().trim() == 'skipped';
       final AppointmentResponseModel result;
       if (isSkipped) {
+        // Doctor has now attended a previously-skipped patient — close that
+        // session. queueRecall re-queues a skipped patient as active and
+        // fails here because the patient is already in_progress.
         result = await ref.read(appointmentViewModelProvider.notifier)
-            .queueRecall(AppointmentRequestModel(
-              appointmentId: widget.appointmentId, doctorId: widget.doctorId));
+            .endSession(AppointmentRequestModel(
+              doctorId:      widget.doctorId,
+              appointmentId: widget.appointmentId,
+              patientId:     widget.patientId,
+            ));
       } else {
         result = await ref.read(appointmentViewModelProvider.notifier)
             .queueNext(AppointmentRequestModel(
@@ -742,13 +759,6 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   Future<void> _handleNextPatient() async {
     final result = await _completeQueueAction();
     if (!mounted || result == null) return;
-
-    if (widget.patientStatus.toLowerCase().trim() == 'skipped') {
-      _showSnack(result.message ?? 'Patient attended', isError: false);
-      await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) Navigator.pop(context);
-      return;
-    }
 
     // API explicitly says no more queue patients — go back to patient list
     final msg = result.message?.trim() ?? '';
@@ -788,6 +798,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       patientAge:    _ageString(next.dob),
       patientGender: next.gender,
       queueNumber:   next.queueNumber,
+      patientStatus: next.status ?? 'booked',
+      symptoms:      next.symptoms,
     )));
   }
 
@@ -910,6 +922,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         patientGender: next.gender,
         queueNumber:   next.queueNumber,
         patientStatus: next.status ?? 'booked',
+        symptoms:      next.symptoms,
       )));
     } catch (e) { _showSnack('Skip failed: $e', isError: true); }
   }
@@ -1485,12 +1498,14 @@ void _onTypeChange(MedicineType t) {
     switch (e.type) {
       case MedicineType.tablet:    return _commonBody();
       case MedicineType.syrups:     return _commonBody();
+          case MedicineType.drops:     return _dropsBody();
         case MedicineType.injections: return _injBody();
-      case MedicineType.drops:     return _dropsBody();
+  
       case MedicineType.lotions:    return _lotionBody();
+        case MedicineType.inhalers:  return _inhalersBody();
       case MedicineType.sprays:     return _sprayBody();
        case MedicineType.powders:   return _powdersBody();
-    case MedicineType.inhalers:  return _inhalersBody();
+  
     }
   }
   Widget _powdersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

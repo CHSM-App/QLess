@@ -70,34 +70,37 @@ const _typeStyles = <String, _TypeStyle>{
     fg: kPrimary,
     icon: Icons.medication_rounded,
   ),
-  'Lotions': _TypeStyle(
-    bg: kPurpleLight,
-    fg: kPurple,
-    icon: Icons.science_outlined,
-  ),
+ 
   'Syrups': _TypeStyle(
     bg: kGreenLight,
     fg: kSuccess,
     icon: Icons.local_drink_outlined,
+  ),
+   'Drops': _TypeStyle(
+    bg: kInfoLight,
+    fg: kInfo,
+    icon: Icons.water_drop_outlined,
   ),
   'Injections': _TypeStyle(
     bg: kAmberLight,
     fg: kWarning,
     icon: Icons.colorize_outlined,
   ),
-  'Drops': _TypeStyle(
-    bg: kInfoLight,
-    fg: kInfo,
-    icon: Icons.water_drop_outlined,
+   'Lotions': _TypeStyle(
+    bg: kPurpleLight,
+    fg: kPurple,
+    icon: Icons.science_outlined,
   ),
-  'Sprays': _TypeStyle(bg: kGreenLight, fg: kSuccess, icon: Icons.air_outlined),
-
-  // FIXED Inhalers icon
+  
   'Inhalers': _TypeStyle(
     bg: kAmberLight,
     fg: kWarning,
     icon: Icons.air, // best available alternative
   ),
+  'Sprays': _TypeStyle(bg: kGreenLight, fg: kSuccess, icon: Icons.air_outlined),
+
+  // FIXED Inhalers icon
+ 
 
   // NEW Powders
   'Powders': _TypeStyle(
@@ -133,12 +136,16 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   static const _types = [
     'All',
     'Tablet',
+     'Syrups',
+      'Drops',
+        'Injections',
     'Lotions',
-    'Syrups',
-    'Injections',
-    'Drops',
-    'Sprays',
+       
     'Inhalers',
+   
+   'Sprays',
+   
+
     'Powders',
   ];
 

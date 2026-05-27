@@ -888,16 +888,17 @@ router.post('/insertPrescription', async (req, res) => {
       }
     }
 
-    // 🔔 If SP didn't return a token, look it up via SP so the patient still gets notified.
+    // sp_prescription doesn't always echo the patient's FCM token. Fallback is a
+    // direct read from patients.token (same column populated by sp_doctor_login's
+    // 'saveFirebaseToken' op for role='patient', and used in the reverse lookup
+    // at the top of this file).
     if (!patientToken) {
       try {
         const tokenLookup = await db.request()
-          .input('operation', 'getFirebaseToken')
           .input('patient_id', patient_id)
-          .execute('sp_doctor_login');
-        const lookupRow = tokenLookup.recordset?.[0];
-        patientToken = lookupRow?.fcm_token || lookupRow?.token || null;
-        console.log('[insertPrescription] token fetched via SP fallback:', patientToken);
+          .query('SELECT TOP 1 token FROM patients WHERE patient_id = @patient_id');
+        patientToken = tokenLookup.recordset?.[0]?.token || null;
+        console.log('[insertPrescription] token fetched via patients fallback:', patientToken);
       } catch (lookupErr) {
         console.error('[insertPrescription] token lookup failed:', lookupErr.message);
       }
@@ -1095,6 +1096,7 @@ router.post('/appointment/queueStart', async (req, res) => {
     for (const tk of tokens) {
       await insertNotificationForToken(tk, startTitle, startBody, 'queue', doctor_id);
     }
+    
 
     // 🔥 SEND NOTIFICATION
     const message = {
@@ -1130,7 +1132,6 @@ router.post('/appointment/queueStart', async (req, res) => {
 // QUEUE PAUSE
 router.post('/appointment/queuePause', async (req, res) => {
   const { doctor_id, queue_id } = req.body;
-
   if (!doctor_id) {
     return res.status(400).json({
       success: false,
