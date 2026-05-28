@@ -32,10 +32,12 @@ jobs:
 
       # Step 4: Get dependencies
       - run: flutter pub get
+        working-directory: frontend
 
       # Step 6: Run unit & widget tests
       - name: Run tests
         run: flutter test --coverage
+        working-directory: frontend
 
       # Step 7: Upload coverage report (optional, viewable in Actions)
       - name: Upload coverage report
@@ -114,15 +116,17 @@ jobs:
 
       # Step 5: Get dependencies
       - run: flutter pub get
+        working-directory: frontend
 
       # Step 6: Build APK
       - run: flutter build apk --release --split-per-abi
+        working-directory: frontend
 
       # Step 7: Push to GitHub Releases
       - name: Push to Releases
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/app/outputs/apk/release/*"
+          artifacts: "frontend/build/app/outputs/apk/release/*"
           tag: ${{ github.ref_name }}
           allowUpdates: true
           token: ${{ secrets.TOKEN }}
