@@ -44,7 +44,32 @@ jobs:
           name: coverage-report
           path: coverage/lcov.info
 
-  # ✅ JOB 2: Build & Release (only runs if tests pass)
+  # ✅ JOB 2: Sync backend folder to 'backend' branch
+  sync-backend:
+    name: Sync Backend to Branch
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Push backend folder to backend branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin backend || true
+          git checkout -B backend
+          git read-tree --empty
+          git checkout HEAD -- backend/
+          git mv backend/* . 2>/dev/null || true
+          git add -A
+          git diff --cached --quiet || git commit -m "sync: update backend from ${{ github.ref_name }}"
+          git push origin backend --force
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+
+  # ✅ JOB 3: Build & Release (only runs if tests pass)
   build:
     name: Build & Release
     runs-on: ubuntu-latest    
