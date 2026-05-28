@@ -58,16 +58,23 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin backend || true
-          git checkout -B backend
-          git read-tree --empty
-          git checkout HEAD -- backend/
-          git mv backend/* . 2>/dev/null || true
+
+          # Embed token into remote URL for auth
+          git remote set-url origin https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }}.git
+
+          # Copy backend contents to a temp directory outside the repo
+          cp -r backend /tmp/backend-content
+
+          # Create orphan branch and wipe working tree
+          git checkout --orphan backend-tmp
+          git rm -rf . --quiet
+
+          # Restore backend contents at root level
+          cp -r /tmp/backend-content/. .
+
           git add -A
-          git diff --cached --quiet || git commit -m "sync: update backend from ${{ github.ref_name }}"
-          git push origin backend --force
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          git commit -m "sync: update backend from ${{ github.ref_name }}"
+          git push origin backend-tmp:backend --force
 
   # ✅ JOB 3: Build & Release (only runs if tests pass)
   build:
