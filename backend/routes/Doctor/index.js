@@ -1,7 +1,8 @@
 var express = require('express');
 var router = express.Router();
-var db = require('../db'); 
+var db = require('../db');
 var sql = require('mssql');
+const log = require('../middleware/logger');
 
 // DELETE Medicine (per-doctor link unlink)
 router.delete("/deleteMedicine/:doctor_id/:medicine_id", async (req, res) => {
@@ -34,7 +35,7 @@ router.delete("/deleteMedicine/:doctor_id/:medicine_id", async (req, res) => {
     });
     
   } catch (err) {
-    console.error("Error in deleteMedicine API:", err);
+    log.error('Error in deleteMedicine API: ' + err.message);
 
     return res.status(500).json({
       success: false,

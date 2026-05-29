@@ -9,6 +9,7 @@ var app = require('../app');
 var debug = require('debug')('donotwait:server');
 var http = require('http');
 var db = require('../routes/db');
+var log = require('../routes/middleware/logger');
 
 /**
  * Get port from environment and store in Express.
@@ -35,7 +36,7 @@ db.ready()
     server.on('listening', onListening);
   })
   .catch(function (err) {
-    console.error('Startup failed: DB not reachable', err.message);
+    log.error('Startup failed: DB not reachable: ' + err.message);
     process.exit(1);
   });
 
@@ -45,10 +46,10 @@ db.ready()
  * (IIS/PM2/systemd) can restart cleanly.
  */
 process.on('unhandledRejection', function (reason) {
-  console.error('UNHANDLED REJECTION:', reason);
+  log.error('UNHANDLED REJECTION: ' + (reason && reason.stack ? reason.stack : reason));
 });
 process.on('uncaughtException', function (err) {
-  console.error('UNCAUGHT EXCEPTION:', err);
+  log.error('UNCAUGHT EXCEPTION: ' + err.stack);
   process.exit(1);
 });
 
@@ -88,11 +89,11 @@ function onError(error) {
   // handle specific listen errors with friendly messages
   switch (error.code) {
     case 'EACCES':
-      console.error(bind + ' requires elevated privileges');
+      log.error(bind + ' requires elevated privileges');
       process.exit(1);
       break;
     case 'EADDRINUSE':
-      console.error(bind + ' is already in use');
+      log.error(bind + ' is already in use');
       process.exit(1);
       break;
     default:
@@ -110,5 +111,5 @@ function onListening() {
     ? 'pipe ' + addr
     : 'port ' + addr.port;
   debug('Listening on ' + bind);
-  console.log('Listening on ' + bind);
+  log.info('Listening on ' + bind);
 }

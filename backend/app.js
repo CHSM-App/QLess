@@ -1,4 +1,5 @@
 process.on('uncaughtException', (err) => {
+  // Use stderr directly — logger may not be initialised yet at this point.
   process.stderr.write('UNCAUGHT EXCEPTION: ' + err.stack + '\n');
   process.exit(1);
 });
@@ -14,6 +15,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
+const log = require('./routes/middleware/logger');
 
 const protect = require('./routes/middleware/protect');
 const uploadAuth = require('./routes/middleware/uploadAuth');
@@ -110,7 +112,7 @@ app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 // instead — same shape, doesn't require `next` to be in scope.
 app.use((err, req, res, next) => {
   const status = err.status || 500;
-  console.error(`[${req.id}] [UNHANDLED ${status}] ${req.method} ${req.originalUrl || req.path}:`, err);
+  log.error(`[${req.id}] [UNHANDLED ${status}] ${req.method} ${req.originalUrl || req.path}: ${err.stack || err.message}`);
   res.status(status).json({
     success: false,
     error: status >= 500 ? 'Internal Server Error' : err.message,
@@ -130,10 +132,10 @@ if (require.main === module) {
   const server = http.createServer(app);
   db.ready()
     .then(() => {
-      server.listen(port, () => console.log('Listening on port ' + port));
+      server.listen(port, () => log.info('Listening on port ' + port));
     })
     .catch((err) => {
-      console.error('Startup failed: DB not reachable', err.message);
+      log.error('Startup failed: DB not reachable: ' + err.message);
       process.exit(1);
     });
 }
