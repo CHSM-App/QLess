@@ -2,6 +2,7 @@
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 dotenv.config();
+const log = require('./logger');
 
 module.exports = function (req, res, next) {
   const authHeader = req.header('Authorization');
@@ -21,7 +22,7 @@ module.exports = function (req, res, next) {
     req.user = decoded; // Attach decoded token data (like user_id)
     next();
   } catch (err) {
-    console.error("JWT verification failed:", err.message);
+    log.error('JWT verification failed: ' + err.message);
     res.status(401).json({ msg: 'Token is not valid' });
   }
 };

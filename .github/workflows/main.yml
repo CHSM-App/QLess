@@ -32,10 +32,12 @@ jobs:
 
       # Step 4: Get dependencies
       - run: flutter pub get
+        working-directory: frontend
 
       # Step 6: Run unit & widget tests
       - name: Run tests
         run: flutter test --coverage
+        working-directory: frontend
 
       # Step 7: Upload coverage report (optional, viewable in Actions)
       - name: Upload coverage report
@@ -44,7 +46,39 @@ jobs:
           name: coverage-report
           path: coverage/lcov.info
 
-  # ✅ JOB 2: Build & Release (only runs if tests pass)
+  # ✅ JOB 2: Sync backend folder to 'backend' branch
+  sync-backend:
+    name: Sync Backend to Branch
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Push backend folder to backend branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Embed token into remote URL for auth
+          git remote set-url origin https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }}.git
+
+          # Copy backend contents to a temp directory outside the repo
+          cp -r backend /tmp/backend-content
+
+          # Create orphan branch and wipe working tree
+          git checkout --orphan backend-tmp
+          git rm -rf . --quiet
+
+          # Restore backend contents at root level
+          cp -r /tmp/backend-content/. .
+
+          git add -A
+          git commit -m "sync: update backend from ${{ github.ref_name }}"
+          git push origin backend-tmp:backend --force
+
+  # ✅ JOB 3: Build & Release (only runs if tests pass)
   build:
     name: Build & Release
     runs-on: ubuntu-latest    
@@ -82,15 +116,17 @@ jobs:
 
       # Step 5: Get dependencies
       - run: flutter pub get
+        working-directory: frontend
 
       # Step 6: Build APK
       - run: flutter build apk --release --split-per-abi
+        working-directory: frontend
 
       # Step 7: Push to GitHub Releases
       - name: Push to Releases
         uses: ncipollo/release-action@v1
         with:
-          artifacts: "build/app/outputs/apk/release/*"
+          artifacts: "frontend/build/app/outputs/apk/release/*"
           tag: ${{ github.ref_name }}
           allowUpdates: true
           token: ${{ secrets.TOKEN }}

@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const log = require('./logger');
 
 // Centralised 500 response. Use from every route catch block so internal
 // errors (SP names, table names, foreign-key violations, stack traces) never
@@ -15,7 +16,7 @@ const crypto = require('crypto');
 function serverError(req, res, err, context) {
   const id = req.id || crypto.randomBytes(6).toString('hex');
   const where = context ? ` (${context})` : '';
-  console.error(`[${id}] [500] ${req.method} ${req.originalUrl || req.path}${where}:`, err);
+  log.error(`[${id}] [500] ${req.method} ${req.originalUrl || req.path}${where}: ${err.stack || err.message}`);
   return res.status(500).json({
     success: false,
     error: 'Internal Server Error',

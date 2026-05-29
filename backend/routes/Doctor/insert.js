@@ -7,12 +7,14 @@ const path = require("path");
 const fs = require("fs-extra");
 const admin = require("firebase-admin");
 const cron = require('node-cron');
+const log = require('../middleware/logger');
 
-const serviceAccount = require("../serviceAccountKey.json");
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+if (!admin.apps.length) {
+  const serviceAccount = require("../ServiceAccountKey.json");
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 // ── Notifications inbox helpers ─────────────────────────────────────────────
 // Every FCM push is mirrored as a row in `notifications` via sp_notification
@@ -31,7 +33,7 @@ async function insertNotification(patient_id, title, body, type, ref_id = null) 
       .execute('sp_notification');
     return r.recordset?.[0] ?? { success: 1 };
   } catch (err) {
-    console.error('insertNotification failed:', err.message);
+    log.error('insertNotification failed: ' + err.message);
     return { success: 0, message: err.message };
   }
 }
@@ -48,7 +50,7 @@ async function insertNotificationForToken(token, title, body, type, ref_id = nul
     if (!patient_id) return;
     await insertNotification(patient_id, title, body, type, ref_id);
   } catch (err) {
-    console.error('insertNotificationForToken failed:', err.message);
+    log.error('insertNotificationForToken failed: ' + err.message);
   }
 }
 
@@ -70,7 +72,7 @@ async function hasNotificationBeenSent(patient_id, type, ref_id) {
                 AND ref_id = @ref_id`);
     return (r.recordset?.[0]?.hit === 1);
   } catch (err) {
-    console.error('hasNotificationBeenSent failed:', err.message);
+    log.error('hasNotificationBeenSent failed: ' + err.message);
     return false;
   }
 }
@@ -147,12 +149,12 @@ async function sendProximityNotifications(doctor_id) {
             appointment_id: String(aptId),
           },
         }).catch(err =>
-          console.error('FCM err (proximity):', err.code || err.message),
+          log.error('FCM err (proximity): ' + (err.code || err.message)),
         );
       }
     }));
   } catch (err) {
-    console.error('sendProximityNotifications failed:', err.message);
+    log.error('sendProximityNotifications failed: ' + err.message);
   }
 }
 
@@ -274,7 +276,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
       message: 'doctor_id and schedule (array) required'
     });
   }
-  console.log('saveDoctorSchedule payload:', JSON.stringify({
+  log.debug('saveDoctorSchedule payload: ' + JSON.stringify({
     doctor_id,
     force: !!force,
     days: schedule.map(d => ({
@@ -487,7 +489,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
               .input('appointment_id', aid)
               .execute('sp_appointment')
               .catch(err =>
-                console.error('status normalize err:', aid, err.message),
+                log.error('status normalize err: ' + aid + ' ' + err.message),
               ),
           ));
         }
@@ -550,7 +552,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
               doctor_id: String(doctor_id),
               appointment_id: String(t.appointment_id),
             },
-          }).catch(err => console.error('FCM err (saveDoctorSchedule):', err.message)),
+          }).catch(err => log.error('FCM err (saveDoctorSchedule): ' + err.message)),
         ),
       );
     }
@@ -563,7 +565,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('saveDoctorSchedule error:', error);
+    log.error('saveDoctorSchedule error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'Error saving schedule',
@@ -673,7 +675,7 @@ router.post('/addDoctorLeave', async (req, res) => {
           .input('appointment_id', a.appointment_id)
           .execute('sp_appointment')
           .catch(err =>
-            console.error('status normalize err:', a.appointment_id, err.message),
+            log.error('status normalize err: ' + a.appointment_id + ' ' + err.message),
           ),
       ));
     }
@@ -707,7 +709,7 @@ router.post('/addDoctorLeave', async (req, res) => {
               doctor_id: String(doctor_id),
               appointment_id: String(t.appointment_id),
             },
-          }).catch(err => console.error('FCM err (addDoctorLeave):', err.message)),
+          }).catch(err => log.error('FCM err (addDoctorLeave): ' + err.message)),
         ),
       );
     }
@@ -720,7 +722,7 @@ router.post('/addDoctorLeave', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('addDoctorLeave error:', error);
+    log.error('addDoctorLeave error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'Error applying leave',
@@ -769,7 +771,7 @@ router.post('/cancelDoctorLeave', async (req, res) => {
       message: 'Leave cancelled. Note: appointments already cancelled are not auto-restored.',
     });
   } catch (error) {
-    console.error('cancelDoctorLeave error:', error);
+    log.error('cancelDoctorLeave error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'Error cancelling leave',
@@ -880,8 +882,8 @@ router.post('/insertPrescription', async (req, res) => {
         // Complete — review it" body. Falls back below if the SP doesn't
         // return it.
         doctorName = row.doctor_name || row.doctorName || null;
-        console.log('[insertPrescription] SP row keys:', Object.keys(row));
-        console.log('[insertPrescription] patientToken:', patientToken);
+        log.debug('[insertPrescription] SP row keys: ' + Object.keys(row).join(', '));
+        log.debug('[insertPrescription] patientToken: ' + (patientToken ? '[REDACTED]' : 'null'));
 
         if (!prescription_id) {
           return res.status(500).json({
@@ -902,9 +904,9 @@ router.post('/insertPrescription', async (req, res) => {
           .input('patient_id', patient_id)
           .query('SELECT TOP 1 token FROM patients WHERE patient_id = @patient_id');
         patientToken = tokenLookup.recordset?.[0]?.token || null;
-        console.log('[insertPrescription] token fetched via patients fallback:', patientToken);
+        log.debug('[insertPrescription] token fetched via patients fallback: ' + (patientToken ? '[REDACTED]' : 'null'));
       } catch (lookupErr) {
-        console.error('[insertPrescription] token lookup failed:', lookupErr.message);
+        log.error('[insertPrescription] token lookup failed: ' + lookupErr.message);
       }
     }
 
@@ -938,15 +940,11 @@ router.post('/insertPrescription', async (req, res) => {
             },
           });
         } catch (err) {
-          console.error(
-            '[insertPrescription] review FCM FAILED:', err.code, err.message,
-          );
+          log.error('[insertPrescription] review FCM FAILED: ' + (err.code || '') + ' ' + err.message);
         }
       }
     } else {
-      console.warn(
-        '[insertPrescription] appointment_id missing — review notification skipped',
-      );
+      log.warn('[insertPrescription] appointment_id missing — review notification skipped');
     }
 
     const presTitle = 'Prescription Assigned';
@@ -965,12 +963,12 @@ router.post('/insertPrescription', async (req, res) => {
             prescription_id: String(prescription_id),
           },
         });
-        console.log('[insertPrescription] FCM send OK:', fcmResp);
+        log.info('[insertPrescription] FCM send OK: ' + fcmResp);
       } catch (err) {
-        console.error('[insertPrescription] FCM send FAILED:', err.code, err.message);
+        log.error('[insertPrescription] FCM send FAILED: ' + (err.code || '') + ' ' + err.message);
       }
     } else {
-      console.warn('[insertPrescription] no patientToken — push skipped (inbox row saved)');
+      log.warn('[insertPrescription] no patientToken — push skipped (inbox row saved)');
     }
 
     return res.status(200).json({
@@ -980,7 +978,7 @@ router.post('/insertPrescription', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Error in /insertPrescription:', err);
+    log.error('Error in /insertPrescription: ' + err.message);
     return res.status(500).json({
       success: false,
       message: err.message
@@ -1017,7 +1015,7 @@ router.post('/appointment/queueNext', async (req, res) => {
 
     const token = row.token;
 
-    console.log("NEXT PATIENT TOKEN:", token);
+    log.debug('queueNext: next patient token present: ' + !!token);
 
     // 🔔 SEND NOTIFICATION TO NEXT PATIENT
     if (token) {
@@ -1041,7 +1039,7 @@ router.post('/appointment/queueNext', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    log.error('queueNext error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'Queue next failed',
@@ -1169,7 +1167,7 @@ router.post('/appointment/queuePause', async (req, res) => {
       .map(r => r.token)
       .filter(t => t && t.trim() !== '');
 
-    console.log("TOKENS:", tokens);
+    log.debug('queuePause: tokens count: ' + tokens.length);
 
     // 🔔 SEND NOTIFICATION
     if (tokens.length > 0) {
@@ -1204,7 +1202,7 @@ router.post('/appointment/queuePause', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    log.error('queuePause error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'Queue pause failed',
@@ -1285,7 +1283,7 @@ router.post('/appointment/queueStop', async (req, res) => {
               doctor_id: String(doctor_id),
               appointment_id: String(t.appointment_id),
             },
-          }).catch(err => console.error('FCM err (queueStop):', err.message)),
+          }).catch(err => log.error('FCM err (queueStop): ' + err.message)),
         ),
       );
     }
@@ -1297,7 +1295,7 @@ router.post('/appointment/queueStop', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    log.error('queueStop error: ' + error.message);
     return res.status(500).json({ success: false, message: 'Queue stop failed', error: error.message });
   }
 });
@@ -1335,7 +1333,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
 
     const token = row.token;
 
-    console.log("SKIPPED PATIENT TOKEN:", token);
+    log.debug('queueSkip: skipped patient token present: ' + !!token);
 
     // 🔔 SEND ONLY TO SKIPPED PATIENT
     if (token) {
@@ -1345,7 +1343,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
       try {
         await insertNotificationForToken(token, skipTitle, skipBody, 'appointment', appointment_id);
       } catch (notifErr) {
-        console.error('insertNotificationForToken failed:', notifErr.message);
+        log.error('insertNotificationForToken failed: ' + notifErr.message);
       }
 
       try {
@@ -1358,7 +1356,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
         });
       } catch (fcmErr) {
         // Stale/unregistered tokens must not fail the skip operation
-        console.error('FCM send failed for skip notification:', fcmErr.code || fcmErr.message);
+        log.error('FCM send failed for skip notification: ' + (fcmErr.code || fcmErr.message));
       }
     }
 
@@ -1371,7 +1369,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    log.error('queueSkip error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'Queue skip failed',
@@ -1484,7 +1482,7 @@ router.post('/appointment/endSession', async (req, res) => {
     // 🔥 ONLY 3rd PATIENT TOKEN
     const token = rows[1]?.token;
 
-    console.log("3rd PATIENT TOKEN:", token);
+    log.debug('endSession: 3rd patient token present: ' + !!token);
 
     // Re-evaluate proximity for everyone further back in the queue — every
     // consultation that ends shifts each waiting patient one slot closer.
@@ -1514,7 +1512,7 @@ router.post('/appointment/endSession', async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    log.error('endSession error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'End session failed',
@@ -1551,9 +1549,9 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
     const statusRow  = recordsets[0]?.[0] || {};
     const tokenRows  = recordsets[1] || [];
 
-    console.log('[queuePauseEmergency] recordsets count:', recordsets.length);
-    console.log('[queuePauseEmergency] status row:', JSON.stringify(statusRow));
-    console.log('[queuePauseEmergency] token rows count:', tokenRows.length);
+    log.debug('[queuePauseEmergency] recordsets count: ' + recordsets.length);
+    log.debug('[queuePauseEmergency] status row: ' + JSON.stringify(statusRow));
+    log.debug('[queuePauseEmergency] token rows count: ' + tokenRows.length);
 
     if (statusRow.success !== 1) {
       return res.json({
@@ -1566,7 +1564,7 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
       .map(r => r.token)
       .filter(t => t && t.trim() !== '');
 
-    console.log('[queuePauseEmergency] tokens extracted:', tokens.length);
+    log.debug('[queuePauseEmergency] tokens extracted: ' + tokens.length);
 
     if (tokens.length > 0) {
       const pauseTitle = 'Queue Paused (Emergency)';
@@ -1583,7 +1581,7 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
       };
 
       const response = await admin.messaging().sendEachForMulticast(message);
-      console.log('[queuePauseEmergency] FCM result:', response.successCount, '/', tokens.length);
+      log.info('[queuePauseEmergency] FCM result: ' + response.successCount + '/' + tokens.length);
 
       return res.json({
         success: true,
@@ -1600,7 +1598,7 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[queuePauseEmergency] error:', error);
+    log.error('[queuePauseEmergency] error: ' + error.message);
     return res.status(500).json({
       success: false,
       message: 'Queue pause failed',
@@ -1620,10 +1618,8 @@ cron.schedule('0 14 * * *', async () => {
     const rows = result.recordset || [];
 
     if (rows.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No appointments for tomorrow'
-      });
+      log.info('[cron 14:00] No appointments for tomorrow');
+      return;
     }
 
     let successCount = 0;
@@ -1660,26 +1656,15 @@ cron.schedule('0 14 * * *', async () => {
         await admin.messaging().send(message);
         successCount++;
       } catch (err) {
-        console.error("FCM Error:", err.message);
+        log.error('FCM Error: ' + err.message);
         failureCount++;
       }
     }
 
-    return res.json({
-      success: true,
-      message: 'Tomorrow reminders sent',
-      total: rows.length,
-      success_count: successCount,
-      failure_count: failureCount
-    });
+    log.info(`[cron 14:00] Tomorrow reminders sent: ${successCount} ok, ${failureCount} failed / ${rows.length} total`);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send reminders',
-      error: error.message
-    });
+    log.error('[cron 14:00] Failed to send reminders: ' + error.message);
   }
 });
 
@@ -1693,10 +1678,8 @@ cron.schedule('0 15 * * *', async () => {
     const rows = result.recordset || [];
 
     if (rows.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No appointments for tomorrow'
-      });
+      log.info('[cron 15:00] No appointments for tomorrow');
+      return;
     }
 
     for (const row of rows) {
@@ -1729,23 +1712,14 @@ cron.schedule('0 15 * * *', async () => {
       try {
         await admin.messaging().send(message);
       } catch (err) {
-        console.error("FCM Error:", err.message);
+        log.error('FCM Error: ' + err.message);
       }
     }
 
-    return res.json({
-      success: true,
-      message: 'Tomorrow reminders sent',
-      total: rows.length
-    });
+    log.info(`[cron 15:00] Tomorrow reminders sent: ${rows.length} total`);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send reminders',
-      error: error.message
-    });
+    log.error('[cron 15:00] Failed to send reminders: ' + error.message);
   }
 });
 
@@ -1759,10 +1733,8 @@ cron.schedule('0 16 * * *', async () => {
     const rows = result.recordset || [];
 
     if (rows.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No patients to send rating request'
-      });
+      log.info('[cron 16:00] No patients to send rating request');
+      return;
     }
 
     let successCount = 0;
@@ -1793,26 +1765,15 @@ cron.schedule('0 16 * * *', async () => {
         await admin.messaging().send(message);
         successCount++;
       } catch (err) {
-        console.error("FCM Error:", err.message);
+        log.error('FCM Error: ' + err.message);
         failureCount++;
       }
     }
 
-    return res.json({
-      success: true,
-      message: 'Rating notifications sent',
-      total: rows.length,
-      success_count: successCount,
-      failure_count: failureCount
-    });
+    log.info(`[cron 16:00] Rating notifications sent: ${successCount} ok, ${failureCount} failed / ${rows.length} total`);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send rating notifications',
-      error: error.message
-    });
+    log.error('[cron 16:00] Failed to send rating notifications: ' + error.message);
   }
 
 });

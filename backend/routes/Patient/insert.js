@@ -3,6 +3,7 @@ var router = express.Router();
 var db = require('../db'); // go from admin/ to routes/
 const sql = require("mssql");
 const multer = require("multer");
+const log = require('../middleware/logger');
 const path = require("path");
 const fs = require("fs-extra");
 
@@ -52,7 +53,7 @@ router.post('/insertFamilyMember', async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error in /addFamilyMember:", error);
+    log.error('Error in /addFamilyMember: ' + error.message);
 
     res.status(500).json({
       success: false,
@@ -179,7 +180,7 @@ router.post('/favoriteDoctor/add', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in /favoriteDoctor/add:', error);
+    log.error('Error in /favoriteDoctor/add: ' + error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -216,7 +217,7 @@ router.post('/review/add', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error in /review/add:', error);
+    log.error('Error in /review/add: ' + error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
