@@ -13,6 +13,7 @@ const db = require('../routes/db');
 
 const DOCTOR_ID = 1;
 const N = parseInt(process.argv[2], 10) || 20;
+const SLOT_START = process.argv[3] || null; // optional HH:MM filter, e.g. "11:30"
 const SYMPTOMS = ['Fever','Cold','Headache','Cough','BP check','Acidity','Joint pain','Skin rash','Stomach upset','Allergy'];
 
 function todayStr() {
@@ -23,7 +24,10 @@ function todayStr() {
 async function main() {
   await db.ready();
 
-  const slotR = await db.request().input('doctor_id', DOCTOR_ID).query(`
+  const slotR = await db.request()
+    .input('doctor_id', DOCTOR_ID)
+    .input('slot_start', SLOT_START)
+    .query(`
     SELECT TOP 1 ts.slot_id,
                  CONVERT(VARCHAR, ts.start_time, 108) AS start_t,
                  CONVERT(VARCHAR, ts.end_time, 108)   AS end_t,
@@ -34,7 +38,8 @@ async function main() {
       AND da.day_of_week = DATENAME(WEEKDAY, GETDATE())
       AND da.is_enabled  = 1
       AND ts.booking_mode = 1
-      AND CAST(GETDATE() AS TIME) < ts.end_time
+      AND (@slot_start IS NULL OR CONVERT(VARCHAR(5), ts.start_time, 108) = @slot_start)
+      AND (@slot_start IS NOT NULL OR CAST(GETDATE() AS TIME) < ts.end_time)
     ORDER BY
       CASE WHEN CAST(GETDATE() AS TIME) BETWEEN ts.start_time AND ts.end_time THEN 0 ELSE 1 END,
       ts.start_time;

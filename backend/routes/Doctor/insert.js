@@ -114,17 +114,21 @@ async function sendProximityNotifications(doctor_id) {
       const doctor = row.doctor_name || 'your doctor';
       if (!patient_id || !aptId || minutes == null) return;
 
+      // Threshold-based (not narrow ranges): as the queue advances a patient's
+      // ETA only drops, so we fire each stage ONCE when it crosses below the
+      // threshold. Check the nearer stage first. Dedup (hasNotificationBeenSent)
+      // guarantees one send per stage per appointment.
       let stage = null, title = null, body = null;
-      if (minutes >= 25 && minutes <= 35) {
-        stage = 'queue_far';
-        title = 'Your turn is approaching';
-        body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please head to the clinic now.`;
-      } else if (minutes >= 5 && minutes <= 15) {
+      if (minutes <= 15) {
         stage = 'queue_near';
         title = 'Almost your turn';
         body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please be at the clinic.`;
+      } else if (minutes <= 40) {
+        stage = 'queue_far';
+        title = 'Your turn is approaching';
+        body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please head to the clinic now.`;
       } else {
-        return;
+        return; // still too far away — notify on a later queue movement
       }
 
       const refId = `${aptId}:${stage}`;
