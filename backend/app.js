@@ -1,3 +1,12 @@
+process.on('uncaughtException', (err) => {
+  process.stderr.write('UNCAUGHT EXCEPTION: ' + err.stack + '\n');
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  process.stderr.write('UNHANDLED REJECTION: ' + (reason && reason.stack ? reason.stack : reason) + '\n');
+  process.exit(1);
+});
+
 require('dotenv').config();
 
 const express = require('express');
