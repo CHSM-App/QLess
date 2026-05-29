@@ -9,7 +9,7 @@ const admin = require("firebase-admin");
 const cron = require('node-cron');
 
 if (!admin.apps.length) {
-  const serviceAccount = require("../../serviceAccount.json");
+  const serviceAccount = require("../ServiceAccountKey.json");
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
@@ -1617,10 +1617,8 @@ cron.schedule('0 14 * * *', async () => {
     const rows = result.recordset || [];
 
     if (rows.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No appointments for tomorrow'
-      });
+      console.log('[cron 14:00] No appointments for tomorrow');
+      return;
     }
 
     let successCount = 0;
@@ -1662,21 +1660,10 @@ cron.schedule('0 14 * * *', async () => {
       }
     }
 
-    return res.json({
-      success: true,
-      message: 'Tomorrow reminders sent',
-      total: rows.length,
-      success_count: successCount,
-      failure_count: failureCount
-    });
+    console.log(`[cron 14:00] Tomorrow reminders sent: ${successCount} ok, ${failureCount} failed / ${rows.length} total`);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send reminders',
-      error: error.message
-    });
+    console.error('[cron 14:00] Failed to send reminders:', error.message);
   }
 });
 
@@ -1690,10 +1677,8 @@ cron.schedule('0 15 * * *', async () => {
     const rows = result.recordset || [];
 
     if (rows.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No appointments for tomorrow'
-      });
+      console.log('[cron 15:00] No appointments for tomorrow');
+      return;
     }
 
     for (const row of rows) {
@@ -1730,19 +1715,10 @@ cron.schedule('0 15 * * *', async () => {
       }
     }
 
-    return res.json({
-      success: true,
-      message: 'Tomorrow reminders sent',
-      total: rows.length
-    });
+    console.log(`[cron 15:00] Tomorrow reminders sent: ${rows.length} total`);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send reminders',
-      error: error.message
-    });
+    console.error('[cron 15:00] Failed to send reminders:', error.message);
   }
 });
 
@@ -1756,10 +1732,8 @@ cron.schedule('0 16 * * *', async () => {
     const rows = result.recordset || [];
 
     if (rows.length === 0) {
-      return res.json({
-        success: true,
-        message: 'No patients to send rating request'
-      });
+      console.log('[cron 16:00] No patients to send rating request');
+      return;
     }
 
     let successCount = 0;
@@ -1795,21 +1769,10 @@ cron.schedule('0 16 * * *', async () => {
       }
     }
 
-    return res.json({
-      success: true,
-      message: 'Rating notifications sent',
-      total: rows.length,
-      success_count: successCount,
-      failure_count: failureCount
-    });
+    console.log(`[cron 16:00] Rating notifications sent: ${successCount} ok, ${failureCount} failed / ${rows.length} total`);
 
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to send rating notifications',
-      error: error.message
-    });
+    console.error('[cron 16:00] Failed to send rating notifications:', error.message);
   }
 
 });
