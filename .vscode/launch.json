@@ -10,18 +10,24 @@
         {
             "name": "qless",
             "request": "launch",
-            "type": "dart"
+            "type": "dart",
+            "cwd": "frontend",
+            "program": "lib/main.dart"
         },
         {
             "name": "qless (profile mode)",
             "request": "launch",
             "type": "dart",
+            "cwd": "frontend",
+            "program": "lib/main.dart",
             "flutterMode": "profile"
         },
         {
             "name": "qless (release mode)",
             "request": "launch",
             "type": "dart",
+            "cwd": "frontend",
+            "program": "lib/main.dart",
             "flutterMode": "release"
         }
     ]
