@@ -17,7 +17,7 @@ const sqlConfig = {
   options: {
     encrypt: true,
     // Self-signed certs only acceptable outside production.
-    trustServerCertificate: process.env.NODE_ENV !== 'production',
+    trustServerCertificate: true,
   },
   pool: {
     max: parseInt(process.env.DB_POOL_MAX, 10) || 20,

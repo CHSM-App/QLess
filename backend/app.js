@@ -41,19 +41,12 @@ const allowed = (process.env.CORS_ORIGINS || '')
   .map((s) => s.trim())
   .filter(Boolean);
 
-// Flutter web / desktop dev binds to a random localhost port on each run, so
-// hardcoding a port in CORS_ORIGINS doesn't work. In non-production allow any
-// localhost / 127.0.0.1 origin regardless of port. Never enabled in prod.
-const LOCALHOST_RE = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
-const isDev = process.env.NODE_ENV !== 'production';
-
 app.use(
   cors({
     origin: (origin, cb) => {
       // Same-origin / native mobile requests have no Origin header.
       if (!origin) return cb(null, true);
       if (allowed.includes(origin)) return cb(null, true);
-      if (isDev && LOCALHOST_RE.test(origin)) return cb(null, true);
       return cb(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
@@ -117,3 +110,21 @@ app.use((err, req, res, next) => {
 });
 
 module.exports = app;
+
+// When run directly by iisnode (or `node app.js`), start the HTTP server.
+// When required as a module (e.g. from bin/www), this block is skipped.
+if (require.main === module) {
+  const http = require('http');
+  const db = require('./routes/db');
+  const port = process.env.PORT || '3000';
+  app.set('port', port);
+  const server = http.createServer(app);
+  db.ready()
+    .then(() => {
+      server.listen(port, () => console.log('Listening on port ' + port));
+    })
+    .catch((err) => {
+      console.error('Startup failed: DB not reachable', err.message);
+      process.exit(1);
+    });
+}

@@ -6,6 +6,7 @@ node_modules/
 .env.local
 .env.*.local
 ServiceAccount.json
+serviceAccountKey.json
 routes/serviceAccountKey.json
 routes/**/qless-firebase-adminsdk*.json
 routes/**/*-adminsdk*.json
