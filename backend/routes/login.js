@@ -9,6 +9,7 @@ const path = require('path');
 const fs = require("fs-extra");
 const { authLimiter, lookupLimiter } = require('./middleware/rateLimit');
 const { upload, uploadHandler, verifyImageFiles, cleanupFiles } = require('./middleware/upload');
+const log = require('./middleware/logger');
 
 // Public base URL is required for returned image URLs to be reachable by
 // clients. Fail fast at startup rather than silently building broken links.
@@ -79,7 +80,7 @@ router.post('/Createlogin', authLimiter, async (req, res) => {
 			mobile
 		});
 	} catch (err) {
-		console.error(err);
+		log.error('Createlogin error: ' + err.message);
 		return res.status(500).json({
 			error: err.message
 		});
@@ -88,7 +89,7 @@ router.post('/Createlogin', authLimiter, async (req, res) => {
 
 
 router.post('/refreshAccessToken', authLimiter, async (req, res) => {
-	console.log("inside the refreshAccessToken route");
+	log.debug('inside the refreshAccessToken route');
 	try {
 		const {
 			refreshToken
@@ -158,7 +159,7 @@ router.post('/refreshAccessToken', authLimiter, async (req, res) => {
 
 
 router.post('/saveFirebaseToken', async (req, res) => {
-	console.log("inside the saveFirebaseToken route");
+	log.debug('inside the saveFirebaseToken route');
 	try {
 		const {
 			role,
@@ -190,7 +191,7 @@ router.post('/saveFirebaseToken', async (req, res) => {
 		});
 
 	} catch (err) {
-		console.error("saveFirebaseToken error:", err.message);
+		log.error('saveFirebaseToken error: ' + err.message);
 		return res.status(500).json({
 			error: err.message
 		});
@@ -230,7 +231,7 @@ router.post('/logout', async (req, res) => {
 		}
 
 	} catch (err) {
-		console.error(err);
+		log.error('logout error: ' + err.message);
 		return res.status(500).json({
 			success: false,
 			message: 'Logout failed'
@@ -260,7 +261,6 @@ router.get('/checkPhoneDoctor', lookupLimiter, async (req, res) => {
 
 router.get('/checkPhonePatient', lookupLimiter, async (req, res) => {
 	try {
-		console.log('query:', req.query); // <-- add this
 		const mobile_no = req.query.mobile_no ?? req.query.mobileNo;
 
 		const result = await db.request()
@@ -450,7 +450,7 @@ router.post('/doctor', uploadHandler(upload.fields([{
 		});
 
 	} catch (err) {
-		console.error(err);
+		log.error('doctor upsert error: ' + err.message);
 		// Drop any orphaned temp file the upload left behind so /uploads/temp
 		// doesn't grow forever when the SP / move step fails mid-request.
 		await cleanupFiles(req).catch(() => {});

@@ -1,5 +1,6 @@
 const sql = require('mssql');
 require('dotenv').config();
+const log = require('./middleware/logger');
 
 const required = ['DB_USER', 'DB_PASSWORD', 'DB_SERVER', 'DB_NAME'];
 for (const k of required) {
@@ -33,16 +34,16 @@ const pool = new sql.ConnectionPool(sqlConfig);
 // binding the HTTP port so the first request always finds a live pool.
 const readyPromise = pool.connect()
   .then(() => {
-    console.log('MSSQL connected');
+    log.info('MSSQL connected');
     return pool;
   })
   .catch((err) => {
-    console.error('MSSQL connection failed:', err.message);
+    log.error('MSSQL connection failed: ' + err.message);
     throw err;
   });
 
 pool.on('error', (err) => {
-  console.error('MSSQL pool error:', err.message);
+  log.error('MSSQL pool error: ' + err.message);
 });
 
 module.exports = pool;
