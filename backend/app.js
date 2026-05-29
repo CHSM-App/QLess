@@ -34,14 +34,30 @@ const app = express();
 // from 127.0.0.1 and the rate limiter buckets everyone together.
 app.set('trust proxy', 1);
 
-// ── TEMPORARILY DISABLED FOR DEBUGGING ──────────────────────────────────────
-// app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-// app.use(cors({ origin: (origin, cb) => { ... }, credentials: true }));
-// app.use(globalLimiter);
-// ────────────────────────────────────────────────────────────────────────────
+// Security headers.
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 
-// Allow all origins (temporary)
-app.use(cors());
+// CORS — restrict to an env-driven allowlist.
+const allowed = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowed.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    credentials: true,
+  }),
+);
 
 // Request-ID first so it's available to the logger and every error handler.
 app.use(requestId);
@@ -49,8 +65,10 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// ── Routers. Folder names are capitalised on disk; use the exact case so the
-// app boots on case-sensitive filesystems (Linux/IIS-on-Azure-Linux).
+// Baseline rate limit on every route.
+app.use(globalLimiter);
+
+// ── Routers.
 const loginRouter = require('./routes/login');
 const doctorUsersRouter = require('./routes/Doctor/users');
 const doctorInsertRouter = require('./routes/Doctor/insert');
@@ -62,27 +80,23 @@ const patientIndexRouter = require('./routes/Patient/index');
 // Public — login + token refresh must be reachable without a valid token.
 app.use('/login', loginRouter);
 
-// ── TEMPORARILY: JWT auth disabled for debugging ────────────────────────────
-app.use('/doctor/users', doctorUsersRouter);
-app.use('/doctor/insert', doctorInsertRouter);
-app.use('/doctor/index', doctorIndexRouter);
-app.use('/patient/users', patientUsersRouter);
-app.use('/patient/insert', patientInsertRouter);
-app.use('/patient/index', patientIndexRouter);
+// Authenticated — every doctor/patient endpoint requires a valid JWT.
+app.use('/doctor/users', protect, doctorUsersRouter);
+app.use('/doctor/insert', protect, doctorInsertRouter);
+app.use('/doctor/index', protect, doctorIndexRouter);
+app.use('/patient/users', protect, patientUsersRouter);
+app.use('/patient/insert', protect, patientInsertRouter);
+app.use('/patient/index', protect, patientIndexRouter);
 
-// ── TEMPORARILY: upload auth disabled
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Uploaded images — JWT-gated.
+app.use('/uploads', uploadAuth, express.static(path.join(__dirname, 'uploads')));
 
 app.get('/', (req, res) => res.send('OK'));
-
 
 // 404 fallthrough
 app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 
-// Global error handler. Catches anything a route forwards via next(err) or
-// throws from synchronous middleware. Per-route async handlers should call
-// the `serverError(req, res, err)` helper from routes/middleware/errors.js
-// instead — same shape, doesn't require `next` to be in scope.
+// Global error handler.
 app.use((err, req, res, next) => {
   const status = err.status || 500;
   log.error(`[${req.id}] [UNHANDLED ${status}] ${req.method} ${req.originalUrl || req.path}: ${err.stack || err.message}`);
