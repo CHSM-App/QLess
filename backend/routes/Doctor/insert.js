@@ -8,11 +8,12 @@ const fs = require("fs-extra");
 const admin = require("firebase-admin");
 const cron = require('node-cron');
 
-const serviceAccount = require("../serviceAccountKey.json");
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+if (!admin.apps.length) {
+  const serviceAccount = require("../../serviceAccount.json");
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 // ── Notifications inbox helpers ─────────────────────────────────────────────
 // Every FCM push is mirrored as a row in `notifications` via sp_notification
