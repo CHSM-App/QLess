@@ -1,7 +1,8 @@
 var express = require('express');
 var router = express.Router();
-var db = require('../db'); 
+var db = require('../db');
 var sql = require('mssql');
+const log = require('../middleware/logger');
 
 // DELETE Medicine
 router.delete("/deleteFamilyMember/:member_id", async (req, res) => {
@@ -33,7 +34,7 @@ router.delete("/deleteFamilyMember/:member_id", async (req, res) => {
     });
     
   } catch (err) {
-    console.error("Error in deleteFamily Members API:", err);
+    log.error('Error in deleteFamily Members API: ' + err.message);
 
     return res.status(500).json({
       success: false,
@@ -74,7 +75,7 @@ router.delete("/favoriteDoctor/:patient_id/:doctor_id", async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Error in deleteFavoriteDoctor API:", err);
+    log.error('Error in deleteFavoriteDoctor API: ' + err.message);
 
     return res.status(500).json({
       success: false,
@@ -113,7 +114,7 @@ router.delete('/review/:appointment_id/:patient_id', async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Error in deleteReview API:", err);
+    log.error('Error in deleteReview API: ' + err.message);
 
     return res.status(500).json({
       success: false,

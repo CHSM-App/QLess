@@ -3,6 +3,7 @@ var router = express.Router();
 var db = require('../db'); // go from admin/ to routes/
 const sql = require("mssql");
 const multer = require("multer");
+const log = require('../middleware/logger');
 const path = require("path");
 const fs = require("fs-extra");
 
@@ -272,7 +273,7 @@ router.get('/favoriteDoctor/:patient_id/:doctor_id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error in check favorite:", error);
+    log.error('Error in check favorite: ' + error.message);
     res.status(500).json({
       success: false,
       message: error.message
@@ -293,7 +294,7 @@ router.get('/review/appointment/:appointment_id', async (req, res) => {
     res.status(200).json(result.recordset || []);
 
   } catch (error) {
-    console.error("Error in get review by appointment:", error);
+    log.error('Error in get review by appointment: ' + error.message);
     res.status(500).json({
       success: false,
       message: error.message
@@ -376,7 +377,7 @@ router.get('/review/doctor/:doctor_id', async (req, res) => {
     res.status(200).json(result.recordset || []);
 
   } catch (error) {
-    console.error("Error in get doctor reviews:", error);
+    log.error('Error in get doctor reviews: ' + error.message);
     res.status(500).json({
       success: false,
       message: error.message
