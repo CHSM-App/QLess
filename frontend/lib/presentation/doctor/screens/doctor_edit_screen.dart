@@ -9,6 +9,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart' as gmap;
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
@@ -377,6 +378,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
   // ── Preview helpers ──────────────────────────────────────────────
   void _previewNetworkPhoto(String url) {
+    final signedUrl = ref.read(authImageUrlProvider)(url) ?? url;
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -385,7 +387,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
         child: Stack(children: [
           InteractiveViewer(
             child: Center(
-              child: Image.network(url, fit: BoxFit.contain,
+              child: Image.network(signedUrl, fit: BoxFit.contain,
                   errorBuilder: (_, __, ___) => const Icon(
                       Icons.broken_image_rounded,
                       color: Colors.white54, size: 48)),
@@ -931,7 +933,11 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // Multi-photo grid (fetched + new)
       _EditClinicPhotoGrid(
-        networkImages: _clinicNetworkImages,
+        // Sign for display only — /uploads is JWT-gated, so Image.network needs
+        // ?token=. Removal/preview still index into the raw _clinicNetworkImages.
+        networkImages: _clinicNetworkImages
+            .map((u) => ref.read(authImageUrlProvider)(u) ?? u)
+            .toList(),
         localPhotos: _clinicPhotos,
         onAdd: _addClinicPhoto,
         onRemoveNetwork: _removeNetworkClinicImageAt,
@@ -971,7 +977,9 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
     if (_doctorImage != null) {
       imageProvider = FileImage(_doctorImage!);
     } else if (_doctorNetworkImage != null && _doctorNetworkImage!.isNotEmpty) {
-      imageProvider = NetworkImage(_doctorNetworkImage!);
+      imageProvider = NetworkImage(
+          ref.read(authImageUrlProvider)(_doctorNetworkImage!) ??
+              _doctorNetworkImage!);
     }
 
     return Container(

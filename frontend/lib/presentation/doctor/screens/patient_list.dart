@@ -417,8 +417,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       );
       if (!mounted) return;
       if (res.success == true) {
-        _hasFetched = false;
-        _refresh(force: true);
+        // VM.queueSkip already refetched the list+queue — no extra call here.
         _snack(res.message ?? 'Patient skipped');
       } else {
         _snack(res.message ?? 'Skip failed', isError: true);
@@ -454,8 +453,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       );
       if (!mounted) return;
       if (res.success == true) {
-        _hasFetched = false;
-        _refresh(force: true);
+        // VM.cancelByDoctor already refetched the list+queue — no extra call.
         _snack(res.message ?? 'Appointment cancelled');
       } else {
         _snack(res.message ?? 'Cancel failed', isError: true);
@@ -624,8 +622,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       final res = await ref.read(appointmentViewModelProvider.notifier)
           .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue started');
-      _hasFetched = false;
-      _refresh(force: true);
+      // VM.queueStart already refetched the list+queue — no extra call here.
     } catch (_) {
       _snack('Failed to start queue', isError: true);
     }
@@ -636,8 +633,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       final res = await ref.read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue paused');
-      _hasFetched = false;
-      _refresh(force: true);
+      // VM.queuePause already refetched the list+queue — no extra call here.
     } catch (_) {
       _snack('Failed to pause queue', isError: true);
     }
@@ -760,8 +756,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       final res = await ref.read(appointmentViewModelProvider.notifier)
           .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue closed');
-      _hasFetched = false;
-      _refresh(force: true);
+      // VM.queueStop already refetched the list+queue — no extra call here.
     } catch (_) {
       _snack('Failed to close queue', isError: true);
     }

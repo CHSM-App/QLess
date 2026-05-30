@@ -169,6 +169,22 @@ String _cap(String? s) {
   return '${s[0].toUpperCase()}${s.substring(1)}';
 }
 
+// Start time as minutes-of-day for ordering same-date appointments
+// (earliest time first). Appointments without a time sort to the end.
+int _startMinutes(AppointmentList a) {
+  final t = a.startTime;
+  if (t == null || t.trim().isEmpty) return 1 << 30;
+  final parsed = DateTime.tryParse(t.trim());
+  if (parsed != null) return parsed.hour * 60 + parsed.minute;
+  final parts = t.trim().split(':');
+  if (parts.length >= 2) {
+    final h = int.tryParse(parts[0]) ?? 0;
+    final m = int.tryParse(parts[1]) ?? 0;
+    return h * 60 + m;
+  }
+  return 1 << 30;
+}
+
 Future<void> openMap(double lat, double lng, String? label) async {
   final uri = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng&query_place_id=${Uri.encodeComponent(label ?? 'Clinic')}');
@@ -798,6 +814,7 @@ bool get _hasDateFilter =>
                 Expanded(
                   child: AppExpandableHeaderSearch(
                     leadingIcon: Icons.calendar_month_rounded,
+                    alwaysShowLeadingIcon: true,
                     title: 'Appointments',
                     subtitle: 'Manage your schedule',
                     hintText: 'Search by patient name...',
@@ -969,11 +986,16 @@ Widget _filterChip({
         var list = applyFilter(
             appointments, f.key, _search, _dateFilter, _customFrom, _customTo);
 
-        // Apply sort order
+        // Apply sort order: by date (direction per _sortNewest), then within
+        // the same day always by earliest appointment time first.
         list = List<AppointmentList>.from(list)..sort((a, b) {
           final da = DateTime.tryParse(a.appointmentDate ?? '') ?? DateTime(0);
           final db = DateTime.tryParse(b.appointmentDate ?? '') ?? DateTime(0);
-          return _sortNewest ? db.compareTo(da) : da.compareTo(db);
+          final dayA = DateTime(da.year, da.month, da.day);
+          final dayB = DateTime(db.year, db.month, db.day);
+          final dateCmp = _sortNewest ? dayB.compareTo(dayA) : dayA.compareTo(dayB);
+          if (dateCmp != 0) return dateCmp;
+          return _startMinutes(a).compareTo(_startMinutes(b));
         });
 
         Future<void> onRefresh() async {

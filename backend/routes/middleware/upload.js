@@ -1,5 +1,6 @@
 const path = require('path');
 const fs = require('fs-extra');
+const fsp = require('fs').promises; // FileHandle API — fs-extra's fs.open returns a numeric fd
 const multer = require('multer');
 
 const TEMP_DIR = path.join(__dirname, '..', '..', 'uploads', 'temp');
@@ -47,7 +48,7 @@ const upload = multer({
   fileFilter,
   limits: {
     fileSize: MAX_FILE_BYTES,
-    files: 5, // sanity bound on multi-field uploads
+    files: 6, // sanity bound: 1 doctor photo + up to 5 clinic photos
   },
 });
 
@@ -55,7 +56,7 @@ const upload = multer({
 // bytes off disk is the only way to confirm the file really is what it claims.
 // Defends against polyglot files (e.g. PNG header + PHP payload).
 async function detectImageMagic(filePath) {
-  const fd = await fs.open(filePath, 'r');
+  const fd = await fsp.open(filePath, 'r');
   try {
     const buf = Buffer.alloc(12);
     const { bytesRead } = await fd.read(buf, 0, 12, 0);
