@@ -12,7 +12,9 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
+import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 
 // ── Colour palette (matches login + patient registration) ─────────
@@ -531,6 +533,20 @@ class _DoctorProfileSetupScreenState
 
       if (returnedDoctorId == null || returnedDoctorId <= 0) {
         _showError('Registration failed: could not retrieve Doctor ID.');
+        return;
+      }
+
+      // Doctor + clinic now exist, but the app holds no JWT yet (registration
+      // runs before login). Step 3's protected endpoints (saveDoctorSchedule /
+      // addQueueStartTime) would 401 without it — so authenticate the new
+      // doctor now and persist the token before continuing.
+      final authResult = await ref
+          .read(authViewModelProvider.notifier)
+          .login(TokenResponse(
+              mobile: _contactController.text.trim(), role: 'doctor'));
+      if (authResult == null) {
+        _showError(
+            'Account created, but sign-in failed. Please log in to set your schedule.');
         return;
       }
 

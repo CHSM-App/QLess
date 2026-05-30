@@ -14,13 +14,16 @@ const commonOptions = {
   handler: rateLimitHandler,
 };
 
-// ── Global baseline. Catches scraping/DDoS noise across every route without
-// blocking realistic user traffic. Mobile clients chatting with the API may
-// burst 50–100 reqs while a screen loads; 300/15min is comfortably above that.
+// ── Global baseline. Pure DDoS/scraping backstop — NOT a per-user throttle.
+// Real per-action limits live on the sensitive routes below. This must sit far
+// above legitimate traffic because (a) the app re-fetches the appointment list
+// (2 API calls each) after every queue action, and (b) a whole clinic behind
+// one WiFi/NAT shares a single public IP (trust proxy: 1), so all their users
+// bucket together. 300/15min was exhausting mid-session and 429-ing every page.
 const globalLimiter = rateLimit({
   ...commonOptions,
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 2000,
 });
 
 // ── Auth issuance + refresh. Brute-force / credential-stuffing target. Real

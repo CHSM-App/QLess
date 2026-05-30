@@ -220,4 +220,26 @@ router.get('/appointment/getTodayQueue/:doctor_id', async (req, res) => {
 
 
 
+// Clinic gallery — list active gallery images for a clinic.
+// Mounted at /doctor/users → GET /doctor/users/clinicGallery/:clinic_id
+router.get('/clinicGallery/:clinic_id', async (req, res) => {
+  try {
+    const { clinic_id } = req.params;
+    if (!clinic_id) {
+      return res.status(400).json({ success: false, message: 'clinic_id is required' });
+    }
+    const result = await db.request()
+      .input('operation', 'fetchClinicGallery')
+      .input('clinic_id', clinic_id)
+      .execute('sp_doctor_login');
+    return res.status(200).json(result.recordset);
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch clinic gallery',
+      error: error.message,
+    });
+  }
+});
+
 module.exports = router; 

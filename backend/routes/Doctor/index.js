@@ -47,4 +47,42 @@ router.delete("/deleteMedicine/:doctor_id/:medicine_id", async (req, res) => {
 
 
 
-module.exports = router; 
+// Clinic gallery — soft-remove selected gallery images for a clinic.
+// Mounted at /doctor/index → DELETE /doctor/index/delete/clinicGallery
+// Body: { clinic_id, image_urls: [..] }. SP splits @image_url on ','.
+router.delete("/delete/clinicGallery", async (req, res) => {
+  try {
+    const { clinic_id, image_urls } = req.body;
+    const urls = Array.isArray(image_urls)
+      ? image_urls.map((u) => (u || "").toString().trim()).filter(Boolean)
+      : [];
+
+    if (!clinic_id || urls.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "clinic_id and a non-empty image_urls array are required",
+      });
+    }
+
+    const result = await db.request()
+      .input("operation", "deleteClinicGallery")
+      .input("clinic_id", clinic_id)
+      .input("image_url", urls.join(","))
+      .execute("sp_doctor_login");
+
+    const deletedCount = result.recordset?.[0]?.deleted_count ?? 0;
+    return res.status(200).json({
+      success: true,
+      deleted_count: deletedCount,
+      message: result.recordset?.[0]?.message || "Images deleted",
+    });
+  } catch (err) {
+    log.error("Error in deleteClinicGallery API: " + err.message);
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to delete clinic gallery images",
+    });
+  }
+});
+
+module.exports = router;

@@ -113,6 +113,7 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   late AnimationController _animCtrl;
   late List<Animation<double>> _anims;
   final _searchCtrl = TextEditingController();
+  bool _showAllNearby = false; // Nearby section: 6 shown, rest behind "Show more"
 
   @override
   void initState() {
@@ -214,7 +215,7 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
             ))
         .toList()
       ..sort((a, b) => a.value.compareTo(b.value));
-    return withDist.take(10).map((e) => e.key).toList();
+    return withDist.take(20).map((e) => e.key).toList();
   }
 
   List<String> _uniqueSpecialties(List<DoctorDetails> all) {
@@ -298,18 +299,25 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
                   const SizedBox(height: 22),
                 ],
 
-                // Nearby Doctors
+                // Nearby Doctors — show 6, rest behind "Show more"
                 if (position != null && (isLoading || nearby.isNotEmpty)) ...[
                   _fade(3, _SectionTitle(
                     'Nearby Doctors',
                     subtitle: 'Doctors close to you',
-                    action: 'See All',
-                    onAction: () => _goToSearch(context),
+                    action: (!isLoading && nearby.length > 6)
+                        ? (_showAllNearby ? 'Show less' : 'Show more')
+                        : null,
+                    onAction: (!isLoading && nearby.length > 6)
+                        ? () => setState(() => _showAllNearby = !_showAllNearby)
+                        : null,
                   )),
                   const SizedBox(height: 10),
                   _fade(3, isLoading
-                      ? const _HorizontalShimmer(height: 148, isRecent: false)
-                      : _buildNearbyDoctors(context, nearby, position)),
+                      ? const _HorizontalShimmer(height: 186, isRecent: false)
+                      : _buildNearbyDoctors(
+                          context,
+                          _showAllNearby ? nearby : nearby.take(6).toList(),
+                          position)),
                   const SizedBox(height: 22),
                 ],
 
@@ -437,7 +445,7 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   Widget _buildNearbyDoctors(
       BuildContext context, List<DoctorDetails> docs, Position? position) {
     return SizedBox(
-      height: 148,
+      height: 186,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: docs.length,
@@ -451,14 +459,16 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
             distKm = _haversineKm(position.latitude,
                 position.longitude, d.latitude!, d.longitude!);
           }
+          void book() => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => BookAppointmentScreen(doctor: d)),
+              );
           return _NearbyDoctorCard(
             doctor: d,
             distanceKm: distKm,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => BookAppointmentScreen(doctor: d)),
-            ),
+            onTap: book,
+            onBook: book,
           );
         },
       ),
@@ -717,10 +727,12 @@ class _NearbyDoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
   final double?       distanceKm;
   final VoidCallback  onTap;
+  final VoidCallback  onBook;
   const _NearbyDoctorCard(
       {required this.doctor,
       required this.distanceKm,
-      required this.onTap});
+      required this.onTap,
+      required this.onBook});
 
   @override
   Widget build(BuildContext context) {
@@ -843,6 +855,31 @@ class _NearbyDoctorCard extends StatelessWidget {
                           fontSize: 10, color: _kTextMuted)),
                 ),
             ]),
+            const Spacer(),
+            // Book button
+            GestureDetector(
+              onTap: onBook,
+              child: Container(
+                width: double.infinity,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: _kPrimary,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                        color: _kPrimary.withOpacity(0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: const Text('Book',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+              ),
+            ),
           ],
         ),
       ),

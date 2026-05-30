@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/review_model.dart';
@@ -366,7 +367,11 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   }
 
   // ── Clinic Gallery ──────────────────────────────────────────────────
-  Widget _buildClinicGallery(List<String> images) {
+  Widget _buildClinicGallery(List<String> rawImages) {
+    // /uploads is JWT-gated — sign each URL with ?token= so the thumbnails
+    // and the full-screen preview both authenticate.
+    final images =
+        rawImages.map((u) => ref.read(authImageUrlProvider)(u) ?? u).toList();
     return SizedBox(
       height: 150,
       child: ListView.separated(

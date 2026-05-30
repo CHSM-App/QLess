@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
@@ -456,6 +457,10 @@ String? _networkImageUrl;   // ← add this
   PreferredSizeWidget _buildAppBar(bool isSaving) {
     return AppBar(
       backgroundColor: Colors.white,
+      // Keep the header flat white when the form scrolls under it — no M3
+      // surface-tint band appears behind the "Edit Profile" title.
+      surfaceTintColor: Colors.transparent,
+      scrolledUnderElevation: 0,
       elevation: 0,
       centerTitle: true,
       leading: GestureDetector(
@@ -589,64 +594,54 @@ String? _networkImageUrl;   // ← add this
     ),
     child: Column(
       children: [
-        Stack(
-          children: [
-           
-          Container(
-  width: 72,
-  height: 72,
-  decoration: BoxDecoration(
-    gradient: (_pickedImage == null && _networkImageUrl == null)
-        ? const LinearGradient(
-            colors: [kPrimary, kPrimaryDark],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          )
-        : null,
-    borderRadius: BorderRadius.circular(18),
-    image: _pickedImage != null
-        ? DecorationImage(
-            image: FileImage(_pickedImage!),
-            fit: BoxFit.cover,
-          )
-        : (_networkImageUrl != null && _networkImageUrl!.isNotEmpty)
-            ? DecorationImage(
-                image: NetworkImage(_networkImageUrl!),
-                fit: BoxFit.cover,
-                onError: (_, __) {},   // silently fallback
-              )
-            : null,
-  ),
-  alignment: Alignment.center,
-  child: (_pickedImage == null && (_networkImageUrl == null || _networkImageUrl!.isEmpty))
-      ? Text(initials,
-          style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Colors.white))
-      : null,
-),
-            Positioned(
-              bottom: 0,
-              right: 0,
-              child: GestureDetector(
-                onTap: _pickImage,         // ← opens bottom sheet
+        GestureDetector(
+          onTap: _pickImage,             // ← whole photo tappable
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 88,
+                height: 88,
+                padding: const EdgeInsets.all(3),   // ring gap
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(color: kPrimaryLight, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: kPrimary.withOpacity(0.18),
+                        blurRadius: 14,
+                        offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: ClipOval(child: _avatarContent(initials)),
+              ),
+              Positioned(
+                bottom: 0,
+                right: 0,
                 child: Container(
-                  width: 24,
-                  height: 24,
+                  width: 28,
+                  height: 28,
                   decoration: BoxDecoration(
-                    color: kWarning,
+                    color: kPrimary,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2),
+                    border: Border.all(color: Colors.white, width: 2.5),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1)),
+                    ],
                   ),
-                  child: const Icon(Icons.edit_rounded,
-                      size: 12, color: Colors.white),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      size: 14, color: Colors.white),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(name,
             style: const TextStyle(
                 fontSize: 14,
@@ -657,8 +652,8 @@ String? _networkImageUrl;   // ← add this
   _pickedImage != null
       ? 'Photo selected'
       : (_networkImageUrl != null && _networkImageUrl!.isNotEmpty)
-          ? 'Tap icon to change photo'
-          : 'Tap icon to add photo',
+          ? 'Tap photo to change'
+          : 'Tap photo to add',
   style: TextStyle(
       fontSize: 11,
       color: _pickedImage != null ? kSuccess : kTextMuted),
@@ -667,6 +662,41 @@ String? _networkImageUrl;   // ← add this
     ),
   );
 }
+// Avatar inside the photo circle: picked image > network image > name letter.
+// Falls back to initials when there is no image (or it fails to load).
+Widget _avatarContent(String initials) {
+  Widget letter() => Container(
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            colors: [kPrimary, kPrimaryDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: Text(initials,
+            style: const TextStyle(
+                fontSize: 28, fontWeight: FontWeight.w700, color: Colors.white)),
+      );
+
+  if (_pickedImage != null) {
+    return Image.file(_pickedImage!,
+        fit: BoxFit.cover, width: double.infinity, height: double.infinity);
+  }
+  final rawUrl = _networkImageUrl;
+  if (rawUrl != null && rawUrl.trim().isNotEmpty) {
+    // /uploads is JWT-gated — sign with ?token= so the avatar loads.
+    final url = ref.read(authImageUrlProvider)(rawUrl) ?? rawUrl;
+    return Image.network(url,
+        fit: BoxFit.cover, width: double.infinity, height: double.infinity,
+        errorBuilder: (_, __, ___) => letter(),
+        loadingBuilder: (_, child, progress) =>
+            progress == null ? child : letter());
+  }
+  return letter();
+}
+
 Future<void> _pickImage() async {
   showModalBottomSheet(
     context: context,

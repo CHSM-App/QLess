@@ -317,8 +317,11 @@ router.post('/doctor', uploadHandler(upload.fields([{
 		maxCount: 1
 	},
 	{
-		name: "clinic_image",
-		maxCount: 1
+		// Flutter sends the gallery under "clinic_images" (plural, up to 5).
+		// Must match the field name the client uses or multer rejects the whole
+		// upload with LIMIT_UNEXPECTED_FILE before the handler ever runs.
+		name: "clinic_images",
+		maxCount: 5
 	}
 ])), async (req, res) => {
 	try {
@@ -390,7 +393,7 @@ router.post('/doctor', uploadHandler(upload.fields([{
 		}
 
 		let doctorImageUrl = null;
-		let clinicImageUrl = null;
+		let clinicImageUrls = [];
 
 		// =========================
 		// 2️⃣ DOCTOR IMAGE
@@ -419,25 +422,38 @@ router.post('/doctor', uploadHandler(upload.fields([{
 		// =========================
 		// 3️⃣ CLINIC IMAGE
 		// =========================
-		if (req.files?.clinic_image) {
-
-			const file = req.files.clinic_image[0];
+		if (req.files?.clinic_images?.length) {
 
 			const dir = path.join(__dirname, "..", "uploads", "clinic_images", returnedClinicId.toString());
 			await fs.ensureDir(dir);
 
-			const dest = path.join(dir, file.filename);
-			await fs.move(file.path, dest, {
-				overwrite: true
-			});
-
-			clinicImageUrl = `${PUBLIC_BASE_URL}/uploads/clinic_images/${returnedClinicId}/${file.filename}`;
-
-			await db.request()
-				.input("operation", "uploadClinicImg")
+			// Continue sort_order after the gallery images that already exist for
+			// this clinic, so newly added photos append rather than collide.
+			const existingGallery = await db.request()
+				.input("operation", "fetchClinicGallery")
 				.input("clinic_id", returnedClinicId)
-				.input("image_url", clinicImageUrl)
 				.execute("sp_doctor_login");
+			let sortOrder = existingGallery.recordset?.length || 0;
+
+			for (const file of req.files.clinic_images) {
+				const dest = path.join(dir, file.filename);
+				await fs.move(file.path, dest, {
+					overwrite: true
+				});
+
+				const url = `${PUBLIC_BASE_URL}/uploads/clinic_images/${returnedClinicId}/${file.filename}`;
+				clinicImageUrls.push(url);
+
+				// uploadClinicGallery INSERTs into dbo.clinic_images (the gallery the
+				// app reads). uploadClinicImg only overwrote clinics.image_url (single).
+				await db.request()
+					.input("operation", "uploadClinicGallery")
+					.input("clinic_id", returnedClinicId)
+					.input("image_url", url)
+					.input("sort_order", sortOrder)
+					.execute("sp_doctor_login");
+				sortOrder++;
+			}
 		}
 
 		return res.json({
@@ -445,7 +461,8 @@ router.post('/doctor', uploadHandler(upload.fields([{
 			doctor_id: returnedDoctorId,
 			clinic_id: returnedClinicId,
 			doctor_image: doctorImageUrl,
-			clinic_image: clinicImageUrl,
+			clinic_images: clinicImageUrls,
+			clinic_image: clinicImageUrls[0] || null,
 			message: operation === "Update" ? "Updated" : "Created"
 		});
 

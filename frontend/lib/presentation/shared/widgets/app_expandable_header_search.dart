@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 
 class AppExpandableHeaderSearch extends StatefulWidget {
   final IconData? leadingIcon;
+  /// When true the leading icon is shown regardless of available width.
+  /// Default false keeps the original behaviour (icon only on wide layouts).
+  final bool alwaysShowLeadingIcon;
   final String title;
   final String subtitle;
   final String hintText;
@@ -23,6 +26,7 @@ class AppExpandableHeaderSearch extends StatefulWidget {
   const AppExpandableHeaderSearch({
     super.key,
     this.leadingIcon,
+    this.alwaysShowLeadingIcon = false,
     required this.title,
     required this.subtitle,
     required this.hintText,
@@ -140,7 +144,8 @@ class _AppExpandableHeaderSearchState
                           showSubtitle: showSubtitle,
                           titleFontSize: titleFontSize,
                           subtitleFontSize: subtitleFontSize,
-                          showLeadingIcon: widget.leadingIcon != null && isWide,
+                          showLeadingIcon: widget.leadingIcon != null &&
+                              (isWide || widget.alwaysShowLeadingIcon),
                         ),
                       ),
                     ),

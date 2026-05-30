@@ -460,7 +460,8 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
 Widget _buildHeader() {
   return Container(
     color: kBg,
-    padding: EdgeInsets.fromLTRB(14, MediaQuery.of(context).padding.top + 8, 14, 8),
+    // SafeArea already insets the status bar; only a small gap is needed here.
+    padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
     child: Row(
       children: [
         GestureDetector(

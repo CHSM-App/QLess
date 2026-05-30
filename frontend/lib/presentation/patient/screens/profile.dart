@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
@@ -135,29 +136,48 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        // Keep the header flat white when content scrolls under it — no M3
+        // surface-tint band appears behind the "My Profile" title.
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
         elevation: 0,
         automaticallyImplyLeading: false,
         centerTitle: false,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Side icon sized to match the header icon on the other screens
+            // (AppExpandableHeaderSearch leading icon: ~40 box, icon ~20).
             Container(
-              width: 32, height: 32,
+              width: 40, height: 40,
               decoration: BoxDecoration(
                 color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(9),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: kPrimary.withOpacity(0.2)),
               ),
-              child: const Icon(Icons.person_rounded, color: kPrimary, size: 16),
+              child: const Icon(Icons.person_rounded, color: kPrimary, size: 20),
             ),
-            const SizedBox(width: 8),
-            const Text(
-              'My Profile',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: kTextPrimary,
-                  letterSpacing: -0.2),
+            const SizedBox(width: 10),
+            // Title + subtitle, matching the other screens' header style.
+            const Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'My Profile',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary,
+                      letterSpacing: -0.2),
+                ),
+                SizedBox(height: 1),
+                Text(
+                  'Manage your profile',
+                  style: TextStyle(fontSize: 11, color: kTextMuted),
+                ),
+              ],
             ),
           ],
         ),
@@ -212,6 +232,11 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     final weight      = details?.weight;
     final initials    = _initials(displayName);
     final contactLine = _joinNonEmpty([email, mobile], separator: ' · ');
+    // /uploads is JWT-gated — sign the avatar URL with ?token= so it loads.
+    final rawImg = details?.imgUrl;
+    final avatarUrl = (rawImg != null && rawImg.trim().isNotEmpty)
+        ? (ref.read(authImageUrlProvider)(rawImg) ?? rawImg)
+        : null;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 14, 14, 0),
@@ -251,11 +276,24 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       alignment: Alignment.center,
-                      child: Text(initials,
-                          style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white)),
+                      clipBehavior: Clip.antiAlias,
+                      child: avatarUrl != null
+                          ? Image.network(
+                              avatarUrl,
+                              width: 54,
+                              height: 54,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Text(initials,
+                                  style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white)),
+                            )
+                          : Text(initials,
+                              style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
