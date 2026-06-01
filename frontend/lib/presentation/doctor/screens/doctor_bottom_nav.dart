@@ -7,6 +7,14 @@ import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
 import 'package:qless/presentation/doctor/screens/profile_screen.dart';
 
+/// Programmatic tab-switch request for [DoctorBottomNav].
+///
+/// Set this to a target tab index from anywhere inside a doctor page
+/// (e.g. the home queue card "Resume" action) to jump tabs. The bottom nav
+/// listens, switches, then resets it back to null. Patient List is index 1.
+final doctorNavTabRequestProvider = StateProvider<int?>((ref) => null);
+const int kDoctorPatientListTab = 1;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // THEME CONSTANTS  (single source of truth — change here, applies everywhere)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -169,6 +177,16 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
 
   @override
   Widget build(BuildContext context) {
+    // Honour programmatic tab-switch requests (e.g. home "Resume" → patient list).
+    ref.listen<int?>(doctorNavTabRequestProvider, (_, next) {
+      if (next == null) return;
+      _onTabTap(next);
+      // Reset so the same request can fire again later.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(doctorNavTabRequestProvider.notifier).state = null;
+      });
+    });
+
     final isWide =
         MediaQuery.of(context).size.width >= DoctorNavTheme.wideBreakpoint;
 

@@ -18,6 +18,10 @@ class AppointmentListState {
   final AsyncValue<List<TodayQueueModel>>? todayQueueResult;
   final QueueState queueState;
   final int? doctorPatientCount;
+  // Queue IDs the doctor has emergency-paused this session. The backend uses a
+  // distinct status for emergency pause; we track it client-side so the card
+  // shows "Resume" (treated as paused) and a re-tap can warn "already paused".
+  final Set<int> emergencyQueueIds;
 
   const AppointmentListState({
     this.isLoading = false,
@@ -26,6 +30,7 @@ class AppointmentListState {
     this.queueState = QueueState.idle,
     this.todayQueueResult = const AsyncValue.data([]),
     this.doctorPatientCount,
+    this.emergencyQueueIds = const {},
   });
 
   AppointmentListState copyWith({
@@ -35,6 +40,7 @@ class AppointmentListState {
     AsyncValue<List<TodayQueueModel>>? todayQueueResult,
     QueueState? queueState,
     int? doctorPatientCount,
+    Set<int>? emergencyQueueIds,
   }) {
     return AppointmentListState(
       isLoading: isLoading ?? this.isLoading,
@@ -43,6 +49,7 @@ class AppointmentListState {
       queueState: queueState ?? this.queueState,
       todayQueueResult: todayQueueResult ?? this.todayQueueResult,
       doctorPatientCount: doctorPatientCount ?? this.doctorPatientCount,
+      emergencyQueueIds: emergencyQueueIds ?? this.emergencyQueueIds,
     );
   }
 }
@@ -72,10 +79,11 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         todayQueues = await usecase.getTodayQueue(doctorId);
       } catch (_) {}
 
+      final emIds = state.emergencyQueueIds;
       state = state.copyWith(
         patientAppointmentsList: AsyncValue.data(result),
-        queueState: derivedQueueState,
-        todayQueueResult: AsyncValue.data(todayQueues),
+        queueState: _adjustForEmergency(derivedQueueState, result, emIds),
+        todayQueueResult: AsyncValue.data(_applyEmergency(todayQueues, emIds)),
       );
     } catch (e, st) {
       state = state.copyWith(patientAppointmentsList: AsyncValue.error(e, st));
@@ -90,6 +98,45 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       default: return QueueState.idle;    // no queue row yet
     }
   }
+
+  // Force emergency-paused queues to display as "paused" (status 2) so the
+  // card shows the Resume control. The backend's own emergency status maps to
+  // idle otherwise, which would wrongly show "Start".
+  List<TodayQueueModel> _applyEmergency(
+      List<TodayQueueModel> queues, Set<int> emIds) {
+    if (emIds.isEmpty) return queues;
+    return queues
+        .map((q) => (q.queueId != null && emIds.contains(q.queueId))
+            ? q.copyWith(queueStatus: 2)
+            : q)
+        .toList();
+  }
+
+  // Keep the global queue state in sync: a backend "idle" that's really an
+  // emergency-paused queue should read as paused.
+  QueueState _adjustForEmergency(
+      QueueState derived, List<AppointmentList> appts, Set<int> emIds) {
+    if (emIds.isEmpty ||
+        derived == QueueState.running ||
+        derived == QueueState.stopped) {
+      return derived;
+    }
+    final firstQueueId = appts.isNotEmpty ? appts.first.queueId : null;
+    if (firstQueueId != null && emIds.contains(firstQueueId)) {
+      return QueueState.paused;
+    }
+    return derived;
+  }
+
+  void _clearEmergency(int? queueId) {
+    if (queueId == null || !state.emergencyQueueIds.contains(queueId)) return;
+    state = state.copyWith(
+      emergencyQueueIds: {...state.emergencyQueueIds}..remove(queueId),
+    );
+  }
+
+  bool isEmergencyPaused(int? queueId) =>
+      queueId != null && state.emergencyQueueIds.contains(queueId);
 
   Future<void> fetchDoctorPatientCount(int doctorId) async {
     try {
@@ -111,6 +158,8 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.queueStart(appointmentRequest);
+      // Resuming clears any emergency-pause flag for this queue.
+      _clearEmergency(appointmentRequest.queueId);
       await fetchPatientAppointments(appointmentRequest.doctorId!);
       state = state.copyWith(isLoading: false, queueState: QueueState.running);
       return result;
@@ -128,6 +177,8 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.queuePause(appointmentRequest);
+      // A normal pause supersedes an emergency pause on the same queue.
+      _clearEmergency(appointmentRequest.queueId);
       await fetchPatientAppointments(appointmentRequest.doctorId!);
       state = state.copyWith(isLoading: false, queueState: QueueState.paused);
       return result;
@@ -145,6 +196,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.queueStop(appointmentRequest);
+      _clearEmergency(appointmentRequest.queueId);
       await fetchPatientAppointments(appointmentRequest.doctorId!);
       state = state.copyWith(isLoading: false, queueState: QueueState.stopped);
       return result;
@@ -244,7 +296,16 @@ Future<AppointmentResponseModel> startSession(
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.queuePauseEmergency(queueId);
-      state = state.copyWith(isLoading: false, queueState: QueueState.paused);
+      // Remember this queue as emergency-paused and force its card to read as
+      // paused so the Resume control shows (mirrors a normal pause).
+      final newSet = {...state.emergencyQueueIds, queueId};
+      final queues = state.todayQueueResult?.value ?? [];
+      state = state.copyWith(
+        isLoading: false,
+        queueState: QueueState.paused,
+        emergencyQueueIds: newSet,
+        todayQueueResult: AsyncValue.data(_applyEmergency(queues, newSet)),
+      );
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

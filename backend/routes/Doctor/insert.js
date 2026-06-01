@@ -1241,6 +1241,26 @@ router.post('/appointment/queueStop', async (req, res) => {
       });
     }
 
+    // Skipped patients aren't part of the cancel context above, but they're
+    // still left waiting when the queue closes — capture them (before the SP
+    // mutates their status) so we can notify them too.
+    const affectedIds = new Set(affectedAppts.map(a => a.patient_id));
+    let skippedAppts = [];
+    try {
+      const skippedRes = await db.request()
+        .input('queue_id', queue_id)
+        .query(`
+          SELECT a.patient_id, p.token AS owner_token, a.appointment_id
+          FROM appointments a
+          LEFT JOIN patients p ON a.user_type = 1 AND p.patient_id = a.patient_id
+          WHERE a.queue_id = @queue_id AND LOWER(a.status) = 'skipped'
+        `);
+      skippedAppts = (skippedRes.recordset || [])
+        .filter(r => r.patient_id && !affectedIds.has(r.patient_id));
+    } catch (e) {
+      log.error('[queueStop] skipped lookup failed: ' + e.message);
+    }
+
     const result = await db.request()
       .input('operation', 'QUEUE_STOP')
       .input('queue_id', queue_id)
@@ -1288,10 +1308,40 @@ router.post('/appointment/queueStop', async (req, res) => {
       );
     }
 
+    if (skippedAppts.length > 0) {
+      const doctorName = affectedAppts[0]?.doctor_name || 'your doctor';
+      const title = 'Queue Closed';
+      const body =
+        `Dr. ${doctorName} has closed today's queue. You were skipped earlier — ` +
+        `please contact the clinic or book again.`;
+
+      await Promise.all(skippedAppts.map(s =>
+        insertNotification(s.patient_id, title, body, 'appointment', s.appointment_id),
+      ));
+
+      await Promise.all(skippedAppts
+        .filter(s => s.owner_token && s.owner_token.trim() !== '')
+        .map(s =>
+          admin.messaging().send({
+            token: s.owner_token,
+            notification: { title, body },
+            data: {
+              type: 'appointment',
+              action: 'cancelled',
+              doctor_id: String(doctor_id),
+              appointment_id: String(s.appointment_id),
+            },
+          }).catch(err => log.error('FCM err (queueStop skipped): ' + err.message)),
+        ),
+      );
+      log.info('[queueStop] notified ' + skippedAppts.length + ' skipped patient(s)');
+    }
+
     return res.json({
       success: true,
       message: statusRow.message || 'Queue stopped',
-      cancelled_notifications: affectedAppts.length
+      cancelled_notifications: affectedAppts.length,
+      skipped_notifications: skippedAppts.length
     });
 
   } catch (error) {
