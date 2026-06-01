@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
@@ -25,6 +26,7 @@ final doctorSettingsViewModelProvider =
 
 final appointmentViewModelProvider =
     StateNotifierProvider<AppointmentListViewmodel, AppointmentListState>((ref) {
-  final usecase = ref.watch(appointmentUsecaseProvider);
-  return AppointmentListViewmodel(usecase);
+  final usecase      = ref.watch(appointmentUsecaseProvider);
+  final offlineStore = ref.watch(offlineQueueStoreProvider);
+  return AppointmentListViewmodel(usecase, offlineStore);
 });

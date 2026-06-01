@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/database/local_database.dart';
+import 'package:qless/core/database/offline_queue_store.dart';
 import 'package:qless/core/network/dio_provider.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/data/repositories/appointment_impl.dart';
@@ -32,4 +34,9 @@ final appointmentRepositoryProvider = Provider<AppointmentRepository>((ref) {
   final dio = ref.watch(dioProvider).value!;
   final api = ApiService(dio);
   return AppointmentImpl(api);
+});
+
+/// Singleton offline store backed by SQLite.
+final offlineQueueStoreProvider = Provider<OfflineQueueStore>((ref) {
+  return OfflineQueueStore(LocalDatabase.instance);
 });

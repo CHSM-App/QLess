@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/database/offline_queue_store.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
@@ -9,7 +10,6 @@ import 'package:qless/domain/usecase/appointment_usecase.dart';
 enum QueueState { idle, running, paused, stopped }
 
 // ─── State ────────────────────────────────────────────────────────────────────
-
 
 class AppointmentListState {
   final bool isLoading;
@@ -22,6 +22,8 @@ class AppointmentListState {
   // distinct status for emergency pause; we track it client-side so the card
   // shows "Resume" (treated as paused) and a re-tap can warn "already paused".
   final Set<int> emergencyQueueIds;
+  /// Number of pending offline operations waiting to be synced.
+  final int pendingOpsCount;
 
   const AppointmentListState({
     this.isLoading = false,
@@ -31,6 +33,7 @@ class AppointmentListState {
     this.todayQueueResult = const AsyncValue.data([]),
     this.doctorPatientCount,
     this.emergencyQueueIds = const {},
+    this.pendingOpsCount = 0,
   });
 
   AppointmentListState copyWith({
@@ -41,15 +44,18 @@ class AppointmentListState {
     QueueState? queueState,
     int? doctorPatientCount,
     Set<int>? emergencyQueueIds,
+    int? pendingOpsCount,
   }) {
     return AppointmentListState(
       isLoading: isLoading ?? this.isLoading,
       error: error ?? this.error,
-      patientAppointmentsList: patientAppointmentsList ?? this.patientAppointmentsList,
+      patientAppointmentsList:
+          patientAppointmentsList ?? this.patientAppointmentsList,
       queueState: queueState ?? this.queueState,
       todayQueueResult: todayQueueResult ?? this.todayQueueResult,
       doctorPatientCount: doctorPatientCount ?? this.doctorPatientCount,
       emergencyQueueIds: emergencyQueueIds ?? this.emergencyQueueIds,
+      pendingOpsCount: pendingOpsCount ?? this.pendingOpsCount,
     );
   }
 }
@@ -58,50 +64,91 @@ class AppointmentListState {
 
 class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   final AppointmentUsecase usecase;
+  final OfflineQueueStore offlineStore;
 
-  AppointmentListViewmodel(this.usecase) : super(const AppointmentListState());
+  AppointmentListViewmodel(this.usecase, this.offlineStore)
+      : super(const AppointmentListState());
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
-  Future<void> fetchPatientAppointments(int doctorId) async {
+  /// Offline-first fetch: tries the network, falls back to SQLite cache.
+  Future<void> fetchPatientAppointments(int doctorId,
+      {bool isOnline = true}) async {
     state = state.copyWith(
       patientAppointmentsList: const AsyncValue.loading(),
       error: null,
     );
     try {
-      final result = await usecase.fetchPatientAppointments(doctorId);
-      // Derive queue state from backend data so it survives app restarts
-      final derivedQueueState = _deriveQueueState(result.isNotEmpty ? result.first.queueStatus : null);
+      if (isOnline) {
+        final result = await usecase.fetchPatientAppointments(doctorId);
+        // Cache the fresh data locally
+        await offlineStore.cacheAppointments(result);
 
-      // Also fetch today's queue sessions to get queue_id per session
-      List<TodayQueueModel> todayQueues = [];
+        final derivedQueueState = _deriveQueueState(
+            result.isNotEmpty ? result.first.queueStatus : null);
+
+        List<TodayQueueModel> todayQueues = [];
+        try {
+          todayQueues = await usecase.getTodayQueue(doctorId);
+          await offlineStore.cacheQueues(todayQueues);
+        } catch (_) {}
+
+        final emIds = state.emergencyQueueIds;
+        final pendingCount = await offlineStore.pendingOpsCount();
+        state = state.copyWith(
+          patientAppointmentsList: AsyncValue.data(result),
+          queueState: _adjustForEmergency(derivedQueueState, result, emIds),
+          todayQueueResult:
+              AsyncValue.data(_applyEmergency(todayQueues, emIds)),
+          pendingOpsCount: pendingCount,
+        );
+      } else {
+        // Offline: load from local SQLite cache
+        await _loadFromCache(doctorId);
+      }
+    } catch (e) {
+      // Network error — fall back to cache
+      debugPrint('[AppointmentVM] Network fetch failed, loading cache: $e');
       try {
-        todayQueues = await usecase.getTodayQueue(doctorId);
-      } catch (_) {}
-
-      final emIds = state.emergencyQueueIds;
-      state = state.copyWith(
-        patientAppointmentsList: AsyncValue.data(result),
-        queueState: _adjustForEmergency(derivedQueueState, result, emIds),
-        todayQueueResult: AsyncValue.data(_applyEmergency(todayQueues, emIds)),
-      );
-    } catch (e, st) {
-      state = state.copyWith(patientAppointmentsList: AsyncValue.error(e, st));
+        await _loadFromCache(doctorId);
+      } catch (cacheErr) {
+        state = state.copyWith(
+            patientAppointmentsList: AsyncValue.error(cacheErr, StackTrace.current));
+      }
     }
+  }
+
+  Future<void> _loadFromCache(int doctorId) async {
+    final cachedAppts  = await offlineStore.getCachedAppointments(doctorId);
+    final cachedQueues = await offlineStore.getCachedQueues(doctorId);
+    final pendingCount = await offlineStore.pendingOpsCount();
+
+    final derivedQueueState = _deriveQueueState(
+        cachedAppts.isNotEmpty ? cachedAppts.first.queueStatus : null);
+    final emIds = state.emergencyQueueIds;
+
+    state = state.copyWith(
+      patientAppointmentsList: AsyncValue.data(cachedAppts),
+      todayQueueResult:
+          AsyncValue.data(_applyEmergency(cachedQueues, emIds)),
+      queueState: _adjustForEmergency(derivedQueueState, cachedAppts, emIds),
+      pendingOpsCount: pendingCount,
+    );
   }
 
   QueueState _deriveQueueState(int? queueStatus) {
     switch (queueStatus) {
-      case 1: return QueueState.running;  // QUEUE_START
-      case 2: return QueueState.paused;   // QUEUE_PAUSE
-      case 3: return QueueState.stopped;  // QUEUE_STOP
-      default: return QueueState.idle;    // no queue row yet
+      case 1:
+        return QueueState.running; // QUEUE_START
+      case 2:
+        return QueueState.paused; // QUEUE_PAUSE
+      case 3:
+        return QueueState.stopped; // QUEUE_STOP
+      default:
+        return QueueState.idle; // no queue row yet
     }
   }
 
-  // Force emergency-paused queues to display as "paused" (status 2) so the
-  // card shows the Resume control. The backend's own emergency status maps to
-  // idle otherwise, which would wrongly show "Start".
   List<TodayQueueModel> _applyEmergency(
       List<TodayQueueModel> queues, Set<int> emIds) {
     if (emIds.isEmpty) return queues;
@@ -112,8 +159,6 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         .toList();
   }
 
-  // Keep the global queue state in sync: a backend "idle" that's really an
-  // emergency-paused queue should read as paused.
   QueueState _adjustForEmergency(
       QueueState derived, List<AppointmentList> appts, Set<int> emIds) {
     if (emIds.isEmpty ||
@@ -138,87 +183,131 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   bool isEmergencyPaused(int? queueId) =>
       queueId != null && state.emergencyQueueIds.contains(queueId);
 
-  Future<void> fetchDoctorPatientCount(int doctorId) async {
+  Future<void> fetchDoctorPatientCount(int doctorId,
+      {bool isOnline = true}) async {
     try {
-      final result = await usecase.fetchPatientAppointments(doctorId);
-      final count = result
-          .where((a) => a.status?.toLowerCase() == 'completed')
-          .length;
+      List<AppointmentList> result;
+      if (isOnline) {
+        result = await usecase.fetchPatientAppointments(doctorId);
+      } else {
+        result = await offlineStore.getCachedAppointments(doctorId);
+      }
+      final count =
+          result.where((a) => a.status?.toLowerCase() == 'completed').length;
       state = state.copyWith(doctorPatientCount: count);
     } catch (_) {
       // Non-critical — count just won't show
     }
   }
 
-  // ── Queue Start ────────────────────────────────────────────────────────────
+  // ── Queue Start ─────────────────────────────────────────────────────────────
 
   Future<AppointmentResponseModel> queueStart(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
+    AppointmentRequestModel appointmentRequest, {
+    bool isOnline = true,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final result = await usecase.queueStart(appointmentRequest);
-      // Resuming clears any emergency-pause flag for this queue.
-      _clearEmergency(appointmentRequest.queueId);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
-      state = state.copyWith(isLoading: false, queueState: QueueState.running);
-      return result;
+      if (isOnline) {
+        final result = await usecase.queueStart(appointmentRequest);
+        _clearEmergency(appointmentRequest.queueId);
+        await fetchPatientAppointments(appointmentRequest.doctorId!,
+            isOnline: true);
+        state =
+            state.copyWith(isLoading: false, queueState: QueueState.running);
+        return result;
+      } else {
+        return await _offlineQueueOp(
+          op: OfflineOperation.queueStart,
+          request: appointmentRequest,
+          newQueueState: QueueState.running,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
   }
 
-  // ── Queue Pause ────────────────────────────────────────────────────────────
+  // ── Queue Pause ─────────────────────────────────────────────────────────────
 
   Future<AppointmentResponseModel> queuePause(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
+    AppointmentRequestModel appointmentRequest, {
+    bool isOnline = true,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final result = await usecase.queuePause(appointmentRequest);
-      // A normal pause supersedes an emergency pause on the same queue.
-      _clearEmergency(appointmentRequest.queueId);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
-      state = state.copyWith(isLoading: false, queueState: QueueState.paused);
-      return result;
+      if (isOnline) {
+        final result = await usecase.queuePause(appointmentRequest);
+        _clearEmergency(appointmentRequest.queueId);
+        await fetchPatientAppointments(appointmentRequest.doctorId!,
+            isOnline: true);
+        state = state.copyWith(isLoading: false, queueState: QueueState.paused);
+        return result;
+      } else {
+        return await _offlineQueueOp(
+          op: OfflineOperation.queuePause,
+          request: appointmentRequest,
+          newQueueState: QueueState.paused,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
   }
 
-  // ── Queue Stop ─────────────────────────────────────────────────────────────
+  // ── Queue Stop ──────────────────────────────────────────────────────────────
 
   Future<AppointmentResponseModel> queueStop(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
+    AppointmentRequestModel appointmentRequest, {
+    bool isOnline = true,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final result = await usecase.queueStop(appointmentRequest);
-      _clearEmergency(appointmentRequest.queueId);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
-      state = state.copyWith(isLoading: false, queueState: QueueState.stopped);
-      return result;
+      if (isOnline) {
+        final result = await usecase.queueStop(appointmentRequest);
+        _clearEmergency(appointmentRequest.queueId);
+        await fetchPatientAppointments(appointmentRequest.doctorId!,
+            isOnline: true);
+        state =
+            state.copyWith(isLoading: false, queueState: QueueState.stopped);
+        return result;
+      } else {
+        return await _offlineQueueOp(
+          op: OfflineOperation.queueStop,
+          request: appointmentRequest,
+          newQueueState: QueueState.stopped,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
   }
 
-  // ── Queue Next (Mark Complete) ─────────────────────────────────────────────
+  // ── Queue Next (Mark Complete) ──────────────────────────────────────────────
 
   Future<AppointmentResponseModel> queueNext(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
+    AppointmentRequestModel appointmentRequest, {
+    bool isOnline = true,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      debugPrint('QueueNext VM request: ${appointmentRequest.toJson()}');
-      final result = await usecase.queueNext(appointmentRequest);
-      debugPrint('QueueNext VM response: ${result.toJson()}');
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
-      state = state.copyWith(isLoading: false);
-      return result;
+      if (isOnline) {
+        debugPrint('QueueNext VM request: ${appointmentRequest.toJson()}');
+        final result = await usecase.queueNext(appointmentRequest);
+        debugPrint('QueueNext VM response: ${result.toJson()}');
+        await fetchPatientAppointments(appointmentRequest.doctorId!,
+            isOnline: true);
+        state = state.copyWith(isLoading: false);
+        return result;
+      } else {
+        return await _offlineQueueOp(
+          op: OfflineOperation.queueNext,
+          request: appointmentRequest,
+        );
+      }
     } catch (e) {
       debugPrint('QueueNext VM error: $e');
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -226,47 +315,68 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     }
   }
 
-  // ── Queue Skip ─────────────────────────────────────────────────────────────
+  // ── Queue Skip ──────────────────────────────────────────────────────────────
 
   Future<AppointmentResponseModel> queueSkip(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
+    AppointmentRequestModel appointmentRequest, {
+    bool isOnline = true,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final result = await usecase.queueSkip(appointmentRequest);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
-      state = state.copyWith(isLoading: false);
-      return result;
+      if (isOnline) {
+        final result = await usecase.queueSkip(appointmentRequest);
+        await fetchPatientAppointments(appointmentRequest.doctorId!,
+            isOnline: true);
+        state = state.copyWith(isLoading: false);
+        return result;
+      } else {
+        return await _offlineQueueOp(
+          op: OfflineOperation.queueSkip,
+          request: appointmentRequest,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
   }
 
-  // ── Queue Recall (attend a skipped patient) ────────────────────────────────
+  // ── Queue Recall ────────────────────────────────────────────────────────────
 
   Future<AppointmentResponseModel> queueRecall(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
+    AppointmentRequestModel appointmentRequest, {
+    bool isOnline = true,
+  }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final result = await usecase.queueRecall(appointmentRequest);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
-      state = state.copyWith(isLoading: false);
-      return result;
+      if (isOnline) {
+        final result = await usecase.queueRecall(appointmentRequest);
+        await fetchPatientAppointments(appointmentRequest.doctorId!,
+            isOnline: true);
+        state = state.copyWith(isLoading: false);
+        return result;
+      } else {
+        return await _offlineQueueOp(
+          op: OfflineOperation.queueRecall,
+          request: appointmentRequest,
+        );
+      }
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
   }
 
-Future<AppointmentResponseModel> startSession(
+  // ── Start / End Session ─────────────────────────────────────────────────────
+
+  Future<AppointmentResponseModel> startSession(
     AppointmentRequestModel appointmentRequest,
   ) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.startSession(appointmentRequest);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
+      await fetchPatientAppointments(appointmentRequest.doctorId!,
+          isOnline: true);
       state = state.copyWith(isLoading: false);
       return result;
     } catch (e) {
@@ -281,31 +391,9 @@ Future<AppointmentResponseModel> startSession(
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.endSession(appointmentRequest);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
+      await fetchPatientAppointments(appointmentRequest.doctorId!,
+          isOnline: true);
       state = state.copyWith(isLoading: false);
-      return result;
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-      rethrow;
-    }
-    }
-
-  // ── Queue Pause Emergency ──────────────────────────────────────────────────
-
-  Future<AppointmentResponseModel> queuePauseEmergency(int queueId) async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      final result = await usecase.queuePauseEmergency(queueId);
-      // Remember this queue as emergency-paused and force its card to read as
-      // paused so the Resume control shows (mirrors a normal pause).
-      final newSet = {...state.emergencyQueueIds, queueId};
-      final queues = state.todayQueueResult?.value ?? [];
-      state = state.copyWith(
-        isLoading: false,
-        queueState: QueueState.paused,
-        emergencyQueueIds: newSet,
-        todayQueueResult: AsyncValue.data(_applyEmergency(queues, newSet)),
-      );
       return result;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -313,7 +401,52 @@ Future<AppointmentResponseModel> startSession(
     }
   }
 
-  // ── Cancel Appointment By Doctor ───────────────────────────────────────────
+  // ── Queue Pause Emergency ───────────────────────────────────────────────────
+
+  Future<AppointmentResponseModel> queuePauseEmergency(
+    int queueId, {
+    bool isOnline = true,
+    int? doctorId,
+  }) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      if (isOnline) {
+        final result = await usecase.queuePauseEmergency(queueId);
+        final newSet = {...state.emergencyQueueIds, queueId};
+        final queues = state.todayQueueResult?.value ?? [];
+        state = state.copyWith(
+          isLoading: false,
+          queueState: QueueState.paused,
+          emergencyQueueIds: newSet,
+          todayQueueResult: AsyncValue.data(_applyEmergency(queues, newSet)),
+        );
+        return result;
+      } else {
+        // Offline emergency pause
+        await offlineStore.enqueueEmergencyPause(
+            queueId, doctorId ?? queueId);
+        await offlineStore.applyOfflineQueueOp(
+            OfflineOperation.queuePauseEmergency, queueId, null);
+
+        final newSet = {...state.emergencyQueueIds, queueId};
+        final queues = state.todayQueueResult?.value ?? [];
+        final pendingCount = await offlineStore.pendingOpsCount();
+        state = state.copyWith(
+          isLoading: false,
+          queueState: QueueState.paused,
+          emergencyQueueIds: newSet,
+          todayQueueResult: AsyncValue.data(_applyEmergency(queues, newSet)),
+          pendingOpsCount: pendingCount,
+        );
+        return AppointmentResponseModel(success: true, message: 'Saved offline');
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
+  }
+
+  // ── Cancel Appointment By Doctor ────────────────────────────────────────────
 
   Future<AppointmentResponseModel> cancelByDoctor(
     AppointmentRequestModel appointmentRequest,
@@ -321,7 +454,8 @@ Future<AppointmentResponseModel> startSession(
     state = state.copyWith(isLoading: true, error: null);
     try {
       final result = await usecase.cancelByDoctor(appointmentRequest);
-      await fetchPatientAppointments(appointmentRequest.doctorId!);
+      await fetchPatientAppointments(appointmentRequest.doctorId!,
+          isOnline: true);
       state = state.copyWith(isLoading: false);
       return result;
     } catch (e) {
@@ -330,21 +464,101 @@ Future<AppointmentResponseModel> startSession(
     }
   }
 
-  Future<List<TodayQueueModel>> getTodayQueue(int doctorId) async {
+  Future<List<TodayQueueModel>> getTodayQueue(int doctorId,
+      {bool isOnline = true}) async {
     state = state.copyWith(
       todayQueueResult: const AsyncValue.loading(),
       error: null,
     );
     try {
-      final result = await usecase.getTodayQueue(doctorId);
-      state = state.copyWith(
-        todayQueueResult: AsyncValue.data(result),
-      );
+      List<TodayQueueModel> result;
+      if (isOnline) {
+        result = await usecase.getTodayQueue(doctorId);
+        await offlineStore.cacheQueues(result);
+      } else {
+        result = await offlineStore.getCachedQueues(doctorId);
+      }
+      state = state.copyWith(todayQueueResult: AsyncValue.data(result));
       return result;
     } catch (e, st) {
-      state = state.copyWith(todayQueueResult: AsyncValue.error(e, st));
-      rethrow;
+      // Fallback to cache on error
+      try {
+        final cached = await offlineStore.getCachedQueues(doctorId);
+        state = state.copyWith(todayQueueResult: AsyncValue.data(cached));
+        return cached;
+      } catch (_) {
+        state = state.copyWith(todayQueueResult: AsyncValue.error(e, st));
+        rethrow;
+      }
     }
   }
 
+  // ── Sync: flush pending operations after coming back online ─────────────────
+
+  Future<void> syncPendingOps(int doctorId) async {
+    final flushed = await offlineStore.flushPendingOps(
+      (op, payload) => _executeOp(op, payload),
+    );
+    if (flushed > 0) {
+      debugPrint('[AppointmentVM] Flushed $flushed pending op(s), refreshing.');
+      await fetchPatientAppointments(doctorId, isOnline: true);
+    }
+    final pendingCount = await offlineStore.pendingOpsCount();
+    state = state.copyWith(pendingOpsCount: pendingCount);
+  }
+
+  Future<AppointmentResponseModel> _executeOp(
+    OfflineOperation op,
+    Map<String, dynamic> payload,
+  ) async {
+    switch (op) {
+      case OfflineOperation.queueStart:
+        return usecase.queueStart(AppointmentRequestModel.fromJson(payload));
+      case OfflineOperation.queuePause:
+        return usecase.queuePause(AppointmentRequestModel.fromJson(payload));
+      case OfflineOperation.queueStop:
+        return usecase.queueStop(AppointmentRequestModel.fromJson(payload));
+      case OfflineOperation.queueNext:
+        return usecase.queueNext(AppointmentRequestModel.fromJson(payload));
+      case OfflineOperation.queueSkip:
+        return usecase.queueSkip(AppointmentRequestModel.fromJson(payload));
+      case OfflineOperation.queueRecall:
+        return usecase.queueRecall(AppointmentRequestModel.fromJson(payload));
+      case OfflineOperation.queuePauseEmergency:
+        final qId = payload['queue_id'] as int;
+        return usecase.queuePauseEmergency(qId);
+    }
+  }
+
+  // ── Offline op helper ───────────────────────────────────────────────────────
+
+  Future<AppointmentResponseModel> _offlineQueueOp({
+    required OfflineOperation op,
+    required AppointmentRequestModel request,
+    QueueState? newQueueState,
+  }) async {
+    // 1. Persist to pending-ops queue
+    await offlineStore.enqueueOp(op, request, queueId: request.queueId);
+
+    // 2. Apply optimistic local mutation
+    await offlineStore.applyOfflineQueueOp(
+        op, request.queueId, request.appointmentId);
+
+    // 3. Reload UI from cache so optimistic changes are visible
+    if (request.doctorId != null) {
+      await _loadFromCache(request.doctorId!);
+    }
+
+    // 4. Update queue state machine in memory
+    if (newQueueState != null) {
+      state = state.copyWith(isLoading: false, queueState: newQueueState);
+    } else {
+      state = state.copyWith(isLoading: false);
+    }
+
+    final pendingCount = await offlineStore.pendingOpsCount();
+    state = state.copyWith(pendingOpsCount: pendingCount);
+
+    return AppointmentResponseModel(success: true, message: 'Saved offline');
+  }
 }
