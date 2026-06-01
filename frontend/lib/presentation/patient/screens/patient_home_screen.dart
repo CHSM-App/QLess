@@ -2011,6 +2011,7 @@ String _fmtClockTime(String? raw) {
     final totalQ    = appt.totalQueue;
     final serving   = appt.currentServing;
     final isMyTurn  = appt.isMyTurn ?? false;
+    final isSkipped = appt.queueState?.toLowerCase() == 'skipped';
     // Show queue section only for today's appointments that have a token
     final showQueue = widget.isToday && myToken != null;
 
@@ -2022,8 +2023,10 @@ String _fmtClockTime(String? raw) {
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: (isMyTurn || widget.isNext) ? kPrimary : kBorder,
-              width: isMyTurn ? 2 : (widget.isNext ? 1.8 : 1),
+              color: isSkipped
+                  ? kError
+                  : (isMyTurn || widget.isNext) ? kPrimary : kBorder,
+              width: (isMyTurn || isSkipped) ? 2 : (widget.isNext ? 1.8 : 1),
             ),
             boxShadow: [
               BoxShadow(
@@ -2090,6 +2093,28 @@ String _fmtClockTime(String? raw) {
                                   color: Colors.white, size: 9),
                               SizedBox(width: 3),
                               Text('Your Turn!',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        )
+                      else if (isSkipped)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: kError,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.block_rounded,
+                                  color: Colors.white, size: 9),
+                              SizedBox(width: 3),
+                              Text('Skipped',
                                   style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 9,
@@ -2530,6 +2555,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
     final myToken = appt.myQueueNumber ?? appt.queueNumber;
     final serving = appt.currentServing;
     final isMyTurn = appt.isMyTurn ?? false;
+    final isSkipped = appt.queueState?.toLowerCase() == 'skipped';
     final typeLabel = _bookingLabel(appt.bookingType);
     final typeColor = _bookingColor(appt.bookingType);
     final doctorID = appt.appointmentId ?? 'general';
@@ -2738,6 +2764,39 @@ class _TodayAppointmentPopup extends StatelessWidget {
                                 color: Colors.white,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (isSkipped) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: kError,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.block_rounded,
+                              color: Colors.white,
+                              size: 15,
+                            ),
+                            SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'You were skipped — please contact the clinic',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ],
