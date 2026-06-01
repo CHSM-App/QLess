@@ -16,7 +16,7 @@ import 'package:qless/presentation/patient/screens/patient_notification.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/shared/controllers/sync_controller.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
-import 'package:qless/presentation/shared/screens/splash_screen.dart';
+import 'package:qless/presentation/shared/screens/auth_gate.dart';
 import 'package:qless/core/navigation/navigator_key.dart';
 export 'package:qless/core/navigation/navigator_key.dart';
 
@@ -193,9 +193,7 @@ class HealthcareApp extends StatelessWidget {
         // returning user will choose.
         '/auth':          (_) => const ContinueAsScreen(),
       },
-      home: QlessSplashScreen(
-        nextScreen: const ContinueAsScreen(), // your existing role-select screen
-      ), // ✅ Auto-login logic
+      home: const AuthGate(), // ✅ Direct auto-login, no splash
     );
   }
 }

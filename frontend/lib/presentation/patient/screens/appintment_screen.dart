@@ -367,7 +367,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
   bool _isLive(AppointmentList a) {
-    if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
+    // Live queue states: waiting ('booked'), being served ('in_progress'),
+    // and skipped ('skipped' — so the banner can show the Skipped state).
+    // Completed / cancelled / reschedule are not live.
+    final s = a.status?.toLowerCase() ?? '';
+    if (s != 'booked' && s != 'in_progress' && s != 'skipped') return false;
     if (a.bookingType != 1) return false;
     final d = DateTime.tryParse(a.appointmentDate ?? '');
     if (d == null) return false;
@@ -1923,8 +1927,11 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
   bool get _isClosed =>
       widget.queueState?.toLowerCase() == 'queue closed';
 
+  bool get _isSkipped =>
+      widget.queueState?.toLowerCase() == 'skipped';
+
   bool get _hasEstRow =>
-      !_isClosed &&
+      !_isClosed && !_isSkipped &&
       (widget.estimatedArrivalTime != null || widget.patientsAhead != null);
 
   @override
@@ -1936,7 +1943,11 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
     final arrival   = widget.estimatedArrivalTime;
     final queueState = widget.queueState ?? '';
 
-    final topColor  = myTurn || started ? kSuccess : kWarning;
+    final topColor  = myTurn
+        ? kSuccess
+        : _isSkipped
+            ? kError
+            : (started ? kSuccess : kWarning);
     final topBg     = topColor.withOpacity(0.07);
     final topBorder = topColor.withOpacity(0.25);
 
@@ -1978,17 +1989,19 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                       TextSpan(
                         text: myTurn
                             ? "It's your turn!  "
-                            : started
-                                ? 'Queue position  '
-                                : _isClosed
-                                    ? ''
-                                    : 'Queue token  ',
+                            : _isSkipped
+                                ? 'You were skipped — contact clinic  '
+                                : started
+                                    ? 'Queue position  '
+                                    : _isClosed
+                                        ? ''
+                                        : 'Queue token  ',
                         style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: kTextSecondary),
                       ),
-                      if (!myTurn && !_isClosed)
+                      if (!myTurn && !_isClosed && !_isSkipped)
                         TextSpan(
                           text: q != null ? '#$q' : '—',
                           style: TextStyle(
@@ -2006,13 +2019,15 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                 decoration: BoxDecoration(
                   color: myTurn
                       ? kSuccess
-                      : (started ? kSuccess : kWarning),
+                      : _isSkipped
+                          ? kError
+                          : (started ? kSuccess : kWarning),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (started) ...[
+                    if (started && !_isSkipped) ...[
                       const Icon(Icons.circle, size: 6, color: Colors.white),
                       const SizedBox(width: 4),
                     ],

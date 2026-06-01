@@ -363,25 +363,46 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     // slot/queue time. 'in_progress' (Continue) and 'skipped' (recall)
     // are intentionally exempt — those flows are already underway.
     final status = p.status?.toLowerCase() ?? '';
-    if (status == 'booked') {
-      final slotStart = _instantOf(p.startTime);
-      if (slotStart != null &&
-          DateTime.now().toUtc().isBefore(slotStart)) {
-        _snack(
-          'Scheduled for ${_fmtTime(p.startTime)} — you can start once the slot time begins.',
-          isError: true,
+
+    // ── Continue (already in_progress) ───────────────────────────────
+    // This patient's session is already running — 'Continue' just reopens
+    // the consult screen. START_SESSION would reject in_progress, so skip
+    // the backend call entirely and go straight to the prescription screen.
+    if (status != 'in_progress') {
+      // ── Slot-time guard ────────────────────────────────────────────
+      // A fresh ('booked') session can't be started before its scheduled
+      // slot/queue time. 'skipped' (recall) is exempt — already underway.
+      if (status == 'booked') {
+        final slotStart = _instantOf(p.startTime);
+        if (slotStart != null &&
+            DateTime.now().toUtc().isBefore(slotStart)) {
+          _snack(
+            'Scheduled for ${_fmtTime(p.startTime)} — you can start once the slot time begins.',
+            isError: true,
+          );
+          return;
+        }
+      }
+
+      try {
+        final res = await ref.read(appointmentViewModelProvider.notifier).startSession(
+          AppointmentRequestModel(
+            doctorId: did, patientId: pid, appointmentId: p.appointmentId ?? 0,
+          ),
         );
+        if (!mounted) return;
+        // Backend blocks starting a session while another patient is still
+        // in_progress (returns success=false). Surface that message here and
+        // do NOT open the prescription screen.
+        if (res.success != true) {
+          _snack(res.message ?? 'Could not start session', isError: true);
+          return;
+        }
+      } catch (e) {
+        if (mounted) _snack('Failed to start session: $e', isError: true);
         return;
       }
     }
-
-    try {
-      await ref.read(appointmentViewModelProvider.notifier).startSession(
-        AppointmentRequestModel(
-          doctorId: did, patientId: pid, appointmentId: p.appointmentId ?? 0,
-        ),
-      );
-    } catch (_) {}
     if (!mounted) return;
     await Navigator.push(
       context,
