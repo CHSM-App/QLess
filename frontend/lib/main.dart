@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:qless/core/database/local_database.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -128,6 +129,9 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
 
   await _setupNotifications();
+
+  // Warm up the SQLite database so the first offline read is instant.
+  await LocalDatabase.instance.database;
 
   final container = ProviderContainer();
   await container.read(tokenProvider.notifier).loadTokens();

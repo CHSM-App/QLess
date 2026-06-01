@@ -6,6 +6,8 @@ import 'package:qless/presentation/doctor/screens/home_screen.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
 import 'package:qless/presentation/doctor/screens/profile_screen.dart';
+import 'package:qless/presentation/shared/controllers/sync_controller.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_banner.dart';
 
 /// Programmatic tab-switch request for [DoctorBottomNav].
 ///
@@ -187,20 +189,25 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
       });
     });
 
+    // Boot the sync controller so pending offline ops flush when back online.
+    ref.watch(syncControllerProvider);
+
     final isWide =
         MediaQuery.of(context).size.width >= DoctorNavTheme.wideBreakpoint;
 
     // Profile page hides the shared app bar (manages its own header)
 final showAppBar = false;
 
-    return PopScope(
-      canPop: _currentIndex == 0,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _onTabTap(0);
-      },
-      child: isWide
-          ? _buildWideLayout(showAppBar)
-          : _buildMobileLayout(showAppBar),
+    return ConnectivityBannerWrapper(
+      child: PopScope(
+        canPop: _currentIndex == 0,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _onTabTap(0);
+        },
+        child: isWide
+            ? _buildWideLayout(showAppBar)
+            : _buildMobileLayout(showAppBar),
+      ),
     );
   }
 
