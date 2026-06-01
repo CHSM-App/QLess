@@ -8,6 +8,7 @@ import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
+import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_patient_history.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
@@ -313,6 +314,15 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     } catch (_) {
       _snack('Failed to start queue');
     }
+  }
+
+  // Resume a paused queue → start it again, then jump straight to the
+  // Patient List tab so the doctor can continue seeing patients.
+  Future<void> _onQueueResume(int? queueId) async {
+    await _onQueueStart(queueId);
+    if (!mounted) return;
+    ref.read(doctorNavTabRequestProvider.notifier).state =
+        kDoctorPatientListTab;
   }
 
   Future<void> _onQueuePause(int? queueId) async {
@@ -1181,6 +1191,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final isRunning = queueState == QueueState.running;
     final isStopped = queueState == QueueState.stopped;
     final isPaused  = queueState == QueueState.paused;
+    // Emergency-paused reads as "paused" but hides Close — the queue must be
+    // resumed (or normally paused) before it can be closed.
+    final isEmergency = ref
+        .read(appointmentViewModelProvider.notifier)
+        .isEmergencyPaused(queueId);
 
     // Highlighted border so the live queue card stands out from
     // surrounding stat strips / sections — state-driven accent.
@@ -1296,20 +1311,32 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         Row(children: [
           Expanded(
             child: _actionBtn(
-              label: isRunning ? 'Pause' : 'Start',
+              label: isRunning
+                  ? 'Pause'
+                  : isPaused
+                      ? 'Resume'
+                      : 'Start',
               icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
               onTap: isRunning
                   ? () => _onQueuePause(queueId)
-                  : () => _onQueueStart(queueId),
+                  : isPaused
+                      ? () => _onQueueResume(queueId)
+                      : () => _onQueueStart(queueId),
               isPrimary: !isRunning,
             ),
           ),
+          // Close is hidden while emergency-paused.
+          if (!isEmergency) ...[
           const SizedBox(width: 6),
           Expanded(
             child: Opacity(
-              opacity: isStopped ? 0.4 : 1.0,
+              // Close is only valid once the queue is live (running/paused).
+              // Before Start (idle) or after Stop it stays disabled.
+              opacity: (isStopped || isIdle) ? 0.4 : 1.0,
               child: GestureDetector(
-                onTap: isStopped ? null : () => _showCloseDialog(queueId),
+                onTap: (isStopped || isIdle)
+                    ? null
+                    : () => _showCloseDialog(queueId),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 9),
                   decoration: BoxDecoration(
@@ -1338,6 +1365,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               ),
             ),
           ),
+          ],
           const SizedBox(width: 6),
           GestureDetector(
             onTap: () => _showEmergencyDialog(queueId),
@@ -1360,6 +1388,40 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // ── Dialogs ───────────────────────────────────────────────────────────────
 
   Future<void> _showCloseDialog(int? queueId) async {
+    // Mirror the patient-list close flow: count every patient that closing
+    // will cancel — this queue's pending (booked / in_progress), its skipped,
+    // and earlier-time slot patients still pending — and warn only when > 0.
+    final vmState     = ref.read(appointmentViewModelProvider);
+    final appts       = vmState.patientAppointmentsList.value ?? <AppointmentList>[];
+    final sessions    = vmState.todayQueueResult?.value ?? [];
+
+    final matchingSession = sessions.where((s) => s.queueId == queueId).toList();
+    final queueStartTime  = matchingSession.isEmpty
+        ? null
+        : DateTime.tryParse(matchingSession.first.startTime ?? '');
+
+    final queuePending = appts.where((p) {
+      if (p.queueId != queueId) return false;
+      final st = (p.status?.toLowerCase() ?? '');
+      return st == 'booked' || st == 'in_progress';
+    }).length;
+
+    final queueSkipped = appts.where((p) {
+      if (p.queueId != queueId) return false;
+      return (p.status?.toLowerCase() ?? '') == 'skipped';
+    }).length;
+
+    final earlierSlotPending = queueStartTime == null
+        ? 0
+        : appts.where((p) {
+            if (p.bookingType != 2) return false;
+            final st = (p.status?.toLowerCase() ?? '');
+            if (st != 'booked' && st != 'skipped') return false;
+            final pTime = DateTime.tryParse(p.startTime ?? '');
+            return pTime != null && pTime.isBefore(queueStartTime);
+          }).length;
+
+    final totalCancel = queuePending + queueSkipped + earlierSlotPending;
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -1389,10 +1451,44 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Are you sure you want to close this queue? This action cannot be undone.',
+              'Are you sure you want to close this queue?',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5),
+              style: TextStyle(
+                  fontSize: 12, color: kTextSecondary, height: 1.5),
             ),
+            if (totalCancel > 0) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: kAmberLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kAmberBorder),
+                ),
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Icon(Icons.warning_amber_rounded, size: 16, color: kAmberDark),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(
+                        '$totalCancel patient${totalCancel == 1 ? '' : 's'} will be cancelled',
+                        style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700, color: kAmberDark),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        [
+                          if (queuePending > 0) '$queuePending pending in this queue',
+                          if (queueSkipped > 0) '$queueSkipped skipped in this queue',
+                          if (earlierSlotPending > 0) '$earlierSlotPending from earlier slots',
+                        ].join(' · '),
+                        style: const TextStyle(fontSize: 11, color: kAmberDark, height: 1.3),
+                      ),
+                    ]),
+                  ),
+                ]),
+              ),
+            ],
             const SizedBox(height: 4),
           ],
         ),
@@ -1444,6 +1540,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   Future<void> _showEmergencyDialog(int? queueId) async {
+    if (ref.read(appointmentViewModelProvider.notifier)
+        .isEmergencyPaused(queueId)) {
+      _snack('Already emergency paused');
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,

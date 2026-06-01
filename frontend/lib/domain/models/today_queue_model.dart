@@ -29,6 +29,37 @@ class TodayQueueModel {
     this.stoppedAt,
   });
 
+  TodayQueueModel copyWith({
+    int? queueId,
+    int? doctorId,
+    String? queueDate,
+    int? slotId,
+    String? startTime,
+    String? endTime,
+    int? queueStatus,
+    int? currentServing,
+    int? currentQueueNo,
+    int? totalQueue,
+    int? completedCount,
+    String? startedAt,
+    String? stoppedAt,
+  }) =>
+      TodayQueueModel(
+        queueId: queueId ?? this.queueId,
+        doctorId: doctorId ?? this.doctorId,
+        queueDate: queueDate ?? this.queueDate,
+        slotId: slotId ?? this.slotId,
+        startTime: startTime ?? this.startTime,
+        endTime: endTime ?? this.endTime,
+        queueStatus: queueStatus ?? this.queueStatus,
+        currentServing: currentServing ?? this.currentServing,
+        currentQueueNo: currentQueueNo ?? this.currentQueueNo,
+        totalQueue: totalQueue ?? this.totalQueue,
+        completedCount: completedCount ?? this.completedCount,
+        startedAt: startedAt ?? this.startedAt,
+        stoppedAt: stoppedAt ?? this.stoppedAt,
+      );
+
   factory TodayQueueModel.fromJson(Map<String, dynamic> json) => TodayQueueModel(
         queueId: json['queue_id'] as int?,
         doctorId: json['doctor_id'] as int?,

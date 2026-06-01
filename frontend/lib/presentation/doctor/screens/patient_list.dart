@@ -679,6 +679,11 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       return st == 'booked' || st == 'in_progress';
     }).length;
 
+    final queueSkipped = allPatients.where((p) {
+      if (p.queueId != queueId) return false;
+      return (p.status?.toLowerCase() ?? '') == 'skipped';
+    }).length;
+
     final earlierSlotPatients = queueStartTime == null
         ? <AppointmentList>[]
         : allPatients.where((p) {
@@ -690,7 +695,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           }).toList();
     final earlierSlotPending = earlierSlotPatients.length;
 
-    final totalCancel = queuePending + earlierSlotPending;
+    final totalCancel = queuePending + earlierSlotPending + queueSkipped;
 
     final confirmed = await showDialog<bool>(
       context: context,
@@ -733,11 +738,11 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        queuePending > 0 && earlierSlotPending > 0
-                            ? '$queuePending from this queue · $earlierSlotPending from earlier slots'
-                            : queuePending > 0
-                                ? '$queuePending pending in this queue'
-                                : '$earlierSlotPending pending in earlier slots',
+                        [
+                          if (queuePending > 0) '$queuePending pending in this queue',
+                          if (queueSkipped > 0) '$queueSkipped skipped in this queue',
+                          if (earlierSlotPending > 0) '$earlierSlotPending from earlier slots',
+                        ].join(' · '),
                         style: const TextStyle(fontSize: 11, color: kAmberDark, height: 1.3),
                       ),
                     ]),
@@ -781,6 +786,114 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     } catch (_) {
       _snack('Failed to close queue', isError: true);
     }
+  }
+
+  // Emergency pause — same behaviour as the home screen. Confirmation is
+  // handled in [_showEmergencyDialog]; this just fires the call.
+  Future<void> _onQueueEmergency(int? queueId) async {
+    if (queueId == null) {
+      _snack('Queue ID not available', isError: true);
+      return;
+    }
+    if (ref.read(appointmentViewModelProvider.notifier)
+        .isEmergencyPaused(queueId)) {
+      _snack('Already emergency paused');
+      return;
+    }
+    final confirmed = await _showEmergencyDialog();
+    if (confirmed != true) return;
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier)
+          .queuePauseEmergency(queueId);
+      _snack(res.message ?? 'Queue paused (emergency)');
+      // VM already refetched the list+queue — no extra call here.
+    } catch (_) {
+      _snack('Failed to pause queue', isError: true);
+    }
+  }
+
+  Future<bool?> _showEmergencyDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                  color: kPurpleLight,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: kPurpleBorder)),
+              child: const Icon(Icons.warning_amber_rounded,
+                  color: kPurple, size: 26),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Emergency Pause?',
+              style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Queue is Emergency Pause. Do you want to pause immediately?',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5),
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+        actions: [
+          Row(children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx, false),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('No',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kTextSecondary)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx, true),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: kPurpleLight,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: kPurpleBorder),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text('Yes, Pause',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kPurpleDark)),
+                ),
+              ),
+            ),
+          ]),
+        ],
+      ),
+    );
   }
 
   @override
@@ -984,6 +1097,9 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
               onQueueStart: _onQueueStart,
               onQueuePause: _onQueuePause,
               onQueueStop: _onQueueStop,
+              onQueueEmergency: _onQueueEmergency,
+              emergencyQueueIds:
+                  ref.watch(appointmentViewModelProvider).emergencyQueueIds,
               onRefresh: () async {
                 ref.read(appointmentViewModelProvider.notifier)
                     .fetchPatientAppointments(_doctorId);
@@ -1053,6 +1169,9 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
                 onQueueStart: _onQueueStart,
                 onQueuePause: _onQueuePause,
                 onQueueStop: _onQueueStop,
+                onQueueEmergency: _onQueueEmergency,
+                emergencyQueueIds:
+                    ref.watch(appointmentViewModelProvider).emergencyQueueIds,
                 onRefresh: () async {
                   ref.read(appointmentViewModelProvider.notifier)
                       .fetchPatientAppointments(_doctorId);
@@ -1098,6 +1217,8 @@ class _SessionGroupedBody extends StatefulWidget {
   final Future<void> Function(int? queueId) onQueueStart;
   final Future<void> Function(int? queueId) onQueuePause;
   final Future<void> Function(int? queueId) onQueueStop;
+  final Future<void> Function(int? queueId) onQueueEmergency;
+  final Set<int> emergencyQueueIds;
 
   const _SessionGroupedBody({
     required this.allSessions,
@@ -1113,6 +1234,8 @@ class _SessionGroupedBody extends StatefulWidget {
     required this.onQueueStart,
     required this.onQueuePause,
     required this.onQueueStop,
+    required this.onQueueEmergency,
+    required this.emergencyQueueIds,
     this.selected,
     this.onSelect,
   });
@@ -1283,6 +1406,8 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
               onQueueStart: widget.onQueueStart,
               onQueuePause: widget.onQueuePause,
               onQueueStop: widget.onQueueStop,
+              onQueueEmergency: widget.onQueueEmergency,
+              emergencyQueueIds: widget.emergencyQueueIds,
               controlsEnabled: i == firstQueueIdx,
             );
           }
@@ -1370,6 +1495,8 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
       onQueueStart: () => widget.onQueueStart(queueId),
       onQueuePause: () => widget.onQueuePause(queueId),
       onQueueStop:  () => widget.onQueueStop(queueId),
+      onQueueEmergency: () => widget.onQueueEmergency(queueId),
+      isEmergency: widget.emergencyQueueIds.contains(queueId),
     );
   }
 
@@ -1421,6 +1548,8 @@ class _QueueSlotSection extends StatelessWidget {
   final Future<void> Function(int? queueId) onQueueStart;
   final Future<void> Function(int? queueId) onQueuePause;
   final Future<void> Function(int? queueId) onQueueStop;
+  final Future<void> Function(int? queueId) onQueueEmergency;
+  final Set<int> emergencyQueueIds;
   final bool controlsEnabled;
 
   const _QueueSlotSection({
@@ -1439,6 +1568,8 @@ class _QueueSlotSection extends StatelessWidget {
     required this.onQueueStart,
     required this.onQueuePause,
     required this.onQueueStop,
+    required this.onQueueEmergency,
+    required this.emergencyQueueIds,
     required this.controlsEnabled,
     this.onSelect,
   });
@@ -1615,6 +1746,9 @@ class _QueueSlotSection extends StatelessWidget {
                       onQueueStart: () => onQueueStart(queueId),
                       onQueuePause: () => onQueuePause(queueId),
                       onQueueStop:  () => onQueueStop(queueId),
+                      onQueueEmergency: () => onQueueEmergency(queueId),
+                      isEmergencyPaused:
+                          queueId != null && emergencyQueueIds.contains(queueId),
                     ),
 
                     // Patient list
@@ -1733,6 +1867,8 @@ class _SessionAccordion extends StatelessWidget {
   final VoidCallback onQueueStart;
   final VoidCallback onQueuePause;
   final VoidCallback onQueueStop;
+  final VoidCallback onQueueEmergency;
+  final bool isEmergency;
 
   const _SessionAccordion({
     super.key,
@@ -1754,6 +1890,8 @@ class _SessionAccordion extends StatelessWidget {
     required this.onQueueStart,
     required this.onQueuePause,
     required this.onQueueStop,
+    required this.onQueueEmergency,
+    required this.isEmergency,
     this.selected,
     this.onSelect,
   });
@@ -1810,6 +1948,8 @@ class _SessionAccordion extends StatelessWidget {
                       onQueueStart: onQueueStart,
                       onQueuePause: onQueuePause,
                       onQueueStop: onQueueStop,
+                      onQueueEmergency: onQueueEmergency,
+                      isEmergencyPaused: isEmergency,
                     ),
 
                     Builder(builder: (_) {
@@ -2037,6 +2177,10 @@ class _LiveQueueCard extends StatelessWidget {
   final VoidCallback onQueueStart;
   final VoidCallback onQueuePause;
   final VoidCallback onQueueStop;
+  // Optional — emergency button only renders where this is wired.
+  final VoidCallback? onQueueEmergency;
+  // Hide the Close (stop) button while emergency-paused.
+  final bool isEmergencyPaused;
 
   const _LiveQueueCard({
     required this.patients,
@@ -2047,6 +2191,8 @@ class _LiveQueueCard extends StatelessWidget {
     required this.onQueueStart,
     required this.onQueuePause,
     required this.onQueueStop,
+    this.onQueueEmergency,
+    this.isEmergencyPaused = false,
   });
 
   @override
@@ -2068,6 +2214,7 @@ class _LiveQueueCard extends StatelessWidget {
     final next      = hasIP ? booked.firstOrNull : (booked.length > 1 ? booked[1] : null);
     final isRunning = qs == QueueState.running;
     final isStopped = qs == QueueState.stopped;
+    final isPaused  = qs == QueueState.paused;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -2103,27 +2250,46 @@ class _LiveQueueCard extends StatelessWidget {
 
             const Spacer(),
 
-            // Start / Pause + Stop buttons (hidden when stopped)
+            // Start / Pause / Resume + Stop + Emergency (hidden when stopped)
             if (!isStopped) ...[
               _QueueIconBtn(
                 icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
                 color: isRunning ? kAmberDark : kPrimaryDark,
                 bg:    isRunning ? kAmberLight : kPrimaryLight,
                 enabled: controlsEnabled,
-                tooltip: isRunning ? 'Pause' : 'Start',
+                tooltip: isRunning
+                    ? 'Pause'
+                    : isPaused
+                        ? 'Resume'
+                        : 'Start',
                 onTap: controlsEnabled
                     ? (isRunning ? onQueuePause : onQueueStart)
                     : null,
               ),
-              const SizedBox(width: 5),
-              _QueueIconBtn(
-                icon: Icons.stop_rounded,
-                color: kRedDark,
-                bg: kRedLight,
-                enabled: controlsEnabled,
-                tooltip: 'Close queue',
-                onTap: controlsEnabled ? onQueueStop : null,
-              ),
+              // Close is hidden while emergency-paused.
+              if (!isEmergencyPaused) ...[
+                const SizedBox(width: 5),
+                _QueueIconBtn(
+                  icon: Icons.stop_rounded,
+                  color: kRedDark,
+                  bg: kRedLight,
+                  enabled: controlsEnabled,
+                  tooltip: 'Close queue',
+                  onTap: controlsEnabled ? onQueueStop : null,
+                ),
+              ],
+              // Emergency pause — only when wired (today queue sessions).
+              if (onQueueEmergency != null) ...[
+                const SizedBox(width: 5),
+                _QueueIconBtn(
+                  icon: Icons.warning_amber_rounded,
+                  color: kPurpleDark,
+                  bg: kPurpleLight,
+                  enabled: controlsEnabled,
+                  tooltip: 'Emergency pause',
+                  onTap: controlsEnabled ? onQueueEmergency : null,
+                ),
+              ],
               const SizedBox(width: 8),
             ],
 
