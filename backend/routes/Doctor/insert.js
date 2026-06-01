@@ -1067,10 +1067,16 @@ router.post('/appointment/queueStart', async (req, res) => {
       .input('doctor_id', doctor_id)
       .execute('sp_appointment');
 
-    const rows = result.recordset || [];
-
-    // 🔥 FIRST ROW = STATUS
-    const statusRow = rows[0] || {};
+    // QUEUE_START's SP returns the status row and the waiting-patient token
+    // rows. Depending on the SP it may put them in ONE recordset (status first,
+    // tokens after) or in TWO separate recordsets — exactly the gotcha
+    // documented in queuePause below. node-mssql only exposes the first
+    // recordset on `.recordset`, so the old `rows.slice(1)` silently found ZERO
+    // tokens whenever the SP used the separate-recordset shape and no
+    // "Doctor Arrived" push ever went out. Flatten every recordset and take all
+    // token-bearing rows (the status row carries `success`, not a token).
+    const allRows = (result.recordsets || [result.recordset || []]).flat();
+    const statusRow = allRows.find(r => r && r.success != null) || {};
 
     /* if (statusRow.success !== 1) {
          return res.json({
@@ -1079,11 +1085,9 @@ router.post('/appointment/queueStart', async (req, res) => {
          });
        }*/
 
-    // 🔥 REMAINING ROWS = TOKENS
-    const tokens = rows
-      .slice(1) // skip first row
-      .map(r => r.token)
-      .filter(t => t && t.trim() !== '');
+    const tokens = allRows
+      .filter(r => r && r !== statusRow && r.token && String(r.token).trim() !== '')
+      .map(r => r.token);
 
     if (tokens.length === 0) {
       return res.json({
@@ -1517,10 +1521,8 @@ router.post('/appointment/endSession', async (req, res) => {
       .input('appointment_id', appointment_id)
       .execute('sp_appointment');
 
-    const rows = result.recordset || [];
-
-    // ✅ STATUS
-    const statusRow = rows[0] || {};
+    const allRows = (result.recordsets || [result.recordset || []]).flat();
+    const statusRow = allRows.find(r => r && r.success != null) || {};
 
     if (statusRow.success !== 1) {
       return res.json({
@@ -1529,36 +1531,17 @@ router.post('/appointment/endSession', async (req, res) => {
       });
     }
 
-    // 🔥 ONLY 3rd PATIENT TOKEN
-    const token = rows[1]?.token;
-
-    log.debug('endSession: 3rd patient token present: ' + !!token);
-
-    // Re-evaluate proximity for everyone further back in the queue — every
-    // consultation that ends shifts each waiting patient one slot closer.
+    // Practo-style queue notifications are purely position/ETA driven. The
+    // patient who just moved up gets a single "Almost your turn" from
+    // sendProximityNotifications — we deliberately DON'T send a separate fixed
+    // "Be Ready (3rd in queue)" push, which only duplicated the proximity
+    // 'near' stage for the same patient. Every ended consultation shifts each
+    // waiting patient one slot closer, so re-scan proximity here.
     sendProximityNotifications(doctor_id);
-
-    if (token) {
-      const readyTitle = 'Be Ready';
-      const readyBody = 'Your turn is coming soon. Please stay nearby.';
-
-      await insertNotificationForToken(token, readyTitle, readyBody, 'queue', doctor_id);
-
-      await admin.messaging().send({
-        token: token,
-        notification: { title: readyTitle, body: readyBody },
-        data: { type: 'queue' },
-      });
-
-      return res.json({
-        success: true,
-        message: '3rd patient notified successfully'
-      });
-    }
 
     return res.json({
       success: true,
-      message: 'Session ended, less than 3 patients in queue'
+      message: statusRow.message || 'Session ended'
     });
 
   } catch (error) {
@@ -1826,6 +1809,73 @@ cron.schedule('0 16 * * *', async () => {
     log.error('[cron 16:00] Failed to send rating notifications: ' + error.message);
   }
 
+});
+
+
+// Follow-up reminders (Practo pattern). When a doctor sets a follow_up_date on a
+// prescription, the patient is reminded the day BEFORE and again the DAY OF so
+// they book the review visit. sp_prescription 'FollowUpReminders' returns one row
+// per prescription whose follow_up_date is today or tomorrow, each carrying the
+// patient's FCM token (patient or family-head), the doctor name and a
+// reminder_kind flag ('day_before' | 'day_of').
+cron.schedule('0 9 * * *', async () => {
+  try {
+    const result = await db.request()
+      .input('operation', 'FollowUpReminders')
+      .execute('sp_prescription');
+
+    const rows = result.recordset || [];
+
+    if (rows.length === 0) {
+      log.info('[cron 09:00] No follow-up reminders due');
+      return;
+    }
+
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const row of rows) {
+      const token = row.patient_token;
+      const doctorName = row.doctor_name || 'your doctor';
+      const kind = row.reminder_kind; // 'day_before' | 'day_of'
+
+      if (!token || !kind) continue;
+
+      const title = kind === 'day_of' ? 'Follow-up Today' : 'Follow-up Tomorrow';
+      const body = kind === 'day_of'
+        ? `Your follow-up with Dr. ${doctorName} is today. Tap to book your visit.`
+        : `Your follow-up with Dr. ${doctorName} is tomorrow. Tap to book your visit.`;
+
+      // type 'appointment' with no appointment_id → the tap lands on the
+      // appointments tab where the patient can book the follow-up. doctor_id is
+      // carried for any future "pre-select this doctor" booking deep link.
+      await insertNotificationForToken(token, title, body, 'appointment', null);
+
+      const message = {
+        token,
+        notification: { title, body },
+        data: {
+          type: 'appointment',
+          action: 'followup',
+          doctor_id: String(row.doctor_id ?? ''),
+          prescription_id: String(row.prescription_id ?? ''),
+        },
+      };
+
+      try {
+        await admin.messaging().send(message);
+        successCount++;
+      } catch (err) {
+        log.error('FCM Error: ' + err.message);
+        failureCount++;
+      }
+    }
+
+    log.info(`[cron 09:00] Follow-up reminders sent: ${successCount} ok, ${failureCount} failed / ${rows.length} total`);
+
+  } catch (error) {
+    log.error('[cron 09:00] Failed to send follow-up reminders: ' + error.message);
+  }
 });
 
 

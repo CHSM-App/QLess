@@ -214,10 +214,40 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   AppointmentList? _selected;
   _Tab _activeTab = _Tab.today;
 
-  _DateFilter _dateFilter = _DateFilter.all;
-  DateTime?   _customFrom;
-  DateTime?   _customTo;
-  bool        _sortNewest = true;
+  // Per-tab filter state. Upcoming defaults to "All Time"; the Completed
+  // (Current Complete Queue) tab defaults to "Today" so it opens showing only
+  // today's completed. Both tabs' lists are computed every build, so they read
+  // their own backing fields directly — the routed getters/setters below are
+  // only for the shared filter UI, which always acts on the active tab.
+  _DateFilter _upcomingFilter = _DateFilter.all;
+  DateTime?   _upcomingFrom;
+  DateTime?   _upcomingTo;
+  bool        _upcomingSortNewest = true;
+
+  _DateFilter _completedFilter = _DateFilter.today;
+  DateTime?   _completedFrom;
+  DateTime?   _completedTo;
+  bool        _completedSortNewest = true;
+
+  bool get _onCompletedTab => _activeTab == _Tab.completed;
+
+  _DateFilter get _dateFilter =>
+      _onCompletedTab ? _completedFilter : _upcomingFilter;
+  set _dateFilter(_DateFilter v) =>
+      _onCompletedTab ? _completedFilter = v : _upcomingFilter = v;
+
+  DateTime? get _customFrom => _onCompletedTab ? _completedFrom : _upcomingFrom;
+  set _customFrom(DateTime? v) =>
+      _onCompletedTab ? _completedFrom = v : _upcomingFrom = v;
+
+  DateTime? get _customTo => _onCompletedTab ? _completedTo : _upcomingTo;
+  set _customTo(DateTime? v) =>
+      _onCompletedTab ? _completedTo = v : _upcomingTo = v;
+
+  bool get _sortNewest =>
+      _onCompletedTab ? _completedSortNewest : _upcomingSortNewest;
+  set _sortNewest(bool v) =>
+      _onCompletedTab ? _completedSortNewest = v : _upcomingSortNewest = v;
 
   @override
   void initState() {
@@ -295,12 +325,12 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         .where((a) =>
             (a.status?.toLowerCase().trim() ?? '') == 'booked' &&
             _isAfter(_pd(a.appointmentDate)) && _match(a) &&
-            _passesDateFilter(a, _dateFilter, _customFrom, _customTo))
+            _passesDateFilter(a, _upcomingFilter, _upcomingFrom, _upcomingTo))
         .toList();
     list.sort((a, b) {
       final da = DateTime.tryParse(a.appointmentDate ?? '') ?? DateTime(0);
       final db = DateTime.tryParse(b.appointmentDate ?? '') ?? DateTime(0);
-      return _sortNewest ? db.compareTo(da) : da.compareTo(db);
+      return _upcomingSortNewest ? db.compareTo(da) : da.compareTo(db);
     });
     return list;
   }
@@ -310,13 +340,13 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         .where((a) {
           final s = a.status?.toLowerCase().trim() ?? '';
           return (s == 'completed' || s == 'done' || s == 'closed') && _match(a) &&
-              _passesDateFilter(a, _dateFilter, _customFrom, _customTo);
+              _passesDateFilter(a, _completedFilter, _completedFrom, _completedTo);
         })
         .toList();
     list.sort((a, b) {
       final da = DateTime.tryParse(a.appointmentDate ?? '') ?? DateTime(0);
       final db = DateTime.tryParse(b.appointmentDate ?? '') ?? DateTime(0);
-      return _sortNewest ? db.compareTo(da) : da.compareTo(db);
+      return _completedSortNewest ? db.compareTo(da) : da.compareTo(db);
     });
     return list;
   }
@@ -2687,9 +2717,9 @@ class _PillTabBar extends StatelessWidget {
             splashFactory: NoSplash.splashFactory,
             overlayColor: WidgetStateProperty.all(Colors.transparent),
             tabs: [
-              Tab(text: 'Today ($todayCount)'),
+              Tab(text: 'Current Today Queue ($todayCount)'),
               Tab(text: 'Upcoming ($upcomingCount)'),
-              Tab(text: 'Done ($completedCount)'),
+              Tab(text: 'Current Complete Queue ($completedCount)'),
             ],
           ),
         ),
@@ -2756,7 +2786,7 @@ class _DesktopSidebar extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Column(children: [
-          _SideNavItem(icon: Icons.access_time_rounded, label: 'Today',
+          _SideNavItem(icon: Icons.access_time_rounded, label: 'Current Today Queue',
               count: todayCount, selected: activeTab == _Tab.today,
               onTap: () => onTabChange(_Tab.today)),
           const SizedBox(height: 4),
@@ -2765,7 +2795,7 @@ class _DesktopSidebar extends StatelessWidget {
               onTap: () => onTabChange(_Tab.upcoming)),
           const SizedBox(height: 4),
           _SideNavItem(icon: Icons.check_circle_outline_rounded,
-              label: 'Completed', count: completedCount,
+              label: 'Current Complete Queue', count: completedCount,
               selected: activeTab == _Tab.completed,
               onTap: () => onTabChange(_Tab.completed)),
         ]),
