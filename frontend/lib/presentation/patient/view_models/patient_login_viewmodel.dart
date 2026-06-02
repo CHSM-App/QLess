@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/database/offline_queue_store.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/usecase/patient_login_usecase.dart';
@@ -62,8 +63,10 @@ class PatientLoginState {
 
 class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
   final PatientLoginUsecase usecase;
+  final OfflineQueueStore offlineStore;
 
-  PatientLoginViewmodel(this.usecase) : super(const PatientLoginState()) {
+  PatientLoginViewmodel(this.usecase, this.offlineStore)
+      : super(const PatientLoginState()) {
     loadFromStoragePatient();
   }
 
@@ -125,6 +128,10 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
       final result = await usecase.checkPhonePatient(mobileNo);
       if (result.isNotEmpty) {
         final p = result.first;
+        // Cache the full profile so the edit screen prefills offline.
+        try {
+          await offlineStore.cachePatientProfile(mobileNo, result);
+        } catch (_) {}
         state = state.copyWith(
           patientPhoneCheck: AsyncValue.data(result),
           name:     p.name     ?? state.name,
@@ -137,9 +144,26 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
       } else {
         state = state.copyWith(patientPhoneCheck: AsyncValue.data(result));
       }
-    } catch (e, st) {
+    } catch (e) {
+      // Network down — serve the cached profile instead of an error state so
+      // the edit/profile screen still prefills.
+      try {
+        final cached = await offlineStore.getCachedPatientProfile(mobileNo);
+        if (cached.isNotEmpty) {
+          final p = cached.first;
+          state = state.copyWith(
+            patientPhoneCheck: AsyncValue.data(cached),
+            name:     p.name     ?? state.name,
+            mobileNo: p.mobileNo ?? state.mobileNo,
+            email:    p.email    ?? state.email,
+          );
+          return;
+        }
+      } catch (cacheErr) {
+        debugPrint('[PatientLoginVM] profile cache load failed: $cacheErr');
+      }
       state = state.copyWith(
-        patientPhoneCheck: AsyncValue.error(e, st),
+        patientPhoneCheck: AsyncValue.error(e, StackTrace.current),
         error: e.toString(),
       );
     }

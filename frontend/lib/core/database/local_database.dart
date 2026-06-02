@@ -13,12 +13,16 @@ class LocalDatabase {
   static final LocalDatabase instance = LocalDatabase._();
 
   static const _dbName    = 'qless_offline.db';
-  static const _dbVersion = 1;
+  static const _dbVersion = 5;
 
   // Table names
   static const _tQueues        = 'queues';
   static const _tAppointments  = 'appointments';
   static const _tPendingOps    = 'pending_operations';
+  static const _tPendingRx     = 'pending_prescriptions';
+  static const _tMedicines     = 'medicines_cache';
+  static const _tPatientAppts  = 'patient_appointments_cache';
+  static const _tPatientProfile = 'patient_profile_cache';
 
   Database? _db;
 
@@ -107,7 +111,8 @@ class LocalDatabase {
 
     // pending_operations: queue actions performed offline
     // operation values: queueStart | queuePause | queueStop | queueNext |
-    //                   queueSkip  | queueRecall | queuePauseEmergency
+    //                   queueSkip  | queueRecall | queuePauseEmergency |
+    //                   startSession | endSession
     await db.execute('''
       CREATE TABLE $_tPendingOps (
         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,10 +125,78 @@ class LocalDatabase {
         retry_count     INTEGER NOT NULL DEFAULT 0
       )
     ''');
+
+    await _createPendingRxTable(db);
+    await _createMedicinesTable(db);
+    await _createPatientApptsTable(db);
+    await _createPatientProfileTable(db);
+  }
+
+  Future<void> _createPendingRxTable(Database db) async {
+    // pending_prescriptions: prescriptions saved offline, waiting to be POSTed
+    await db.execute('''
+      CREATE TABLE $_tPendingRx (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        payload_json    TEXT    NOT NULL,
+        doctor_id       INTEGER,
+        appointment_id  INTEGER,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+        retry_count     INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+  }
+
+  Future<void> _createMedicinesTable(Database db) async {
+    // medicines_cache: the doctor's medicine catalog, cached so prescriptions
+    // can still be written (with medicine selection) while offline.
+    await db.execute('''
+      CREATE TABLE $_tMedicines (
+        medicine_id   INTEGER PRIMARY KEY,
+        doctor_id     INTEGER,
+        payload_json  TEXT NOT NULL,
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    ''');
+  }
+
+  Future<void> _createPatientApptsTable(Database db) async {
+    // patient_appointments_cache: a patient's own appointment list, stored as a
+    // single JSON blob keyed by the id passed to getPatientAppointments, so the
+    // list (upcoming/past) still renders offline.
+    await db.execute('''
+      CREATE TABLE $_tPatientAppts (
+        owner_id     INTEGER PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    ''');
+  }
+
+  Future<void> _createPatientProfileTable(Database db) async {
+    // patient_profile_cache: the patient's own profile (Patients JSON), keyed
+    // by the lookup id (mobile) so the edit screen can prefill offline.
+    await db.execute('''
+      CREATE TABLE $_tPatientProfile (
+        cache_key    TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    ''');
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Future migrations go here
+    if (oldVersion < 2) {
+      await _createPendingRxTable(db);
+    }
+    if (oldVersion < 3) {
+      await _createMedicinesTable(db);
+    }
+    if (oldVersion < 4) {
+      await _createPatientApptsTable(db);
+    }
+    if (oldVersion < 5) {
+      await _createPatientProfileTable(db);
+    }
   }
 
   // ── Queue cache ─────────────────────────────────────────────────────────────
@@ -253,6 +326,138 @@ class LocalDatabase {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  // ── Pending prescriptions ────────────────────────────────────────────────────
+
+  /// [payloadJson] must already be a valid JSON string (the prescription has a
+  /// nested `medicines` list, so the caller encodes it with dart:convert rather
+  /// than the flat [_mapToJsonString] helper used for queue ops).
+  Future<int> enqueuePendingPrescription({
+    required String payloadJson,
+    int? doctorId,
+    int? appointmentId,
+  }) async {
+    final db = await database;
+    return db.insert(_tPendingRx, {
+      'payload_json':   payloadJson,
+      'doctor_id':      doctorId,
+      'appointment_id': appointmentId,
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingPrescriptions() async {
+    final db = await database;
+    return db.query(_tPendingRx, orderBy: 'id ASC');
+  }
+
+  Future<void> deletePendingPrescription(int id) async {
+    final db = await database;
+    await db.delete(_tPendingRx, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> incrementPrescriptionRetry(int id) async {
+    final db = await database;
+    await db.rawUpdate(
+      'UPDATE $_tPendingRx SET retry_count = retry_count + 1 WHERE id = ?',
+      [id],
+    );
+  }
+
+  Future<int> pendingPrescriptionsCount() async {
+    final db = await database;
+    final result =
+        await db.rawQuery('SELECT COUNT(*) as cnt FROM $_tPendingRx');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // ── Medicines catalog cache ──────────────────────────────────────────────────
+
+  /// Replace the cached catalog for [doctorId]. Each [rows] entry must include
+  /// `medicine_id` and a pre-encoded `payload_json` string.
+  Future<void> upsertMedicines(
+      int doctorId, List<Map<String, dynamic>> rows) async {
+    final db = await database;
+    final batch = db.batch();
+    // Clear the doctor's old catalog first so deletions on the server are
+    // reflected, then re-insert the fresh set.
+    batch.delete(_tMedicines, where: 'doctor_id = ?', whereArgs: [doctorId]);
+    for (final row in rows) {
+      batch.insert(
+        _tMedicines,
+        {...row, 'updated_at': DateTime.now().toIso8601String()},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<List<Map<String, dynamic>>> getMedicines(int doctorId) async {
+    final db = await database;
+    return db.query(
+      _tMedicines,
+      where: 'doctor_id = ?',
+      whereArgs: [doctorId],
+      orderBy: 'medicine_id ASC',
+    );
+  }
+
+  // ── Patient appointments cache ───────────────────────────────────────────────
+
+  /// [payloadJson] is a pre-encoded JSON array of the patient's appointments.
+  Future<void> upsertPatientAppointments(
+      int ownerId, String payloadJson) async {
+    final db = await database;
+    await db.insert(
+      _tPatientAppts,
+      {
+        'owner_id':     ownerId,
+        'payload_json': payloadJson,
+        'updated_at':   DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String?> getPatientAppointmentsJson(int ownerId) async {
+    final db = await database;
+    final rows = await db.query(
+      _tPatientAppts,
+      columns: ['payload_json'],
+      where: 'owner_id = ?',
+      whereArgs: [ownerId],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['payload_json'] as String?;
+  }
+
+  // ── Patient profile cache ────────────────────────────────────────────────────
+
+  Future<void> upsertPatientProfile(String cacheKey, String payloadJson) async {
+    final db = await database;
+    await db.insert(
+      _tPatientProfile,
+      {
+        'cache_key':    cacheKey,
+        'payload_json': payloadJson,
+        'updated_at':   DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String?> getPatientProfileJson(String cacheKey) async {
+    final db = await database;
+    final rows = await db.query(
+      _tPatientProfile,
+      columns: ['payload_json'],
+      where: 'cache_key = ?',
+      whereArgs: [cacheKey],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['payload_json'] as String?;
+  }
+
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   /// Minimal JSON encode without importing dart:convert at every call-site.
@@ -293,6 +498,10 @@ class LocalDatabase {
     await db.delete(_tQueues);
     await db.delete(_tAppointments);
     await db.delete(_tPendingOps);
+    await db.delete(_tPendingRx);
+    await db.delete(_tMedicines);
+    await db.delete(_tPatientAppts);
+    await db.delete(_tPatientProfile);
     debugPrint('[LocalDatabase] All local data cleared.');
   }
 }

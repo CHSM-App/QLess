@@ -8,14 +8,16 @@ import 'package:qless/presentation/doctor/view_models/prescription_viewmodel.dar
 
 final doctorLoginViewModelProvider =
     StateNotifierProvider<DoctorLoginViewmodel, DoctorLoginState>((ref) {
-  final usecase = ref.watch(doctorLoginUsecaseProvider);
-  return DoctorLoginViewmodel(usecase);
+  final usecase      = ref.watch(doctorLoginUsecaseProvider);
+  final offlineStore = ref.watch(offlineQueueStoreProvider);
+  return DoctorLoginViewmodel(usecase, offlineStore);
 });
 
 final prescriptionViewModelProvider =
     StateNotifierProvider<PrescriptionViewmodel, PrescriptionState>((ref) {
-  final usecase = ref.watch(prescriptionUsecaseProvider);
-  return PrescriptionViewmodel(usecase);
+  final usecase      = ref.watch(prescriptionUsecaseProvider);
+  final offlineStore = ref.watch(offlineQueueStoreProvider);
+  return PrescriptionViewmodel(usecase, offlineStore);
 });
 
 final doctorSettingsViewModelProvider =

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/database/offline_queue_store.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
@@ -77,8 +79,10 @@ class AppointmentState {
 
 class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   final AppointmentUsecase usecase;
+  final OfflineQueueStore offlineStore;
 
-  AppointmentViewmodel(this.usecase) : super(const AppointmentState());
+  AppointmentViewmodel(this.usecase, this.offlineStore)
+      : super(const AppointmentState());
 
   Future<void> getAppointmentAvailability(
     AppointmentRequestModel appointmentRequest,
@@ -104,9 +108,24 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     );
     try {
       final result = await usecase.getPatientAppointments(familyId);
+      // Cache so the list (upcoming/past) still renders offline.
+      try {
+        await offlineStore.cachePatientAppointments(familyId, result);
+      } catch (_) {}
       state = state.copyWith(patientAppointmentsList: AsyncValue.data(result));
-    } catch (e, st) {
-      state = state.copyWith(patientAppointmentsList: AsyncValue.error(e, st));
+    } catch (e) {
+      // Network down — fall back to the cached list instead of an error state
+      // (which the screens render as a hard "no internet" / empty view).
+      try {
+        final cached =
+            await offlineStore.getCachedPatientAppointments(familyId);
+        state =
+            state.copyWith(patientAppointmentsList: AsyncValue.data(cached));
+      } catch (cacheErr) {
+        debugPrint('[PatientApptVM] cache load failed: $cacheErr');
+        state = state.copyWith(
+            patientAppointmentsList: const AsyncValue.data([]));
+      }
     }
   }
 

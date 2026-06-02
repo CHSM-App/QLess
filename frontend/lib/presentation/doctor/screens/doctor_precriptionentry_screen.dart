@@ -953,7 +953,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   Widget build(BuildContext context) {
     final state       = ref.watch(prescriptionViewModelProvider);
     final doctorState = ref.watch(doctorLoginViewModelProvider);
-    final medicines   = doctorState.medicines?.value ?? const <Medicine>[];
+    // valueOrNull (not .value): on an AsyncError, Riverpod's `.value` RETHROWS
+    // the error during build — offline that crashed the whole screen. We want
+    // a graceful empty catalog instead.
+    final medicines   = doctorState.medicines?.valueOrNull ?? const <Medicine>[];
 
     return Stack(children: [
       Scaffold(

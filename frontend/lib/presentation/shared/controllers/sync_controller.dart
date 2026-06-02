@@ -20,6 +20,11 @@ final syncControllerProvider = Provider<void>((ref) {
       final doctorId   = _extractDoctorId(loginState);
       if (doctorId == null) return;
 
+      // Flush prescriptions first so a prescription saved offline lands before
+      // the queueNext that closed its consult, then replay the queue ops.
+      final prescriptionVm = ref.read(prescriptionViewModelProvider.notifier);
+      await prescriptionVm.syncPendingPrescriptions();
+
       final appointmentVm = ref.read(appointmentViewModelProvider.notifier);
       await appointmentVm.syncPendingOps(doctorId);
     }

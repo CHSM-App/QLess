@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/doctors_viewmodel.dart';
@@ -15,7 +16,8 @@ final selectedPositionProvider = StateProvider<Position?>((ref) => null);
 final patientLoginViewModelProvider =
     StateNotifierProvider<PatientLoginViewmodel, PatientLoginState>((ref) {
   final usecase = ref.watch(patientLoginUsecaseProvider);
-  return PatientLoginViewmodel(usecase);
+  final offlineStore = ref.watch(offlineQueueStoreProvider);
+  return PatientLoginViewmodel(usecase, offlineStore);
 });
 
 
@@ -41,8 +43,9 @@ final favoriteViewModelProvider =
 
 final appointmentViewModelProvider =
     StateNotifierProvider<AppointmentViewmodel, AppointmentState>((ref) {
-  final usecase = ref.watch(appointmentUsecaseProvider);
-  return AppointmentViewmodel(usecase);
+  final usecase      = ref.watch(appointmentUsecaseProvider);
+  final offlineStore = ref.watch(offlineQueueStoreProvider);
+  return AppointmentViewmodel(usecase, offlineStore);
 });
 
 final reviewViewModelProvider =
