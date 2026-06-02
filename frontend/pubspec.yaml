@@ -63,6 +63,8 @@ dependencies:
 
   # Offline-first local storage
   sqflite: ^2.4.2
+  # Web support for sqflite (Chrome) — provides databaseFactoryFfiWeb
+  sqflite_common_ffi_web: ^0.4.5+1
 
   # PDF generation (prescription printout — print_prescription_screen.dart)
   printing: ^5.12.0
@@ -82,6 +84,15 @@ dependencies:
 
   geocoding: ^2.1.0
 
+
+# All sqlite3 3.x ships hook/build.dart (native assets), which invokes the
+# Flutter SDK path unquoted and breaks because ours contains a space
+# ("C:\flutter development\flutter"). Web doesn't need native sqlite3 at all —
+# it uses sqlite3.wasm. Pin to the last pre-hook line (sqlite3 2.9.4) and the
+# matching ffi desktop package so no native build hook runs at all.
+dependency_overrides:
+  sqlite3: 2.9.4
+  sqflite_common_ffi: 2.3.7+1
 
 dev_dependencies:
   flutter_test:

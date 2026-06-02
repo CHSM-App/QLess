@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/domain/models/otp_response.dart';
 
 abstract class DoctorLoginRepository {
   Future<dynamic> addDoctorDetails(
@@ -27,4 +28,8 @@ abstract class DoctorLoginRepository {
   Future<List<String>> fetchClinicGallery(String clinicId);
   Future<dynamic> deleteClinicGallery(String clinicId, List<String> imageUrls);
 
+
+  //send otp
+    Future<OtpResponse> sendOtp(OtpResponse payload);
+  Future<OtpResponse> verifyOtp(OtpResponse payload);
 }

@@ -6,6 +6,7 @@ import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
 
 class DoctorLoginImpl implements DoctorLoginRepository {
@@ -123,6 +124,17 @@ class DoctorLoginImpl implements DoctorLoginRepository {
       "clinic_id": clinicId,
       "image_urls": imageUrls,
     });
+  }
+
+  
+  @override
+  Future<OtpResponse> sendOtp(OtpResponse payload) {
+    return apiService.sendOtp(payload);
+  }
+
+  @override
+  Future<OtpResponse> verifyOtp(OtpResponse payload) {
+    return apiService.verifyOtp(payload);
   }
 
 }
