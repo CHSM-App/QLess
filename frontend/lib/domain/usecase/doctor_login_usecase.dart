@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
 
 class DoctorLoginUsecase {
@@ -55,6 +56,14 @@ class DoctorLoginUsecase {
 
   Future<dynamic> deleteClinicGallery(String clinicId, List<String> imageUrls) {
     return doctorLoginRepository.deleteClinicGallery(clinicId, imageUrls);
+  }
+  
+  Future<OtpResponse> sendOtp(OtpResponse payload) {
+    return doctorLoginRepository.sendOtp(payload);
+  }
+
+  Future<OtpResponse> verifyOtp(OtpResponse payload) {
+    return doctorLoginRepository.verifyOtp(payload);
   }
 
 }

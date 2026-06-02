@@ -5,6 +5,8 @@ require('dotenv').config();
 const auth = require('./middleware/auth');
 const db = require('./db'); // your mssql pool wrapper
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const axios = require('axios');
 const path = require('path');
 const fs = require("fs-extra");
 const { authLimiter, lookupLimiter } = require('./middleware/rateLimit');
@@ -296,9 +298,24 @@ router.get('/mobileExistDoctor', lookupLimiter, async (req, res) => {
 
 router.get('/mobileExistPatient', lookupLimiter, async (req, res) => {
 	try {
-		const {
-			mobile_no
-		} = req.query;
+		let mobile_no = req.query.mobile_no ?? req.query.mobileNo;
+		if (!mobile_no) {
+			return res.status(400).json({
+				error: 'mobile_no is required'
+			});
+		}
+
+		mobile_no = mobile_no.toString().trim().replace(/\D/g, '');
+		if (mobile_no.startsWith('91') && mobile_no.length === 12) {
+			mobile_no = mobile_no.slice(2);
+		}
+
+		if (!/^[6-9]\d{9}$/.test(mobile_no)) {
+			return res.status(400).json({
+				error: 'Invalid mobile number'
+			});
+		}
+
 		const result = await db.request()
 			.input('operation', 'patient_mobile_exist')
 			.input('mobile_no', mobile_no)
@@ -562,9 +579,151 @@ router.post('/patient', uploadHandler(upload.single("image")), async (req, res) 
 	}
 });
 
+
+router.post('/send-otp', async (req, res) => {
+  try {
+    const body = req.body || {};
+    let mobile_no = body.mobile_no ?? body.mobileNo ?? body.mobile;
+
+    if (!mobile_no) {
+      return res.status(400).json({
+        status: 0,
+        message: 'Mobile number required'
+      });
+    }
+
+    if (typeof mobile_no !== 'string') {
+      mobile_no = mobile_no.toString();
+    }
+
+    let normalized = mobile_no.trim().replace(/\D/g, '');
+
+    if (normalized.startsWith('91') && normalized.length > 10) {
+      normalized = normalized.slice(normalized.length - 10);
+    }
+
+    if (normalized.startsWith('0')) {
+      normalized = normalized.replace(/^0+/, '');
+    }
+
+    if (!/^[6-9]\d{9}$/.test(normalized)) {
+      return res.status(400).json({
+        status: 0,
+        message: 'Invalid mobile number'
+      });
+    }
+
+    const mobile_no_cc = `91${normalized}`;
+
+    if (!process.env.WHATSAPP_API_TOKEN) {
+      return res.status(500).json({
+        status: 0,
+        message: 'WhatsApp API token not configured'
+      });
+    }
+
+    // ✅ Generate OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // ✅ Send WhatsApp OTP
+    const waResponse = await axios.post(
+      "https://api2.smsala.com/whatsapp/SendOtp",
+      {
+        PhoneNumber: mobile_no_cc,
+        OtpCode: otp,
+        ApiToken: process.env.WHATSAPP_API_TOKEN,
+        TemplateId: 463
+      }
+    );
+
+    if (!waResponse.data || waResponse.data.IsSuccess !== true) {
+      return res.status(400).json({
+        status: 0,
+        message: 'Failed to send OTP via WhatsApp',
+        response: waResponse.data
+      });
+    }
+
+    // ✅ Hash OTP
+    const otp_hash = await bcrypt.hash(otp, 10);
+
+    // ✅ Save in DB using normalized local number
+    const dbResult = await db.request()
+      .input('operation', 'send_otp')
+      .input('mobile_no', normalized)
+      .input('otp_hash', otp_hash)
+      .execute('sp_otp');
+
+    if (dbResult.recordset[0].status === 0) {
+      return res.status(400).json(dbResult.recordset[0]);
+    }
+
+    res.json({
+      status: 1,
+      message: 'OTP sent successfully',
+      otp: otp // ⚠️ remove in production
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      status: 0,
+      message: 'Server error',
+      error: err?.response?.data || err.message
+    });
+  }
+});
+router.post('/verify-otp', async (req, res) => {
+  const { mobile_no, otp } = req.body;
+
+  try {
+    const result = await db.request()
+      .input('operation', 'verify_otp')
+      .input('mobile_no', mobile_no)
+      .execute('sp_otp');
+
+    const data = result.recordset[0];
+
+    if (data.status === 0) {
+      return res.status(400).json(data);
+    }
+
+    const isMatch = await bcrypt.compare(otp, data.otp_hash);
+
+    if (!isMatch) {
+      // increase attempt
+      await db.request()
+        .input('operation', 'update_attempt')
+        .input('mobile_no', mobile_no)
+        .execute('sp_otp');
+
+      return res.status(400).json({
+        status: 0,
+        message: 'Invalid OTP'
+      });
+    }
+
+    // mark verified
+    await db.request()
+      .input('operation', 'mark_verified')
+      .input('mobile_no', mobile_no)
+      .execute('sp_otp');
+
+    res.json({
+      status: 1,
+      message: 'OTP verified successfully'
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
 router.get('/privacy', (req, res) => {
 	res.sendFile(path.join(__dirname, 'privacy.html'));
 });
+
 
 
 module.exports = router;

@@ -28,8 +28,10 @@ class LocalDatabase {
   }
 
   Future<Database> _open() async {
-    final dbPath = await getDatabasesPath();
-    final path   = join(dbPath, _dbName);
+    // On web the ffi-web factory has no databases directory — getDatabasesPath()
+    // throws ("getDatabasesPath is null"). Open with the bare db name instead;
+    // on native we still resolve the platform databases path.
+    final path = kIsWeb ? _dbName : join(await getDatabasesPath(), _dbName);
 
     return openDatabase(
       path,

@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
@@ -130,8 +132,20 @@ void main() async {
 
   await _setupNotifications();
 
+  // On web (Chrome) the default sqflite factory is unavailable — use the
+  // ffi-web factory so getDatabasesPath()/openDatabase() work in the browser.
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  }
+
   // Warm up the SQLite database so the first offline read is instant.
-  await LocalDatabase.instance.database;
+  // Never let an offline-cache failure (e.g. the web wasm worker not loading)
+  // block app startup — degrade to online-only instead of a white screen.
+  try {
+    await LocalDatabase.instance.database;
+  } catch (e) {
+    debugPrint('LocalDatabase warm-up failed (continuing online-only): $e');
+  }
 
   final container = ProviderContainer();
   await container.read(tokenProvider.notifier).loadTokens();

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/domain/usecase/doctor_login_usecase.dart';
 
 class DoctorLoginState {
@@ -381,6 +382,31 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  
+  Future<OtpResponse> sendOtp(OtpResponse payload) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await usecase.sendOtp(payload);
+      state = state.copyWith(isLoading: false);
+      return response;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return OtpResponse(status: 0, message: "Something went wrong");
+    }
+  }
+
+  Future<OtpResponse> verifyOtp(OtpResponse payload) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final response = await usecase.verifyOtp(payload);
+      state = state.copyWith(isLoading: false);
+      return response;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return OtpResponse(status: 0, message: "Something went wrong");
     }
   }
 }

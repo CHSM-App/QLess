@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/demo_accounts.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
 import 'package:qless/presentation/patient/screens/patient_registration.dart';
@@ -114,7 +116,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         return;
       }
 
-      if (isDoctor) {
+      // Demo/review numbers skip the verification gate so reviewers can always
+      // reach the OTP screen regardless of the seeded account's verified flag.
+      if (isDoctor && !isDemoNumber(mobile)) {
         final doctor = result.first as DoctorDetails;
         final isNotVerified = (doctor.isverified) == 1;
         if (isNotVerified) {
@@ -132,12 +136,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         }
       }
 
+      // Real users get a server-generated OTP via SMS. Demo/review numbers use
+      // the fixed local OTP (123456) and skip the send-OTP API entirely.
+      if (!isDemoNumber(mobile)) {
+        final otpRes = await ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .sendOtp(OtpResponse(mobileNo: mobile));
+        if (!mounted) return;
+        if ((otpRes.status ?? 0) != 1) {
+          _snack((otpRes.message?.isNotEmpty ?? false)
+              ? otpRes.message!
+              : 'Unable to send OTP. Please try again.');
+          return;
+        }
+        _snack('OTP sent successfully');
+      }
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => OtpVerificationScreen(
             mobileNumber: mobile,
             role: widget.role,
+            demoOtp: demoOtpFor(mobile),
           ),
         ),
       );

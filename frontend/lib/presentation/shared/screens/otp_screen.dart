@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
@@ -39,10 +40,16 @@ class OtpVerificationScreen extends ConsumerStatefulWidget {
   final String mobileNumber;
   final String role;
 
+  /// Fixed OTP for demo/review accounts. When non-null, the code is validated
+  /// locally against it and the verify-OTP API is skipped. `null` for real
+  /// users, who follow the normal flow.
+  final String? demoOtp;
+
   const OtpVerificationScreen({
     super.key,
     required this.mobileNumber,
     required this.role,
+    this.demoOtp,
   });
 
   @override
@@ -160,7 +167,29 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
   Future<void> _verifyOtp() async {
     if (!_isFilled) return;
+
+    // Demo/review accounts: validate the fixed OTP locally and skip the
+    // verify-OTP API. Real users (demoOtp == null) fall through unchanged.
+    if (widget.demoOtp != null && _otpValue != widget.demoOtp) {
+      _triggerError();
+      return;
+    }
+
     setState(() => _isLoading = true);
+
+    // Real users: verify the OTP with the backend before logging in.
+    // Demo users already passed the local check above.
+    if (widget.demoOtp == null) {
+      final verify = await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .verifyOtp(OtpResponse(mobileNo: widget.mobileNumber, otp: _otpValue));
+      if (!mounted) return;
+      if ((verify.status ?? 0) != 1) {
+        setState(() => _isLoading = false);
+        _triggerError();
+        return;
+      }
+    }
 
     if (widget.role == 'doctor') {
       await ref
@@ -261,7 +290,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     setState(() => _hasError = false);
     _focusNodes[0].requestFocus();
     _startTimer();
-    // TODO: trigger resend OTP API call
+    // Demo numbers have no server OTP — only real users re-request one.
+    if (widget.demoOtp == null) {
+      ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .sendOtp(OtpResponse(mobileNo: widget.mobileNumber));
+    }
   }
 
   @override

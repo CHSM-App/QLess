@@ -32,7 +32,7 @@ const pool = new sql.ConnectionPool(sqlConfig);
 // Eagerly start connecting; routes that call pool.request() before the
 // connection resolves will queue, not crash. bin/www awaits ready() before
 // binding the HTTP port so the first request always finds a live pool.
-const readyPromise = pool.connect()
+ let readyPromise = pool.connect()
   .then(() => {
     log.info('MSSQL connected');
     return pool;
@@ -42,8 +42,35 @@ const readyPromise = pool.connect()
     throw err;
   });
 
+const originalRequest = pool.request.bind(pool);
+pool.request = function () {
+  if (!pool.connected && !pool.connecting) {
+    readyPromise = pool.connect()
+      .then(() => {
+        log.info('MSSQL reconnected');
+        return pool;
+      })
+      .catch((err) => {
+        log.error('MSSQL reconnect failed: ' + err.message);
+        throw err;
+      });
+  }
+  return originalRequest();
+};
+
 pool.on('error', (err) => {
   log.error('MSSQL pool error: ' + err.message);
+  if (pool.closed) {
+    readyPromise = pool.connect()
+      .then(() => {
+        log.info('MSSQL reconnected after pool error');
+        return pool;
+      })
+      .catch((error) => {
+        log.error('MSSQL reconnect after pool error failed: ' + error.message);
+        throw error;
+      });
+  }
 });
 
 module.exports = pool;

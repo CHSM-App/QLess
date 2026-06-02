@@ -10,6 +10,7 @@ import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/domain/models/queue_preview_model.dart';
@@ -40,6 +41,14 @@ abstract class ApiService {
 
   @POST("login/logout")
   Future<dynamic> logOut(@Body() TokenResponse tokenResponse);
+
+  
+  @POST("login/send-otp")
+  Future<OtpResponse> sendOtp(@Body() OtpResponse otpRequest);
+
+  @POST("login/verify-otp")
+  Future<OtpResponse> verifyOtp(@Body() OtpResponse otpRequest);
+
   //---------------------------------------------------------------------------------------------------------------------------------------//
   //------------------------------------------//DOCTOR API//---------------------------------------
   // GET API
