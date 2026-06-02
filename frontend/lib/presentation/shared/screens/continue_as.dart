@@ -38,7 +38,6 @@ class ContinueAsScreen extends ConsumerStatefulWidget {
 
 class _ContinueAsScreenState extends ConsumerState<ContinueAsScreen>
     with TickerProviderStateMixin {
-  String? _selectedRole; // 'doctor' | 'patient' | null
   late AnimationController _entryController;
   late Animation<double> _fadeAnim;
   late Animation<Offset> _slideAnim;
@@ -64,16 +63,11 @@ class _ContinueAsScreenState extends ConsumerState<ContinueAsScreen>
     super.dispose();
   }
 
-  void _selectRole(String role) {
-    setState(() => _selectedRole = role);
-  }
-
-  void _onContinue() {
-    if (_selectedRole == null) return;
+  void _onRoleTap(String role) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LoginScreen(role: _selectedRole!),
+        builder: (_) => LoginScreen(role: role),
       ),
     );
   }
@@ -95,16 +89,8 @@ class _ContinueAsScreenState extends ConsumerState<ContinueAsScreen>
             child: OrientationBuilder(
               builder: (context, orientation) {
                 return orientation == Orientation.landscape
-                    ? _LandscapeLayout(
-                        selectedRole: _selectedRole,
-                        onSelect: _selectRole,
-                        onContinue: _onContinue,
-                      )
-                    : _PortraitLayout(
-                        selectedRole: _selectedRole,
-                        onSelect: _selectRole,
-                        onContinue: _onContinue,
-                      );
+                    ? _LandscapeLayout(onRoleTap: _onRoleTap)
+                    : _PortraitLayout(onRoleTap: _onRoleTap);
               },
             ),
           ),
@@ -118,15 +104,9 @@ class _ContinueAsScreenState extends ConsumerState<ContinueAsScreen>
 // PORTRAIT LAYOUT
 // ─────────────────────────────────────────────────────────────────────────────
 class _PortraitLayout extends StatelessWidget {
-  final String? selectedRole;
-  final ValueChanged<String> onSelect;
-  final VoidCallback onContinue;
+  final ValueChanged<String> onRoleTap;
 
-  const _PortraitLayout({
-    required this.selectedRole,
-    required this.onSelect,
-    required this.onContinue,
-  });
+  const _PortraitLayout({required this.onRoleTap});
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +127,9 @@ class _PortraitLayout extends StatelessWidget {
               // ── HERO ────────────────────────────────────────────────────
               Container(
                 width: double.infinity,
+                constraints: BoxConstraints(
+                  minHeight: screenH * (isVerySmall ? 0.34 : 0.40),
+                ),
                 child: Stack(
                   children: [
                     Positioned.fill(
@@ -175,14 +158,19 @@ class _PortraitLayout extends StatelessWidget {
 
                     SafeArea(
                       bottom: false,
+                      child: SizedBox(
+                      width: double.infinity,
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(28, 28, 28, heroBottomPad),
                         child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             _BrandLogo(size: logoSize),
                             SizedBox(height: isVerySmall ? 14 : 20),
                             Text(
                               'HealthConnect',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: titleSize,
                                 fontWeight: FontWeight.w800,
@@ -204,6 +192,7 @@ class _PortraitLayout extends StatelessWidget {
                           ],
                         ),
                       ),
+                    ),
                     ),
 
                     Positioned(
@@ -284,8 +273,7 @@ class _PortraitLayout extends StatelessWidget {
                         icon: _RoleCardIcon.doctor,
                         accentColor: kPrimary,
                         accentBg: kPrimaryLight,
-                        isSelected: selectedRole == 'doctor',
-                        onTap: () => onSelect('doctor'),
+                        onTap: () => onRoleTap('doctor'),
                       ),
                       const SizedBox(height: 14),
                       _RoleCard(
@@ -296,20 +284,10 @@ class _PortraitLayout extends StatelessWidget {
                         icon: _RoleCardIcon.patient,
                         accentColor: kInfo,
                         accentBg: kInfoLight,
-                        isSelected: selectedRole == 'patient',
-                        onTap: () => onSelect('patient'),
+                        onTap: () => onRoleTap('patient'),
                       ),
 
                       const SizedBox(height: 24),
-
-                      // Continue button
-                      _ContinueButton(
-                        enabled: selectedRole != null,
-                        onPressed: onContinue,
-                        height: 56,
-                      ),
-
-                      const SizedBox(height: 20),
 
                       // Legal text
                       const _LegalText(),
@@ -334,15 +312,9 @@ class _PortraitLayout extends StatelessWidget {
 // LANDSCAPE LAYOUT
 // ─────────────────────────────────────────────────────────────────────────────
 class _LandscapeLayout extends StatelessWidget {
-  final String? selectedRole;
-  final ValueChanged<String> onSelect;
-  final VoidCallback onContinue;
+  final ValueChanged<String> onRoleTap;
 
-  const _LandscapeLayout({
-    required this.selectedRole,
-    required this.onSelect,
-    required this.onContinue,
-  });
+  const _LandscapeLayout({required this.onRoleTap});
 
   @override
   Widget build(BuildContext context) {
@@ -373,11 +345,14 @@ class _LandscapeLayout extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         _BrandLogo(size: 88),
                         const SizedBox(height: 22),
                         const Text(
                           'HealthConnect',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 30,
                             fontWeight: FontWeight.w800,
@@ -479,8 +454,7 @@ class _LandscapeLayout extends StatelessWidget {
                           icon: _RoleCardIcon.doctor,
                           accentColor: kPrimary,
                           accentBg: kPrimaryLight,
-                          isSelected: selectedRole == 'doctor',
-                          onTap: () => onSelect('doctor'),
+                          onTap: () => onRoleTap('doctor'),
                         ),
                         const SizedBox(height: 14),
                         _RoleCard(
@@ -491,16 +465,9 @@ class _LandscapeLayout extends StatelessWidget {
                           icon: _RoleCardIcon.patient,
                           accentColor: kInfo,
                           accentBg: kInfoLight,
-                          isSelected: selectedRole == 'patient',
-                          onTap: () => onSelect('patient'),
+                          onTap: () => onRoleTap('patient'),
                         ),
                         const SizedBox(height: 26),
-                        _ContinueButton(
-                          enabled: selectedRole != null,
-                          onPressed: onContinue,
-                          height: 54,
-                        ),
-                        const SizedBox(height: 18),
                         const _LegalText(),
                         const SizedBox(height: 12),
                         const _SecureFooter(),
@@ -530,7 +497,6 @@ class _RoleCard extends StatelessWidget {
   final _RoleCardIcon icon;
   final Color accentColor;
   final Color accentBg;
-  final bool isSelected;
   final VoidCallback onTap;
 
   const _RoleCard({
@@ -541,7 +507,6 @@ class _RoleCard extends StatelessWidget {
     required this.icon,
     required this.accentColor,
     required this.accentBg,
-    required this.isSelected,
     required this.onTap,
   });
 
@@ -551,35 +516,27 @@ class _RoleCard extends StatelessWidget {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
-        color: isSelected ? accentBg.withOpacity(0.45) : kSurface,
+        color: kSurface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isSelected ? accentColor : kBorderStrong,
-          width: isSelected ? 2 : 1,
-        ),
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.18),
-                  blurRadius: 18,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : [
-                BoxShadow(
-                  color: kTextPrimary.withOpacity(0.03),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+        border: Border.all(color: kBorderStrong, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: kTextPrimary.withOpacity(0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(18),
-          splashColor: accentColor.withOpacity(0.08),
-          highlightColor: accentColor.withOpacity(0.04),
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          focusColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          overlayColor: WidgetStateProperty.all(Colors.transparent),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -637,26 +594,19 @@ class _RoleCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Selection indicator
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 24,
-                  height: 24,
+                // Tap indicator
+                Container(
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
-                    color: isSelected ? accentColor : Colors.transparent,
+                    color: accentBg,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isSelected ? accentColor : kBorderStrong,
-                      width: 1.5,
-                    ),
                   ),
-                  child: isSelected
-                      ? const Icon(
-                          Icons.check_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        )
-                      : null,
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: accentColor,
+                    size: 18,
+                  ),
                 ),
               ],
             ),
@@ -690,83 +640,6 @@ class _MiniChip extends StatelessWidget {
           ),
         ),
       );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CONTINUE BUTTON
-// ─────────────────────────────────────────────────────────────────────────────
-class _ContinueButton extends StatelessWidget {
-  final bool enabled;
-  final VoidCallback onPressed;
-  final double height;
-
-  const _ContinueButton({
-    required this.enabled,
-    required this.onPressed,
-    required this.height,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: height,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        decoration: BoxDecoration(
-          gradient: enabled
-              ? const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [kPrimary, kPrimaryDark],
-                )
-              : null,
-          color: enabled ? null : kBorderStrong,
-          borderRadius: BorderRadius.circular(14),
-          boxShadow: enabled
-              ? [
-                  BoxShadow(
-                    color: kPrimary.withOpacity(0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ]
-              : [],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: enabled ? onPressed : null,
-            borderRadius: BorderRadius.circular(14),
-            child: Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    enabled ? 'Continue' : 'Select a role to continue',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w700,
-                      color: enabled ? Colors.white : kTextMuted,
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                  if (enabled) ...[
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.arrow_forward_rounded,
-                      color: Colors.white,
-                      size: 19,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

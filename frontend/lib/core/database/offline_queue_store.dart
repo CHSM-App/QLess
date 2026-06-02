@@ -5,6 +5,9 @@ import 'package:qless/core/database/local_database.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
+import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/domain/models/patients.dart';
+import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/domain/models/today_queue_model.dart';
 
 /// Possible offline queue operations that can be queued for later sync.
@@ -16,6 +19,8 @@ enum OfflineOperation {
   queueSkip,
   queueRecall,
   queuePauseEmergency,
+  startSession,
+  endSession,
 }
 
 extension OfflineOperationX on OfflineOperation {
@@ -28,6 +33,8 @@ extension OfflineOperationX on OfflineOperation {
       case OfflineOperation.queueSkip:           return 'queueSkip';
       case OfflineOperation.queueRecall:         return 'queueRecall';
       case OfflineOperation.queuePauseEmergency: return 'queuePauseEmergency';
+      case OfflineOperation.startSession:        return 'startSession';
+      case OfflineOperation.endSession:          return 'endSession';
     }
   }
 
@@ -40,6 +47,8 @@ extension OfflineOperationX on OfflineOperation {
       case 'queueSkip':           return OfflineOperation.queueSkip;
       case 'queueRecall':         return OfflineOperation.queueRecall;
       case 'queuePauseEmergency': return OfflineOperation.queuePauseEmergency;
+      case 'startSession':        return OfflineOperation.startSession;
+      case 'endSession':          return OfflineOperation.endSession;
       default: throw ArgumentError('Unknown offline operation: $s');
     }
   }
@@ -106,12 +115,31 @@ class OfflineQueueStore {
 
   Future<List<TodayQueueModel>> getCachedQueues(int doctorId) async {
     final rows = await _db.getQueuesForDoctor(doctorId);
-    return rows.map(TodayQueueModel.fromJson).toList();
+    // Parse each row defensively — a single malformed cached row (e.g. an int
+    // where the model expects a bool) must not blow up the whole offline load
+    // and push the screen into a hard error state.
+    final out = <TodayQueueModel>[];
+    for (final row in rows) {
+      try {
+        out.add(TodayQueueModel.fromJson(row));
+      } catch (e) {
+        debugPrint('[OfflineQueueStore] Skipped bad cached queue row: $e');
+      }
+    }
+    return out;
   }
 
   Future<List<AppointmentList>> getCachedAppointments(int doctorId) async {
     final rows = await _db.getAppointmentsForDoctor(doctorId);
-    return rows.map(_rowToAppointment).toList();
+    final out = <AppointmentList>[];
+    for (final row in rows) {
+      try {
+        out.add(_rowToAppointment(row));
+      } catch (e) {
+        debugPrint('[OfflineQueueStore] Skipped bad cached appointment row: $e');
+      }
+    }
+    return out;
   }
 
   // ── Optimistic local mutations ───────────────────────────────────────────────
@@ -147,6 +175,19 @@ class OfflineQueueStore {
       case OfflineOperation.queueRecall:
         if (appointmentId != null) {
           await _db.updateAppointmentStatus(appointmentId, 'pending');
+        }
+        break;
+      case OfflineOperation.startSession:
+        // Doctor began consulting this patient — reflect it locally so the
+        // consult screen opens and the list shows the patient as active.
+        if (appointmentId != null) {
+          await _db.updateAppointmentStatus(appointmentId, 'in_progress');
+        }
+        break;
+      case OfflineOperation.endSession:
+        // Session closed offline — mark the patient done in the local cache.
+        if (appointmentId != null) {
+          await _db.updateAppointmentStatus(appointmentId, 'completed');
         }
         break;
     }
@@ -189,6 +230,125 @@ class OfflineQueueStore {
   Future<void> deletePendingOp(int id) => _db.deletePendingOp(id);
 
   Future<void> incrementRetry(int id) => _db.incrementRetry(id);
+
+  // ── Pending prescriptions ──────────────────────────────────────────────────
+
+  /// Persist a prescription written offline so it can be POSTed on reconnect.
+  Future<void> enqueuePrescription(PrescriptionModel prescription) async {
+    await _db.enqueuePendingPrescription(
+      payloadJson:    jsonEncode(prescription.toJson()),
+      doctorId:       prescription.doctorId,
+      appointmentId:  prescription.appointmentId,
+    );
+    debugPrint('[OfflineQueueStore] Enqueued offline prescription '
+        '(appt ${prescription.appointmentId})');
+  }
+
+  Future<int> pendingPrescriptionsCount() => _db.pendingPrescriptionsCount();
+
+  // ── Medicines catalog cache ────────────────────────────────────────────────
+
+  Future<void> cacheMedicines(int doctorId, List<Medicine> medicines) async {
+    final rows = medicines
+        .where((m) => m.medicineId != null)
+        .map((m) => {
+              'medicine_id':  m.medicineId,
+              'doctor_id':    doctorId,
+              'payload_json': jsonEncode(m.toJson()),
+            })
+        .toList();
+    await _db.upsertMedicines(doctorId, rows);
+  }
+
+  Future<List<Medicine>> getCachedMedicines(int doctorId) async {
+    final rows = await _db.getMedicines(doctorId);
+    final out = <Medicine>[];
+    for (final row in rows) {
+      try {
+        final json =
+            jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+        out.add(Medicine.fromJson(json));
+      } catch (e) {
+        debugPrint('[OfflineQueueStore] Skipped bad cached medicine row: $e');
+      }
+    }
+    return out;
+  }
+
+  // ── Patient appointments cache ─────────────────────────────────────────────
+
+  /// Cache a patient's appointment list (keyed by the id passed to
+  /// getPatientAppointments) so it renders offline.
+  Future<void> cachePatientAppointments(
+      int ownerId, List<AppointmentList> appointments) async {
+    final json = jsonEncode(appointments.map((a) => a.toJson()).toList());
+    await _db.upsertPatientAppointments(ownerId, json);
+  }
+
+  Future<List<AppointmentList>> getCachedPatientAppointments(
+      int ownerId) async {
+    final raw = await _db.getPatientAppointmentsJson(ownerId);
+    if (raw == null) return const [];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list
+          .map((e) => AppointmentList.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[OfflineQueueStore] Bad cached patient appointments: $e');
+      return const [];
+    }
+  }
+
+  // ── Patient profile cache ──────────────────────────────────────────────────
+
+  /// Cache the patient's own profile list (keyed by the lookup id, e.g. mobile)
+  /// so the edit/profile screen prefills offline.
+  Future<void> cachePatientProfile(
+      String cacheKey, List<Patients> profile) async {
+    final json = jsonEncode(profile.map((p) => p.toJson()).toList());
+    await _db.upsertPatientProfile(cacheKey, json);
+  }
+
+  Future<List<Patients>> getCachedPatientProfile(String cacheKey) async {
+    final raw = await _db.getPatientProfileJson(cacheKey);
+    if (raw == null) return const [];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list
+          .map((e) => Patients.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[OfflineQueueStore] Bad cached patient profile: $e');
+      return const [];
+    }
+  }
+
+  /// Flush all offline prescriptions by POSTing them via [executor].
+  /// Returns the number successfully sent.
+  Future<int> flushPendingPrescriptions(
+    Future<void> Function(PrescriptionModel prescription) executor,
+  ) async {
+    final rows = await _db.getPendingPrescriptions();
+    if (rows.isEmpty) return 0;
+
+    int flushed = 0;
+    for (final row in rows) {
+      final id = row['id'] as int;
+      try {
+        final json =
+            jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+        await executor(PrescriptionModel.fromJson(json));
+        await _db.deletePendingPrescription(id);
+        flushed++;
+        debugPrint('[OfflineQueueStore] Flushed prescription $id');
+      } catch (e) {
+        await _db.incrementPrescriptionRetry(id);
+        debugPrint('[OfflineQueueStore] Failed prescription $id: $e');
+      }
+    }
+    return flushed;
+  }
 
   /// Flush all pending offline operations by executing them against the API.
   ///

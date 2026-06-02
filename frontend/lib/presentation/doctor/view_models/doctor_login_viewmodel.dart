@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/database/offline_queue_store.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
@@ -78,8 +79,10 @@ class DoctorLoginState {
 
 class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   final DoctorLoginUsecase usecase;
+  final OfflineQueueStore offlineStore;
 
-  DoctorLoginViewmodel(this.usecase) : super(const DoctorLoginState()) {
+  DoctorLoginViewmodel(this.usecase, this.offlineStore)
+      : super(const DoctorLoginState()) {
     loadFromStorage();
   }
 
@@ -261,9 +264,20 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     state = state.copyWith(medicines: const AsyncValue.loading(), error: null);
     try {
       final result = await usecase.fetchAllMedicines(doctorId);
+      // Cache the catalog so it's available for offline prescriptions.
+      try {
+        await offlineStore.cacheMedicines(doctorId, result);
+      } catch (_) {}
       state = state.copyWith(medicines: AsyncValue.data(result));
-    } catch (e, st) {
-      state = state.copyWith(medicines: AsyncValue.error(e, st));
+    } catch (e) {
+      // Network down — serve the cached catalog instead of an error state
+      // (which would otherwise crash the prescription screen on `.value`).
+      try {
+        final cached = await offlineStore.getCachedMedicines(doctorId);
+        state = state.copyWith(medicines: AsyncValue.data(cached));
+      } catch (_) {
+        state = state.copyWith(medicines: const AsyncValue.data([]));
+      }
     }
   }
 
