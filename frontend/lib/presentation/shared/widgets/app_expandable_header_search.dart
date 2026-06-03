@@ -187,6 +187,79 @@ class _AppExpandableHeaderSearchState
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AppStaticHeaderTitle
+//
+// Same title block as [AppExpandableHeaderSearch] (identical leading badge,
+// responsive title/subtitle sizes) but WITHOUT a search field — for screens
+// that need the standard header look without search (e.g. doctor Settings).
+// Reuses [_HeaderTitle] so it stays pixel-identical to the search header.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class AppStaticHeaderTitle extends StatelessWidget {
+  final IconData leadingIcon;
+  final String title;
+  final String subtitle;
+  final double height;
+  final Color accentColor;
+  final Color leadingBackgroundColor;
+  final Color titleColor;
+  final Color subtitleColor;
+
+  const AppStaticHeaderTitle({
+    super.key,
+    required this.leadingIcon,
+    required this.title,
+    required this.subtitle,
+    this.height = 44,
+    this.accentColor = const Color(0xFF26C6B0),
+    this.leadingBackgroundColor = const Color(0xFFD9F5F1),
+    this.titleColor = const Color(0xFF2D3748),
+    this.subtitleColor = const Color(0xFF718096),
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+
+        final isNarrow = width < 220;
+        final isMedium = width >= 220 && width < 340;
+
+        final titleFontSize = isNarrow
+            ? 13.0
+            : isMedium
+                ? 14.0
+                : 16.0;
+        final subtitleFontSize = isNarrow
+            ? 10.0
+            : isMedium
+                ? 10.5
+                : 11.0;
+
+        return SizedBox(
+          height: height,
+          child: _HeaderTitle(
+            height: height,
+            leadingIcon: leadingIcon,
+            leadingBackgroundColor: leadingBackgroundColor,
+            accentColor: accentColor,
+            title: title,
+            subtitle: subtitle,
+            titleColor: titleColor,
+            subtitleColor: subtitleColor,
+            showSubtitle: !isNarrow,
+            titleFontSize: titleFontSize,
+            subtitleFontSize: subtitleFontSize,
+            showLeadingIcon: true,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // _HeaderTitle
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -237,33 +310,40 @@ class _HeaderTitle extends StatelessWidget {
           const SizedBox(width: 10),
         ],
         Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.w700,
-                  color: titleColor,
-                ),
-              ),
-              if (showSubtitle) ...[
-                const SizedBox(height: 1),
+          // Clamp the system text scale so large device font settings can't
+          // overflow the fixed-height header (title + subtitle must fit 44px).
+          child: MediaQuery.withClampedTextScaling(
+            maxScaleFactor: 1.1,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  subtitle,
+                  title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: subtitleFontSize,
-                    color: subtitleColor,
+                    fontSize: titleFontSize,
+                    fontWeight: FontWeight.w700,
+                    color: titleColor,
+                    height: 1.2,
                   ),
                 ),
+                if (showSubtitle) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: subtitleFontSize,
+                      color: subtitleColor,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ],

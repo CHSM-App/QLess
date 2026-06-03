@@ -111,3 +111,14 @@ flutter:
   generate: true
   # assets:
   #   - asset/sound/success.mp3
+
+# Launcher icon generation. Run: dart run flutter_launcher_icons
+# Generates adaptive icons (white bg + Q foreground) across all densities,
+# so the launcher no longer shows a black background on Android 8+.
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/qless_logo.png"
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/icon/qless_logo.png"
+  adaptive_icon_foreground_inset: 20

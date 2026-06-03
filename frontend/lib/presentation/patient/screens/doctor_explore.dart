@@ -258,22 +258,23 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: RefreshIndicator(
-        color: _kPrimary,
-        onRefresh: _loadData,
-        child: CustomScrollView(
-        slivers: [
+      body: Column(
+        children: [
+          _fade(0, _buildHeader()),
+          Expanded(
+            child: RefreshIndicator(
+              color: _kPrimary,
+              onRefresh: _loadData,
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
 
           // ── HEADER ─────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: _fade(0, _buildHeader()),
-          ),
-
           // ── BODY ───────────────────────────────────────────────────
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(14, 16, 14, 90),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(14, 16, 14, 90),
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate([
 
                 // Favorite Doctors
                 if (favorites.isNotEmpty) ...[
@@ -360,11 +361,14 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
                   )),
                 ],
 
-              ]),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
-      ),
       ),
     );
   }

@@ -10,6 +10,7 @@ import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
 import 'package:qless/presentation/doctor/screens/doctor_help_center_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
+import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart' hide appointmentViewModelProvider;
 import 'package:url_launcher/url_launcher.dart';
@@ -390,7 +391,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     );
   }
 
-  // ── Header — compact, matched to home_screen aesthetic ──────────────────
+  // ── Header — standardized to match Patients / Medicines headers ─────────
   Widget _buildHeader() {
     return Container(
       decoration: const BoxDecoration(
@@ -402,47 +403,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-          child: Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  gradient: kPrimaryGradient,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                alignment: Alignment.center,
-                child: const Icon(Icons.settings_rounded,
-                    color: Colors.white, size: 15),
-              ),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Settings',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: kTextPrimary,
-                        letterSpacing: -0.2,
-                        height: 1.15,
-                      ),
-                    ),
-                    SizedBox(height: 1),
-                    Text(
-                      'Manage your account & preferences',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        color: kTextSecondary,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          child: AppStaticHeaderTitle(
+            leadingIcon: Icons.settings_rounded,
+            title: 'Settings',
+            subtitle: 'Manage your account & preferences',
+            accentColor: kPrimary,
+            leadingBackgroundColor: kPrimaryLight,
+            titleColor: kTextPrimary,
+            subtitleColor: kTextSecondary,
           ),
         ),
       ),

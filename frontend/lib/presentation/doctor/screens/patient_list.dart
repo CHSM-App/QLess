@@ -1024,13 +1024,14 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
               child: Row(
                 children: [
                   Expanded(
                     child: AppExpandableHeaderSearch(
                       controller: _searchCtrl,
                       leadingIcon: Icons.people_alt_outlined,
+                      alwaysShowLeadingIcon: true,
                       title: 'Patients',
                       subtitle: 'Manage your patient queue',
                       hintText: 'Search by name, status or queue...',
