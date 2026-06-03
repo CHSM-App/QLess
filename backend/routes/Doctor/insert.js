@@ -1818,63 +1818,92 @@ cron.schedule('0 16 * * *', async () => {
 // per prescription whose follow_up_date is today or tomorrow, each carrying the
 // patient's FCM token (patient or family-head), the doctor name and a
 // reminder_kind flag ('day_before' | 'day_of').
+//
+// Extracted from the cron so the /test/followup-reminders debug route can fire it
+// on demand without waiting for 09:00. `tag` only labels the log line.
+async function runFollowUpReminders(tag = 'cron 09:00') {
+  const result = await db.request()
+    .input('operation', 'FollowUpReminders')
+    .execute('sp_prescription');
+
+  const rows = result.recordset || [];
+
+  if (rows.length === 0) {
+    log.info(`[${tag}] No follow-up reminders due`);
+    return { total: 0, sent: 0, failed: 0, skipped: 0 };
+  }
+
+  let successCount = 0;
+  let failureCount = 0;
+  let skippedCount = 0;
+
+  for (const row of rows) {
+    const token = row.patient_token;
+    const doctorName = row.doctor_name || 'your doctor';
+    const kind = row.reminder_kind; // 'day_before' | 'day_of'
+
+    if (!token || !kind) { skippedCount++; continue; }
+
+    const title = kind === 'day_of' ? 'Follow-up Today' : 'Follow-up Tomorrow';
+    const body = kind === 'day_of'
+      ? `Your follow-up with Dr. ${doctorName} is today. Tap to book your visit.`
+      : `Your follow-up with Dr. ${doctorName} is tomorrow. Tap to book your visit.`;
+
+    // type 'appointment' with no appointment_id → the tap lands on the
+    // appointments tab where the patient can book the follow-up. doctor_id is
+    // carried for any future "pre-select this doctor" booking deep link.
+    await insertNotificationForToken(token, title, body, 'appointment', null);
+
+    const message = {
+      token,
+      notification: { title, body },
+      data: {
+        type: 'appointment',
+        action: 'followup',
+        doctor_id: String(row.doctor_id ?? ''),
+        prescription_id: String(row.prescription_id ?? ''),
+      },
+    };
+
+    try {
+      await admin.messaging().send(message);
+      successCount++;
+    } catch (err) {
+      log.error('FCM Error: ' + err.message);
+      failureCount++;
+    }
+  }
+
+  log.info(`[${tag}] Follow-up reminders sent: ${successCount} ok, ${failureCount} failed, ${skippedCount} skipped / ${rows.length} total`);
+  return { total: rows.length, sent: successCount, failed: failureCount, skipped: skippedCount };
+}
+
 cron.schedule('0 9 * * *', async () => {
   try {
-    const result = await db.request()
+    await runFollowUpReminders('cron 09:00');
+  } catch (error) {
+    log.error('[cron 09:00] Failed to send follow-up reminders: ' + error.message);
+  }
+});
+
+// DEBUG: fire the follow-up reminders immediately (no wait for 09:00). Returns
+// the SP rows + send summary so you can see exactly what matched and what was
+// skipped (e.g. NULL token). Remove once the flow is verified in production.
+router.get('/test/followup-reminders', async (req, res) => {
+  try {
+    const peek = await db.request()
       .input('operation', 'FollowUpReminders')
       .execute('sp_prescription');
 
-    const rows = result.recordset || [];
+    const summary = await runFollowUpReminders('debug followup');
 
-    if (rows.length === 0) {
-      log.info('[cron 09:00] No follow-up reminders due');
-      return;
-    }
-
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (const row of rows) {
-      const token = row.patient_token;
-      const doctorName = row.doctor_name || 'your doctor';
-      const kind = row.reminder_kind; // 'day_before' | 'day_of'
-
-      if (!token || !kind) continue;
-
-      const title = kind === 'day_of' ? 'Follow-up Today' : 'Follow-up Tomorrow';
-      const body = kind === 'day_of'
-        ? `Your follow-up with Dr. ${doctorName} is today. Tap to book your visit.`
-        : `Your follow-up with Dr. ${doctorName} is tomorrow. Tap to book your visit.`;
-
-      // type 'appointment' with no appointment_id → the tap lands on the
-      // appointments tab where the patient can book the follow-up. doctor_id is
-      // carried for any future "pre-select this doctor" booking deep link.
-      await insertNotificationForToken(token, title, body, 'appointment', null);
-
-      const message = {
-        token,
-        notification: { title, body },
-        data: {
-          type: 'appointment',
-          action: 'followup',
-          doctor_id: String(row.doctor_id ?? ''),
-          prescription_id: String(row.prescription_id ?? ''),
-        },
-      };
-
-      try {
-        await admin.messaging().send(message);
-        successCount++;
-      } catch (err) {
-        log.error('FCM Error: ' + err.message);
-        failureCount++;
-      }
-    }
-
-    log.info(`[cron 09:00] Follow-up reminders sent: ${successCount} ok, ${failureCount} failed / ${rows.length} total`);
-
+    return res.json({
+      success: true,
+      summary,
+      rows: peek.recordset || [], // includes patient_token / reminder_kind for inspection
+    });
   } catch (error) {
-    log.error('[cron 09:00] Failed to send follow-up reminders: ' + error.message);
+    return res.status(500).json({ success: false, message: error.message });
   }
 });
 
