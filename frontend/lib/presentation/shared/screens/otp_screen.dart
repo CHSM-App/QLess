@@ -399,7 +399,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(68);
+  Size get preferredSize => const Size.fromHeight(74);
 
   @override
   Widget build(BuildContext context) {
@@ -407,8 +407,8 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
       color: kSurface,
       elevation: 0,
       child: Container(
-        height: 68,
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        height: 74,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
         decoration: const BoxDecoration(
           color: kSurface,
           border: Border(bottom: BorderSide(color: kBorder, width: 1)),
@@ -443,6 +443,8 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                   children: [
                     Text(
                       title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -453,6 +455,8 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 11.5,
                         color: kTextSecondary,
@@ -482,6 +486,8 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                     const SizedBox(width: 5),
                     Text(
                       isDoctor ? 'Doctor' : 'Patient',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w700,
