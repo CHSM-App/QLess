@@ -437,7 +437,11 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
+                // Clamp device font scaling so a large system font setting
+                // can't overflow the fixed-height (68px) title bar.
+                child: MediaQuery.withClampedTextScaling(
+                  maxScaleFactor: 1.1,
+                  child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -450,6 +454,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                         fontWeight: FontWeight.w800,
                         color: kTextPrimary,
                         letterSpacing: -0.3,
+                        height: 1.2,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -461,9 +466,11 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                         fontSize: 11.5,
                         color: kTextSecondary,
                         fontWeight: FontWeight.w500,
+                        height: 1.2,
                       ),
                     ),
                   ],
+                  ),
                 ),
               ),
               Container(

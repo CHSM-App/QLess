@@ -12,7 +12,9 @@ import 'package:qless/presentation/patient/screens/patient_prescription_list.dar
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/review_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
@@ -295,6 +297,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool   _didReadRouteArgs = false; // honour route args (e.g. filter=cancelled) once
   int?   _pendingDetailApptId;      // notification tap: auto-open this appt's detail
   int?   _pendingRatingApptId;      // 'Appointment Complete' notification: open review dialog
+  int    _offlineAnchorTab = -1;    // the tab that was open when the connection
+                                    // dropped — only it keeps data offline.
+                                    // Switching tab / leaving the page clears it.
+
+
 
   // ── Date filter state ──────────────────────────────────────────────
   _DateFilter _dateFilter = _DateFilter.all;
@@ -351,6 +358,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   void _setFilterIndex(int index) {
     final next = _filters[index].key;
     if (_filterStatus == next) return;
+    // Moving to a different tab while offline invalidates the kept tab, so the
+    // non-today tabs all fall back to the no-internet widget.
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _offlineAnchorTab = -1;
+    }
     setState(() => _filterStatus = next);
   }
 
@@ -380,6 +392,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
   Future<void> refreshOnVisible() async {
+    // Returning to the page after leaving it → non-today tabs need a connection.
+    _offlineAnchorTab = -1;
     _didFetch = false;
     await _fetch(force: true);
   }
@@ -747,6 +761,22 @@ bool get _hasDateFilter =>
       }
     });
 
+    final isOffline = ref.watch(connectivityNotifierProvider).isOffline;
+    ref.listen(connectivityNotifierProvider, (prev, next) {
+      final wasOffline = prev?.isOffline ?? false;
+      if (wasOffline && next.isOnline) {
+        // Reconnected → reload and drop the anchor.
+        _offlineAnchorTab = -1;
+        final id = ref.read(patientLoginViewModelProvider).patientId;
+        if (id != null && id != 0) {
+          ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(id);
+        }
+      } else if (!wasOffline && next.isOffline) {
+        // Just went offline → keep data only for the tab open right now.
+        _offlineAnchorTab = _tabCtrl.index;
+      }
+    });
+
     final vmState    = ref.watch(appointmentViewModelProvider);
     final loginState = ref.watch(patientLoginViewModelProvider);
     final async      = vmState.patientAppointmentsList;
@@ -771,7 +801,7 @@ bool get _hasDateFilter =>
                               data: (list) {
                                 _maybeOpenPendingDetail(list);
                                 _maybeOpenRatingDialog(list);
-                                return _buildTabContent(list);
+                                return _buildTabContent(list, isOffline);
                               },
                             ),
             ),
@@ -983,10 +1013,13 @@ Widget _filterChip({
   // ---------------------------------------------------------------------------
   // Tab content
   // ---------------------------------------------------------------------------
-  Widget _buildTabContent(List<AppointmentList> appointments) {
+  Widget _buildTabContent(List<AppointmentList> appointments, bool isOffline) {
     return TabBarView(
       controller: _tabCtrl,
-      children: _filters.map((f) {
+      children: _filters.asMap().entries.map((entry) {
+        final tabIndex = entry.key;
+        final f = entry.value;
+        final isToday = f.key == 'today';
         var list = applyFilter(
             appointments, f.key, _search, _dateFilter, _customFrom, _customTo);
 
@@ -1009,6 +1042,14 @@ Widget _filterChip({
                 .read(appointmentViewModelProvider.notifier)
                 .getPatientAppointments(id);
           }
+        }
+
+        // Only Today is available offline (it syncs locally). Other tabs keep
+        // their data only if this is the tab that was open when the connection
+        // dropped (_offlineAnchorTab). Switching tab / returning to the page
+        // clears the anchor, so they fall back to the no-internet widget.
+        if (isOffline && !isToday && tabIndex != _offlineAnchorTab) {
+          return ConnectivityErrorView(onRetry: onRefresh);
         }
 
         if (list.isEmpty && !vmState.isLoading) {
@@ -1646,16 +1687,25 @@ class _AppointmentCard extends StatelessWidget {
                                 backgroundColor: kPrimary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10)),
                               ),
-                              child: Text(
-                                  onViewPrescription != null
-                                      ? 'View Prescription'
-                                      : 'View Details',
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
+                              // Scale the label down to fit one line instead of
+                              // wrapping/clipping when the device font is large.
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                    onViewPrescription != null
+                                        ? 'View Prescription'
+                                        : 'View Details',
+                                    maxLines: 1,
+                                    softWrap: false,
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600)),
+                              ),
                             ),
                           ),
                         ),

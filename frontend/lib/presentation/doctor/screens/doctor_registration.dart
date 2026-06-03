@@ -14,8 +14,10 @@ import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Colour palette (matches login + patient registration) ─────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -219,6 +221,13 @@ class _DoctorProfileSetupScreenState
       return;
     }
     _mobileDebounce = Timer(const Duration(milliseconds: 800), () async {
+      if (ref.read(connectivityNotifierProvider).isOffline) {
+        if (_mobileExistsError != null && mounted) {
+          setState(() => _mobileExistsError = null);
+        }
+        return;
+      }
+
       final result = await ref
           .read(doctorLoginViewModelProvider.notifier)
           .mobileExistDoctor(trimmed);
@@ -427,6 +436,9 @@ class _DoctorProfileSetupScreenState
       if (_contactController.text.trim().length != 10) {
         return _showError('Contact No must be 10 digits');
       }
+      if (ref.read(connectivityNotifierProvider).isOffline) {
+        return _showError(connectivityErrorMessage);
+      }
 
       _mobileDebounce?.cancel();
       final mobileCheck = await ref
@@ -480,6 +492,9 @@ class _DoctorProfileSetupScreenState
           !_isValidEmail(_clinicEmailController.text)) {
         return _showError('Please enter a valid Clinic Email Address');
       }
+      if (ref.read(connectivityNotifierProvider).isOffline) {
+        return _showError(connectivityErrorMessage);
+      }
 
       if (_fcmToken == null) {
         try {
@@ -524,7 +539,9 @@ class _DoctorProfileSetupScreenState
 
       final latestState = ref.read(doctorLoginViewModelProvider);
       if (latestState.error != null) {
-        _showError(latestState.error!);
+        _showError(isConnectivityFailureMessage(latestState.error)
+            ? connectivityErrorMessage
+            : latestState.error!);
         return;
       }
 
@@ -598,6 +615,9 @@ class _DoctorProfileSetupScreenState
       );
       return;
     }
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      return _showError(connectivityErrorMessage);
+    }
 
     await ref
         .read(doctorSettingsViewModelProvider.notifier)
@@ -609,7 +629,9 @@ class _DoctorProfileSetupScreenState
 
     final schedErr = ref.read(doctorSettingsViewModelProvider).errorMessage;
     if (schedErr.isNotEmpty) {
-      _showError(schedErr);
+      _showError(isConnectivityFailureMessage(schedErr)
+          ? connectivityErrorMessage
+          : schedErr);
       return;
     }
 
@@ -624,7 +646,9 @@ class _DoctorProfileSetupScreenState
 
       final leadErr = ref.read(doctorLoginViewModelProvider).error;
       if (leadErr != null) {
-        _showError('Schedule saved, but lead time update failed: $leadErr');
+        _showError(isConnectivityFailureMessage(leadErr)
+            ? connectivityErrorMessage
+            : 'Schedule saved, but lead time update failed: $leadErr');
       }
     }
 
@@ -674,6 +698,7 @@ class _DoctorProfileSetupScreenState
                   children: [
                     _StepProgressBar(currentStep: _step),
                     const SizedBox(height: 22),
+                    const ConnectivityErrorCard(),
                     if (_step == 1) _buildStep1(),
                     if (_step == 2) _buildStep2(),
                     if (_step == 3) _buildStep3(),

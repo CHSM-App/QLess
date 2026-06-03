@@ -8,7 +8,9 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/screens/print_prescription_screen.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Shared colour palette ─────────────────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -135,6 +137,15 @@ class _PatientPrescriptionListScreenState
     }
   }
 
+  Future<void> _reload() async {
+    final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    if (pid > 0) {
+      await ref
+          .read(prescriptionViewModelProvider.notifier)
+          .patientPrescriptionList(pid);
+    }
+  }
+
   @override
   void dispose() {
     _patientSub?.close();
@@ -251,6 +262,12 @@ class _PatientPrescriptionListScreenState
     final tokenOk   = !tokenSt.isLoading && (tokenSt.accessToken ?? '').isNotEmpty;
     final waitAuth  = !tokenOk || pid == 0;
 
+    final isOffline = ref.watch(connectivityNotifierProvider).isOffline;
+    // Auto-reload when the connection is restored.
+    ref.listen(connectivityNotifierProvider, (prev, next) {
+      if ((prev?.isOffline ?? false) && next.isOnline) _reload();
+    });
+
     final state   = ref.watch(prescriptionViewModelProvider);
     final apiList = state.prescriptionsListPatient ?? const <PrescriptionModel>[];
     final mapped  = apiList.map((m) => PatientPrescription.fromModel(m,
@@ -333,9 +350,9 @@ class _PatientPrescriptionListScreenState
                 child: TabBarView(
                   controller: _tabCtrl,
                   children: [
-                    _buildList(all,    waitAuth: waitAuth, state: state, pid: pid),
-                    _buildList(active, waitAuth: waitAuth, state: state, pid: pid),
-                    _buildList(past,   waitAuth: waitAuth, state: state, pid: pid),
+                    _buildList(all,    waitAuth: waitAuth, state: state, pid: pid, isOffline: isOffline),
+                    _buildList(active, waitAuth: waitAuth, state: state, pid: pid, isOffline: isOffline),
+                    _buildList(past,   waitAuth: waitAuth, state: state, pid: pid, isOffline: isOffline),
                   ],
                 ),
               ),
@@ -491,11 +508,20 @@ class _PatientPrescriptionListScreenState
   // ── List body ───────────────────────────────────────────────────────
   Widget _buildList(List<PatientPrescription> items,
     {required bool waitAuth, required PrescriptionState state,
-     required int pid}) {
+     required int pid, required bool isOffline}) {
+  // Offline with nothing cached → no-internet retry widget, not a Dio error.
+  if (isOffline && items.isEmpty) {
+    return ConnectivityErrorView(onRetry: _reload);
+  }
   if (waitAuth || (state.isLoading && items.isEmpty)) {
     return const _PrescriptionSkeletonList();
   }
-  if (state.error != null && items.isEmpty) return _errorState(state.error!, pid);
+  if (state.error != null && items.isEmpty) {
+    if (isConnectivityFailureMessage(state.error)) {
+      return ConnectivityErrorView(onRetry: _reload);
+    }
+    return _errorState(state.error!, pid);
+  }
   if (items.isEmpty) return _emptyState(pid);
 
   return RefreshIndicator(

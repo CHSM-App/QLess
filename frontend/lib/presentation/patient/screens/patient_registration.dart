@@ -8,8 +8,10 @@ import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Colour palette (matches login + continue_as screens) ──────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -116,6 +118,13 @@ class _PatientRegistrationScreenState
       return;
     }
     _mobileDebounce = Timer(const Duration(milliseconds: 800), () async {
+      if (ref.read(connectivityNotifierProvider).isOffline) {
+        if (_mobileExistsError != null && mounted) {
+          setState(() => _mobileExistsError = null);
+        }
+        return;
+      }
+
       final result = await ref
           .read(patientLoginViewModelProvider.notifier)
           .mobileExistPatient(trimmed);
@@ -314,6 +323,10 @@ class _PatientRegistrationScreenState
       _snack('Please select your blood group', isError: true);
       return;
     }
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack(connectivityErrorMessage, isError: true);
+      return;
+    }
 
     final patient = Patients(
       name:         _fullNameController.text.trim(),
@@ -374,7 +387,13 @@ class _PatientRegistrationScreenState
       );
     }
     if (next.error != null && next.error != prev?.error) {
-      _snack(next.error!, isError: true);
+      final isConnectivityError =
+          ref.read(connectivityNotifierProvider).isOffline ||
+              isConnectivityFailureMessage(next.error);
+      _snack(
+        isConnectivityError ? connectivityErrorMessage : next.error!,
+        isError: true,
+      );
     }
   }
 
@@ -403,9 +422,10 @@ class _PatientRegistrationScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                        // Avatar picker
-                        Center(child: _buildAvatarPicker()),
-                        const SizedBox(height: 22),
+                const ConnectivityErrorCard(),
+                // Avatar picker
+                Center(child: _buildAvatarPicker()),
+                const SizedBox(height: 22),
 
                         // ─── Personal Information card ────────────
                         _SectionCard(

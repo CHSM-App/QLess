@@ -5,6 +5,8 @@ import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_leave_sheet.dart';
 import 'package:qless/presentation/doctor/view_models/doctore_settings_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -87,12 +89,14 @@ class _DoctorAvailabilityPageState
     _days = _dayMeta
         .map((m) => DaySchedule(dayName: m.$1, shortName: m.$2))
         .toList();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final doctorId =
-          ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
-      ref.read(doctorSettingsViewModelProvider.notifier)
-          .getDoctorSchedule(doctorId);
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
+  }
+
+  Future<void> _reload() async {
+    final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+    await ref
+        .read(doctorSettingsViewModelProvider.notifier)
+        .getDoctorSchedule(doctorId);
   }
 
   // ---------------------------------------------------------------------------
@@ -220,6 +224,11 @@ class _DoctorAvailabilityPageState
   // ---------------------------------------------------------------------------
 
   Future<void> _save() async {
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack(connectivityErrorMessage, isError: true);
+      return;
+    }
+
     // Overlap validation
     for (final day in _days) {
       if (!day.isEnabled) continue;
@@ -451,6 +460,9 @@ class _DoctorAvailabilityPageState
   }
 
   void _snack(String message, {bool isError = false}) {
+    // Never surface a raw Dio/network exception — show a friendly message.
+    final text =
+        isConnectivityFailureMessage(message) ? connectivityErrorMessage : message;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(children: [
@@ -461,7 +473,7 @@ class _DoctorAvailabilityPageState
             color: Colors.white, size: 15,
           ),
           const SizedBox(width: 8),
-          Expanded(child: Text(message,
+          Expanded(child: Text(text,
               style: const TextStyle(fontSize: 13, color: Colors.white))),
         ]),
         backgroundColor: isError ? kError : kPrimary,
@@ -483,8 +495,17 @@ class _DoctorAvailabilityPageState
     final loaded    = state.doctorSchedule;
     final isLoading = state.isLoading;
     final isTablet  = MediaQuery.of(context).size.width >= 600;
+    final isOffline = ref.watch(connectivityNotifierProvider).isOffline;
 
-    if (loaded != null && !identical(loaded, _hydratedFrom)) {
+    // Auto-reload the schedule when the connection is restored.
+    ref.listen(connectivityNotifierProvider, (prev, next) {
+      if ((prev?.isOffline ?? false) && next.isOnline) _reload();
+    });
+
+    // Don't hydrate stale data from a previous visit while offline — a fresh
+    // entry / refresh with no connection must land on the no-internet screen,
+    // not silently show the old schedule.
+    if (loaded != null && !identical(loaded, _hydratedFrom) && !isOffline) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _hydrateFromModel(loaded);
       });
@@ -492,8 +513,13 @@ class _DoctorAvailabilityPageState
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: _buildAppBar(isLoading),
-      body: SafeArea(
+      appBar: _buildAppBar(isLoading && !isOffline),
+      // Keep data while you're on the page and the connection drops, but a
+      // fresh entry / refresh while offline lands on the no-internet screen.
+      // _hydratedFrom is per screen-instance, so re-entering resets it to null.
+      body: (isOffline && _hydratedFrom == null)
+          ? SafeArea(child: ConnectivityErrorView(onRetry: _reload))
+          : SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -73,6 +75,10 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       _snack('Please select a medicine type', isError: true);
       return;
     }
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack(connectivityErrorMessage, isError: true);
+      return;
+    }
 
     final notifier   = ref.read(doctorLoginViewModelProvider.notifier);
     var   loginState = ref.read(doctorLoginViewModelProvider);
@@ -108,7 +114,13 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       setState(() => _selectedType = null);
       _snack('Medicine added successfully');
     } else {
-      _snack(response['message'] ?? 'Failed to add medicine', isError: true);
+      final message = response['message']?.toString();
+      _snack(
+        isConnectivityFailureMessage(message)
+            ? connectivityErrorMessage
+            : (message ?? 'Failed to add medicine'),
+        isError: true,
+      );
     }
   }
 
@@ -149,7 +161,11 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
         doctorLoginViewModelProvider.select((s) => s.medicineTypes));
 
     ref.listen(doctorLoginViewModelProvider.select((s) => s.error), (_, error) {
-      if (error != null) _snack(error, isError: true);
+      if (error == null) return;
+      _snack(
+        isConnectivityFailureMessage(error) ? connectivityErrorMessage : error,
+        isError: true,
+      );
     });
 
     return Scaffold(
@@ -193,6 +209,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                 children: [
                   _heroBanner(),
                   const SizedBox(height: 16),
+                  const ConnectivityErrorCard(),
                   _sectionCard(children: [
                     _fieldLabel('Medicine Name', isRequired: true),
                     const SizedBox(height: 8),
@@ -471,13 +488,25 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     if (typesAsync is AsyncValue<List<Medicine>>) {
       return typesAsync.when(
         loading: _typeLoading,
-        error: (_, __) => _typeError(),
+        error: (error, __) => ref.read(connectivityNotifierProvider).isOffline ||
+                isConnectivityFailureMessage(error.toString())
+            ? _typeList(_fallbackMedicineTypes())
+            : _typeError(),
         data: (types) => _typeList(types),
       );
     }
     if (typesAsync is List<Medicine>) return _typeList(typesAsync);
     return _typeError();
   }
+
+  List<Medicine> _fallbackMedicineTypes() => [
+        Medicine(medTypeId: 1, medTypeName: 'Tablet'),
+        Medicine(medTypeId: 2, medTypeName: 'Syrups'),
+        Medicine(medTypeId: 3, medTypeName: 'Injections'),
+        Medicine(medTypeId: 4, medTypeName: 'Drops'),
+        Medicine(medTypeId: 5, medTypeName: 'Lotions'),
+        Medicine(medTypeId: 6, medTypeName: 'Sprays'),
+      ];
 
   Widget _typeLoading() => Wrap(
         spacing: 8, runSpacing: 8,

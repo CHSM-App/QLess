@@ -8,6 +8,7 @@ import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -163,7 +164,13 @@ String? _networkImageUrl;   // ← add this
       _didSubmit = false;
       _isSubmitting = false;
       if (mounted) setState(() {});
-      _snack(next.error ?? 'Failed to update profile', success: false);
+      // Show a friendly offline message instead of a raw Dio exception.
+      _snack(
+        isConnectivityFailureMessage(next.error)
+            ? connectivityErrorMessage
+            : (next.error ?? 'Failed to update profile'),
+        success: false,
+      );
     }
   }
 
@@ -312,6 +319,8 @@ String? _networkImageUrl;   // ← add this
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Offline banner (auto-hides when online)
+              const ConnectivityErrorCard(),
               // Avatar
               _avatarCard(),
               const SizedBox(height: 12),
