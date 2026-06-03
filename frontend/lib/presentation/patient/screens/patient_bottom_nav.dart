@@ -5,6 +5,7 @@ import 'package:qless/presentation/patient/screens/appintment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctor_explore.dart';
 import 'package:qless/presentation/patient/screens/patient_home_screen.dart';
 import 'package:qless/presentation/patient/screens/profile.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_banner.dart';
 
 // Global handle so notification taps can drive the patient shell from
 // anywhere (in-app inbox, FCM tray) — they switch the active tab and pass
@@ -223,7 +224,8 @@ static const _regularNavHeight = 56.0;
 
   @override
 Widget build(BuildContext context) {
-  return PopScope(
+  return ConnectivityBannerWrapper(
+    child: PopScope(
     canPop: _tab == 0,
     onPopInvokedWithResult: (didPop, _) {
       if (!didPop) _setTab(0);
@@ -256,6 +258,7 @@ Widget build(BuildContext context) {
           ],
         ),
       ),
+    ),
     ),
   );
 }

@@ -13,6 +13,8 @@ import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS
@@ -148,6 +150,9 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
   void _maybeFetchProfile(DoctorLoginState state) {
     if (_didFetchProfile) return;
+    // Offline → keep the data already in state and prefill from it. A fresh
+    // fetch would only fail and wipe the form, leaving the fields empty.
+    if (ref.read(connectivityNotifierProvider).isOffline) return;
     final mobile = state.mobile;
     if (mobile != null && mobile.trim().isNotEmpty) {
       _didFetchProfile = true;
@@ -630,6 +635,11 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
   // ── Save ─────────────────────────────────────────────────────────
   Future<void> _save() async {
+    // Block saving while offline — let the form data stay, just don't submit.
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _showSnack(connectivityErrorMessage, isError: true);
+      return;
+    }
     if (_isMobileChanged) {
       _showSnack('Please verify your new mobile number before saving',
           isError: true);
@@ -723,7 +733,13 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
 
     final after = ref.read(doctorLoginViewModelProvider);
     if (after.error != null && after.error!.isNotEmpty) {
-      _showSnack(after.error!, isError: true);
+      // Show a friendly offline message instead of a raw Dio exception.
+      _showSnack(
+        isConnectivityFailureMessage(after.error)
+            ? connectivityErrorMessage
+            : after.error!,
+        isError: true,
+      );
       return;
     }
     _showSnack('Profile updated successfully');
@@ -789,6 +805,8 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
       body: Column(children: [
         _buildHeader(),
         _buildTabBar(),
+        // Offline banner (auto-hides when online)
+        const ConnectivityErrorCard(margin: EdgeInsets.fromLTRB(16, 12, 16, 0)),
         Expanded(
           child: _isDesktop
               ? _buildDesktopBody()

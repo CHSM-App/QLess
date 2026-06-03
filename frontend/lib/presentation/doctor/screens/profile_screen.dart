@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
@@ -189,15 +190,18 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       ref
           .read(doctorLoginViewModelProvider.notifier)
           .checkPhoneDoctor(mobile);
-      await Future.delayed(const Duration(milliseconds: 600));
     }
+    final doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
+    if (doctorId != null && doctorId > 0) _fetchCounts(doctorId, force: true);
+    await Future.delayed(const Duration(milliseconds: 600));
   }
 
   // ── Counts fetch ──────────────────────────────────────────────────────────
 
-  void _fetchCounts(int doctorId) {
-    if (_didFetchCounts) return;
+  void _fetchCounts(int doctorId, {bool force = false}) {
+    if (_didFetchCounts && !force) return;
     _didFetchCounts = true;
+    ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(doctorId);
     ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(doctorId);
     ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(doctorId);
   }
@@ -210,6 +214,58 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     if (parts.length == 1) return parts[0][0].toUpperCase();
     return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
   }
+
+  bool _isTodayAppointment(AppointmentList a) {
+    final d = DateTime.tryParse(a.appointmentDate ?? '');
+    if (d == null) return false;
+    final today = DateTime.now();
+    return d.year == today.year && d.month == today.month && d.day == today.day;
+  }
+
+  bool _isWaitingStatus(String? rawStatus) {
+    final status = rawStatus?.trim().toLowerCase();
+    return status == 'booked' ||
+        status == 'pending' ||
+        status == 'skipped' ||
+        status == 'in_progress';
+  }
+
+  int _todayAppointmentsCount(List<AppointmentList> appointments) =>
+      appointments.where(_isTodayAppointment).length;
+
+  int _waitingTodayCount(List<AppointmentList> appointments) => appointments
+      .where((a) => _isTodayAppointment(a) && _isWaitingStatus(a.status))
+      .length;
+
+  int _completedAppointmentsCount(List<AppointmentList> appointments) =>
+      appointments
+          .where((a) => a.status?.trim().toLowerCase() == 'completed')
+          .length;
+
+  String _countText(int value, {required bool isLoading}) =>
+      isLoading ? '...' : value.toString();
+
+  bool _hasText(String? value) => value != null && value.trim().isNotEmpty;
+
+  double _profileCompletion(DoctorLoginState s, DoctorDetails? d) {
+    final fields = <bool>[
+      _hasText(d?.name ?? s.name),
+      _hasText(d?.mobile ?? s.mobile),
+      _hasText(d?.email ?? s.email),
+      _hasText(d?.specialization),
+      _hasText(d?.qualification),
+      _hasText(d?.licenseNo),
+      _hasText(d?.clinicName ?? s.clinic_name),
+      _hasText(d?.clinicAddress),
+      d?.consultationFee != null,
+      d?.leadTime != null || s.leadTimeMinutes != null,
+    ];
+    final filled = fields.where((v) => v).length;
+    return fields.isEmpty ? 0 : filled / fields.length;
+  }
+
+  double _documentVerification(DoctorDetails? d) =>
+      _hasText(d?.licenseNo) ? 1.0 : 0.0;
 
   // ── Bottom sheets ─────────────────────────────────────────────────────────
 
@@ -315,7 +371,20 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final apptState   = ref.watch(appointmentViewModelProvider);
     final reviewState = ref.watch(reviewViewModelProvider);
 
-    final patientCount = apptState.doctorPatientCount;
+    final appointments = apptState.patientAppointmentsList.maybeWhen(
+      data: (list) => list,
+      orElse: () => const <AppointmentList>[],
+    );
+    final hasAppointmentData = apptState.patientAppointmentsList.maybeWhen(
+      data: (_) => true,
+      orElse: () => false,
+    );
+    final appointmentStatsLoading = apptState.patientAppointmentsList.isLoading;
+    final patientCount = hasAppointmentData
+        ? _completedAppointmentsCount(appointments)
+        : apptState.doctorPatientCount;
+    final todayAppointments = _todayAppointmentsCount(appointments);
+    final waitingToday = _waitingTodayCount(appointments);
 
     // Rating avg + review count — both from fetchDoctorReviews
     final reviews     = reviewState.reviews;
@@ -333,6 +402,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       }
     }
     avgRating ??= doctorDetails?.rating; // fallback to profile-API rating
+    final ratingScore =
+        avgRating == null ? 0.0 : (avgRating / 5).clamp(0.0, 1.0).toDouble();
 
     return Scaffold(
       backgroundColor: kPageBg,
@@ -367,7 +438,22 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           ),
                           SizedBox(
                             width: 300,
-                            child: _buildRightPanel(),
+                            child: _buildRightPanel(
+                              todayAppointments: _countText(
+                                todayAppointments,
+                                isLoading: appointmentStatsLoading,
+                              ),
+                              waitingToday: _countText(
+                                waitingToday,
+                                isLoading: appointmentStatsLoading,
+                              ),
+                              pendingSync: apptState.pendingOpsCount.toString(),
+                              profileCompletion:
+                                  _profileCompletion(doctorState, doctorDetails),
+                              documentVerification:
+                                  _documentVerification(doctorDetails),
+                              ratingScore: ratingScore,
+                            ),
                           ),
                         ],
                       )
@@ -1387,7 +1473,14 @@ Widget _buildAvailabilityCard() => Container(
 
   // ── Right Panel (desktop) ─────────────────────────────────────────────────
 
-  Widget _buildRightPanel() => SingleChildScrollView(
+  Widget _buildRightPanel({
+    required String todayAppointments,
+    required String waitingToday,
+    required String pendingSync,
+    required double profileCompletion,
+    required double documentVerification,
+    required double ratingScore,
+  }) => SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(0, 14, 20, 100),
         child: Container(
           decoration: _cardDec(),
@@ -1400,14 +1493,14 @@ Widget _buildAvailabilityCard() => Container(
                     fontWeight: FontWeight.w700,
                     color: kTextPrimary)),
             const SizedBox(height: 10),
-            _quickStat("Today's Appointments", '8',
+            _quickStat("Today's Appointments", todayAppointments,
                 Icons.calendar_today_outlined, kPrimary),
             const SizedBox(height: 7),
-            _quickStat('Pending Reports', '3',
-                Icons.assignment_outlined, kWarning),
+            _quickStat('Waiting Today', waitingToday,
+                Icons.hourglass_top_rounded, kWarning),
             const SizedBox(height: 7),
-            _quickStat('New Messages', '12',
-                Icons.message_outlined, kSuccess),
+            _quickStat('Sync Pending', pendingSync,
+                Icons.sync_rounded, kSuccess),
             const SizedBox(height: 16),
             const Text('Account Health',
                 style: TextStyle(
@@ -1415,11 +1508,11 @@ Widget _buildAvailabilityCard() => Container(
                     fontWeight: FontWeight.w600,
                     color: kTextPrimary)),
             const SizedBox(height: 10),
-            _healthRow('Profile Completion', 0.85),
+            _healthRow('Profile Completion', profileCompletion),
             const SizedBox(height: 7),
-            _healthRow('Document Verification', 1.0),
+            _healthRow('Document Verification', documentVerification),
             const SizedBox(height: 7),
-            _healthRow('Rating Score', 0.97),
+            _healthRow('Rating Score', ratingScore),
           ]),
         ),
       );

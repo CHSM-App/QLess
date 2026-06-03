@@ -54,13 +54,14 @@ class DoctorLoginState {
     String? clinicId,
     String? clinic_name,
     int? leadTimeMinutes,
+    bool clearError = false,
     AsyncValue<List<DoctorDetails>>? phoneCheckResult,
     AsyncValue<List<Medicine>>? medicines,
     AsyncValue<List<Medicine>>? medicineTypes,
   }) {
     return DoctorLoginState(
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
+      error: clearError ? null : (error ?? this.error),
       doctorId: doctorId ?? this.doctorId,
       name: name ?? this.name,
       mobile: mobile ?? this.mobile,
@@ -99,6 +100,14 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     final leadTime = await TokenStorage.getValue('q_start_before');
     final leadTimeMinutes = int.tryParse(leadTime ?? '');
 
+    // Only seed the lightweight storage profile when we don't already hold
+    // richer details from checkPhoneDoctor — otherwise this would clobber the
+    // full profile (qualification, fee, address, gender, …) with half the
+    // fields and the edit screen would show blanks for the rest.
+    final hasFullDetails = state.phoneCheckResult.maybeWhen(
+      data: (list) => list.isNotEmpty,
+      orElse: () => false,
+    );
     state = state.copyWith(
       clinicId: clinicId,
       doctorId: doctorId,
@@ -109,19 +118,21 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       clinic_name: clinicName,
       token: token,
       leadTimeMinutes: leadTimeMinutes,
-      phoneCheckResult: AsyncValue.data([
-        DoctorDetails(
-          doctorId: doctorId,
-          name: name,
-          mobile: mobile,
-          email: email,
-          roleId: roleId != null ? int.tryParse(roleId) : null,
-          clinicName: clinicName,
-          Token: token,
-          clinicId: clinicId,
-          leadTime: leadTimeMinutes,
-        ),
-      ]),
+      phoneCheckResult: hasFullDetails
+          ? state.phoneCheckResult
+          : AsyncValue.data([
+              DoctorDetails(
+                doctorId: doctorId,
+                name: name,
+                mobile: mobile,
+                email: email,
+                roleId: roleId != null ? int.tryParse(roleId) : null,
+                clinicName: clinicName,
+                Token: token,
+                clinicId: clinicId,
+                leadTime: leadTimeMinutes,
+              ),
+            ]),
     );
   }
 
@@ -140,7 +151,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     File? doctorImage,
     List<File>? clinicImages,
   }) async {
-    state = state.copyWith(isLoading: true, error: null);
+    state = state.copyWith(isLoading: true, clearError: true);
     try {
       final result = await usecase.addDoctorDetails(
         doctorLogin,
@@ -157,6 +168,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         isLoading: false,
         doctorId: doctorId, // stored on state for the screen to read
         clinicId: clinicId,
+        clearError: true,
       );
     } catch (e) {
       if (e is DioException && e.response?.data is Map) {
@@ -171,6 +183,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
             isLoading: false,
             doctorId: doctorId,
             clinicId: clinicId,
+            clearError: true,
           );
           return;
         }
@@ -191,7 +204,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
                 isLoading: false,
                 doctorId: d.doctorId,
                 clinicId: d.clinicId,
-                error: null,
+                clearError: true,
               );
               return;
             }
@@ -205,8 +218,15 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   }
 
   Future<void> checkPhoneDoctor(String mobile) async {
+    // Offline-first: keep previously-loaded details visible while refreshing.
+    // A failed/offline refresh must not blank out the profile & edit screens.
+    final hadData = state.phoneCheckResult.maybeWhen(
+      data: (list) => list.isNotEmpty,
+      orElse: () => false,
+    );
     state = state.copyWith(
-      phoneCheckResult: const AsyncValue.loading(),
+      phoneCheckResult:
+          hadData ? state.phoneCheckResult : const AsyncValue.loading(),
       error: null,
     );
     try {
@@ -229,7 +249,10 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         await TokenStorage.saveValue('clinic_name', d.clinicName!);
     } catch (e, st) {
       state = state.copyWith(
-        phoneCheckResult: AsyncValue.error(e, st),
+        // Preserve the cached details on failure; only surface an error state
+        // when we never had any data to show.
+        phoneCheckResult:
+            hadData ? state.phoneCheckResult : AsyncValue.error(e, st),
         error: e.toString(),
       );
     }
@@ -242,8 +265,11 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       state = state.copyWith(isLoading: false);
       return response;
     } catch (e) {
-      state = state.copyWith(isLoading: false, error: 'Failed to add medicine');
-      return {"success": 0, "message": "Failed to add medicine"};
+      // Keep the real error text so the UI can tell a network failure apart
+      // from a genuine server error and show "No internet connection".
+      final message = e.toString().replaceFirst('Exception: ', '');
+      state = state.copyWith(isLoading: false, error: message);
+      return {"success": 0, "message": message};
     }
   }
 
@@ -346,7 +372,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
 
   Future<void> updateLeadTime(DoctorDetails doctor) async {
     try {
-      state = state.copyWith(isLoading: true, error: null);
+      state = state.copyWith(isLoading: true, clearError: true);
 
       await usecase.updateLeadTime(doctor);
 
@@ -393,6 +419,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         isLoading: false,
         leadTimeMinutes: doctor.leadTime,
         phoneCheckResult: updatedPhoneCheckResult,
+        clearError: true,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());

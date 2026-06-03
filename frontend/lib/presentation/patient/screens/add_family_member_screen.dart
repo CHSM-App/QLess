@@ -5,6 +5,7 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -245,7 +246,13 @@ class _AddFamilyMemberScreenState
         });
       }
       if (next.error != null && next.error != prev?.error) {
-        _snack(next.error!, isError: true);
+        // Show a friendly offline message instead of a raw Dio exception.
+        _snack(
+          isConnectivityFailureMessage(next.error)
+              ? connectivityErrorMessage
+              : next.error!,
+          isError: true,
+        );
       }
     });
 
@@ -265,6 +272,8 @@ class _AddFamilyMemberScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Offline banner (auto-hides when online)
+                      const ConnectivityErrorCard(),
                       // Progress
                       // _buildProgressBar(),
                       // const SizedBox(height: 16),

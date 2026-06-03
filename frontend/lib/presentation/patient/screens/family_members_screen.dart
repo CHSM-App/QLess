@@ -4,7 +4,9 @@ import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -342,8 +344,16 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
       }
     });
 
+    // Auto-reload when the connection is restored so the user never stays
+    // stuck on the offline screen.
+    ref.listen(connectivityNotifierProvider, (prev, next) {
+      final wasOffline = prev?.isOffline ?? false;
+      if (wasOffline && next.isOnline) _refresh();
+    });
+
     final familyState = ref.watch(familyViewModelProvider);
     final loginState  = ref.watch(patientLoginViewModelProvider);
+    final isOffline   = ref.watch(connectivityNotifierProvider).isOffline;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -352,10 +362,18 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
           children: [
             _buildHeader(),
             Expanded(
+              // Don't yank an already-loaded list away when the connection
+              // drops — keep showing the data. The no-internet widget only
+              // appears for a fresh load / refresh that has no data yet.
               child: familyState.allfamilyMembers.when(
-                loading: _buildLoading,
-                error:   (err, _) => _buildError(err.toString()),
-                data:    (members) => _buildList(loginState, members),
+                loading: () => isOffline
+                    ? ConnectivityErrorView(onRetry: _refresh)
+                    : _buildLoading(),
+                error: (err, _) =>
+                    (isOffline || isConnectivityFailureMessage(err.toString()))
+                        ? ConnectivityErrorView(onRetry: _refresh)
+                        : _buildError(err.toString()),
+                data: (members) => _buildList(loginState, members),
               ),
             ),
             _buildAddButton(),
@@ -551,6 +569,10 @@ Widget _buildLoading() {
   return _FamilySkeletonList();
 }
 Widget _buildError(String message) {
+  // Offline / network failure → friendly retry widget, never the raw Dio text.
+  if (isConnectivityFailureMessage(message)) {
+    return ConnectivityErrorView(onRetry: _refresh);
+  }
   return RefreshIndicator(
     color: kPrimary,
     strokeWidth: 2,

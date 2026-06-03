@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/view_models/doctore_settings_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // Local palette (kept independent of the availability page).
 const _kPrimary = Color(0xFF26C6B0);
@@ -60,11 +62,17 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
     return '${d.day} ${m[d.month - 1]} ${d.year}';
   }
 
+  bool get _isOffline =>
+      ref.read(connectivityNotifierProvider).isOffline;
+
   void _snack(String msg, {bool isError = false}) {
     if (!mounted) return;
+    // Never surface a raw Dio/network exception — show a friendly message.
+    final text =
+        isConnectivityFailureMessage(msg) ? connectivityErrorMessage : msg;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
+        content: Text(text),
         backgroundColor: isError ? _kError : _kPrimary,
         behavior: SnackBarBehavior.floating,
         shape:
@@ -75,6 +83,10 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
   }
 
   Future<void> _addLeaveFlow() async {
+    if (_isOffline) {
+      _snack(connectivityErrorMessage, isError: true);
+      return;
+    }
     final today = DateTime.now();
     final range = await showDateRangePicker(
       context: context,
@@ -224,6 +236,10 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
   }
 
   Future<void> _cancelLeave(int leaveId) async {
+    if (_isOffline) {
+      _snack(connectivityErrorMessage, isError: true);
+      return;
+    }
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -266,6 +282,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
     final state = ref.watch(doctorSettingsViewModelProvider);
     final leaves = state.leaves;
     final busy = state.isLeaveBusy;
+    final isOffline = ref.watch(connectivityNotifierProvider).isOffline;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -321,6 +338,11 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                         TextStyle(fontSize: 11.5, color: _kTextMuted),
                   ),
                 ),
+              ),
+              // Offline banner (auto-hides when online)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(14, 0, 14, 0),
+                child: ConnectivityErrorCard(margin: EdgeInsets.only(bottom: 8)),
               ),
               const Divider(height: 16, color: _kBorder),
               Flexible(
@@ -409,7 +431,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                   width: double.infinity,
                   height: 46,
                   child: ElevatedButton.icon(
-                    onPressed: busy ? null : _addLeaveFlow,
+                    onPressed: (busy || isOffline) ? null : _addLeaveFlow,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _kPrimary,
                       disabledBackgroundColor: _kPrimaryLight,
