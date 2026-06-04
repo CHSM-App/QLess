@@ -7,6 +7,7 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 const kPrimary        = Color(0xFF26C6B0);
@@ -495,6 +496,11 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   Future<void> _cancelByDoctor(AppointmentList p) async {
     final did = _doctorId;
     if (did == 0) { _snack('Missing info', isError: true); return; }
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack('No internet connection. Connect to cancel the appointment.',
+          isError: true);
+      return;
+    }
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier).cancelByDoctor(
         AppointmentRequestModel(

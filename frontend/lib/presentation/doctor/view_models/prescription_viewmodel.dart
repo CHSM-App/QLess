@@ -8,6 +8,12 @@ import 'package:qless/core/database/offline_queue_store.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/domain/usecase/prescription_usecase.dart';
 
+/// Sentinel for [PrescriptionState.copyWith] so callers can explicitly clear
+/// [error] by passing `error: null`. Without this, `error ?? this.error` makes
+/// passing null a no-op and a stale network error can never be cleared — which
+/// blocks the Complete/Next flow even after the prescription is saved offline.
+const Object _kUnset = Object();
+
 class PrescriptionState {
   final bool isLoading;
   final String? error;
@@ -28,7 +34,7 @@ final List<PrescriptionModel>? appointmentWisePrescriptions;
 
   PrescriptionState copyWith({
     bool? isLoading,
-    String? error,
+    Object? error = _kUnset,
     List<PrescriptionModel>? prescriptionsListPatient,
     List<PrescriptionModel>? prescriptionDetailsPatient,
     List<PrescriptionModel>? appointmentWisePrescriptions,
@@ -37,7 +43,7 @@ final List<PrescriptionModel>? appointmentWisePrescriptions;
   }) {
     return PrescriptionState(
       isLoading: isLoading ?? this.isLoading,
-      error: error ?? this.error,
+      error: identical(error, _kUnset) ? this.error : error as String?,
       prescriptionsListPatient: prescriptionsListPatient ?? this.prescriptionsListPatient,
       prescriptionDetailsPatient: prescriptionDetailsPatient ?? this.prescriptionDetailsPatient,
       appointmentWisePrescriptions: appointmentWisePrescriptions ?? this.appointmentWisePrescriptions,
@@ -75,18 +81,26 @@ class PrescriptionViewmodel extends StateNotifier<PrescriptionState> {
         case DioExceptionType.receiveTimeout:
           return true;
         case DioExceptionType.unknown:
-          return e.error is SocketException;
+          if (e.error is SocketException) return true;
+          break; // message-only connectivity failure — sniff below
         default:
-          return false;
+          return false; // badResponse / cancel — a real server reply
       }
     }
+    // Also match the TokenInterceptor's sanitized connectivity messages so a
+    // connection failure that reaches us message-only (not a typed
+    // DioException) still routes the prescription to offline save instead of
+    // surfacing "Network error. Please check your connection." to the doctor.
     final s = e.toString().toLowerCase();
     return s.contains('socketexception') ||
         s.contains('failed host lookup') ||
         s.contains('network is unreachable') ||
         s.contains('connection refused') ||
         s.contains('connection timed out') ||
-        s.contains('connection closed');
+        s.contains('connection closed') ||
+        s.contains('network error') ||
+        s.contains('check your connection') ||
+        s.contains('request timed out');
   }
 
 

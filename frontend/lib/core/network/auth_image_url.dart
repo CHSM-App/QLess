@@ -23,6 +23,7 @@ String? authImageUrlFor(String? url, String? accessToken) {
   return '$url${sep}token=${Uri.encodeQueryComponent(accessToken)}';
 }
 
+
 /// Reactive variant for widgets: `ref.watch(authImageUrlProvider)(url)`.
 /// The closure rebuilds when the access token changes, so existing
 /// `Image` widgets re-render with a fresh token after token refresh.
