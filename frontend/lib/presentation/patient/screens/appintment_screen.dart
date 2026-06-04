@@ -297,9 +297,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool   _didReadRouteArgs = false; // honour route args (e.g. filter=cancelled) once
   int?   _pendingDetailApptId;      // notification tap: auto-open this appt's detail
   int?   _pendingRatingApptId;      // 'Appointment Complete' notification: open review dialog
-  int    _offlineAnchorTab = -1;    // the tab that was open when the connection
-                                    // dropped — only it keeps data offline.
-                                    // Switching tab / leaving the page clears it.
 
 
 
@@ -358,11 +355,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   void _setFilterIndex(int index) {
     final next = _filters[index].key;
     if (_filterStatus == next) return;
-    // Moving to a different tab while offline invalidates the kept tab, so the
-    // non-today tabs all fall back to the no-internet widget.
-    if (ref.read(connectivityNotifierProvider).isOffline) {
-      _offlineAnchorTab = -1;
-    }
     setState(() => _filterStatus = next);
   }
 
@@ -392,8 +384,6 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
   Future<void> refreshOnVisible() async {
-    // Returning to the page after leaving it → non-today tabs need a connection.
-    _offlineAnchorTab = -1;
     _didFetch = false;
     await _fetch(force: true);
   }
@@ -542,6 +532,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
   Future<void> _handleCancel(AppointmentList a) async {
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack('No internet connection. Connect to cancel the appointment.',
+          isError: true);
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
@@ -610,6 +605,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
   Future<void> _handleReschedule(AppointmentList a) async {
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack('No internet connection. Connect to reschedule the appointment.',
+          isError: true);
+      return;
+    }
     final doctor = DoctorDetails(
       doctorId: a.doctorId, name: a.doctorName,
       specialization: a.specialization, experience: a.experience,
@@ -638,6 +638,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
 
   Future<void> _handleViewPrescription(AppointmentList a) async {
     if (a.appointmentId == null || a.patientId == null) return;
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack('No internet connection. Connect to view the prescription.',
+          isError: true);
+      return;
+    }
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -686,6 +691,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   }
 
   Future<void> _handleReview(BuildContext ctx, AppointmentList a) async {
+    if (ref.read(connectivityNotifierProvider).isOffline) {
+      _snack('No internet connection. Connect to submit your review.',
+          isError: true);
+      return;
+    }
     final input = await showAppointmentReviewDialog(ctx, doctorName: a.doctorName ?? 'Doctor');
     if (input == null) return;
     await ref.read(reviewViewModelProvider.notifier).submitReview(
@@ -765,15 +775,11 @@ bool get _hasDateFilter =>
     ref.listen(connectivityNotifierProvider, (prev, next) {
       final wasOffline = prev?.isOffline ?? false;
       if (wasOffline && next.isOnline) {
-        // Reconnected → reload and drop the anchor.
-        _offlineAnchorTab = -1;
+        // Reconnected → reload every tab with fresh data.
         final id = ref.read(patientLoginViewModelProvider).patientId;
         if (id != null && id != 0) {
           ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(id);
         }
-      } else if (!wasOffline && next.isOffline) {
-        // Just went offline → keep data only for the tab open right now.
-        _offlineAnchorTab = _tabCtrl.index;
       }
     });
 
@@ -1016,10 +1022,7 @@ Widget _filterChip({
   Widget _buildTabContent(List<AppointmentList> appointments, bool isOffline) {
     return TabBarView(
       controller: _tabCtrl,
-      children: _filters.asMap().entries.map((entry) {
-        final tabIndex = entry.key;
-        final f = entry.value;
-        final isToday = f.key == 'today';
+      children: _filters.map((f) {
         var list = applyFilter(
             appointments, f.key, _search, _dateFilter, _customFrom, _customTo);
 
@@ -1044,11 +1047,11 @@ Widget _filterChip({
           }
         }
 
-        // Only Today is available offline (it syncs locally). Other tabs keep
-        // their data only if this is the tab that was open when the connection
-        // dropped (_offlineAnchorTab). Switching tab / returning to the page
-        // clears the anchor, so they fall back to the no-internet widget.
-        if (isOffline && !isToday && tabIndex != _offlineAnchorTab) {
+        // One fetched list (live or SQLite cache) feeds every tab, so data we
+        // already have is never ripped away when the connection drops. Show the
+        // full no-internet placeholder only when there is genuinely nothing
+        // cached to show; the global banner conveys the offline status.
+        if (isOffline && appointments.isEmpty) {
           return ConnectivityErrorView(onRetry: onRefresh);
         }
 

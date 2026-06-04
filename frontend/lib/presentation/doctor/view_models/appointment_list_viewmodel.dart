@@ -588,15 +588,36 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   Future<AppointmentResponseModel?> _startSessionOfflineGuard(
       int? doctorId, int? appointmentId) async {
     if (doctorId == null) return null;
+    // Mirror the backend START_SESSION rule that rejects starting a consult
+    // while the queue is paused. We read the cached QUEUES table here rather
+    // than state.queueState: an offline pause writes queue_status=2 only to the
+    // queues cache, while _deriveQueueState reads the appointment rows it never
+    // touches — so state.queueState reverts to "running" on the next cache
+    // reload and can't be trusted as the paused signal.
+    if (await _isQueuePausedOffline(doctorId)) {
+      return AppointmentResponseModel(
+        success: false,
+        message:
+            'The queue is paused. Resume the queue before starting a session.',
+      );
+    }
     List<AppointmentList> appts;
     try {
       appts = await offlineStore.getCachedAppointments(doctorId);
     } catch (_) {
       return null; // can't read cache — don't block the doctor
     }
+    // Mirror the backend START_SESSION rule, which only considers the doctor's
+    // CURRENT queue (today, non-slot). The local cache upserts by appointment_id
+    // and never deletes, so a stale 'in_progress' row from an earlier session/day
+    // can linger forever — without this scoping it would falsely block every
+    // offline start with "complete the patient currently in progress". Slot and
+    // past-day rows are excluded here exactly as _pickNextAppointment does.
     final blocked = appts.any((a) =>
         (a.status?.toLowerCase().trim() == 'in_progress') &&
-        a.appointmentId != appointmentId);
+        a.appointmentId != appointmentId &&
+        _isTodayDate(a.appointmentDate) &&
+        !_isSlotAppointment(a));
     if (blocked) {
       return AppointmentResponseModel(
         success: false,
@@ -605,6 +626,43 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       );
     }
     return null;
+  }
+
+  /// True when the doctor's current queue is paused according to the local
+  /// cache. Aggregates like the UI does: a running queue (status 1) wins and
+  /// allows starting; otherwise any paused queue (status 2, including an
+  /// emergency-paused one) means the doctor must resume before starting. An
+  /// unreadable/empty cache never blocks — offline must stay usable.
+  Future<bool> _isQueuePausedOffline(int doctorId) async {
+    List<TodayQueueModel> queues;
+    try {
+      queues = await offlineStore.getCachedQueues(doctorId);
+    } catch (_) {
+      return false;
+    }
+    bool anyPaused = false;
+    for (final q in queues) {
+      if (q.queueStatus == 1) return false; // a running queue — allow start
+      if (q.queueStatus == 2 ||
+          (q.queueId != null && state.emergencyQueueIds.contains(q.queueId))) {
+        anyPaused = true;
+      }
+    }
+    return anyPaused;
+  }
+
+  /// Slot (scheduled-time) appointments are handled separately from the walk-in
+  /// queue, so the one-in-progress queue rule must not count them.
+  bool _isSlotAppointment(AppointmentList a) =>
+      a.bookingType == 2 ||
+      (a.bookingType == null && a.startTime != null && a.endTime != null);
+
+  bool _isTodayDate(String? s) {
+    if (s == null) return false;
+    final d = DateTime.tryParse(s.trim());
+    if (d == null) return false;
+    final n = DateTime.now();
+    return d.year == n.year && d.month == n.month && d.day == n.day;
   }
 
   /// True when [e] is a loss-of-connectivity failure (no internet, timeout,
@@ -621,20 +679,27 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         case DioExceptionType.receiveTimeout:
           return true;
         case DioExceptionType.unknown:
-          return e.error is SocketException;
+          if (e.error is SocketException) return true;
+          break; // message-only connectivity failure — sniff below
         default:
-          return false;
+          return false; // badResponse / cancel — a real server reply
       }
     }
-    // Some layers wrap the cause in a plain Exception(message) — sniff the
-    // common connectivity signatures as a last resort.
+    // Some layers wrap the cause in a plain Exception(message), and the
+    // TokenInterceptor rewrites connection failures to a user-facing string —
+    // sniff for both raw socket signatures and those sanitized phrases so a
+    // connectivity error that reaches us message-only still falls back to
+    // offline instead of being shown as a real server rejection.
     final s = e.toString().toLowerCase();
     return s.contains('socketexception') ||
         s.contains('failed host lookup') ||
         s.contains('network is unreachable') ||
         s.contains('connection refused') ||
         s.contains('connection timed out') ||
-        s.contains('connection closed');
+        s.contains('connection closed') ||
+        s.contains('network error') ||
+        s.contains('check your connection') ||
+        s.contains('request timed out');
   }
 
   // ── Offline op helper ───────────────────────────────────────────────────────
@@ -650,6 +715,17 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     // 2. Apply optimistic local mutation
     await offlineStore.applyOfflineQueueOp(
         op, request.queueId, request.appointmentId);
+
+    // A start (resume) or regular pause supersedes an emergency pause — mirror
+    // the online path's _clearEmergency here so an offline resume drops the
+    // emergency flag. Otherwise emergencyQueueIds lingers, _adjustForEmergency
+    // keeps forcing the card to "Resume", and a re-tap wrongly reports
+    // "Already emergency paused" even after the queue is running again. Cleared
+    // before _loadFromCache so the reload derives state without the stale flag.
+    if (op == OfflineOperation.queueStart ||
+        op == OfflineOperation.queuePause) {
+      _clearEmergency(request.queueId);
+    }
 
     // 3. Reload UI from cache so optimistic changes are visible
     if (request.doctorId != null) {

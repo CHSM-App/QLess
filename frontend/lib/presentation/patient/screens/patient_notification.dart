@@ -8,7 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/navigation/navigator_key.dart';
-import 'package:qless/core/theme/patient_theme.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 
@@ -17,6 +16,12 @@ import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 // them with ref_id=doctor_id|queue_id, so any "open this appointment" deep
 // link would silently no-op. Treat them as informational: tap = mark read,
 // hide the forward-arrow so the card doesn't falsely advertise a deep link.
+// Local palette — this screen no longer depends on the (now removed) AppTheme.
+const Color _primary       = Color(0xFF1A73E8);
+const Color _textPrimary   = Color(0xFF1A1F36);
+const Color _textSecondary = Color(0xFF6B7280);
+const Color _textHint      = Color(0xFFADB5BD);
+
 bool _isInformationalQueueAnnouncement(NotificationItem n) {
   if (n.type != 'queue') return false;
   final t = n.title.trim().toLowerCase();
@@ -171,7 +176,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               style: TextStyle(
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
-                color: isDark ? Colors.white : AppTheme.textPrimary,
+                color: isDark ? Colors.white : _textPrimary,
               ),
             ),
             if (unread > 0) ...[
@@ -179,7 +184,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary,
+                  color: _primary,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -204,7 +209,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 icon: const Icon(Icons.done_all_rounded, size: 18),
                 label: const Text('Read all'),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
+                  foregroundColor: _primary,
                   textStyle: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -215,7 +220,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ],
       ),
       body: RefreshIndicator(
-        color: AppTheme.primary,
+        color: _primary,
         onRefresh: () =>
             ref.read(notificationProvider.notifier).loadFromServer(),
         child: notifications.isEmpty
@@ -266,7 +271,7 @@ class _SectionLabel extends StatelessWidget {
           fontSize: 10.5,
           letterSpacing: 0.9,
           fontWeight: FontWeight.w800,
-          color: isDark ? Colors.white54 : AppTheme.textSecondary,
+          color: isDark ? Colors.white54 : _textSecondary,
         ),
       ),
     );
@@ -302,7 +307,7 @@ class _NotificationCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: unread
-                  ? AppTheme.primary.withValues(alpha: 0.25)
+                  ? _primary.withValues(alpha: 0.25)
                   : (isDark ? Colors.white12 : const Color(0xFFE2E8F0)),
               width: unread ? 1.2 : 1,
             ),
@@ -345,7 +350,7 @@ class _NotificationCard extends StatelessWidget {
                               fontWeight: FontWeight.w800,
                               color: isDark
                                   ? Colors.white
-                                  : AppTheme.textPrimary,
+                                  : _textPrimary,
                               height: 1.25,
                             ),
                           ),
@@ -357,7 +362,7 @@ class _NotificationCard extends StatelessWidget {
                             height: 8,
                             margin: const EdgeInsets.only(top: 5),
                             decoration: const BoxDecoration(
-                              color: AppTheme.primary,
+                              color: _primary,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -373,7 +378,7 @@ class _NotificationCard extends StatelessWidget {
                         fontSize: 12.5,
                         color: isDark
                             ? Colors.white60
-                            : AppTheme.textSecondary,
+                            : _textSecondary,
                         height: 1.4,
                       ),
                     ),
@@ -385,7 +390,7 @@ class _NotificationCard extends StatelessWidget {
                           size: 12,
                           color: isDark
                               ? Colors.white38
-                              : AppTheme.textHint,
+                              : _textHint,
                         ),
                         const SizedBox(width: 4),
                         Text(
@@ -394,7 +399,7 @@ class _NotificationCard extends StatelessWidget {
                             fontSize: 11,
                             color: isDark
                                 ? Colors.white38
-                                : AppTheme.textHint,
+                                : _textHint,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -406,7 +411,7 @@ class _NotificationCard extends StatelessWidget {
                             size: 11,
                             color: isDark
                                 ? Colors.white38
-                                : AppTheme.textHint,
+                                : _textHint,
                           ),
                       ],
                     ),
@@ -436,13 +441,13 @@ class _EmptyState extends StatelessWidget {
             width: 84,
             height: 84,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withValues(alpha: 0.08),
+              color: _primary.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.notifications_none_rounded,
               size: 42,
-              color: AppTheme.primary,
+              color: _primary,
             ),
           ),
         ),
@@ -453,7 +458,7 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: AppTheme.textPrimary,
+              color: _textPrimary,
             ),
           ),
         ),
@@ -466,7 +471,7 @@ class _EmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12.5,
-                color: AppTheme.textSecondary,
+                color: _textSecondary,
                 height: 1.5,
               ),
             ),
