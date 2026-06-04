@@ -763,6 +763,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                     onPressed: () async {
                       Navigator.pop(context);
                       await ref.read(tokenProvider.notifier).clearTokens();
+                      ref.read(favoriteViewModelProvider.notifier).reset();
                       await ref
                           .read(patientLoginViewModelProvider.notifier)
                           .logout();

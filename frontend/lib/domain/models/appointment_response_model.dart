@@ -2,9 +2,20 @@ import 'package:json_annotation/json_annotation.dart';
 
 part 'appointment_response_model.g.dart';
 
+// SQL Server has no boolean type — stored procs return success as 1/0 (int),
+// so accept int, bool, or string and coerce. Avoids "type 'int' is not a
+// subtype of type 'bool'" crashes on cancel/reschedule responses.
+bool? _successFromJson(dynamic value) {
+  if (value == null) return null;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) return value == '1' || value.toLowerCase() == 'true';
+  return null;
+}
+
 @JsonSerializable()
 class AppointmentResponseModel {
-  @JsonKey(name: 'success')
+  @JsonKey(name: 'success', fromJson: _successFromJson)
   bool? success;
 
   @JsonKey(name: 'message')

@@ -262,6 +262,9 @@ class _BookAppointmentScreenState
         ref.read(doctorsViewModelProvider.notifier).getDoctorLeaveDates(did);
         ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did);
         ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
+        // Fetch this doctor's reviews so the rating/review-count shows on first
+        // open instead of only after visiting the profile page and back.
+        ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did);
       }
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {

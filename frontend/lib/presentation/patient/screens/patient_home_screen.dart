@@ -9,7 +9,6 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
-import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
@@ -219,8 +218,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   List<Map<String, dynamic>> _cachedSpecialties = [];
   bool _popupShown = false;
-  final Map<int, double> _homeRatings = {};
-  bool _ratingsLoading = false;
 
   @override
   void initState() {
@@ -270,42 +267,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
       ]);
       if (!mounted) return;
-      final doctorIds = ref
-          .read(doctorsViewModelProvider)
-          .doctors
-          .map((d) => d.doctorId)
-          .whereType<int>()
-          .toList();
-      _loadRatings(doctorIds);
     } finally {
       _isFetching = false;
     }
-  }
-
-  Future<void> _loadRatings(List<int> doctorIds) async {
-    final toFetch = doctorIds.where((id) => !_homeRatings.containsKey(id)).toList();
-    if (toFetch.isEmpty) return;
-    if (mounted) setState(() => _ratingsLoading = true);
-    final usecase = ref.read(reviewUsecaseProvider);
-    final results = await Future.wait(
-      toFetch.map((id) async {
-        try {
-          final reviews = await usecase.getDoctorReviews(id);
-          if (reviews.isEmpty) return MapEntry(id, 0.0);
-          final avg = reviews.fold<double>(
-                  0, (a, r) => a + (r.rating?.toDouble() ?? 0)) /
-              reviews.length;
-          return MapEntry(id, avg);
-        } catch (_) {
-          return MapEntry(id, 0.0);
-        }
-      }),
-    );
-    if (!mounted) return;
-    setState(() {
-      for (final e in results) { _homeRatings[e.key] = e.value; }
-      _ratingsLoading = false;
-    });
   }
 
   Future<void> _ensureLocationPermission() async {
@@ -662,16 +626,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildTopRatedDoctorsSection(
       List<DoctorDetails> doctors, bool isLoading) {
+    // Top rated = avg rating >= 3.5 AND at least 3 reviews, so a single stray
+    // review can't push a doctor to the top. Both fields come straight from the
+    // getDoctors response (server-aggregated) — no per-doctor review fetch.
     final rated = doctors
-        .where((d) => d.doctorId != null && (_homeRatings[d.doctorId!] ?? 0) > 3.5)
+        .where((d) =>
+            d.doctorId != null &&
+            (d.rating ?? 0) >= 3.5 &&
+            (d.reviewCount ?? 0) >= 3)
         .toList()
-      ..sort((a, b) =>
-          (_homeRatings[b.doctorId!] ?? 0)
-              .compareTo(_homeRatings[a.doctorId!] ?? 0));
+      ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
 
     final hasMore = rated.length > 3;
     final shownDoctors = rated.take(3).toList();
-    final stillLoading = isLoading || _ratingsLoading;
+    final stillLoading = isLoading;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -694,7 +662,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               padding: const EdgeInsets.only(bottom: 8),
               child: _TopDoctorCard(
                 doctor: doctor,
-                cardRating: _homeRatings[doctor.doctorId!],
+                cardRating: doctor.rating,
                 onTap: () => _goToSearch(specialty: doctor.specialization),
               ),
             ),
