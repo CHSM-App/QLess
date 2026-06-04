@@ -92,15 +92,20 @@ class FavoriteViewmodel extends StateNotifier<FavoriteState> {
           .then((r) => MapEntry(did, _asBool(r['is_favorite'])))
           .catchError((_) => MapEntry(did, false))),
     );
-    final updated = Map<int, bool>.from(state.doctorFavorites)
-      ..addEntries(results);
-    state = state.copyWith(doctorFavorites: updated);
+    // Build a fresh map from this patient's results — do NOT merge onto the
+    // previous state, otherwise a previously logged-in patient's favourites
+    // leak into the current patient's list.
+    state = state.copyWith(doctorFavorites: Map<int, bool>.fromEntries(results));
   }
+
+  /// Wipe all favourite state. Call on logout so the next patient starts clean.
+  void reset() => state = const FavoriteState();
 
   void clearError() => state = state.copyWith(clearError: true);
 
   bool _asBool(Object? value, {bool defaultValue = false}) {
     if (value == null) return defaultValue;
+    
     if (value is bool) return value;
     if (value is num) return value != 0;
     final s = value.toString().toLowerCase().trim();

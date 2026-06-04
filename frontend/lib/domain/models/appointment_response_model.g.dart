@@ -9,7 +9,7 @@ part of 'appointment_response_model.dart';
 AppointmentResponseModel _$AppointmentResponseModelFromJson(
   Map<String, dynamic> json,
 ) => AppointmentResponseModel(
-  success: json['success'] as bool?,
+  success: _successFromJson(json['success']),
   message: json['message'] as String?,
   data: (json['data'] as List<dynamic>?)
       ?.map((e) => AppointmentData.fromJson(e as Map<String, dynamic>))

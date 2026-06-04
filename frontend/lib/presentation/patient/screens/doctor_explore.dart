@@ -114,6 +114,7 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   late List<Animation<double>> _anims;
   final _searchCtrl = TextEditingController();
   bool _showAllNearby = false; // Nearby section: 6 shown, rest behind "Show more"
+  bool _showAllFavorites = false; // Favorites: 6 shown, rest behind "View more"
 
   @override
   void initState() {
@@ -187,7 +188,6 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
       List<DoctorDetails> all, Map<int, bool> favMap) =>
       all
           .where((d) => d.doctorId != null && favMap[d.doctorId] == true)
-          .take(10)
           .toList();
 
   void _goToSearch(BuildContext context, {String? specialty}) {
@@ -245,6 +245,18 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   // ════════════════════════════════════════════════════════════════════
   @override
   Widget build(BuildContext context) {
+    // On first login patientId loads from storage asynchronously, so the
+    // initState _loadData() can run with id 0 (empty doctors/favorites until a
+    // manual refresh). Re-run the load the moment a real patientId arrives.
+    ref.listen(
+      patientLoginViewModelProvider.select((s) => s.patientId),
+      (prev, next) {
+        if ((prev == null || prev == 0) && next != null && next != 0) {
+          _loadData();
+        }
+      },
+    );
+
     final state       = ref.watch(doctorsViewModelProvider);
     final position    = ref.watch(selectedPositionProvider);
     final favMap      = ref.watch(favoriteViewModelProvider).doctorFavorites;
@@ -276,14 +288,22 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
 
-                // Favorite Doctors
+                // Favorite Doctors — show 6, rest behind "View more"
                 if (favorites.isNotEmpty) ...[
                   _fade(1, _SectionTitle(
                     'Favorite Doctors',
                     subtitle: 'Your saved doctors',
+                    action: favorites.length > 6
+                        ? (_showAllFavorites ? 'View less' : 'View more')
+                        : null,
+                    onAction: favorites.length > 6
+                        ? () => setState(() => _showAllFavorites = !_showAllFavorites)
+                        : null,
                   )),
                   const SizedBox(height: 10),
-                  _fade(1, _buildFavoriteDoctors(context, favorites)),
+                  _fade(1, _buildFavoriteDoctors(
+                      context,
+                      _showAllFavorites ? favorites : favorites.take(6).toList())),
                   const SizedBox(height: 22),
                 ],
 

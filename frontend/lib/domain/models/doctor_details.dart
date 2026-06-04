@@ -106,6 +106,9 @@ class DoctorDetails {
   @JsonKey(fromJson: _doubleFromJson)
   final double? rating;
 
+  @JsonKey(name: 'review_count', fromJson: _intFromJson)
+  final int? reviewCount;
+
 
 //CLINIC IMAGES
 
@@ -151,6 +154,7 @@ class DoctorDetails {
     this.bookingEndTime,
     this.isRecentlyVisited,
     this.rating,
+    this.reviewCount,
     this.clinicImageId,
     this.sortOrder,
   });

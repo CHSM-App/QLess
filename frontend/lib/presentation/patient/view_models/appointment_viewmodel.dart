@@ -56,6 +56,7 @@ class AppointmentState {
     List<MonthSlotData>? bookedSlots,
     AsyncValue<List<AppointmentList>>?  patientAppointmentsList,
     int? doctorPatientCount,
+    bool clearDoctorPatientCount = false,
   }) {
     return AppointmentState(
       isLoading: isLoading ?? this.isLoading,
@@ -72,7 +73,9 @@ class AppointmentState {
           queuePreviewEstimateResponse ?? this.queuePreviewEstimateResponse,
       bookedSlots: bookedSlots ?? this.bookedSlots,
       patientAppointmentsList: patientAppointmentsList ?? this.patientAppointmentsList,
-      doctorPatientCount: doctorPatientCount ?? this.doctorPatientCount,
+      doctorPatientCount: clearDoctorPatientCount
+          ? null
+          : (doctorPatientCount ?? this.doctorPatientCount),
     );
   }
 }
@@ -217,6 +220,9 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   }
 
   Future<void> fetchDoctorPatientCount(int doctorId) async {
+    // Reset so a new doctor's profile shows '--' instead of the previous
+    // doctor's count until this fetch resolves.
+    state = state.copyWith(clearDoctorPatientCount: true);
     try {
       final result = await usecase.fetchPatientAppointments(doctorId);
       final count = result
