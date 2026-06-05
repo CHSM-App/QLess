@@ -116,21 +116,17 @@ async function sendProximityNotifications(doctor_id) {
       const doctor = row.doctor_name || 'your doctor';
       if (!patient_id || !aptId || minutes == null) return;
 
-      // Threshold-based (not narrow ranges): as the queue advances a patient's
-      // ETA only drops, so we fire each stage ONCE when it crosses below the
-      // threshold. Check the nearer stage first. Dedup (hasNotificationBeenSent)
-      // guarantees one send per stage per appointment.
       let stage = null, title = null, body = null;
-      if (minutes <= 15) {
-        stage = 'queue_near';
-        title = 'Almost your turn';
-        body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please be at the clinic.`;
-      } else if (minutes <= 40) {
+      if (minutes >= 25 && minutes <= 35) {
         stage = 'queue_far';
         title = 'Your turn is approaching';
         body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please head to the clinic now.`;
+      } else if (minutes >= 5 && minutes <= 15) {
+        stage = 'queue_near';
+        title = 'Almost your turn';
+        body = `Your turn with Dr. ${doctor} is in about ${minutes} minutes. Please be at the clinic.`;
       } else {
-        return; // still too far away — notify on a later queue movement
+        return;
       }
 
       const refId = `${aptId}:${stage}`;
@@ -171,15 +167,27 @@ function formatApptDate(d) {
 
 function formatApptTime(t) {
   if (!t) return '';
-  let s = String(t);
-  if (s.includes('T')) s = s.split('T')[1].split('.')[0];
-  const parts = s.split(':');
-  let h = parseInt(parts[0], 10);
-  const m = String(parts[1] || '00').padStart(2, '0');
+  let h, m;
+  if (t instanceof Date) {
+    // node-mssql returns a TIME column as a Date pinned to 1970-01-01 whose
+    // LOCAL wall-clock equals the stored value (tedious builds it from the
+    // server TZ), so read it back with getHours/getMinutes — NOT getUTC* and
+    // NOT String()+split('T') (a Date's toString has no 'T', yielding NaN).
+    if (isNaN(t.getTime())) return '';
+    h = t.getHours();
+    m = t.getMinutes();
+  } else {
+    let s = String(t);
+    if (s.includes('T')) s = s.split('T')[1].split('.')[0];
+    const parts = s.split(':');
+    h = parseInt(parts[0], 10);
+    m = parseInt(parts[1], 10);
+  }
   if (isNaN(h)) return '';
+  const mm = String(isNaN(m) ? 0 : m).padStart(2, '0');
   const ampm = h >= 12 ? 'PM' : 'AM';
   h = h % 12 || 12;
-  return `${h}:${m} ${ampm}`;
+  return `${h}:${mm} ${ampm}`;
 }
 
 // Public endpoint — same logic, exposed for any caller wanting to drop a row
@@ -985,8 +993,6 @@ router.post('/insertPrescription', async (req, res) => {
     });
   }
 });
-
-
 router.post('/appointment/queueNext', async (req, res) => {
   const { doctor_id, appointment_id } = req.body;
 
@@ -1024,14 +1030,18 @@ router.post('/appointment/queueNext', async (req, res) => {
 
       await insertNotificationForToken(token, nextTitle, nextBody, 'appointment', appointment_id);
 
-      await admin.messaging().send({
-        token: token,
-        notification: { title: nextTitle, body: nextBody },
-        // appointment_id lets the killed-app FCM tap auto-open this exact
-        // appointment's detail sheet (otherwise patient just lands on list).
-        data: { type: 'appointment', appointment_id: String(appointment_id) },
-      });
+      try {
+        await admin.messaging().send({
+          token: token,
+          notification: { title: nextTitle, body: nextBody },
+          data: { type: 'appointment', appointment_id: String(appointment_id) },
+        });
+      } catch (fcmErr) {
+        log.error('FCM send failed for queueNext notification: ' + (fcmErr.code || fcmErr.message));
+      }
     }
+
+    sendProximityNotifications(doctor_id);
 
     return res.json({
       success: true,
@@ -1096,8 +1106,17 @@ router.post('/appointment/queueStart', async (req, res) => {
       });
     }
 
+	  let doctorName = 'your doctor';
+    try {
+      const ctx = await db.request()
+        .input('operation', 'APPT_CONTEXT_QUEUE')
+        .input('doctor_id', doctor_id)
+        .input('queue_id', queue_id)
+        .execute('sp_notification');
+      doctorName = ctx.recordset?.[0]?.doctor_name || 'your doctor';
+    } catch (e) { log.error('[queueStart] name lookup failed: ' + e.message); }
     const startTitle = 'Doctor Arrived';
-    const startBody = 'Doctor has started serving. Please be ready.';
+     const startBody = `Dr. ${doctorName} has started the queue. Please be ready.`;
 
     for (const tk of tokens) {
       await insertNotificationForToken(tk, startTitle, startBody, 'queue', doctor_id);
@@ -1134,6 +1153,95 @@ router.post('/appointment/queueStart', async (req, res) => {
   }
 });
 
+
+// QUEUE PAUSE
+router.post('/appointment/queuePause', async (req, res) => {
+  const { doctor_id, queue_id } = req.body;
+  if (!doctor_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'doctor_id required'
+    });
+  }
+
+  try {
+    const result = await db.request()
+      .input('operation', 'QUEUE_PAUSE')
+      .input('queue_id', queue_id)
+      .input('doctor_id', doctor_id)
+      .execute('sp_appointment');
+
+    // SP returns 2 separate result sets: [0] = status, [1] = token rows.
+    // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
+    // live in `result.recordsets[1]`.
+    const recordsets = result.recordsets || [];
+    const statusRow  = recordsets[0]?.[0] || {};
+    const tokenRows  = recordsets[1] || [];
+
+    // ✅ CHECK SUCCESS
+    if (statusRow.success !== 1) {
+      return res.json({
+        success: false,
+        message: statusRow.message || 'Queue pause failed'
+      });
+    }
+
+    const tokens = tokenRows
+      .map(r => r.token)
+      .filter(t => t && t.trim() !== '');
+
+    log.debug('queuePause: tokens count: ' + tokens.length);
+
+    // 🔔 SEND NOTIFICATION
+    if (tokens.length > 0) {
+		 let doctorName = 'your doctor';
+      try {
+        const ctx = await db.request()
+          .input('operation', 'APPT_CONTEXT_QUEUE')
+          .input('doctor_id', doctor_id)
+          .input('queue_id', queue_id)
+          .execute('sp_notification');
+        doctorName = ctx.recordset?.[0]?.doctor_name || 'your doctor';
+      } catch (e) { log.error('[queuePause] name lookup failed: ' + e.message); }
+      const pauseTitle = 'Queue Paused';
+       const pauseBody = `Dr. ${doctorName} has paused the queue. Please wait.`;
+
+      for (const tk of tokens) {
+        await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', doctor_id);
+      }
+
+      const message = {
+        notification: { title: pauseTitle, body: pauseBody },
+        data: { type: 'queue' },
+        tokens: tokens,
+      };
+
+      const response = await admin.messaging().sendEachForMulticast(message);
+
+      return res.json({
+        success: true,
+        message: 'Queue paused and notifications sent',
+        total_tokens: tokens.length,
+        success_count: response.successCount,
+        failure_count: response.failureCount
+      });
+    }
+
+    // ✅ NO TOKENS CASE
+    return res.json({
+      success: true,
+      message: 'Queue paused, no patients to notify'
+    });
+
+  } catch (error) {
+    log.error('queuePause error: ' + error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Queue pause failed',
+      error: error.message
+    });
+  }
+});
 
 // QUEUE PAUSE
 router.post('/appointment/queuePause', async (req, res) => {
@@ -1214,6 +1322,7 @@ router.post('/appointment/queuePause', async (req, res) => {
     });
   }
 });
+
 
 
 // QUEUE STOP
@@ -1353,8 +1462,6 @@ router.post('/appointment/queueStop', async (req, res) => {
     return res.status(500).json({ success: false, message: 'Queue stop failed', error: error.message });
   }
 });
-
-
 //QUEUE SKIP
 router.post('/appointment/queueSkip', async (req, res) => {
   const { doctor_id, appointment_id, is_next } = req.body;
@@ -1503,6 +1610,7 @@ router.post('/appointment/startSession', async (req, res) => {
 });
 
 
+
 //END SESSION 
 router.post('/appointment/endSession', async (req, res) => {
   const { doctor_id, appointment_id } = req.body;
@@ -1600,8 +1708,18 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
     log.debug('[queuePauseEmergency] tokens extracted: ' + tokens.length);
 
     if (tokens.length > 0) {
+		  let doctorName = 'your doctor';
+      try {
+        const dn = await db.request()
+          .input('queue_id', queue_id)
+          .query(`SELECT d.name FROM doctor_queue dq
+                  JOIN doctor_login d ON d.doctor_id = dq.doctor_id
+                  WHERE dq.queue_id = @queue_id`);
+        doctorName = dn.recordset?.[0]?.name || 'your doctor';
+      } catch (e) { log.error('[queuePauseEmergency] name lookup failed: ' + e.message); }
+
       const pauseTitle = 'Queue Paused (Emergency)';
-      const pauseBody = 'Doctor has paused the queue due to an emergency. Please wait — we will notify you when it resumes.';
+     const pauseBody = `Dr. ${doctorName} has paused the queue due to an emergency. Please wait — we will notify you when it resumes.`;
 
       for (const tk of tokens) {
         await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', queue_id);
@@ -1661,17 +1779,13 @@ cron.schedule('0 14 * * *', async () => {
     for (const row of rows) {
       const token = row.patient_token;
       const doctorName = row.doctor_name;
-      const appointmentDate = new Date(row.appointment_date);
-
       if (!token) continue;
 
-      // 🕒 FORMAT DATE & TIME
-      const formattedDate = appointmentDate.toLocaleDateString('en-IN');
-      const formattedTime = appointmentDate.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-
+      // Date from the DATE column, time from the TIME column. Formatting the
+      // date's own time always yields midnight → 05:30 am in IST; start_time
+      // holds the real booked slot time.
+      const formattedDate = formatApptDate(row.appointment_date);
+      const formattedTime = formatApptTime(row.start_time);
       const remTitle = 'Appointment Reminder';
       const remBody = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
 
@@ -1699,7 +1813,7 @@ cron.schedule('0 14 * * *', async () => {
   } catch (error) {
     log.error('[cron 14:00] Failed to send reminders: ' + error.message);
   }
-});
+}, { timezone: 'Asia/Kolkata' });
 
 
 cron.schedule('0 15 * * *', async () => {
@@ -1718,16 +1832,11 @@ cron.schedule('0 15 * * *', async () => {
     for (const row of rows) {
       const token = row.patient_token;
       const doctorName = row.doctor_name;
-      const appointmentDate = new Date(row.appointment_date);
-
       if (!token) continue;
 
-      // 🕒 FORMAT DATE & TIME
-      const formattedDate = appointmentDate.toLocaleDateString('en-IN');
-      const formattedTime = appointmentDate.toLocaleTimeString('en-IN', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      // Date from the DATE column, time from the TIME column (see 14:00 cron).
+      const formattedDate = formatApptDate(row.appointment_date);
+      const formattedTime = formatApptTime(row.start_time);
 
       const remTitle = 'Appointment Reminder';
       const remBody = `Your appointment with Dr. ${doctorName} is scheduled on ${formattedDate} at ${formattedTime}.`;
@@ -1754,7 +1863,7 @@ cron.schedule('0 15 * * *', async () => {
   } catch (error) {
     log.error('[cron 15:00] Failed to send reminders: ' + error.message);
   }
-});
+}, { timezone: 'Asia/Kolkata' });
 
 
 cron.schedule('0 16 * * *', async () => {
@@ -1809,7 +1918,7 @@ cron.schedule('0 16 * * *', async () => {
     log.error('[cron 16:00] Failed to send rating notifications: ' + error.message);
   }
 
-});
+}, { timezone: 'Asia/Kolkata' });
 
 
 // Follow-up reminders (Practo pattern). When a doctor sets a follow_up_date on a
@@ -1884,29 +1993,7 @@ cron.schedule('0 9 * * *', async () => {
   } catch (error) {
     log.error('[cron 09:00] Failed to send follow-up reminders: ' + error.message);
   }
-});
-
-// DEBUG: fire the follow-up reminders immediately (no wait for 09:00). Returns
-// the SP rows + send summary so you can see exactly what matched and what was
-// skipped (e.g. NULL token). Remove once the flow is verified in production.
-router.get('/test/followup-reminders', async (req, res) => {
-  try {
-    const peek = await db.request()
-      .input('operation', 'FollowUpReminders')
-      .execute('sp_prescription');
-
-    const summary = await runFollowUpReminders('debug followup');
-
-    return res.json({
-      success: true,
-      summary,
-      rows: peek.recordset || [], // includes patient_token / reminder_kind for inspection
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-});
-
+}, { timezone: 'Asia/Kolkata' });
 
 
 // CANCEL SLOT APPOINTMENT BY DOCTOR

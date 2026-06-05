@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/patients.dart';
+import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
@@ -459,13 +460,38 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
   //  STATS ROW
   // ---------------------------------------------------------------------------
   Widget _buildStatsRow(Patients? details) {
+    // This account's primary patient id — needed to tell self/family rows apart
+    // from other patients' rows the SPs leak (see prescription identity model).
+    final pid = details?.patientId ??
+        ref.read(patientLoginViewModelProvider).patientId ??
+        0;
+
+    final members = ref.watch(familyViewModelProvider)
+        .allfamilyMembers
+        .maybeWhen(data: (l) => l, orElse: () => const <FamilyMember>[]);
+
+    // A row belongs to THIS account when it's the primary patient's own row
+    // (userType != 2 && patientId == pid) or a family member registered under
+    // this account (userType == 2 && patientId == some member_id). patientId
+    // alone collides across accounts, so we key on (patientId, userType).
+    bool ownedByAccount(int? rowPatientId, int? rowUserType) {
+      final isMemberRow = rowUserType == 2;
+      if (!isMemberRow) return rowPatientId == pid;
+      return members.any((m) => (m.memberId ?? 0) > 0 && m.memberId == rowPatientId);
+    }
+
+    // Visits = completed appointments. Status is 'completed' or 'complete'
+    // (both forms exist in the API) — matching the appointments screen's
+    // Completed tab; 'done'/'closed' never occur and were silently zeroing the
+    // count. No ownership filter: getPatientAppointments is already family-
+    // scoped (it takes family_id), so this stays in sync with that tab.
     final visitCount = ref.watch(appointmentViewModelProvider)
         .patientAppointmentsList
         ?.maybeWhen(
           data: (l) => l
               .where((a) {
                 final s = a.status?.toLowerCase().trim() ?? '';
-                return s == 'completed' || s == 'done' || s == 'closed';
+                return s == 'completed' || s == 'complete';
               })
               .length,
           orElse: () => null,
@@ -475,8 +501,13 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
         .allfamilyMembers
         .maybeWhen(data: (l) => l.length, orElse: () => null);
 
-    final recordCount =
-        ref.watch(prescriptionViewModelProvider).prescriptionsListPatient?.length;
+    // Records = prescriptions for this account only. The SP leaks other
+    // patients' rows, so filter to self + this account's family members
+    // (same logic as the prescription list screen) instead of raw length.
+    final recordCount = ref.watch(prescriptionViewModelProvider)
+        .prescriptionsListPatient
+        ?.where((p) => ownedByAccount(p.patientId, p.userType))
+        .length;
 
     final stats = [
       _StatItem(visitCount?.toString()  ?? '—', 'Visits',  Icons.medical_services_rounded, kPrimary, kPrimaryLight),
