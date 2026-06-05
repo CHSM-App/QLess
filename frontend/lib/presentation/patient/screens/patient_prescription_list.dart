@@ -178,41 +178,29 @@ class _PatientPrescriptionListScreenState
 
   bool _passesMember(PatientPrescription p, int pid, String pName,
       List<FamilyMember> members) {
-    // A booking stamps patient_id = the account-holder's id for self, but the
-    // family member's member_id for a member (see book_appointment_screen);
-    // patient_name always carries the person's name. So a member row matches
-    // either by member_id OR by name — and self is "belongs to nobody else".
-    final rxName   = p.patientName.trim().toLowerCase();
-    final selfName = pName.trim().toLowerCase();
+    // Identity model confirmed from the live API + booking flow:
+    //   userType == 1 → a primary patient; patientId == that patient's patient_id
+    //   userType == 2 → a family member;   patientId == that member's member_id
+    // patientId alone collides (e.g. the holder and a member can share id 1),
+    // so a person is keyed by the (patientId, userType) pair. Names are NOT
+    // reliable keys, and the API also leaks other primary patients' rows —
+    // those are dropped because their (patientId, userType==1) != this account.
+    final isMemberRow = p.userType == 2;
 
-    bool matchesMember(FamilyMember? m) {
-      if (m == null) return false;
-      if ((m.memberId ?? 0) > 0 && m.memberId == p.patientId) return true;
-      final mn = m.memberName?.trim().toLowerCase();
-      return mn != null && mn.isNotEmpty && mn == rxName;
-    }
+    // Self = this account's primary patient.
+    final isSelfRow = !isMemberRow && p.patientId == pid;
 
-    final belongsToAMember = members.any(matchesMember);
-
-    // Self = the account holder: not attributable to any family member, and
-    // carrying the holder's own name. (We don't trust patient_id == pid here:
-    // when the API leaves patient_id unset it defaults to the holder, which
-    // would wrongly pull every row — including other patients — into Self.)
-    bool isSelfRow() => !belongsToAMember && rxName == selfName;
+    if (_memberFilter == _filterSelf) return isSelfRow;
 
     if (_memberFilter == _filterAll) {
-      // Only this account's people (holder + family); drop anyone else.
-      return isSelfRow() || belongsToAMember;
+      if (isSelfRow) return true;
+      // A family member registered under THIS account.
+      return isMemberRow &&
+          members.any((m) => (m.memberId ?? 0) > 0 && m.memberId == p.patientId);
     }
 
-    if (_memberFilter == _filterSelf) {
-      return isSelfRow();
-    }
-
-    // A specific family member.
-    final m = members.cast<FamilyMember?>()
-        .firstWhere((m) => m?.memberId == _memberFilter, orElse: () => null);
-    return matchesMember(m);
+    // A specific family member → member rows whose member_id matches.
+    return isMemberRow && p.patientId == _memberFilter;
   }
 
   List<PatientPrescription> _filtered(List<PatientPrescription> src, String status,
@@ -2172,6 +2160,10 @@ class PatientPrescription {
   final DateTime prescriptionDate;
   final DateTime? followUpDate;
   final List<PrescriptionMedicineItem> medicines;
+  // 1 = primary patient (patientId == patient_id);
+  // 2 = family member  (patientId == member_id). Together (patientId,userType)
+  // uniquely identifies the person — patientId alone collides.
+  final int? userType;
 
   const PatientPrescription({
     required this.prescriptionId, required this.patientId,
@@ -2183,7 +2175,7 @@ class PatientPrescription {
     this.patientAge, this.tokenNumber, this.patientGender,
     this.regNo, this.followUpRoom, this.followUpInstruction,
     this.symptoms, this.diagnosis, this.clinicalNotes,
-    this.followUpDate, this.advice,
+    this.followUpDate, this.advice, this.userType,
   });
 
   factory PatientPrescription.fromModel(PrescriptionModel model,
@@ -2210,6 +2202,7 @@ class PatientPrescription {
       medicines: (model.medicines ?? <PrescriptionMedicineModel>[])
               .map(PrescriptionMedicineItem.fromModel).toList() + flatMeds,
       status: _statusFromFollowUp(fu),
+      userType: model.userType,
     );
   }
 
@@ -2234,6 +2227,7 @@ class PatientPrescription {
       symptoms: first.symptoms, diagnosis: first.diagnosis,
       clinicalNotes: first.clinicalNotes, followUpDate: fu, advice: first.advice,
       medicines: meds, status: _statusFromFollowUp(fu),
+      userType: first.userType,
     );
   }
 }
