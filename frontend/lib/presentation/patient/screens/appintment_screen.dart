@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qless/core/navigation/navigator_key.dart';
+import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/review_request_model.dart';
@@ -399,13 +401,32 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         await notifier.loadFromStoragePatient();
         pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
         if (mounted) setState(() => _isWaiting = false);
-        if (pid == 0) { if (mounted) setState(() => _idMissing = true); return; }
+        if (pid == 0) { if (mounted) _handleSessionInvalid(); return; }
       }
       _didFetch = true;
       await ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(pid);
     } finally {
       _isFetching = false;
     }
+  }
+
+  // Reaching this screen means AuthGate already saw a logged-in patient
+  // (token + roleId==2) and called loadFromStoragePatient(). If patient_id is
+  // STILL missing after a re-read, the stored session is corrupt — not a
+  // transient race. Treat it exactly like TokenInterceptor's 401 handling:
+  // clear the broken session and route to /auth. We must clear the tokens,
+  // not just navigate — otherwise AuthGate would see the lingering token and
+  // bounce the user straight back here, looping. The _redirecting latch keeps
+  // a rebuild from firing this twice.
+  bool _redirecting = false;
+  void _handleSessionInvalid() {
+    if (_redirecting) return;
+    _redirecting = true;
+    setState(() => _idMissing = true);
+    Future.microtask(() async {
+      await ref.read(tokenProvider.notifier).clearTokens();
+      navigatorKey.currentState?.pushNamedAndRemoveUntil('/auth', (_) => false);
+    });
   }
 
   void _openDetail(AppointmentList a) {
@@ -798,7 +819,7 @@ bool get _hasDateFilter =>
               child: _isWaiting
                   ? _buildLoading('Loading your account…')
                   : _idMissing && (loginState.patientId ?? 0) == 0
-                      ? _buildMissingLogin()
+                      ? _buildLoading('Session expired. Redirecting to login…')
                       : async == null
                           ? _buildLoading('Fetching appointments…')
                           : async.when(
@@ -1214,32 +1235,6 @@ Widget _filterChip({
               ),
             ],
           ),
-        ),
-      );
-
-  Widget _buildMissingLogin() => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 60, height: 60,
-              decoration: const BoxDecoration(
-                  color: kAmberLight, shape: BoxShape.circle),
-              child: const Icon(Icons.lock_outline_rounded,
-                  size: 26, color: kWarning),
-            ),
-            const SizedBox(height: 12),
-            const Text('Session Expired',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: kTextPrimary)),
-            const SizedBox(height: 4),
-            const Text('Please login again to view your appointments.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    fontSize: 12, color: kTextSecondary, height: 1.5)),
-          ],
         ),
       );
 }

@@ -236,6 +236,12 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
 
   void clearError() => state = state.copyWith(clearError: true);
 
+  /// Wipe all appointment state. Call on logout so the next patient starts
+  /// clean — otherwise the previous patient's cached `patientAppointmentsList`
+  /// survives in memory and the home screen's first build fires the "Today's
+  /// Appointment" popup with the previous patient's appointment.
+  void reset() => state = const AppointmentState();
+
   String _extractError(Object e) {
     if (e is DioException) {
       final data = e.response?.data;

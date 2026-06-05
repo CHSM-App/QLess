@@ -236,7 +236,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       ),
     );
     _animCtrl.forward();
-    _ensureLocationPermission();
+    _initLocation();
     Future.microtask(_ensurePatientIdAndFetch);
   }
 
@@ -272,6 +272,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
+  /// Runs once per cold start. A previously saved location — whether picked
+  /// manually or auto-detected on the very first run — is the source of truth
+  /// on every reopen / logout-reopen: it is shown instantly and the device is
+  /// NOT re-located. GPS detection happens only when nothing usable has ever
+  /// been saved (true first launch), so the first-set location persists.
+  Future<void> _initLocation() async {
+    final isManual = await LocationStorage.isManual();
+    final saved    = await LocationStorage.getLocation();
+    if (saved != null &&
+        saved.isNotEmpty &&
+        (isManual || !_isGenericLocation(saved))) {
+      if (mounted) {
+        setState(() {
+          _location = saved;
+          _locationLoaded = true;
+        });
+      }
+      _geocodeAndStore(saved);
+      return;
+    }
+    // First launch (or only a generic/failed value saved) → detect via GPS.
+    await _ensureLocationPermission();
+  }
+
   Future<void> _ensureLocationPermission() async {
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
@@ -279,40 +303,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
     if (perm == LocationPermission.deniedForever) {
       if (mounted) _showLocationSnack();
-      await _loadLocation();
+      await _detectLocation();
       return;
     }
-    await _loadLocation();
+    await _detectLocation();
   }
 
-  Future<void> _loadLocation() async {
-    final isManual = await LocationStorage.isManual();
-    if (isManual) {
-      final saved = await LocationStorage.getLocation();
-      if (saved != null && saved.isNotEmpty) {
-        if (mounted)
-          setState(() {
-            _location = saved;
-            _locationLoaded = true;
-          });
-        _geocodeAndStore(saved);
-        return;
-      }
-    }
-    final saved = await LocationStorage.getLocation();
-    if (saved != null && saved.isNotEmpty && !_isGenericLocation(saved)) {
-      if (mounted)
-        setState(() {
-          _location = saved;
-          _locationLoaded = true;
-        });
-      _geocodeAndStore(saved);
-      return;
-    }
+  /// GPS detection + auto-save. Only reached on first launch (see
+  /// [_initLocation]); manual changes go through [_openLocationPicker] /
+  /// "Use Current Location" instead.
+  Future<void> _detectLocation() async {
     final pos = await LocationService.getCurrentPosition();
-    final current = pos != null
-        ? await LocationService.getCurrentAddress()
-        : await LocationService.getCurrentAddress();
+    final current = await LocationService.getCurrentAddress();
     if (mounted) {
       setState(() {
         _location = current;
@@ -841,7 +843,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) =>
+                                  builder: (s_) =>
                                       const PatientPrescriptionListScreen())),
                         ),
                       ]),
