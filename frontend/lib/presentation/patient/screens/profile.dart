@@ -5,6 +5,7 @@ import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_help_center_screen.dart';
@@ -764,6 +765,11 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                       Navigator.pop(context);
                       await ref.read(tokenProvider.notifier).clearTokens();
                       ref.read(favoriteViewModelProvider.notifier).reset();
+                      // Wipe patient-scoped state so the next patient doesn't
+                      // inherit this one's appointments (the home "Today's
+                      // Appointment" popup) or notification inbox/badge.
+                      ref.read(appointmentViewModelProvider.notifier).reset();
+                      ref.read(notificationProvider.notifier).reset();
                       await ref
                           .read(patientLoginViewModelProvider.notifier)
                           .logout();

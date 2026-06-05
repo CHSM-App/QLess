@@ -180,6 +180,10 @@ class NotificationNotifier extends StateNotifier<List<NotificationItem>> {
   }
 
   int get unreadCount => state.where((n) => !n.isRead).length;
+
+  /// Wipe the inbox. Call on logout so the next patient doesn't inherit the
+  /// previous patient's notifications (and unread badge count).
+  void reset() => state = [];
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────

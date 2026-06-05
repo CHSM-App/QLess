@@ -178,16 +178,41 @@ class _PatientPrescriptionListScreenState
 
   bool _passesMember(PatientPrescription p, int pid, String pName,
       List<FamilyMember> members) {
-    if (_memberFilter == _filterAll) return true;
-    if (_memberFilter == _filterSelf) {
-      if (pid > 0 && p.patientId == pid) return true;
-      return pName.trim().toLowerCase() == p.patientName.toLowerCase();
+    // A booking stamps patient_id = the account-holder's id for self, but the
+    // family member's member_id for a member (see book_appointment_screen);
+    // patient_name always carries the person's name. So a member row matches
+    // either by member_id OR by name — and self is "belongs to nobody else".
+    final rxName   = p.patientName.trim().toLowerCase();
+    final selfName = pName.trim().toLowerCase();
+
+    bool matchesMember(FamilyMember? m) {
+      if (m == null) return false;
+      if ((m.memberId ?? 0) > 0 && m.memberId == p.patientId) return true;
+      final mn = m.memberName?.trim().toLowerCase();
+      return mn != null && mn.isNotEmpty && mn == rxName;
     }
-    if (_memberFilter > 0 && p.patientId == _memberFilter) return true;
+
+    final belongsToAMember = members.any(matchesMember);
+
+    // Self = the account holder: not attributable to any family member, and
+    // carrying the holder's own name. (We don't trust patient_id == pid here:
+    // when the API leaves patient_id unset it defaults to the holder, which
+    // would wrongly pull every row — including other patients — into Self.)
+    bool isSelfRow() => !belongsToAMember && rxName == selfName;
+
+    if (_memberFilter == _filterAll) {
+      // Only this account's people (holder + family); drop anyone else.
+      return isSelfRow() || belongsToAMember;
+    }
+
+    if (_memberFilter == _filterSelf) {
+      return isSelfRow();
+    }
+
+    // A specific family member.
     final m = members.cast<FamilyMember?>()
         .firstWhere((m) => m?.memberId == _memberFilter, orElse: () => null);
-    final mn = m?.memberName?.trim().toLowerCase();
-    return mn != null && mn.isNotEmpty && p.patientName.toLowerCase() == mn;
+    return matchesMember(m);
   }
 
   List<PatientPrescription> _filtered(List<PatientPrescription> src, String status,
