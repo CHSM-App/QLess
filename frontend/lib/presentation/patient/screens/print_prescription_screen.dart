@@ -101,6 +101,36 @@ class _PatientPrescriptionPdfScreenState
         ),
       );
 
+  // Dose / Freq rendered as a Morning–Afternoon–Night mini table.
+  List<String> splitSlots(String? raw) {
+    final parts = (raw ?? '').split('-').map((p) => p.trim()).toList();
+    while (parts.length < 3) {
+      parts.add('-');
+    }
+    return parts.take(3).map((p) => p.isEmpty ? '-' : p).toList();
+  }
+
+  pw.Widget doseCell(String? raw) {
+    final dose = splitSlots(raw);
+    pw.Widget head(String t) => pw.Expanded(
+          child: pw.Text(t,
+              textAlign: pw.TextAlign.center,
+              style: pw.TextStyle(
+                  font: ttfBold, fontSize: 7, color: PdfColors.grey600)),
+        );
+    pw.Widget val(String t) => pw.Expanded(
+          child: pw.Text(t,
+              textAlign: pw.TextAlign.center, style: s(bold: true, size: 8)),
+        );
+    return pw.Column(children: [
+      pw.Row(children: [head('M'), head('A'), head('N')]),
+      pw.SizedBox(height: 2),
+      pw.Divider(height: 0.5, thickness: 0.4, color: PdfColors.grey400),
+      pw.SizedBox(height: 2),
+      pw.Row(children: [val(dose[0]), val(dose[1]), val(dose[2])]),
+    ]);
+  }
+
   doc.addPage(
     pw.MultiPage(
       pageFormat: PdfPageFormat.a4,
@@ -127,33 +157,24 @@ class _PatientPrescriptionPdfScreenState
           pw.Divider(thickness: 0.8, color: PdfColors.black),
           pw.SizedBox(height: 6),
 
-          // Patient info
-          pw.Row(
-            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          // Patient info — all left-aligned
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  pw.Text('Patient: ${rx.patientName}', style: s(bold: true, size: 11)),
-                  pw.SizedBox(height: 2),
-                  pw.Text(
-                    [
-                      if (rx.patientAge != null && rx.patientAge! > 0) '${rx.patientAge} yrs',
-                      if (rx.patientGender?.isNotEmpty == true) rx.patientGender!,
-                      if (rx.tokenNumber != null) 'Token #${rx.tokenNumber}',
-                    ].join('  |  '),
-                    style: s(size: 9),
-                  ),
-                ],
+              pw.Text('Patient: ${rx.patientName}', style: s(bold: true, size: 11)),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                [
+                  if (rx.patientAge != null && rx.patientAge! > 0) '${rx.patientAge} yrs',
+                  if (rx.patientGender?.isNotEmpty == true) rx.patientGender!,
+                  if (rx.tokenNumber != null) 'Token #${rx.tokenNumber}',
+                ].join('  |  '),
+                style: s(size: 9),
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.Text('Rx #${rx.prescriptionId}', style: s(bold: true, size: 11)),
-                  pw.SizedBox(height: 2),
-                  pw.Text(_fmtDate(rx.prescriptionDate), style: s(size: 9)),
-                ],
-              ),
+              pw.SizedBox(height: 4),
+              pw.Text('Rx #${rx.prescriptionId}', style: s(bold: true, size: 11)),
+              pw.SizedBox(height: 2),
+              pw.Text(_fmtDate(rx.prescriptionDate), style: s(size: 9)),
             ],
           ),
           pw.SizedBox(height: 6),
@@ -221,20 +242,17 @@ class _PatientPrescriptionPdfScreenState
                     pw.Padding(
                       padding: const pw.EdgeInsets.symmetric(
                           horizontal: 6, vertical: 5),
-                      child: pw.Text(m.doseDisplay,
-                          style: s(size: 9), textAlign: pw.TextAlign.center),
+                      child: doseCell(m.doseDisplay),
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.symmetric(
                           horizontal: 6, vertical: 5),
-                      child: pw.Text(m.timing ?? '-',
-                          style: s(size: 9), textAlign: pw.TextAlign.center),
+                      child: pw.Text(m.timing ?? '-', style: s(size: 9)),
                     ),
                     pw.Padding(
                       padding: const pw.EdgeInsets.symmetric(
                           horizontal: 6, vertical: 5),
-                      child: pw.Text(m.duration ?? '-',
-                          style: s(size: 9), textAlign: pw.TextAlign.center),
+                      child: pw.Text(m.duration ?? '-', style: s(size: 9)),
                     ),
                   ],
                 )),
