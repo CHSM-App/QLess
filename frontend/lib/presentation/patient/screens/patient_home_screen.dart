@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
@@ -445,6 +446,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  // Top rated doctor tap → straight to the booking screen for that doctor
+  // (same as other apps; no detour through the search list).
+  void _goToBook(DoctorDetails doctor) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookAppointmentScreen(doctor: doctor),
+      ),
+    );
+  }
+
   Widget _buildAppointmentsSection() {
     final async = ref
         .watch(appointmentViewModelProvider)
@@ -665,7 +677,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               child: _TopDoctorCard(
                 doctor: doctor,
                 cardRating: doctor.rating,
-                onTap: () => _goToSearch(specialty: doctor.specialization),
+                onTap: () => _goToBook(doctor),
               ),
             ),
           ),
