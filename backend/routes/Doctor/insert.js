@@ -2044,4 +2044,215 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
 
 
 
-module.exports = router; 
+// ─────────────────────────────────────────────────────────────────────────────
+// AUTO-CLOSE STALE SESSIONS
+// A queue/slot session a doctor forgets to close at end of day stays "open"
+// (doctor_queue.queue_status <> 3 with queue_date < today). GET_TODAY_QUEUE then
+// keeps returning it, so it lingers on the doctor's Home / Patient List the next
+// day, and its booked/skipped patients are never told their visit lapsed.
+//
+// This sweep, for every stale session:
+//   1. closes each stale queue by reusing the proven QUEUE_STOP flow (same as the
+//      manual Close button at /appointment/queueStop), and
+//   2. cancels any remaining past-dated pending appointment (slot bookings +
+//      stragglers) via CANCEL_BY_DOCTOR,
+// then notifies each affected patient that they missed their appointment.
+//
+// Idempotent: only still-pending rows are selected, so a second run is a no-op —
+// safe to fire from the nightly cron, on startup, AND lazily on getTodayQueue.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Only notify about a no-show that lapsed recently. The nightly cron always sees
+// yesterday's data (so this is always true there), but a first-run / startup
+// catch-up can hit a backlog of weeks-old sessions — we still cancel+close those
+// for cleanup, but pushing "you missed your 15 May visit" today would be spam.
+const NOTIFY_MAX_AGE_DAYS = 2;
+function isWithinNotifyWindow(rawDate) {
+  if (!rawDate) return false;
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) return false;
+  const ageMs = Date.now() - d.getTime();
+  return ageMs <= NOTIFY_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+}
+
+// Shared "you missed your visit" notification (inbox row + FCM). Mirrors the
+// data payload shape used by queueStop so the killed-app tap behaves the same.
+// Silently skips stale backlog (see NOTIFY_MAX_AGE_DAYS) — cancellation already
+// happened at the call site regardless.
+async function notifyMissedAppointment(doctor_id, a) {
+  if (!isWithinNotifyWindow(a.rawDate)) return;
+
+  const title = 'Appointment Closed';
+  const when = a.date ? ` on ${a.date}` : '';
+  const body =
+    `You missed your appointment with Dr. ${a.doctor_name}${when}. ` +
+    `It has been closed. Tap to book again.`;
+
+  await insertNotification(a.patient_id, title, body, 'appointment', a.appointment_id);
+
+  if (a.token && a.token.trim() !== '') {
+    await admin.messaging().send({
+      token: a.token,
+      notification: { title, body },
+      data: {
+        type: 'appointment',
+        action: 'cancelled',
+        doctor_id: String(doctor_id),
+        appointment_id: String(a.appointment_id),
+      },
+    }).catch(err => log.error('FCM err (staleSweep): ' + (err.code || err.message)));
+  }
+}
+
+// Close one stale queue — mirrors the /appointment/queueStop handler: capture
+// affected (pending + skipped) patients BEFORE the SP mutates them, run QUEUE_STOP,
+// then notify with no-show wording.
+async function closeOneStaleQueue(doctor_id, queue_id) {
+  const detailsRes = await db.request()
+    .input('operation', 'APPT_CONTEXT_QUEUE')
+    .input('doctor_id', doctor_id)
+    .input('queue_id', queue_id)
+    .execute('sp_notification');
+
+  const affected = [];
+  for (const row of (detailsRes.recordset || [])) {
+    if (!row.owner_id) continue;
+    affected.push({
+      patient_id: row.owner_id,
+      token: row.owner_token,
+      doctor_name: row.doctor_name || 'your doctor',
+      date: formatApptDate(row.appointment_date),
+      rawDate: row.appointment_date,
+      appointment_id: row.appointment_id,
+    });
+  }
+
+  // Skipped patients aren't in the cancel context but are still left waiting —
+  // capture them before QUEUE_STOP flips their status.
+  const affectedIds = new Set(affected.map(a => a.patient_id));
+  const doctorName = affected[0]?.doctor_name || 'your doctor';
+  try {
+    const skippedRes = await db.request()
+      .input('queue_id', queue_id)
+      .query(`
+        SELECT a.patient_id, p.token AS owner_token, a.appointment_id,
+               a.appointment_date
+        FROM appointments a
+        LEFT JOIN patients p ON a.user_type = 1 AND p.patient_id = a.patient_id
+        WHERE a.queue_id = @queue_id AND LOWER(a.status) = 'skipped'
+      `);
+    for (const r of (skippedRes.recordset || [])) {
+      if (!r.patient_id || affectedIds.has(r.patient_id)) continue;
+      affected.push({
+        patient_id: r.patient_id,
+        token: r.owner_token,
+        doctor_name: doctorName,
+        date: formatApptDate(r.appointment_date),
+        rawDate: r.appointment_date,
+        appointment_id: r.appointment_id,
+      });
+    }
+  } catch (e) {
+    log.error('[staleSweep] skipped lookup failed: ' + e.message);
+  }
+
+  const result = await db.request()
+    .input('operation', 'QUEUE_STOP')
+    .input('queue_id', queue_id)
+    .input('doctor_id', doctor_id)
+    .execute('sp_appointment');
+  const statusRow = (result.recordset || [])[0] || {};
+  if (statusRow.success !== 1) {
+    throw new Error(statusRow.message || 'QUEUE_STOP failed');
+  }
+
+  await Promise.all(affected.map(a => notifyMissedAppointment(doctor_id, a)));
+  return affected.length;
+}
+
+// Cancel any past-dated appointment still pending (slot bookings + stragglers not
+// tied to a queue closed above). Queue rows are already 'cancelled' by QUEUE_STOP,
+// so this picks up only what's left — keeping the sweep idempotent.
+async function cancelStalePendingAppointments() {
+  const res = await db.request().query(`
+    SELECT a.appointment_id, a.doctor_id, a.patient_id, a.appointment_date,
+           p.token AS owner_token, d.name AS doctor_name
+    FROM appointments a
+    LEFT JOIN patients p     ON a.user_type = 1 AND p.patient_id = a.patient_id
+    LEFT JOIN doctor_login d ON d.doctor_id = a.doctor_id
+    WHERE a.appointment_date < CAST(GETDATE() AS DATE)
+      AND LOWER(a.status) IN ('booked', 'in_progress', 'skipped')
+  `);
+
+  let count = 0;
+  for (const row of (res.recordset || [])) {
+    try {
+      const r = await db.request()
+        .input('operation', 'CANCEL_BY_DOCTOR')
+        .input('appointment_id', row.appointment_id)
+        .input('doctor_id', row.doctor_id)
+        .execute('sp_appointment');
+      if ((r.recordset?.[0]?.success) !== 1) continue;
+      count++;
+      await notifyMissedAppointment(row.doctor_id, {
+        patient_id: row.patient_id,
+        token: row.owner_token,
+        doctor_name: row.doctor_name || 'your doctor',
+        date: formatApptDate(row.appointment_date),
+        rawDate: row.appointment_date,
+        appointment_id: row.appointment_id,
+      });
+    } catch (e) {
+      log.error(`[staleSweep] cancel appt ${row.appointment_id} failed: ${e.message}`);
+    }
+  }
+  return count;
+}
+
+// In-process guard so the nightly cron and a lazy getTodayQueue call can't run the
+// sweep concurrently (would double-notify on a race).
+let _staleSweepRunning = false;
+async function closeStaleSessions() {
+  if (_staleSweepRunning) return { skipped: true };
+  _staleSweepRunning = true;
+  let queuesClosed = 0;
+  let slotsCancelled = 0;
+  try {
+    const staleQ = await db.request().query(`
+      SELECT queue_id, doctor_id FROM doctor_queue
+      WHERE queue_date < CAST(GETDATE() AS DATE) AND queue_status <> 3
+    `);
+
+    for (const q of (staleQ.recordset || [])) {
+      try {
+        await closeOneStaleQueue(q.doctor_id, q.queue_id);
+        queuesClosed++;
+      } catch (e) {
+        log.error(`[staleSweep] queue ${q.queue_id} failed: ${e.message}`);
+      }
+    }
+
+    slotsCancelled = await cancelStalePendingAppointments();
+
+    if (queuesClosed > 0 || slotsCancelled > 0) {
+      log.info(`[staleSweep] closed ${queuesClosed} stale queue(s), cancelled ${slotsCancelled} stale appt(s)`);
+    }
+    return { queuesClosed, slotsCancelled };
+  } catch (e) {
+    log.error('[staleSweep] failed: ' + e.message);
+    return { error: e.message };
+  } finally {
+    _staleSweepRunning = false;
+  }
+}
+
+// Nightly at 00:05 IST → a previous-day session is auto-closed as the new day starts.
+cron.schedule('5 0 * * *', () => { closeStaleSessions(); },
+  { timezone: 'Asia/Kolkata' });
+
+// Catch up once on startup — covers a server/IIS recycle that straddled midnight
+// and missed the cron. Deferred so it never blocks the listen() call.
+setTimeout(() => { closeStaleSessions(); }, 5000);
+
+module.exports = router;
+module.exports.closeStaleSessions = closeStaleSessions; 

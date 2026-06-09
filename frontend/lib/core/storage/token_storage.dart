@@ -6,7 +6,13 @@ class TokenStorage {
   static const _refreshTokenKey = 'REFRESH_TOKEN';
   static const _roleIdKey = 'ROLE_ID';
 
-  static const FlutterSecureStorage _storage = FlutterSecureStorage();
+  // v10 Android storage is already encrypted + survives process death by
+  // default (the old encryptedSharedPreferences flag is deprecated/ignored).
+  // iOS still needs an explicit accessibility class: first_unlock lets the
+  // background refresh / FCM paths read the token after one device unlock.
+  static const FlutterSecureStorage _storage = FlutterSecureStorage(
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+  );
 
   /// SAVE TOKENS
   static Future<void> saveTokens(

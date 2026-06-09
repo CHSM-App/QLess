@@ -70,9 +70,25 @@ class TokenInterceptor extends Interceptor {
 
       return await _retryRequest(err, handler);
     } catch (e) {
-      await _forceLogout();
+      // Only end the session when the refresh is genuinely REJECTED
+      // (401/403 → refresh token dead). A network blip, timeout or cold
+      // server on next-day launch must NOT log the user out — keep the
+      // tokens and surface the original error so the call can retry.
+      if (_isAuthRejection(e)) {
+        await _forceLogout();
+      }
       return handler.next(sanitizedErr);
     }
+  }
+
+  /// True only for a real auth rejection (invalid/expired refresh token),
+  /// not for connectivity/timeout/server-down failures.
+  bool _isAuthRejection(Object e) {
+    if (e is DioException) {
+      final code = e.response?.statusCode;
+      return code == 401 || code == 403;
+    }
+    return false;
   }
 
   Future<void> _retryRequest(
