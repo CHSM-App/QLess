@@ -4,7 +4,11 @@ var db = require('../db'); // go from admin/ to routes/
 const sql = require("mssql");
 const multer = require("multer");
 const path = require("path");
+
 const fs = require("fs-extra");
+// Auto-close sweep for previous-day sessions (cancel + notify). Shared from the
+// insert router so getTodayQueue can self-heal stale data on demand.
+const { closeStaleSessions } = require('./insert');
 
 
 router.get('/getMedicineTypes', async (req, res) => {
@@ -97,6 +101,8 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
           slots: []
         };
       }
+ 
+
 
       if (row.slot_id) {
         grouped[row.day_of_week].slots.push({
@@ -152,10 +158,6 @@ router.get('/patientAppointmentList/:doctor_id', async (req, res) => {
     });
   }
 });
-
-
-
-
 router.get('/appointmentWisePrescription/:appointment_id', async (req, res) => {
   const { appointment_id } = req.params;
 
@@ -190,6 +192,11 @@ router.get('/appointment/getTodayQueue/:doctor_id', async (req, res) => {
   }
 
   try {
+    // Self-heal: close any previous-day session (cancel its lapsed patients +
+    // notify) before reading, so a doctor opening the app never sees stale data
+    // even if the nightly cron / startup catch-up was missed. No-op on normal days.
+    try { await closeStaleSessions(); } catch (e) { /* never block the read */ }
+
     const result = await db.request()
       .input('operation', 'GET_TODAY_QUEUE')
       .input('doctor_id', doctor_id)

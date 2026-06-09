@@ -489,14 +489,29 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   // ── FILTER: which sessions to show as cards ───────────────────────────────
   // Hide a session when:
+  //   • queue_date is before today → a previous-day session the doctor never
+  //     closed. The live API already drops these, but the OFFLINE cache keeps
+  //     serving yesterday's session on a next-day refresh — guard it here so it
+  //     never renders as if it were today's.
   //   • queue_status == 0 (idle) AND start_time == null  → no slot assigned yet, skip it
   //   • queue_status == 3 (stopped/closed)               → hide closed queues
   bool _shouldShowSession(dynamic session) {
+    if (_isStaleQueueDate(session.queueDate as String?)) return false; // past day → hide
     final qs = session.queueStatus ?? 0;
     final hasSlot = session.startTime != null;
     if (qs == 3) return false;               // closed → hide
     if (qs == 0 && !hasSlot) return false;   // idle + no time slot → hide
     return true;
+  }
+
+  // True when a session's queue_date is before today (compared by calendar day).
+  // Null/unparseable dates are treated as not-stale so live rows aren't dropped.
+  bool _isStaleQueueDate(String? queueDate) {
+    final d = DateTime.tryParse(queueDate ?? '');
+    if (d == null) return false;
+    final now = DateTime.now();
+    return DateTime(d.year, d.month, d.day)
+        .isBefore(DateTime(now.year, now.month, now.day));
   }
 
   // ─────────────────────────────────────────────────────────────────────────

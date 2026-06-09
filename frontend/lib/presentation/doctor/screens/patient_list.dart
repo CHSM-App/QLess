@@ -1285,6 +1285,10 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
   final Map<int, bool> _slotGroupExpanded = {};
 
   bool _shouldShow(dynamic session) {
+    // Previous-day session the doctor never closed. The live API already drops
+    // these, but the OFFLINE cache keeps serving yesterday's session on a
+    // next-day refresh — hide it so it never renders as today's.
+    if (_isStaleQueueDate(session.queueDate as String?)) return false;
     final qs      = session.queueStatus ?? 0;
     final hasSlot = _slotTimeLabel(
           session.startTime as String?,
@@ -1294,6 +1298,16 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
     if (qs == 3) return false;
     if (qs == 0 && !hasSlot) return false;
     return true;
+  }
+
+  // True when a session's queue_date is before today (compared by calendar day).
+  // Null/unparseable dates are treated as not-stale so live rows aren't dropped.
+  bool _isStaleQueueDate(String? queueDate) {
+    final d = DateTime.tryParse(queueDate ?? '');
+    if (d == null) return false;
+    final now = DateTime.now();
+    return DateTime(d.year, d.month, d.day)
+        .isBefore(DateTime(now.year, now.month, now.day));
   }
 
   // Build ordered list of items: slot groups (with their sessions inside)

@@ -20,6 +20,12 @@ if (!PUBLIC_BASE_URL) {
 	throw new Error('Missing required env var: PUBLIC_BASE_URL');
 }
 
+// Refresh-token lifetime. Access tokens are short (15m); the refresh token is
+// what keeps the user signed in across days, so give it a long, Practo-style
+// window. Override via REFRESH_TOKEN_TTL_DAYS env without a code change.
+const REFRESH_TOKEN_TTL_DAYS = parseInt(process.env.REFRESH_TOKEN_TTL_DAYS, 10) || 30;
+const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * 24 * 3600 * 1000;
+
 function generateRefreshToken() {
 	return crypto.randomBytes(64).toString('hex');
 }
@@ -57,7 +63,7 @@ router.post('/Createlogin', authLimiter, async (req, res) => {
 			.execute('ManageRefreshToken');
 
 		const refreshToken = createRefreshTokenPayload(mobile);
-		const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+		const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
 		const result = await db.request()
 			.input('operation', 'insert')
@@ -132,7 +138,7 @@ router.post('/refreshAccessToken', authLimiter, async (req, res) => {
 
 		const newRefreshToken = createRefreshTokenPayload(mobile);
 
-		const newExpiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000);
+		const newExpiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 		await db.request()
 			.input('operation', 'insert')
 			.input('user_mobile', mobile)
