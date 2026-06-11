@@ -37,6 +37,7 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       await ref
           .read(patientLoginViewModelProvider.notifier)
           .loadFromStoragePatient();
+      patientShellKey = GlobalKey<PatientBottomNavState>();
       target = PatientBottomNav(
         key: patientShellKey,
         onToggleTheme: () {},

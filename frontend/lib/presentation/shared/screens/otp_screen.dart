@@ -224,6 +224,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
         (_) => false,
       );
     } else if (2 == roleId) {
+      // Recreate the key so the old PatientBottomNav element (still inactive
+      // from the previous logout) doesn't clash with the new one.
+      patientShellKey = GlobalKey<PatientBottomNavState>();
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(

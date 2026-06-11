@@ -9,6 +9,13 @@ const admin = require("firebase-admin");
 const cron = require('node-cron');
 const log = require('../middleware/logger');
 
+// Helper — emits a queue_update event to all sockets in clinic_<doctor_id> room.
+// req.app.get('io') is available because app.set('io', io) is called in app.js.
+function emitQueueUpdate(req, event, doctor_id, extra = {}) {
+  const io = req.app.get('io');
+  if (io && doctor_id) io.to('clinic_' + doctor_id).emit('queue_update', { event, doctor_id, ...extra });
+}
+
 if (!admin.apps.length) {
   const serviceAccount = require("../ServiceAccountKey.json");
   admin.initializeApp({
@@ -993,6 +1000,7 @@ router.post('/insertPrescription', async (req, res) => {
     });
   }
 });
+
 router.post('/appointment/queueNext', async (req, res) => {
   const { doctor_id, appointment_id } = req.body;
 
@@ -1042,6 +1050,7 @@ router.post('/appointment/queueNext', async (req, res) => {
     }
 
     sendProximityNotifications(doctor_id);
+    emitQueueUpdate(req, 'next', doctor_id);
 
     return res.json({
       success: true,
@@ -1100,6 +1109,7 @@ router.post('/appointment/queueStart', async (req, res) => {
       .map(r => r.token);
 
     if (tokens.length === 0) {
+      emitQueueUpdate(req, 'queue_started', doctor_id, { queue_id });
       return res.json({
         success: true,
         message: 'Queue started, no patients to notify'
@@ -1132,9 +1142,8 @@ router.post('/appointment/queueStart', async (req, res) => {
 
     const response = await admin.messaging().sendEachForMulticast(message);
 
-    // Catch patients who are already within 5–15 min of their turn at the
-    // moment the doctor starts (e.g. doctor opened the queue late).
     sendProximityNotifications(doctor_id);
+    emitQueueUpdate(req, 'queue_started', doctor_id, { queue_id });
 
     return res.json({
       success: true,
@@ -1218,6 +1227,7 @@ router.post('/appointment/queuePause', async (req, res) => {
 
       const response = await admin.messaging().sendEachForMulticast(message);
 
+      emitQueueUpdate(req, 'queue_paused', doctor_id, { queue_id });
       return res.json({
         success: true,
         message: 'Queue paused and notifications sent',
@@ -1228,86 +1238,7 @@ router.post('/appointment/queuePause', async (req, res) => {
     }
 
     // ✅ NO TOKENS CASE
-    return res.json({
-      success: true,
-      message: 'Queue paused, no patients to notify'
-    });
-
-  } catch (error) {
-    log.error('queuePause error: ' + error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Queue pause failed',
-      error: error.message
-    });
-  }
-});
-
-// QUEUE PAUSE
-router.post('/appointment/queuePause', async (req, res) => {
-  const { doctor_id, queue_id } = req.body;
-  if (!doctor_id) {
-    return res.status(400).json({
-      success: false,
-      message: 'doctor_id required'
-    });
-  }
-
-  try {
-    const result = await db.request()
-      .input('operation', 'QUEUE_PAUSE')
-      .input('queue_id', queue_id)
-      .input('doctor_id', doctor_id)
-      .execute('sp_appointment');
-
-    // SP returns 2 separate result sets: [0] = status, [1] = token rows.
-    // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
-    // live in `result.recordsets[1]`.
-    const recordsets = result.recordsets || [];
-    const statusRow  = recordsets[0]?.[0] || {};
-    const tokenRows  = recordsets[1] || [];
-
-    // ✅ CHECK SUCCESS
-    if (statusRow.success !== 1) {
-      return res.json({
-        success: false,
-        message: statusRow.message || 'Queue pause failed'
-      });
-    }
-
-    const tokens = tokenRows
-      .map(r => r.token)
-      .filter(t => t && t.trim() !== '');
-
-    log.debug('queuePause: tokens count: ' + tokens.length);
-
-    // 🔔 SEND NOTIFICATION
-    if (tokens.length > 0) {
-      const pauseTitle = 'Queue Paused';
-      const pauseBody = 'Doctor has paused the queue. Please wait.';
-
-      for (const tk of tokens) {
-        await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', doctor_id);
-      }
-
-      const message = {
-        notification: { title: pauseTitle, body: pauseBody },
-        data: { type: 'queue' },
-        tokens: tokens,
-      };
-
-      const response = await admin.messaging().sendEachForMulticast(message);
-
-      return res.json({
-        success: true,
-        message: 'Queue paused and notifications sent',
-        total_tokens: tokens.length,
-        success_count: response.successCount,
-        failure_count: response.failureCount
-      });
-    }
-
-    // ✅ NO TOKENS CASE
+    emitQueueUpdate(req, 'queue_paused', doctor_id, { queue_id });
     return res.json({
       success: true,
       message: 'Queue paused, no patients to notify'
@@ -1450,6 +1381,7 @@ router.post('/appointment/queueStop', async (req, res) => {
       log.info('[queueStop] notified ' + skippedAppts.length + ' skipped patient(s)');
     }
 
+    emitQueueUpdate(req, 'queue_stopped', doctor_id, { queue_id });
     return res.json({
       success: true,
       message: statusRow.message || 'Queue stopped',
@@ -1521,8 +1453,8 @@ router.post('/appointment/queueSkip', async (req, res) => {
       }
     }
 
-    // Skipping a patient moves everyone behind them up — re-scan proximity.
     sendProximityNotifications(doctor_id);
+    emitQueueUpdate(req, 'skip', doctor_id);
 
     return res.json({
       success: true,
@@ -1542,7 +1474,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
 
 //QUEUE RECALL
 router.post('/appointment/queueRecall', async (req, res) => {
-  const { appointment_id } = req.body;
+  const { appointment_id, doctor_id } = req.body;
 
   // ✅ validation
   if (!appointment_id) {
@@ -1559,6 +1491,8 @@ router.post('/appointment/queueRecall', async (req, res) => {
       .execute('sp_appointment');
 
     const row = result.recordset?.[0] ?? {};
+
+    if (row.success === 1) emitQueueUpdate(req, 'recall', doctor_id);
 
     return res.json({
       success: row.success === 1,
@@ -1595,6 +1529,7 @@ router.post('/appointment/startSession', async (req, res) => {
 
     const row = result.recordset?.[0] ?? {};
 
+    if (row.success === 1) emitQueueUpdate(req, 'session_started', doctor_id);
     return res.json({
       success: row.success === 1,
       message: row.message ?? 'Session started'
@@ -1646,6 +1581,7 @@ router.post('/appointment/endSession', async (req, res) => {
     // 'near' stage for the same patient. Every ended consultation shifts each
     // waiting patient one slot closer, so re-scan proximity here.
     sendProximityNotifications(doctor_id);
+    emitQueueUpdate(req, 'session_ended', doctor_id);
 
     return res.json({
       success: true,
@@ -1707,19 +1643,21 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
 
     log.debug('[queuePauseEmergency] tokens extracted: ' + tokens.length);
 
-    if (tokens.length > 0) {
-		  let doctorName = 'your doctor';
-      try {
-        const dn = await db.request()
-          .input('queue_id', queue_id)
-          .query(`SELECT d.name FROM doctor_queue dq
-                  JOIN doctor_login d ON d.doctor_id = dq.doctor_id
-                  WHERE dq.queue_id = @queue_id`);
-        doctorName = dn.recordset?.[0]?.name || 'your doctor';
-      } catch (e) { log.error('[queuePauseEmergency] name lookup failed: ' + e.message); }
+    let emergencyDoctorId = null;
+    let doctorName = 'your doctor';
+    try {
+      const dn = await db.request()
+        .input('queue_id', queue_id)
+        .query(`SELECT dq.doctor_id, d.name FROM doctor_queue dq
+                JOIN doctor_login d ON d.doctor_id = dq.doctor_id
+                WHERE dq.queue_id = @queue_id`);
+      emergencyDoctorId = dn.recordset?.[0]?.doctor_id ?? null;
+      doctorName = dn.recordset?.[0]?.name || 'your doctor';
+    } catch (e) { log.error('[queuePauseEmergency] name lookup failed: ' + e.message); }
 
+    if (tokens.length > 0) {
       const pauseTitle = 'Queue Paused (Emergency)';
-     const pauseBody = `Dr. ${doctorName} has paused the queue due to an emergency. Please wait — we will notify you when it resumes.`;
+      const pauseBody = `Dr. ${doctorName} has paused the queue due to an emergency. Please wait — we will notify you when it resumes.`;
 
       for (const tk of tokens) {
         await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', queue_id);
@@ -1734,6 +1672,7 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
       const response = await admin.messaging().sendEachForMulticast(message);
       log.info('[queuePauseEmergency] FCM result: ' + response.successCount + '/' + tokens.length);
 
+      emitQueueUpdate(req, 'queue_paused_emergency', emergencyDoctorId, { queue_id });
       return res.json({
         success: true,
         message: statusRow.message || 'Queue paused successfully',
@@ -1743,6 +1682,7 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
       });
     }
 
+    emitQueueUpdate(req, 'queue_paused_emergency', emergencyDoctorId, { queue_id });
     return res.json({
       success: true,
       message: statusRow.message || 'Queue paused, no patients to notify'
@@ -2025,6 +1965,7 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
 
     // Cancelling a patient shifts everyone behind them up — re-scan proximity.
     sendProximityNotifications(doctor_id);
+    emitQueueUpdate(req, 'cancel', doctor_id);
 
     return res.json({
       success: true,

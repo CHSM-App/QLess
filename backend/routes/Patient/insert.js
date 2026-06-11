@@ -7,6 +7,11 @@ const log = require('../middleware/logger');
 const path = require("path");
 const fs = require("fs-extra");
 
+function emitQueueUpdate(req, event, doctor_id, extra = {}) {
+  const io = req.app.get('io');
+  if (io && doctor_id) io.to('clinic_' + doctor_id).emit('queue_update', { event, doctor_id, ...extra });
+}
+
 
 router.post('/insertFamilyMember', async (req, res) => {
   try {
@@ -94,10 +99,9 @@ router.post('/appointment/book', async (req, res) => {
 		  .input('symptoms', symptoms)
       .execute('sp_appointment');
 
-    res.json({
-      success: result.recordset[0].success === 1,
-      message: result.recordset[0].message
-    });
+    const booked = result.recordset[0].success === 1;
+    if (booked) emitQueueUpdate(req, 'booked', doctor_id);
+    res.json({ success: booked, message: result.recordset[0].message });
 
   } catch (error) {
     res.json({
@@ -246,6 +250,7 @@ router.post('/rescheduleAppointment', async (req, res) => {
 	
       .execute('sp_appointment');
 
+    emitQueueUpdate(req, 'rescheduled', doctor_id);
     res.status(200).json({
       success: true,
       message: result.recordset[0]?.message || 'Operation completed'
@@ -261,16 +266,24 @@ router.post('/rescheduleAppointment', async (req, res) => {
 });
 
 router.post('/cancelAppointment/:appointment_id', async (req, res) => {
-  const {
-    appointment_id
-  } = req.params;
+  const { appointment_id } = req.params;
 
   try {
+    // Look up doctor_id before cancelling so we can notify the room.
+    let doctor_id = null;
+    try {
+      const dr = await db.request()
+        .input('appointment_id', appointment_id)
+        .query('SELECT TOP 1 doctor_id FROM appointments WHERE appointment_id = @appointment_id');
+      doctor_id = dr.recordset?.[0]?.doctor_id ?? null;
+    } catch (_) {}
+
     const result = await db.request()
       .input('operation', 'CANCEL_APPOINTMENT')
       .input('appointment_id', appointment_id)
       .execute('sp_appointment');
 
+    emitQueueUpdate(req, 'patient_cancelled', doctor_id);
     res.status(200).json({
       success: result.recordset[0]?.success || true,
       message: result.recordset[0]?.message || 'Appointment cancelled successfully'
@@ -377,7 +390,9 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
               patients_ahead: q.patients_ahead,
               estimated_arrival_time: q.estimated_arrival_time,
               queue_started: q.queue_started,
-              is_my_turn: q.is_my_turn
+              is_my_turn: q.is_my_turn,
+              total_queue: q.total_queue,
+              current_serving: q.current_serving,
             };
           }
         } catch (err) {

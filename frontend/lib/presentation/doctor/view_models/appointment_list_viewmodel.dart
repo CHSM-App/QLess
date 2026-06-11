@@ -9,6 +9,7 @@ import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/today_queue_model.dart';
+import 'package:qless/core/network/socket_service.dart';
 import 'package:qless/domain/usecase/appointment_usecase.dart';
 
 enum QueueState { idle, running, paused, stopped }
@@ -69,19 +70,50 @@ class AppointmentListState {
 class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   final AppointmentUsecase usecase;
   final OfflineQueueStore offlineStore;
+  final SocketService socketService;
 
-  AppointmentListViewmodel(this.usecase, this.offlineStore)
+  StreamSubscription<Map<String, dynamic>>? _socketSub;
+  int? _currentDoctorId;
+
+  AppointmentListViewmodel(this.usecase, this.offlineStore, this.socketService)
       : super(const AppointmentListState());
+
+  void joinClinic(int doctorId) {
+    _currentDoctorId = doctorId;
+    socketService.joinClinic(doctorId);
+    _socketSub?.cancel();
+    _socketSub = socketService.updates.listen((_) {
+      fetchPatientAppointments(doctorId, silent: true);
+    });
+  }
+
+  void leaveClinic() {
+    _socketSub?.cancel();
+    _socketSub = null;
+    if (_currentDoctorId != null) {
+      socketService.leaveClinic(_currentDoctorId!);
+      _currentDoctorId = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
+  }
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   /// Offline-first fetch: tries the network, falls back to SQLite cache.
+  /// [silent] skips the loading spinner — used for background socket refreshes.
   Future<void> fetchPatientAppointments(int doctorId,
-      {bool isOnline = true}) async {
-    state = state.copyWith(
-      patientAppointmentsList: const AsyncValue.loading(),
-      error: null,
-    );
+      {bool isOnline = true, bool silent = false}) async {
+    if (!silent) {
+      state = state.copyWith(
+        patientAppointmentsList: const AsyncValue.loading(),
+        error: null,
+      );
+    }
     try {
       if (isOnline) {
         final result = await usecase.fetchPatientAppointments(doctorId);
@@ -234,7 +266,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         final result = await usecase.queueStart(appointmentRequest);
         _clearEmergency(appointmentRequest.queueId);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state =
             state.copyWith(isLoading: false, queueState: QueueState.running);
         return result;
@@ -257,7 +289,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         final result = await usecase.queuePause(appointmentRequest);
         _clearEmergency(appointmentRequest.queueId);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state = state.copyWith(isLoading: false, queueState: QueueState.paused);
         return result;
       },
@@ -279,7 +311,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         final result = await usecase.queueStop(appointmentRequest);
         _clearEmergency(appointmentRequest.queueId);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state =
             state.copyWith(isLoading: false, queueState: QueueState.stopped);
         return result;
@@ -302,7 +334,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         final result = await usecase.queueNext(appointmentRequest);
         debugPrint('QueueNext VM response: ${result.toJson()}');
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state = state.copyWith(isLoading: false);
         return result;
       },
@@ -322,7 +354,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       online: () async {
         final result = await usecase.queueSkip(appointmentRequest);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state = state.copyWith(isLoading: false);
         return result;
       },
@@ -342,7 +374,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       online: () async {
         final result = await usecase.queueRecall(appointmentRequest);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state = state.copyWith(isLoading: false);
         return result;
       },
@@ -364,7 +396,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       online: () async {
         final result = await usecase.startSession(appointmentRequest);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state = state.copyWith(isLoading: false);
         return result;
       },
@@ -382,7 +414,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       online: () async {
         final result = await usecase.endSession(appointmentRequest);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
-            isOnline: true);
+            isOnline: true, silent: true);
         state = state.copyWith(isLoading: false);
         return result;
       },
@@ -451,7 +483,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     try {
       final result = await usecase.cancelByDoctor(appointmentRequest);
       await fetchPatientAppointments(appointmentRequest.doctorId!,
-          isOnline: true);
+          isOnline: true, silent: true);
       state = state.copyWith(isLoading: false);
       return result;
     } catch (e) {

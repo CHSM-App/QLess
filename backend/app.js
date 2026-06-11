@@ -28,6 +28,10 @@ const uploadAuth = require('./routes/middleware/uploadAuth');
 const requestId = require('./routes/middleware/requestId');
 const { globalLimiter } = require('./routes/middleware/rateLimit');
 
+
+const http = require('http');
+const { Server } = require('socket.io');
+
 const app = express();
 
 // Behind IIS/nginx/Cloudflare. Without this, every request looks like it came
@@ -109,19 +113,52 @@ app.use((err, req, res, next) => {
 
 module.exports = app;
 
-// iisnode runs app.js directly (it does not use `npm start` or bin/www).
-// Bind the HTTP port immediately so iisnode gets a live server; the DB pool
-// connects eagerly in routes/db.js and routes will queue until it is ready.
-const http = require('http');
+// ── SERVER + SOCKET SETUP ───────────────────────────────────────
 const db = require('./routes/db');
-const port = process.env.PORT || '3000';
-app.set('port', port);
+const port = process.env.PORT || 3000;
+
 const server = http.createServer(app);
-server.listen(port, () => log.info('Listening on port ' + port));
+
+// SOCKET.IO INIT
+const io = new Server(server, {
+  cors: {
+    origin: '*', // restrict in production
+    methods: ['GET', 'POST'],
+  },
+});
+
+app.set('io', io);
+
+// SOCKET EVENTS
+io.on('connection', (socket) => {
+  console.log('Socket connected:', socket.id);
+
+  socket.on('joinClinic', (clinicId) => {
+    socket.join(`clinic_${clinicId}`);
+  });
+
+  socket.on('leaveClinic', (clinicId) => {
+    socket.leave(`clinic_${clinicId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Socket disconnected:', socket.id);
+  });
+});
+
+// START SERVER
+server.listen(port, () => {
+  log.info('Listening on port ' + port);
+});
+
 server.on('error', (err) => {
   log.error('Server error: ' + err.message);
   process.exit(1);
 });
+
+// DB READY
 db.ready()
   .then(() => log.info('DB pool ready'))
-  .catch((err) => log.error('DB connection failed at startup: ' + err.message));
+  .catch((err) =>
+    log.error('DB connection failed at startup: ' + err.message)
+  );

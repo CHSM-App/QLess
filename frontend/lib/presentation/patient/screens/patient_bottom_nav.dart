@@ -11,7 +11,7 @@ import 'package:qless/presentation/shared/widgets/connectivity_banner.dart';
 // anywhere (in-app inbox, FCM tray) — they switch the active tab and pass
 // deep-link args to the in-shell AppointmentScreen, which keeps the bottom
 // bar visible and avoids pushing standalone screens on top of the shell.
-final GlobalKey<PatientBottomNavState> patientShellKey =
+GlobalKey<PatientBottomNavState> patientShellKey =
     GlobalKey<PatientBottomNavState>();
 
 // Cold-start FCM tap fires before the shell mounts (getInitialMessage runs

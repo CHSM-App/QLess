@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/available_slots.dart';
 import 'package:qless/domain/models/queue_preview_model.dart';
 
+import 'package:qless/core/network/socket_service.dart';
 import 'package:qless/domain/usecase/appointment_usecase.dart';
 
 class AppointmentState {
@@ -83,9 +86,33 @@ class AppointmentState {
 class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   final AppointmentUsecase usecase;
   final OfflineQueueStore offlineStore;
+  final SocketService socketService;
 
-  AppointmentViewmodel(this.usecase, this.offlineStore)
+  StreamSubscription<Map<String, dynamic>>? _socketSub;
+
+  AppointmentViewmodel(this.usecase, this.offlineStore, this.socketService)
       : super(const AppointmentState());
+
+  void watchClinics(List<int> doctorIds, int patientId) {
+    _socketSub?.cancel();
+    for (final id in doctorIds) {
+      socketService.joinClinic(id);
+    }
+    _socketSub = socketService.updates.listen((_) {
+      getPatientAppointments(patientId, silent: true);
+    });
+  }
+
+  void unwatchClinics() {
+    _socketSub?.cancel();
+    _socketSub = null;
+  }
+
+  @override
+  void dispose() {
+    _socketSub?.cancel();
+    super.dispose();
+  }
 
   Future<void> getAppointmentAvailability(
     AppointmentRequestModel appointmentRequest,
@@ -104,11 +131,13 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   }
 
 
-  Future<void> getPatientAppointments(int familyId) async {
-    state = state.copyWith(
-      patientAppointmentsList: const AsyncValue.loading(),
-      error: null,
-    );
+  Future<void> getPatientAppointments(int familyId, {bool silent = false}) async {
+    if (!silent) {
+      state = state.copyWith(
+        patientAppointmentsList: const AsyncValue.loading(),
+        error: null,
+      );
+    }
     try {
       final result = await usecase.getPatientAppointments(familyId);
       // Cache so the list (upcoming/past) still renders offline.

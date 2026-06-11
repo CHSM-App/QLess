@@ -348,6 +348,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
 
   @override
   void dispose() {
+    ref.read(appointmentViewModelProvider.notifier).unwatchClinics();
     _tabCtrl.animation?.removeListener(_syncFilterToSwipeProgress);
     _tabCtrl.removeListener(_syncFilterToSettledTab);
     _tabCtrl.dispose();
@@ -405,6 +406,11 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       }
       _didFetch = true;
       await ref.read(appointmentViewModelProvider.notifier).getPatientAppointments(pid);
+      final appts = ref.read(appointmentViewModelProvider).patientAppointmentsList?.value ?? [];
+      final liveDocIds = appts.where(_isLive).map((a) => a.doctorId).whereType<int>().toSet().toList();
+      if (liveDocIds.isNotEmpty) {
+        ref.read(appointmentViewModelProvider.notifier).watchClinics(liveDocIds, pid);
+      }
     } finally {
       _isFetching = false;
     }
@@ -789,6 +795,12 @@ bool get _hasDateFilter =>
       if (next.isSuccess && next.cancelResponse != null &&
           next.cancelResponse != prev?.cancelResponse) {
         _snack(next.cancelResponse?.message ?? 'Appointment cancelled');
+      }
+      // New booking detected anywhere in the app → refresh so the live-queue
+      // banner appears and WebSocket watching starts for the new clinic.
+      if (next.isSuccess && next.bookingResponse != null &&
+          next.bookingResponse != prev?.bookingResponse) {
+        refreshOnVisible();
       }
     });
 
@@ -1955,29 +1967,33 @@ class _LiveQueueBanner extends StatefulWidget {
 }
 
 class _LiveQueueBannerState extends State<_LiveQueueBanner>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
+    with TickerProviderStateMixin {
+  late final AnimationController _rippleCtrl;
+  late final AnimationController _pulseCtrl;
   late final Animation<double>   _pulse;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
+    _rippleCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 1600))
+      ..repeat();
+    _pulseCtrl = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 900))
       ..repeat(reverse: true);
     _pulse = Tween<double>(begin: 0.35, end: 1.0)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+        .animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
   }
 
   @override
-  void dispose() { _ctrl.dispose(); super.dispose(); }
+  void dispose() {
+    _rippleCtrl.dispose();
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
 
-  bool get _isClosed =>
-      widget.queueState?.toLowerCase() == 'queue closed';
-
-  bool get _isSkipped =>
-      widget.queueState?.toLowerCase() == 'skipped';
-
+  bool get _isClosed  => widget.queueState?.toLowerCase() == 'queue closed';
+  bool get _isSkipped => widget.queueState?.toLowerCase() == 'skipped';
   bool get _hasEstRow =>
       !_isClosed && !_isSkipped &&
       (widget.estimatedArrivalTime != null || widget.patientsAhead != null);
@@ -1991,18 +2007,18 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
     final arrival   = widget.estimatedArrivalTime;
     final queueState = widget.queueState ?? '';
 
-    final topColor  = myTurn
+    final accentColor = myTurn
         ? kSuccess
-        : _isSkipped
-            ? kError
-            : (started ? kSuccess : kWarning);
-    final topBg     = topColor.withOpacity(0.07);
-    final topBorder = topColor.withOpacity(0.25);
+        : _isSkipped ? kError
+        : started    ? kPrimary
+        : kWarning;
+    final topBg     = accentColor.withOpacity(0.06);
+    final topBorder = accentColor.withOpacity(0.22);
 
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           decoration: BoxDecoration(
             color: topBg,
             borderRadius: _hasEstRow
@@ -2012,78 +2028,69 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
           ),
           child: Row(
             children: [
-              if (started)
-                AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (_, __) => Container(
-                    width: 8, height: 8,
-                    decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: topColor.withOpacity(_pulse.value)),
-                  ),
-                )
-              else
-                Container(
-                  width: 8, height: 8,
-                  decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: kWarning.withOpacity(0.6)),
-                ),
-              const SizedBox(width: 8),
+              // ── Animated token circle ──────────────────────────
+              _buildTokenCircle(q, accentColor, myTurn, started),
+              const SizedBox(width: 10),
+              // ── Status text ────────────────────────────────────
               Expanded(
-                child: RichText(
-                  text: TextSpan(
-                    children: [
-                      TextSpan(
-                        text: myTurn
-                            ? "It's your turn!  "
-                            : _isSkipped
-                                ? 'You were skipped — contact clinic  '
-                                : started
-                                    ? 'Queue position  '
-                                    : _isClosed
-                                        ? ''
-                                        : 'Queue token  ',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: kTextSecondary),
-                      ),
-                      if (!myTurn && !_isClosed && !_isSkipped)
-                        TextSpan(
-                          text: q != null ? '#$q' : '—',
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: q != null ? topColor : kTextMuted),
-                        ),
-                    ],
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      myTurn      ? "It's your turn!"
+                      : _isSkipped ? 'You were skipped'
+                      : started    ? 'Live queue'
+                      : _isClosed  ? 'Queue closed'
+                      :              'Not started yet',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: accentColor),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      myTurn      ? 'Please proceed to the doctor'
+                      : _isSkipped ? 'Contact clinic for assistance'
+                      : started && ahead == 0 ? 'Your turn is next!'
+                      : started && ahead != null ? '$ahead patient${ahead == 1 ? '' : 's'} ahead'
+                      : arrival != null ? 'Est. arrival: $arrival'
+                      : 'Queue will start soon',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: kTextSecondary),
+                    ),
+                  ],
                 ),
               ),
+              // ── Status badge ───────────────────────────────────
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                 decoration: BoxDecoration(
-                  color: myTurn
-                      ? kSuccess
-                      : _isSkipped
-                          ? kError
-                          : (started ? kSuccess : kWarning),
+                  color: accentColor,
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (started && !_isSkipped) ...[
-                      const Icon(Icons.circle, size: 6, color: Colors.white),
-                      const SizedBox(width: 4),
+                    if (started && !_isSkipped && !_isClosed) ...[
+                      AnimatedBuilder(
+                        animation: _pulse,
+                        builder: (_, __) => Container(
+                          width: 5, height: 5,
+                          margin: const EdgeInsets.only(right: 4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white.withOpacity(_pulse.value),
+                          ),
+                        ),
+                      ),
                     ],
                     Text(
-                      myTurn ? 'YOUR TURN' : queueState,
+                      myTurn ? 'YOUR TURN' : queueState.toUpperCase(),
                       style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.5),
                     ),
@@ -2093,14 +2100,13 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
             ],
           ),
         ),
-        if (_hasEstRow)
+        if (_hasEstRow && arrival != null && !myTurn && started && ahead != null && ahead > 0)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: (myTurn ? kSuccess : kWarning).withOpacity(0.06),
-              borderRadius:
-                  const BorderRadius.vertical(bottom: Radius.circular(10)),
+              color: accentColor.withOpacity(0.05),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
               border: Border(
                 left:   BorderSide(color: topBorder),
                 right:  BorderSide(color: topBorder),
@@ -2109,53 +2115,98 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
             ),
             child: Row(
               children: [
-                Icon(
-                  myTurn
-                      ? Icons.notifications_active_rounded
-                      : Icons.hourglass_top_rounded,
-                  size: 12,
-                  color: myTurn ? kSuccess : kWarning,
-                ),
-                const SizedBox(width: 6),
-                if (myTurn)
-                  const Text('Please proceed to the doctor',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kSuccess))
-                else if (started && ahead == 0)
-                  const Text('Your turn next',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kWarning))
-                else if (arrival != null)
-                  Text('Est. arrival: $arrival',
-                      style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: kWarning)),
-                if (!myTurn && started && ahead != null) ...[
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: kWarning.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                        ahead == 0 ? 'Next' : '$ahead ahead',
-                        style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: kWarning)),
-                  ),
-                ],
+                Icon(Icons.hourglass_top_rounded, size: 11, color: accentColor),
+                const SizedBox(width: 5),
+                Text('Est. $arrival',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: accentColor)),
               ],
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildTokenCircle(int? q, Color color, bool myTurn, bool started) {
+    return SizedBox(
+      width: 54, height: 54,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Ripple rings — only when queue is live
+          if (started && !_isClosed && !_isSkipped)
+            ...[0.0, 0.33, 0.66].map((phase) => AnimatedBuilder(
+              animation: _rippleCtrl,
+              builder: (_, __) {
+                final p  = (_rippleCtrl.value + phase) % 1.0;
+                final sz = 30.0 + p * 24.0;
+                final op = (1.0 - p) * 0.38;
+                return Center(
+                  child: Container(
+                    width: sz, height: sz,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                          color: color.withOpacity(op), width: 1.3),
+                    ),
+                  ),
+                );
+              },
+            )),
+          // Gradient circle with token number
+          Container(
+            width: 42, height: 42,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [color, color.withOpacity(0.75)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                    color: color.withOpacity(0.35),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  myTurn ? 'TURN' : 'TOKEN',
+                  style: const TextStyle(
+                      fontSize: 6,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.4),
+                ),
+                // Bounce when token number changes (socket update)
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 350),
+                  transitionBuilder: (child, anim) => ScaleTransition(
+                    scale: Tween<double>(begin: 0.4, end: 1.0).animate(
+                      CurvedAnimation(parent: anim, curve: Curves.elasticOut),
+                    ),
+                    child: child,
+                  ),
+                  child: Text(
+                    _isSkipped ? '⚠' : myTurn ? '✓' : (q != null ? '#$q' : '—'),
+                    key: ValueKey('$q-$myTurn-$_isSkipped'),
+                    style: TextStyle(
+                        fontSize: myTurn || _isSkipped ? 14 : 13,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.0),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

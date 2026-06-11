@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:qless/core/network/socket_service.dart';
 import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
@@ -45,7 +46,7 @@ final appointmentViewModelProvider =
     StateNotifierProvider<AppointmentViewmodel, AppointmentState>((ref) {
   final usecase      = ref.watch(appointmentUsecaseProvider);
   final offlineStore = ref.watch(offlineQueueStoreProvider);
-  return AppointmentViewmodel(usecase, offlineStore);
+  return AppointmentViewmodel(usecase, offlineStore, ref.watch(socketServiceProvider));
 });
 
 final reviewViewModelProvider =

@@ -163,6 +163,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (_doctorId == 0) return;
     if (_hasFetched && !force) return;
     _hasFetched = true;
+    ref.read(appointmentViewModelProvider.notifier).joinClinic(_doctorId);
     await Future.wait([
       ref
           .read(appointmentViewModelProvider.notifier)

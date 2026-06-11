@@ -10,6 +10,7 @@ import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
@@ -243,6 +244,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   @override
   void dispose() {
+    ref.read(appointmentViewModelProvider.notifier).unwatchClinics();
     _animCtrl.dispose();
     super.dispose();
   }
@@ -268,6 +270,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
       ]);
       if (!mounted) return;
+      final appts = ref.read(appointmentViewModelProvider).patientAppointmentsList?.value ?? [];
+      final now = DateTime.now();
+      final liveDocIds = appts.where((a) {
+        final s = a.status?.toLowerCase() ?? '';
+        if (s != 'booked' && s != 'in_progress' && s != 'skipped') return false;
+        if (a.bookingType != 1) return false;
+        final d = DateTime.tryParse(a.appointmentDate ?? '');
+        return d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+      }).map((a) => a.doctorId).whereType<int>().toSet().toList();
+      if (liveDocIds.isNotEmpty) {
+        ref.read(appointmentViewModelProvider.notifier).watchClinics(liveDocIds, pid);
+      }
     } finally {
       _isFetching = false;
     }
@@ -448,13 +462,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   // Top rated doctor tap → straight to the booking screen for that doctor
   // (same as other apps; no detour through the search list).
-  void _goToBook(DoctorDetails doctor) {
-    Navigator.push(
+  Future<void> _goToBook(DoctorDetails doctor) async {
+    final ok = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => BookAppointmentScreen(doctor: doctor),
       ),
     );
+    if (ok == true && mounted) {
+      _didFetch = false;
+      _ensurePatientIdAndFetch();
+    }
   }
 
   Widget _buildAppointmentsSection() {
@@ -694,6 +712,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final greeting      = hour < 12
         ? 'Good Morning 👋'
         : hour < 17 ? 'Good Afternoon 👋' : 'Good Evening 👋';
+
+    // Any new booking from any screen → refresh so upcoming section is current
+    // and watchClinics starts for the new clinic if it's a walk-in today.
+    ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
+      if (next.isSuccess &&
+          next.bookingResponse != null &&
+          next.bookingResponse != prev?.bookingResponse) {
+        _didFetch = false;
+        _ensurePatientIdAndFetch();
+      }
+    });
+
 
     return Scaffold(
       backgroundColor: Colors.white,
