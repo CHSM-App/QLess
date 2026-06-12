@@ -476,9 +476,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildAppointmentsSection() {
-    final async = ref
-        .watch(appointmentViewModelProvider)
-        .patientAppointmentsList;
+    final vmState  = ref.watch(appointmentViewModelProvider);
+    final async    = vmState.patientAppointmentsList;
+    final offline  = vmState.offlineDoctors;
     if (async == null || async is AsyncLoading)
       return _apptShell(loading: true);
     return async.when(
@@ -578,6 +578,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     appointment: e.value,
                     isToday: _isToday(e.value),
                     isNext: e.key == 0,
+                    doctorOffline: offline.contains(e.value.doctorId),
+                    queueEvent: vmState.doctorQueueEvents[e.value.doctorId],
+                    currentServingOverride: vmState.doctorCurrentServing[e.value.doctorId],
                   ),
                 ),
               ),
@@ -1962,16 +1965,30 @@ class _ApptCard extends StatefulWidget {
   final AppointmentList appointment;
   final bool isToday;
   final bool isNext;
-  const _ApptCard(
-      {required this.appointment, this.isToday = false, this.isNext = false});
+  final bool doctorOffline;
+  final String? queueEvent;
+  /// Real current_serving from socket events — used for skipped patients where
+  /// the SP echoes their own token instead of the actual serving number.
+  final int? currentServingOverride;
+  const _ApptCard({
+    required this.appointment,
+    this.isToday = false,
+    this.isNext = false,
+    this.doctorOffline = false,
+    this.queueEvent,
+    this.currentServingOverride,
+  });
   @override
   State<_ApptCard> createState() => _ApptCardState();
 }
 
 class _ApptCardState extends State<_ApptCard>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _dotBlink;
+
+  late AnimationController _bounceCtrl;
+  late Animation<double> _bounceScale;
 
   @override
   void initState() {
@@ -1982,12 +1999,60 @@ class _ApptCardState extends State<_ApptCard>
     _dotBlink = Tween<double>(begin: 1.0, end: 0.25).animate(CurvedAnimation(
         parent: _ctrl,
         curve: const Interval(0.0, 0.5, curve: Curves.easeInOut)));
+
+    _bounceCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 420));
+    _bounceScale = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.28), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 1.28, end: 0.92), weight: 30),
+      TweenSequenceItem(tween: Tween(begin: 0.92, end: 1.0),  weight: 35),
+    ]).animate(CurvedAnimation(parent: _bounceCtrl, curve: Curves.easeOut));
+  }
+
+  @override
+  void didUpdateWidget(_ApptCard old) {
+    super.didUpdateWidget(old);
+    final prev = old.appointment;
+    final curr = widget.appointment;
+    if (curr.currentServing != prev.currentServing ||
+        curr.totalQueue     != prev.totalQueue     ||
+        curr.isMyTurn       != prev.isMyTurn) {
+      _bounceCtrl.forward(from: 0);
+    }
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _bounceCtrl.dispose();
     super.dispose();
+  }
+
+  Widget _buildQueueBanner(String event) {
+    final (Color bg, Color fg, Color border, IconData icon, String text) = switch (event) {
+      'queue_started'           => (kGreenLight,  kSuccess,  kSuccess.withOpacity(0.3),  Icons.play_circle_outline_rounded,  'Queue is live — your turn is approaching'),
+      'queue_paused'            => (kAmberLight,  kWarning,  kWarning.withOpacity(0.3),  Icons.pause_circle_outline_rounded, 'Queue paused temporarily'),
+      'queue_paused_emergency'  => (kRedLight,    kError,    kError.withOpacity(0.3),    Icons.warning_amber_rounded,        'Emergency break • queue on hold'),
+      'queue_stopped'           => (const Color(0xFFF7F8FA), kTextMuted, kBorder, Icons.stop_circle_outlined, 'Queue stopped for today'),
+      _                         => (kPrimaryLight, kPrimary, kPrimary.withOpacity(0.2),  Icons.info_outline_rounded, event),
+    };
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
+        border: Border(bottom: BorderSide(color: border)),
+      ),
+      child: Row(children: [
+        Icon(icon, size: 12, color: fg),
+        const SizedBox(width: 5),
+        Expanded(
+          child: Text(text,
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: fg)),
+        ),
+      ]),
+    );
   }
 
   String _fmtDate(String? raw) {
@@ -2021,11 +2086,48 @@ String _fmtClockTime(String? raw) {
 
     final myToken   = appt.myQueueNumber ?? appt.queueNumber;
     final totalQ    = appt.totalQueue;
-    final serving   = appt.currentServing;
-    final isMyTurn  = appt.isMyTurn ?? false;
     final isSkipped = appt.queueState?.toLowerCase() == 'skipped';
-    // Show queue section only for today's appointments that have a token
-    final showQueue = widget.isToday && myToken != null;
+    final isMyTurn  = appt.isMyTurn ?? false;
+    // Socket override is always fresher than the SP value.
+    // Sanitize: when no socket data is available yet, the SP echoes the
+    // patient's own queue_number as current_serving (SP bug). Discard it so
+    // we show nothing rather than a misleading value.
+    final rawServing = widget.currentServingOverride ?? appt.currentServing;
+    final serving = (widget.currentServingOverride == null &&
+            rawServing != null &&
+            rawServing == myToken &&
+            !isMyTurn)
+        ? null
+        : rawServing;
+    // Show queue row (QUEUE NO. chip + badges) for today when token exists OR skipped.
+    // The Skipped badge lives inside this row so it must show even when SP returns
+    // null for my_queue_number (which happens for skipped patients).
+    final showQueueSection = widget.isToday && (myToken != null || isSkipped);
+    // NOW circle: hide when serving is unknown (null) to avoid showing stale/wrong data.
+    final showQueue = widget.isToday && myToken != null && serving != null;
+
+    // Derive effective queue event (socket live OR API cold-start)
+    String? queueEvent = widget.queueEvent;
+    if (queueEvent == null && widget.isToday && appt.bookingType == 1) {
+      if (appt.queueStarted == true) queueEvent = 'queue_started';
+    }
+    final showBanner = widget.isToday && queueEvent != null;
+
+    Color borderColor;
+    double borderWidth;
+    if (isMyTurn) {
+      borderColor = kPrimary; borderWidth = 2;
+    } else if (isSkipped) {
+      borderColor = kError;   borderWidth = 2;
+    } else if (queueEvent == 'queue_paused_emergency') {
+      borderColor = kError;   borderWidth = 2;
+    } else if (queueEvent == 'queue_paused') {
+      borderColor = kWarning; borderWidth = 1.8;
+    } else if (queueEvent == 'queue_started' || widget.isNext) {
+      borderColor = kPrimary; borderWidth = 1.8;
+    } else {
+      borderColor = kBorder;  borderWidth = 1;
+    }
 
     return AnimatedBuilder(
       animation: _ctrl,
@@ -2034,15 +2136,10 @@ String _fmtClockTime(String? raw) {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSkipped
-                  ? kError
-                  : (isMyTurn || widget.isNext) ? kPrimary : kBorder,
-              width: (isMyTurn || isSkipped) ? 2 : (widget.isNext ? 1.8 : 1),
-            ),
+            border: Border.all(color: borderColor, width: borderWidth),
             boxShadow: [
               BoxShadow(
-                  color: widget.isNext
+                  color: (isMyTurn || queueEvent == 'queue_started' || widget.isNext)
                       ? kPrimary.withOpacity(0.20)
                       : Colors.black.withOpacity(0.05),
                   blurRadius: widget.isNext ? 16 : 10,
@@ -2052,42 +2149,76 @@ String _fmtClockTime(String? raw) {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── TOP ROW: Queue chip + Today/Turn badge ──────────
-              if (showQueue)
+              // ── Queue status banner (live socket event) ──────────
+              if (showBanner)
+                _buildQueueBanner(queueEvent!),
+              // ── Doctor offline warning ───────────────────────────
+              if (widget.doctorOffline)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: kWarning.withOpacity(0.12),
+                    // Only round top corners when no queue banner sits above this strip.
+                    borderRadius: showBanner
+                        ? BorderRadius.zero
+                        : const BorderRadius.vertical(top: Radius.circular(13)),
+                    border: Border(bottom: BorderSide(color: kWarning.withOpacity(0.3))),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.wifi_off_rounded, size: 13, color: kWarning),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'Dr. ${appt.doctorName ?? 'Doctor'} has a network connection issue. Please come at your estimated time.',
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: kWarning,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // ── TOP ROW: Queue chip + Today/Turn/Skipped badge ──
+              if (showQueueSection)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 9, 12, 0),
                   child: Row(
                     children: [
-                      // Queue number chip
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 9, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: kPrimaryLight,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: kPrimary.withOpacity(0.3)),
+                      // Queue number chip — only when SP returned a token
+                      if (myToken != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: kPrimaryLight,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: kPrimary.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('QUEUE NO.',
+                                  style: TextStyle(
+                                      fontSize: 8,
+                                      fontWeight: FontWeight.w700,
+                                      color: kPrimaryDark,
+                                      letterSpacing: 0.5)),
+                              const SizedBox(width: 6),
+                              Text(
+                                myToken.toString().padLeft(2, '0'),
+                                style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: kPurple),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('QUEUE NO.',
-                                style: TextStyle(
-                                    fontSize: 8,
-                                    fontWeight: FontWeight.w700,
-                                    color: kPrimaryDark,
-                                    letterSpacing: 0.5)),
-                            const SizedBox(width: 6),
-                            Text(
-                              myToken.toString().padLeft(2, '0'),
-                              style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                  color: kPurple),
-                            ),
-                          ],
-                        ),
-                      ),
                       const Spacer(),
                       // Today / Your Turn badge
                       if (isMyTurn)
@@ -2157,7 +2288,7 @@ String _fmtClockTime(String? raw) {
               // ── MAIN ROW: Avatar + Info + NOW badge ─────────────
               Padding(
                 padding: EdgeInsets.fromLTRB(
-                    12, showQueue ? 8 : 11, 12, 10),
+                    12, showQueueSection ? 8 : 11, 12, 10),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -2226,7 +2357,9 @@ String _fmtClockTime(String? raw) {
                       Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(
+                          ScaleTransition(
+                            scale: _bounceScale,
+                            child: SizedBox(
                             width: 42,
                             height: 42,
                             child: Stack(
@@ -2270,7 +2403,7 @@ String _fmtClockTime(String? raw) {
                                                   .withOpacity(0.85),
                                               letterSpacing: 0.4)),
                                       Text(
-                                        '${serving ?? 0}/${totalQ ?? 0}',
+                                        '$serving/${totalQ ?? 0}',
                                         style: const TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.w800,
@@ -2283,6 +2416,7 @@ String _fmtClockTime(String? raw) {
                               ],
                             ),
                           ),
+                          ), // ScaleTransition
                           const SizedBox(height: 3),
                           Row(mainAxisSize: MainAxisSize.min, children: [
                             Opacity(

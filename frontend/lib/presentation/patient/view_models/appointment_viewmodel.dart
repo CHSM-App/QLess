@@ -27,6 +27,11 @@ class AppointmentState {
   final List<MonthSlotData> bookedSlots;
   final AsyncValue<List<AppointmentList>>?  patientAppointmentsList;
   final int? doctorPatientCount;
+  final Set<int> offlineDoctors; // doctor IDs whose network is currently down
+  // Live queue status per doctorId: 'queue_started' | 'queue_paused' | 'queue_paused_emergency' | 'queue_stopped'
+  final Map<int, String> doctorQueueEvents;
+  // Real current_serving per doctorId from socket events (overrides SP value for skipped patients).
+  final Map<int, int> doctorCurrentServing;
 
   const AppointmentState({
     this.isLoading = false,
@@ -42,6 +47,9 @@ class AppointmentState {
     this.bookedSlots = const [],
     this.patientAppointmentsList,
     this.doctorPatientCount,
+    this.offlineDoctors = const {},
+    this.doctorQueueEvents = const {},
+    this.doctorCurrentServing = const {},
   });
 
   AppointmentState copyWith({
@@ -49,6 +57,7 @@ class AppointmentState {
     String? error,
     bool? isSuccess,
     bool clearError = false,
+    bool clearBookingResponse = false,
     AppointmentResponseModel? availabilityResponse,
     AppointmentResponseModel? bookingResponse,
     AppointmentResponseModel? rescheduleResponse,
@@ -60,18 +69,20 @@ class AppointmentState {
     AsyncValue<List<AppointmentList>>?  patientAppointmentsList,
     int? doctorPatientCount,
     bool clearDoctorPatientCount = false,
+    Set<int>? offlineDoctors,
+    Map<int, String>? doctorQueueEvents,
+    Map<int, int>? doctorCurrentServing,
   }) {
     return AppointmentState(
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
       isSuccess: isSuccess ?? this.isSuccess,
       availabilityResponse: availabilityResponse ?? this.availabilityResponse,
-      bookingResponse: bookingResponse ?? this.bookingResponse,
+      bookingResponse: clearBookingResponse ? null : (bookingResponse ?? this.bookingResponse),
       rescheduleResponse: rescheduleResponse ?? this.rescheduleResponse,
       cancelResponse: cancelResponse ?? this.cancelResponse,
       queueStatusResponse: queueStatusResponse ?? this.queueStatusResponse,
       queueEstimates: queueEstimates ?? this.queueEstimates,
-
       queuePreviewEstimateResponse:
           queuePreviewEstimateResponse ?? this.queuePreviewEstimateResponse,
       bookedSlots: bookedSlots ?? this.bookedSlots,
@@ -79,6 +90,9 @@ class AppointmentState {
       doctorPatientCount: clearDoctorPatientCount
           ? null
           : (doctorPatientCount ?? this.doctorPatientCount),
+      offlineDoctors: offlineDoctors ?? this.offlineDoctors,
+      doctorQueueEvents: doctorQueueEvents ?? this.doctorQueueEvents,
+      doctorCurrentServing: doctorCurrentServing ?? this.doctorCurrentServing,
     );
   }
 }
@@ -89,28 +103,73 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   final SocketService socketService;
 
   StreamSubscription<Map<String, dynamic>>? _socketSub;
+  StreamSubscription<Map<String, dynamic>>? _statusSub;
 
   AppointmentViewmodel(this.usecase, this.offlineStore, this.socketService)
       : super(const AppointmentState());
 
   void watchClinics(List<int> doctorIds, int patientId) {
     _socketSub?.cancel();
+    _statusSub?.cancel();
+    debugPrint('[SOCKET] watchClinics called for doctorIds=$doctorIds');
+
+    // Register BEFORE joinClinic so we don't miss the immediate doctor_status
+    // reply the backend sends when the doctor is already offline at join time.
+    _statusSub = socketService.doctorStatusUpdates.listen((data) {
+      debugPrint('[SOCKET] doctor_status received: $data');
+      final raw      = data['doctor_id'];
+      final doctorId = raw is int ? raw : int.tryParse(raw.toString());
+      final online   = data['online'] as bool? ?? true;
+      if (doctorId == null) return;
+      final updated = Set<int>.from(state.offlineDoctors);
+      if (online) { updated.remove(doctorId); } else { updated.add(doctorId); }
+      debugPrint('[SOCKET] offlineDoctors updated: $updated');
+      state = state.copyWith(offlineDoctors: updated);
+    });
+
+    const bannerEvents = {
+      'queue_started', 'queue_paused', 'queue_paused_emergency', 'queue_stopped',
+    };
+    _socketSub = socketService.updates.listen((data) {
+      final event = data['event'] as String?;
+      final raw   = data['doctor_id'];
+      final dId   = raw is int ? raw : int.tryParse(raw.toString());
+      if (dId != null) {
+        // Capture real current_serving from socket (avoids SP bug where skipped
+        // patients receive their own token echoed back as current_serving).
+        final rawCs = data['current_serving'];
+        final cs = rawCs is int ? rawCs : int.tryParse(rawCs?.toString() ?? '');
+        if (cs != null && cs > 0) {
+          final csMap = Map<int, int>.from(state.doctorCurrentServing);
+          csMap[dId] = cs;
+          state = state.copyWith(doctorCurrentServing: csMap);
+        }
+        if (event != null && bannerEvents.contains(event)) {
+          final evMap = Map<int, String>.from(state.doctorQueueEvents);
+          evMap[dId] = event;
+          state = state.copyWith(doctorQueueEvents: evMap);
+        }
+      }
+      getPatientAppointments(patientId, silent: true);
+    });
+
+    // Join AFTER listeners are set up.
     for (final id in doctorIds) {
       socketService.joinClinic(id);
     }
-    _socketSub = socketService.updates.listen((_) {
-      getPatientAppointments(patientId, silent: true);
-    });
   }
 
   void unwatchClinics() {
     _socketSub?.cancel();
+    _statusSub?.cancel();
     _socketSub = null;
+    _statusSub = null;
   }
 
   @override
   void dispose() {
     _socketSub?.cancel();
+    _statusSub?.cancel();
     super.dispose();
   }
 
@@ -164,7 +223,7 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   Future<void> bookAppointment(
     AppointmentRequestModel appointmentRequest,
   ) async {
-    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
+    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false, clearBookingResponse: true);
     try {
       final result = await usecase.bookAppointment(appointmentRequest);
       state = state.copyWith(

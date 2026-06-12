@@ -6,8 +6,10 @@ import 'package:socket_io_client/socket_io_client.dart' as sio;
 
 class SocketService {
   late final sio.Socket _socket;
-  final _controller = StreamController<Map<String, dynamic>>.broadcast();
-  final _joinedRooms = <int>{};
+  final _controller       = StreamController<Map<String, dynamic>>.broadcast();
+  final _statusController = StreamController<Map<String, dynamic>>.broadcast();
+  final _joinedRooms      = <int>{};
+  final _doctorRooms      = <int>{}; // rooms joined as doctor (for reconnect)
 
   SocketService() {
     final serverUrl = baseUrl.endsWith('/')
@@ -32,11 +34,19 @@ class SocketService {
       }
     });
 
-    // After a reconnect the server has no room state for this socket —
-    // re-join every room the client was subscribed to.
+    _socket.on('doctor_status', (data) {
+      if (data is Map) {
+        _statusController.add(Map<String, dynamic>.from(data));
+      }
+    });
+
+    // After a reconnect re-join all rooms (patient + doctor).
     _socket.on('reconnect', (_) {
       for (final id in _joinedRooms) {
         _socket.emit('joinClinic', id);
+      }
+      for (final id in _doctorRooms) {
+        _socket.emit('doctorJoinClinic', id);
       }
     });
 
@@ -45,29 +55,42 @@ class SocketService {
     });
   }
 
-  Stream<Map<String, dynamic>> get updates => _controller.stream;
+  Stream<Map<String, dynamic>> get updates       => _controller.stream;
+  Stream<Map<String, dynamic>> get doctorStatusUpdates => _statusController.stream;
 
+  // Patient-side join (no presence tracking on server)
   void joinClinic(int doctorId) {
     _joinedRooms.add(doctorId);
     if (!_socket.connected) _socket.connect();
     _socket.emit('joinClinic', doctorId);
   }
 
+  // Doctor-side join — server tracks socket for offline detection
+  void doctorJoinClinic(int doctorId) {
+    _doctorRooms.add(doctorId);
+    if (!_socket.connected) _socket.connect();
+    _socket.emit('doctorJoinClinic', doctorId);
+  }
+
   void leaveClinic(int doctorId) {
     _joinedRooms.remove(doctorId);
+    _doctorRooms.remove(doctorId);
     _socket.emit('leaveClinic', doctorId);
-    if (_joinedRooms.isEmpty) _socket.disconnect();
+    if (_joinedRooms.isEmpty && _doctorRooms.isEmpty) _socket.disconnect();
   }
 
   void disconnect() {
     _joinedRooms.clear();
+    _doctorRooms.clear();
     _socket.disconnect();
   }
 
   void dispose() {
     _joinedRooms.clear();
+    _doctorRooms.clear();
     _socket.dispose();
     _controller.close();
+    _statusController.close();
   }
 }
 

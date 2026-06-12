@@ -14,7 +14,7 @@ import 'package:qless/domain/usecase/appointment_usecase.dart';
 
 enum QueueState { idle, running, paused, stopped }
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// ─── State ────────────────s────────────────────────────────────────────────────
 
 class AppointmentListState {
   final bool isLoading;
@@ -80,7 +80,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
 
   void joinClinic(int doctorId) {
     _currentDoctorId = doctorId;
-    socketService.joinClinic(doctorId);
+    socketService.doctorJoinClinic(doctorId);
     _socketSub?.cancel();
     _socketSub = socketService.updates.listen((_) {
       fetchPatientAppointments(doctorId, silent: true);

@@ -16,6 +16,27 @@ function emitQueueUpdate(req, event, doctor_id, extra = {}) {
   if (io && doctor_id) io.to('clinic_' + doctor_id).emit('queue_update', { event, doctor_id, ...extra });
 }
 
+// Returns the furthest queue_number the active queue has reached — MAX among
+// in_progress and completed only. Skipped patients are handled outside the
+// main queue and must not affect this value. When a skipped patient is
+// recalled (skipped → in_progress), completed tokens still dominate the MAX
+// (e.g. recalled token 2 after token 4 was completed → MAX = 4 ✓).
+async function fetchCurrentServing(appointment_id) {
+  try {
+    const res = await db.request()
+      .input('appointment_id', sql.Int, parseInt(appointment_id))
+      .query(`
+        SELECT MAX(a.queue_number) AS current_serving
+        FROM   appointments a
+        WHERE  a.queue_id = (SELECT queue_id FROM appointments WHERE appointment_id = @appointment_id)
+          AND  a.status   IN ('in_progress', 'completed')
+      `);
+    return res.recordset[0]?.current_serving ?? null;
+  } catch (_) {
+    return null;
+  }
+}
+
 if (!admin.apps.length) {
   const serviceAccount = require("../ServiceAccountKey.json");
   admin.initializeApp({
@@ -1050,7 +1071,8 @@ router.post('/appointment/queueNext', async (req, res) => {
     }
 
     sendProximityNotifications(doctor_id);
-    emitQueueUpdate(req, 'next', doctor_id);
+    const nextServing = await fetchCurrentServing(appointment_id);
+    emitQueueUpdate(req, 'next', doctor_id, { current_serving: nextServing });
 
     return res.json({
       success: true,
@@ -1103,6 +1125,7 @@ router.post('/appointment/queueStart', async (req, res) => {
            message: statusRow|| 'Queue start failed'
          });
        }*/
+
 
     const tokens = allRows
       .filter(r => r && r !== statusRow && r.token && String(r.token).trim() !== '')
@@ -1454,7 +1477,8 @@ router.post('/appointment/queueSkip', async (req, res) => {
     }
 
     sendProximityNotifications(doctor_id);
-    emitQueueUpdate(req, 'skip', doctor_id);
+    const skipServing = await fetchCurrentServing(appointment_id);
+    emitQueueUpdate(req, 'skip', doctor_id, { current_serving: skipServing });
 
     return res.json({
       success: true,
@@ -1492,7 +1516,10 @@ router.post('/appointment/queueRecall', async (req, res) => {
 
     const row = result.recordset?.[0] ?? {};
 
-    if (row.success === 1) emitQueueUpdate(req, 'recall', doctor_id);
+    if (row.success === 1) {
+      const recallServing = await fetchCurrentServing(appointment_id);
+      emitQueueUpdate(req, 'recall', doctor_id, { current_serving: recallServing });
+    }
 
     return res.json({
       success: row.success === 1,
@@ -1529,7 +1556,10 @@ router.post('/appointment/startSession', async (req, res) => {
 
     const row = result.recordset?.[0] ?? {};
 
-    if (row.success === 1) emitQueueUpdate(req, 'session_started', doctor_id);
+    if (row.success === 1) {
+      const startServing = await fetchCurrentServing(appointment_id);
+      emitQueueUpdate(req, 'session_started', doctor_id, { current_serving: startServing });
+    }
     return res.json({
       success: row.success === 1,
       message: row.message ?? 'Session started'

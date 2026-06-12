@@ -463,12 +463,13 @@ void dispose() {
     // Listeners
     ref.listen<AppointmentState>(appointmentViewModelProvider, (prev, next) {
       if (!widget.isReschedule &&
+          _isBooking &&
+          next.isSuccess &&
           next.bookingResponse != null &&
-          next.bookingResponse != prev?.bookingResponse &&
           !next.isLoading) {
-        _snack(next.bookingResponse!.message ?? 'Appointment booked!');
         setState(() => _isBooking = false);
         Navigator.pop(context, true);
+        _snack(next.bookingResponse!.message ?? 'Appointment booked!');
         return;
       }
       if (widget.isReschedule &&

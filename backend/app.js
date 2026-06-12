@@ -129,12 +129,57 @@ const io = new Server(server, {
 
 app.set('io', io);
 
+// doctorSockets: doctorId → Set<socketId>  (active connections)
+// doctorStatus:  doctorId → true/false       (last known online state)
+const doctorSockets = new Map();
+const doctorStatus  = new Map();
+
 // SOCKET EVENTS
 io.on('connection', (socket) => {
   console.log('Socket connected:', socket.id);
 
-  socket.on('joinClinic', (clinicId) => {
+  // Patient/general join.
+  // Sends two immediate replies so the patient's screen is correct even if
+  // they open the app after queue actions already happened:
+  //   1. doctor_status  — avoids a stuck offline banner on reconnect
+  //   2. queue_update   — seeds current_serving so the NOW circle shows the
+  //                       real value instead of the SP's stale/buggy value
+  socket.on('joinClinic', async (clinicId) => {
     socket.join(`clinic_${clinicId}`);
+    if (doctorStatus.has(clinicId)) {
+      socket.emit('doctor_status', { doctor_id: clinicId, online: doctorStatus.get(clinicId) });
+    }
+    // Fetch today's furthest-served token for this doctor and push it so the
+    // Flutter app's doctorCurrentServing map is populated on cold start.
+    try {
+      const res = await db.request()
+        .input('doctor_id', parseInt(clinicId))
+        .query(`
+          SELECT MAX(a.queue_number) AS current_serving
+          FROM   appointments a
+          JOIN   doctor_queue dq ON dq.queue_id = a.queue_id
+          WHERE  dq.doctor_id = @doctor_id
+            AND  CAST(dq.queue_date AS DATE) = CAST(GETDATE() AS DATE)
+            AND  a.status IN ('in_progress', 'completed')
+        `);
+      const cs = res.recordset[0]?.current_serving;
+      if (cs != null && cs > 0) {
+        socket.emit('queue_update', { event: 'initial', doctor_id: clinicId, current_serving: cs });
+      }
+    } catch (_) {}
+  });
+
+  // Doctor join — tracked for offline detection
+  socket.on('doctorJoinClinic', (doctorId) => {
+    console.log(`[DOCTOR] doctorJoinClinic doctorId=${doctorId} socket=${socket.id}`);
+    socket.join(`clinic_${doctorId}`);
+    if (!doctorSockets.has(doctorId)) doctorSockets.set(doctorId, new Set());
+    doctorSockets.get(doctorId).add(socket.id);
+    socket._doctorRooms = socket._doctorRooms || new Set();
+    socket._doctorRooms.add(doctorId);
+    doctorStatus.set(doctorId, true);
+    io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: true });
+    console.log(`[DOCTOR] emitted online=true to clinic_${doctorId}`);
   });
 
   socket.on('leaveClinic', (clinicId) => {
@@ -142,7 +187,21 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    console.log('Socket disconnected:', socket.id);
+    console.log('Socket disconnected:', socket.id, '| doctorRooms:', socket._doctorRooms ? [...socket._doctorRooms] : 'none');
+    if (socket._doctorRooms) {
+      for (const doctorId of socket._doctorRooms) {
+        const sockets = doctorSockets.get(doctorId);
+        if (sockets) {
+          sockets.delete(socket.id);
+          if (sockets.size === 0) {
+            doctorSockets.delete(doctorId);
+            doctorStatus.set(doctorId, false); // remember offline state
+            io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false });
+            console.log(`[DOCTOR] emitted online=false to clinic_${doctorId}`);
+          }
+        }
+      }
+    }
   });
 });
 

@@ -501,21 +501,21 @@ class _DoctorPatientHistoryScreenState
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: avBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: avBd),
-            ),
-            alignment: Alignment.center,
-            child: Text(initials,
-                style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: avFg)),
-          ),
+          // Container(
+          //   width: 44,
+          //   height: 44,
+          //   decoration: BoxDecoration(
+          //     color: avBg,
+          //     borderRadius: BorderRadius.circular(12),
+          //     border: Border.all(color: avBd),
+          //   ),
+          //   alignment: Alignment.center,
+          //   child: Text(initials,
+          //       style: TextStyle(
+          //           fontSize: 13,
+          //           fontWeight: FontWeight.w800,
+          //           color: avFg)),
+          // ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -538,25 +538,25 @@ class _DoctorPatientHistoryScreenState
                       const TextStyle(fontSize: 10, color: _kTextSecondary),
                 ),
                 const SizedBox(height: 5),
-                Row(children: [
-                  _completedBadge(),
-                  if (p.specialization != null) ...[
-                    const SizedBox(width: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 7, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: _kPrimaryLighter,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(p.specialization!,
-                          style: const TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: _kPrimaryDark)),
-                    ),
-                  ],
-                ]),
+                // Row(children: [
+                //   _completedBadge(),
+                //   if (p.specialization != null) ...[
+                //     const SizedBox(width: 5),
+                //     Container(
+                //       padding: const EdgeInsets.symmetric(
+                //           horizontal: 7, vertical: 2),
+                //       decoration: BoxDecoration(
+                //         color: _kPrimaryLighter,
+                //         borderRadius: BorderRadius.circular(6),
+                //       ),
+                //       child: Text(p.specialization!,
+                //           style: const TextStyle(
+                //               fontSize: 9,
+                //               fontWeight: FontWeight.w700,
+                //               color: _kPrimaryDark)),
+                //     ),
+                //   ],
+                // ]),
               ],
             ),
           ),

@@ -102,6 +102,14 @@ String? _slotTimeLabel(String? startTime, String? endTime) {
 
 bool _isSlotBooking(AppointmentList appointment) => appointment.bookingType == 2;
 
+bool _showPatientStatusText(String? status) {
+  final value = status?.toLowerCase().trim();
+  return value == 'skipped' || value == 'in_progress';
+}
+
+String _patientStatusLabel(String status) =>
+    status[0].toUpperCase() + status.substring(1).replaceAll('_', ' ');
+
 String _fmtDateLabel(String? raw, {bool includeYear = false}) {
   if (raw == null) return '--';
   final d = DateTime.tryParse(raw);
@@ -574,6 +582,8 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     final inits = name.trim().split(' ').take(2)
         .map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
     final isSlot = _isSlotBooking(p);
+    final status = p.status?.toLowerCase().trim() ?? '';
+    final showStatusText = _showPatientStatusText(status);
     final slotMeta = isSlot
         ? _slotAppointmentMetaLabel(p.appointmentDate, p.startTime, includeYear: true)
         : null;
@@ -607,9 +617,9 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
             ],
             const SizedBox(height: 14),
             const Divider(height: 1, color: kDivider),
-            _DetailRow('Status',
-                (p.status ?? 'Unknown')[0].toUpperCase() +
-                    (p.status ?? 'unknown').substring(1).replaceAll('_', ' ')),
+            if (showStatusText)
+              _DetailRow('Status',
+                  _patientStatusLabel(status)),
             if (p.specialization != null) _DetailRow('Specialty', p.specialization!),
             _DetailRow(
               'Date',
@@ -1858,7 +1868,8 @@ class _QueueSlotSection extends StatelessWidget {
                           accessible = true;
                         } else if (status == 'skipped') {
                           accessible = true;
-                        } else if (queueActive && status == 'booked') {
+                        }
+                         else if (queueActive && status == 'booked') {
                           accessible = !hasIP && p.queueNumber == nextBooked.firstOrNull?.queueNumber;
                         }
                         final effectiveAccessible = status == 'skipped' ? accessible : queueActive && accessible;
@@ -2738,9 +2749,9 @@ class _PillTabBar extends StatelessWidget {
             splashFactory: NoSplash.splashFactory,
             overlayColor: WidgetStateProperty.all(Colors.transparent),
             tabs: [
-              Tab(text: 'Current Today Queue ($todayCount)'),
+              Tab(text: 'Today ($todayCount)'),
               Tab(text: 'Upcoming ($upcomingCount)'),
-              Tab(text: 'Current Complete Queue ($completedCount)'),
+              Tab(text: 'Current Complete ($completedCount)'),
             ],
           ),
         ),
@@ -3000,13 +3011,18 @@ class _PatientCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final av = _av;
     final st = patient.status ?? 'unknown';
-    final status = st.toLowerCase();
+    final status = st.toLowerCase().trim();
     final isIP = status == 'in_progress';
     final isSlotBooking = _isSlotBooking(patient);
-    final slotMetaLabel = isSlotBooking
-        ? _slotAppointmentMetaLabel(patient.appointmentDate, patient.startTime)
-        : null;
-    final showBookedTag = !(isSlotBooking && status == 'booked');
+    final metaLabel = switch (tab) {
+      _Tab.today when isSlotBooking =>
+        _slotTimeLabel(patient.startTime, patient.endTime),
+      _Tab.today => null,
+      _ when isSlotBooking =>
+        _slotAppointmentMetaLabel(patient.appointmentDate, patient.startTime),
+      _ => _fmtDateLabel(patient.appointmentDate),
+    };
+    final showStatusText = _showPatientStatusText(status);
     final (Color sBg, Color sFg, Color sDot) = switch (status) {
       'booked' => (kGreenLight, kGreenDark, kSuccess),
       'in_progress' => (kPrimaryLighter, kPrimaryDark, kPrimary),
@@ -3038,30 +3054,30 @@ class _PatientCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [av.bg, Colors.white],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(11),
-                    border: Border.all(color: av.fg.withOpacity(0.18)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    _inits,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: av.fg,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 9),
+                // Container(
+                //   width: 38,
+                //   height: 38,
+                //   decoration: BoxDecoration(
+                //     gradient: LinearGradient(
+                //       colors: [av.bg, Colors.white],
+                //       begin: Alignment.topLeft,
+                //       end: Alignment.bottomRight,
+                //     ),
+                //     borderRadius: BorderRadius.circular(11),
+                //     border: Border.all(color: av.fg.withOpacity(0.18)),
+                //   ),
+                //   alignment: Alignment.center,
+                //   child: Text(
+                //     _inits,
+                //     style: TextStyle(
+                //       fontSize: 12,
+                //       fontWeight: FontWeight.w800,
+                //       color: av.fg,
+                //       letterSpacing: 0.4,
+                //     ),
+                //   ),
+                // ),
+                // const SizedBox(width: 9),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -3091,20 +3107,18 @@ class _PatientCard extends StatelessWidget {
                         spacing: 4,
                         runSpacing: 3,
                         children: [
-                          if (patient.specialization != null)
-                            _Chip(label: patient.specialization!, bg: kPrimaryLighter, fg: kPrimaryDark),
-                          if (showBookedTag)
+                          // if (patient.specialization != null)
+                          //   _Chip(label: patient.specialization!, bg: kPrimaryLighter, fg: kPrimaryDark),
+                          if (showStatusText)
                             _DotChip(
-                              label: st[0].toUpperCase() + st.substring(1).replaceAll('_', ' '),
+                              label: _patientStatusLabel(status),
                               bg: sBg,
                               fg: sFg,
                               dot: sDot,
                             ),
-                          if (!isSlotBooking || slotMetaLabel != null)
+                          if (metaLabel != null)
                             _Chip(
-                              label: isSlotBooking
-                                  ? slotMetaLabel!
-                                  : _fmtDateLabel(patient.appointmentDate),
+                              label: metaLabel,
                               bg: kInfoLight,
                               fg: kInfoDark,
                             ),
@@ -3272,6 +3286,8 @@ class _DetailPanel extends StatelessWidget {
 
     final p = patient!;
     final isSlotBooking = _isSlotBooking(p);
+    final status = p.status?.toLowerCase().trim() ?? '';
+    final showStatusText = _showPatientStatusText(status);
     final slotMetaLabel = isSlotBooking
         ? _slotAppointmentMetaLabel(
             p.appointmentDate,
@@ -3348,10 +3364,11 @@ class _DetailPanel extends StatelessWidget {
               ),
             const Divider(height: 1, color: kDivider),
             _DetailRow('Specialty', p.specialization ?? '--'),
-            _DetailRow(
-              'Status',
-              (p.status ?? 'Unknown')[0].toUpperCase() + (p.status ?? 'unknown').substring(1),
-            ),
+            if (showStatusText)
+              _DetailRow(
+                'Status',
+                _patientStatusLabel(status),
+              ),
             if (!isSlotBooking || slotMetaLabel != null)
               _DetailRow(
                 'Date',
