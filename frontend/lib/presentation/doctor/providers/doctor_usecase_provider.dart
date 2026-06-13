@@ -3,6 +3,7 @@ import 'package:qless/domain/usecase/appointment_usecase.dart';
 import 'package:qless/domain/usecase/doctor_login_usecase.dart';
 import 'package:qless/domain/usecase/prescription_usecase.dart';
 import 'package:qless/domain/usecase/doctor_settings_usecase.dart';
+import 'package:qless/domain/usecase/receptionist_usecase.dart';
 import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 
 final doctorLoginUsecaseProvider = Provider<DoctorLoginUsecase>((ref) {
@@ -23,4 +24,9 @@ final doctorSettingsUsecaseProvider = Provider<DoctorSettingsUsecase>((ref) {
 final appointmentUsecaseProvider = Provider<AppointmentUsecase>((ref) {
   final appointmentRepo = ref.watch(appointmentRepositoryProvider);
   return AppointmentUsecase(appointmentRepo);
+});
+
+final receptionistUsecaseProvider = Provider<ReceptionistUsecase>((ref) {
+  final repo = ref.watch(receptionistRepositoryProvider);
+  return ReceptionistUsecase(repo);
 });

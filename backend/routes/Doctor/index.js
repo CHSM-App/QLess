@@ -85,4 +85,46 @@ router.delete("/delete/clinicGallery", async (req, res) => {
   }
 });
 
+
+
+// DELETE Receptionist
+router.delete("/deletereceptionist/:recep_id", async (req, res) => {
+  try {
+    const { recep_id } = req.params;
+
+    if (!recep_id) {
+      return res.status(400).json({
+        success: false,
+        message: "recep_id is required"
+      });
+    }
+
+    const request = db.request();
+    request.input("operation", "DeleteReceptionist");
+    request.input("recep_id", sql.Int, parseInt(recep_id));
+
+    const result = await request.execute("sp_receptionist");
+
+    // SP returns 'Medicine removed from your list.' on success
+    // OR 'No medicine found to delete.' on failure
+    const message = result.recordset?.[0]?.Message || "Operation completed";
+    const lower = message.toLowerCase();
+    const success = lower.includes("removed") || lower.includes("successfully");
+
+    return res.status(success ? 200 : 400).json({
+      success,
+      message
+    });
+    
+  } catch (err) {
+    log.error('Error in deleteReceptionist API: ' + err.message);
+
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to delete receptionist"
+    });
+  }
+});
+
+
 module.exports = router;

@@ -164,6 +164,11 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           ? rawDoctorId
           : int.tryParse(rawDoctorId?.toString() ?? '');
       final String? clinicId = rawClinicId?.toString();
+      if (clinicId != null &&
+          clinicId.trim().isNotEmpty &&
+          clinicId.trim().toLowerCase() != 'null') {
+        await TokenStorage.saveValue('clinic_id', clinicId);
+      }
       state = state.copyWith(
         isLoading: false,
         doctorId: doctorId, // stored on state for the screen to read
@@ -179,6 +184,11 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
             : int.tryParse(rawDoctorId?.toString() ?? '');
         if (doctorId != null && doctorId > 0) {
           final String? clinicId = data['clinic_id']?.toString();
+          if (clinicId != null &&
+              clinicId.trim().isNotEmpty &&
+              clinicId.trim().toLowerCase() != 'null') {
+            await TokenStorage.saveValue('clinic_id', clinicId);
+          }
           state = state.copyWith(
             isLoading: false,
             doctorId: doctorId,
@@ -200,6 +210,11 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
             );
             if (existing.isNotEmpty) {
               final d = existing.first;
+              if (d.clinicId != null &&
+                  d.clinicId!.trim().isNotEmpty &&
+                  d.clinicId!.trim().toLowerCase() != 'null') {
+                await TokenStorage.saveValue('clinic_id', d.clinicId!);
+              }
               state = state.copyWith(
                 isLoading: false,
                 doctorId: d.doctorId,

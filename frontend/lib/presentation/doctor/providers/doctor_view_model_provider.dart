@@ -6,6 +6,7 @@ import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/doctor/view_models/doctore_settings_viewmodel.dart';
 import 'package:qless/presentation/doctor/view_models/prescription_viewmodel.dart';
+import 'package:qless/presentation/doctor/view_models/receptionist_viewmodel.dart';
 
 final doctorLoginViewModelProvider =
     StateNotifierProvider<DoctorLoginViewmodel, DoctorLoginState>((ref) {
@@ -33,4 +34,10 @@ final appointmentViewModelProvider =
   final offlineStore  = ref.watch(offlineQueueStoreProvider);
   final socketService = ref.watch(socketServiceProvider);
   return AppointmentListViewmodel(usecase, offlineStore, socketService);
+});
+
+final receptionistLoginViewModelProvider =
+    StateNotifierProvider<ReceptionistLoginViewmodel, ReceptionistLoginState>((ref) {
+  final usecase = ref.watch(receptionistUsecaseProvider);
+  return ReceptionistLoginViewmodel(usecase);
 });

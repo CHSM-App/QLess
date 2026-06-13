@@ -7,10 +7,12 @@ import 'package:qless/data/repositories/appointment_impl.dart';
 import 'package:qless/data/repositories/doctor_login_impl.dart';
 import 'package:qless/data/repositories/doctor_settings_impl.dart';
 import 'package:qless/data/repositories/prescription_impl.dart';
+import 'package:qless/data/repositories/receptionist.dart';
 import 'package:qless/domain/repository/appointment_repo.dart';
 import 'package:qless/domain/repository/doctor_login_repo.dart';
 import 'package:qless/domain/repository/doctor_settings_repo.dart';
 import 'package:qless/domain/repository/prescription_repo.dart';
+import 'package:qless/domain/repository/receptionist_repo.dart';
 
 final doctorLoginRepositoryProvider = Provider<DoctorLoginRepository>((ref) {
   final dio = ref.watch(dioProvider).value!;
@@ -34,6 +36,12 @@ final appointmentRepositoryProvider = Provider<AppointmentRepository>((ref) {
   final dio = ref.watch(dioProvider).value!;
   final api = ApiService(dio);
   return AppointmentImpl(api);
+});
+
+final receptionistRepositoryProvider = Provider<ReceptionistRepository>((ref) {
+  final dio = ref.watch(dioProvider).value!;
+  final api = ApiService(dio);
+  return ReceptionistImpl(api);
 });
 
 /// Singleton offline store backed by SQLite.

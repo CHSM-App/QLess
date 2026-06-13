@@ -97,6 +97,17 @@ app.use('/uploads', uploadAuth, express.static(path.join(__dirname, 'uploads')))
 
 app.get('/', (req, res) => res.send('OK'));
 
+// Public — Privacy Policy (required for Play Store listing)
+app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'routes', 'privacy.html')));
+app.get('/privacy/logo', (req, res) => res.sendFile(path.join(__dirname, '..', 'frontend', 'assets', 'icon', 'qless_logo.png')));
+app.get('/delete-account', (req, res) => res.sendFile(path.join(__dirname, 'routes', 'delete-account.html')));
+app.post('/delete-account/request', express.json(), (req, res) => {
+  const { name, phone, userType, reason } = req.body;
+  if (!name || !phone || !userType) return res.status(400).json({ error: 'Missing required fields' });
+  log.info(`[ACCOUNT DELETION REQUEST] name=${name} phone=${phone} type=${userType} reason=${reason || 'not provided'}`);
+  res.json({ success: true });
+});
+
 // 404 fallthrough
 app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
 

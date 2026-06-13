@@ -77,7 +77,12 @@ class DoctorLoginImpl implements DoctorLoginRepository {
       await TokenStorage.saveValue('role_id', response[0].roleId.toString());
       await TokenStorage.saveValue('clinic_name', response[0].clinicName.toString());
       await TokenStorage.saveValue('token', response[0].Token.toString());
-      await TokenStorage.saveValue('clinic_id', response[0].clinicId.toString());
+      final clinicId = response[0].clinicId;
+      if (clinicId != null &&
+          clinicId.trim().isNotEmpty &&
+          clinicId.trim().toLowerCase() != 'null') {
+        await TokenStorage.saveValue('clinic_id', clinicId);
+      }
     }
     return response;
   }

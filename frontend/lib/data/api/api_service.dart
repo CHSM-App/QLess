@@ -18,6 +18,7 @@ import 'package:qless/domain/models/review_model.dart';
 import 'package:qless/domain/models/today_queue_model.dart';
 import 'package:qless/domain/models/review_request_model.dart';
 import 'package:qless/domain/models/clinic_image_model.dart';
+import 'package:qless/domain/models/receptionist_model.dart';
 
 import 'package:qless/domain/models/token_response.dart';
 import 'package:retrofit/retrofit.dart';
@@ -386,4 +387,46 @@ Future<AppointmentResponseModel> queuePauseEmergency(
 
   @GET("users/fetchBloodGroupList")
   Future<List<BloodGroupModel>> fetchBloodGroupList();
+
+  //------------------------------------------------------------------------------------------------------------------------------------//
+  //-----------------------------------------//RECEPTIONIST API//------------------------------
+
+  @GET("login/checkPhoneReceptionist")
+  Future<List<ReceptionistApiModel>> checkPhoneReceptionist(
+    @Query("mobile_no") String mobileNo,
+  );
+
+  @GET("login/mobileExistReceptionist")
+  Future<List<ReceptionistApiModel>> mobileExistReceptionist(
+    @Query("mobile_no") String mobileNo,
+  );
+
+  @GET("login/receptionist/{clinic_id}")
+  Future<List<ReceptionistApiModel>> fetchReceptionists(
+    @Path("clinic_id") String clinicId,
+  );
+
+  @GET("users/fetchReceptionistList/{clinic_id}")
+  Future<List<ReceptionistApiModel>> fetchReceptionistList(
+    @Path("clinic_id") int clinicId,
+  );
+
+  @MultiPart()
+  @POST("login/receptionist")
+  Future<dynamic> addReceptionist(
+    @Part(name: "recep_id")  int?           recepId,
+    @Part(name: "name")      String         name,
+    @Part(name: "mobile_no") String         mobileNo,
+    @Part(name: "email")     String?        email,
+    @Part(name: "address")   String?        address,
+    @Part(name: "gender_id") int            genderId,
+    @Part(name: "clinic_id") int            clinicId,
+    @Part(name: "image")     MultipartFile? image,
+  );
+
+  @DELETE("login/deletereceptionist/{recep_id}")
+  Future<dynamic> deleteReceptionist(
+    @Path("recep_id") int recepId,
+  );
 }
+

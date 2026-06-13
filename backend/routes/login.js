@@ -145,7 +145,7 @@ router.post('/refreshAccessToken', authLimiter, async (req, res) => {
 			.input('refresh_token', newRefreshToken)
 			.input('device_info', row.device_info)
 			.input('expires_at', newExpiresAt)
-			.input('role', row.role_id == 1 ? 'doctor' : 'patient')
+			.input('role', row.role_id === 1 ? 'doctor' : row.role_id === 2 ? 'patient' : 'receptionist')
 
 			.execute('ManageRefreshToken');
 
@@ -331,6 +331,48 @@ router.get('/mobileExistPatient', lookupLimiter, async (req, res) => {
 		res.status(500).json({
 			error: err.message
 		});
+	}
+});
+
+
+router.get('/checkPhoneReceptionist', lookupLimiter, async (req, res) => {
+	try {
+		const mobile_no = req.query.mobile_no ?? req.query.mobileNo;
+
+		const result = await db.request()
+			.input('operation', 'check_phone_receptionist')
+			.input('mobile_no', mobile_no)
+			.execute('sp_receptionist');
+
+		res.json(result.recordset);
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
+router.get('/mobileExistReceptionist', lookupLimiter, async (req, res) => {
+	try {
+		let mobile_no = req.query.mobile_no ?? req.query.mobileNo;
+		if (!mobile_no) {
+			return res.status(400).json({ error: 'mobile_no is required' });
+		}
+
+		mobile_no = mobile_no.toString().trim().replace(/\D/g, '');
+		if (mobile_no.startsWith('91') && mobile_no.length === 12) {
+			mobile_no = mobile_no.slice(2);
+		}
+
+		if (!/^[6-9]\d{9}$/.test(mobile_no)) {
+			return res.status(400).json({ error: 'Invalid mobile number' });
+		}
+
+		const result = await db.request()
+			.input('operation', 'check_phone_receptionist')
+			.input('mobile_no', mobile_no)
+			.execute('sp_receptionist');
+		res.json(result.recordset);
+	} catch (err) {
+		res.status(500).json({ error: err.message });
 	}
 });
 
@@ -730,6 +772,94 @@ router.get('/privacy', (req, res) => {
 	res.sendFile(path.join(__dirname, 'privacy.html'));
 });
 
+
+router.get('/delete-account', (req, res) => {
+	res.sendFile(path.join(__dirname, 'delete-account.html'));
+});
+
+
+
+// ════════════════════════════════════════════════════════════════════
+//  RECEPTIONIST — CREATE / UPDATE  (same pattern as /patient)
+// ════════════════════════════════════════════════════════════════════
+router.post('/receptionist', uploadHandler(upload.single("image")), async (req, res) => {
+	try {
+		if (!(await verifyImageFiles(req, res))) return;
+
+		const {
+			recep_id,
+			name,
+			mobile_no,
+			email,
+			address,
+			gender_id,
+			clinic_id,
+		} = req.body;
+		console.log('[ReceptionistDebug] save receptionist body:', {
+			recep_id,
+			name,
+			mobile_no,
+			email,
+			gender_id,
+			clinic_id,
+			hasImage: !!req.file,
+		});
+
+		const operation = recep_id && recep_id > 0 ? 'Update' : 'Insert';
+
+		const request = db.request();
+		request.input('operation',  operation);
+		request.input('recep_id',   recep_id  || null);
+		request.input('name',       name);
+		request.input('mobile_no',  mobile_no);
+		request.input('email',      email      || null);
+		request.input('Address',    address    || null);
+		request.input('gender_id',  gender_id  || null);
+		request.input('clinic_id',  clinic_id  || null);
+
+		const result = await request.execute('sp_receptionist');
+
+		const row = result.recordset?.[0];
+		console.log('[ReceptionistDebug] save receptionist result:', row);
+
+		if (!row?.success) {
+			return res.status(400).json({
+				success: false,
+				message: row?.message || 'Receptionist operation failed',
+			});
+		}
+
+		const returnedRecepId = row.recep_id || recep_id;
+		let imageUrl = null;
+
+		if (req.file) {
+			const dir = path.join(__dirname, '..', 'uploads', 'receptionist_images', returnedRecepId.toString());
+			await fs.ensureDir(dir);
+
+			const dest = path.join(dir, req.file.filename);
+			await fs.move(req.file.path, dest, { overwrite: true });
+
+			imageUrl = `${PUBLIC_BASE_URL}/uploads/receptionist_images/${returnedRecepId}/${req.file.filename}`;
+
+			await db.request()
+				.input('operation', 'uploadReceptionistImg')
+				.input('recep_id',  returnedRecepId)
+				.input('img_url',   imageUrl)
+				.execute('sp_receptionist');
+		}
+
+		return res.json({
+			success: true,
+			recep_id:  returnedRecepId,
+			image_url: imageUrl,
+			message:   operation === 'Update' ? 'Updated' : 'Created',
+		});
+
+	} catch (err) {
+		await cleanupFiles(req).catch(() => {});
+		res.status(500).json({ success: false, error: err.message });
+	}
+});
 
 
 module.exports = router;

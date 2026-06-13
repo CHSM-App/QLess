@@ -249,4 +249,35 @@ router.get('/clinicGallery/:clinic_id', async (req, res) => {
   }
 });
 
+
+
+router.get('/fetchReceptionistList/:clinic_id', async (req, res) => {
+  const { clinic_id } = req.params;
+  console.log('[ReceptionistDebug] fetchReceptionistList clinic_id:', clinic_id);
+
+  try {
+    const request = db.request();
+
+    request.input('operation', 'FetchReceptionistList');
+    request.input('clinic_id', clinic_id);
+
+    const result = await request.execute('sp_receptionist');
+    console.log(
+      '[ReceptionistDebug] fetchReceptionistList count:',
+      result.recordset?.length || 0
+    );
+
+    res.status(200).json(result.recordset);
+
+  } catch (error) {
+    console.error('[ReceptionistDebug] fetchReceptionistList error:', error);
+    res.status(500).json({
+      success: 0,
+      message: `Failed to fetch receptionist list: ${error.message}`
+    });
+  }
+});
+
+
+
 module.exports = router; 
