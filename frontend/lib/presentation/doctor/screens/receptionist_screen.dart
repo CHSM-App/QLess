@@ -606,6 +606,8 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
 
     setState(() => _saving = true);
 
+    final doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
+
     final model = ReceptionistApiModel(
       recepId:  widget.existing?.recepId,
       name:     _nameCtrl.text.trim(),
@@ -615,6 +617,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
       genderId: _genderMap[_gender] ?? 2,
       clinicId: clinicId,
       activeStatus: widget.existing?.activeStatus ?? 1,
+      doctorId: doctorId,
     );
 
     try {
@@ -735,6 +738,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
                     _field(ctrl: _mobileCtrl, label: 'Mobile Number', hint: '10-digit number',
                         icon: Icons.phone_outlined, inputType: TextInputType.phone,
                         formatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                        readOnly: _isEdit,
                         validator: (v) => (v == null || v.trim().length != 10) ? 'Valid 10-digit number required' : null),
                     const SizedBox(height: 12),
                     _field(ctrl: _emailCtrl, label: 'Email Address (optional)', hint: 'staff@clinic.com',
@@ -831,6 +835,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
     String? Function(String?)? validator,
     void Function(String)? onChanged,
     int maxLines = 1,
+    bool readOnly = false,
   }) =>
       TextFormField(
         controller: ctrl,
@@ -840,6 +845,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
         validator: validator,
         onChanged: onChanged,
         maxLines: maxLines,
+        readOnly: readOnly,
         style: const TextStyle(fontSize: 13, color: _kTextPrimary, fontWeight: FontWeight.w600),
         decoration: InputDecoration(
           labelText: label, hintText: hint,

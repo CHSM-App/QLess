@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/demo_accounts.dart';
-import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
 import 'package:qless/presentation/patient/screens/patient_registration.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/shared/screens/otp_screen.dart';
+import 'package:qless/domain/models/receptionist_model.dart';
 
 // ── Colour Palette ─────────────────────────────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -98,46 +98,62 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     setState(() => _isLoading = true);
 
     try {
-      final List result;
       if (isDoctor) {
-        result = await ref
+        // First check if mobile belongs to a doctor
+        final doctorResult = await ref
             .read(doctorLoginViewModelProvider.notifier)
             .mobileExistDoctor(mobile);
+
+        if (!mounted) return;
+
+        if (doctorResult.isEmpty) {
+          // Not a doctor — check if it's a receptionist
+          final receptionistResult = await ref
+              .read(receptionistLoginViewModelProvider.notifier)
+              .mobileExistReceptionist(mobile);
+
+          if (!mounted) return;
+
+          if (receptionistResult.isEmpty) {
+            _snack('User not found');
+            return;
+          }
+          // Receptionist found — proceed to OTP (role stays 'doctor' so
+          // otp_screen detects receptionist automatically via mobileExistReceptionist)
+        } else {
+          // Doctor found — run verification check
+          if (!isDemoNumber(mobile)) {
+            final doctor = doctorResult.first;
+            final isNotVerified = (doctor.isverified) == 1;
+            if (isNotVerified) {
+              _showStatusDialog(
+                icon: Icons.hourglass_top_rounded,
+                iconColor: kWarning,
+                iconBg: kAmberLight,
+                title: 'Under Verification',
+                message:
+                    'Your account is currently being reviewed by our team. '
+                    'You will be notified once verification is complete.',
+                buttonLabel: 'OK, Got it',
+              );
+              return;
+            }
+          }
+        }
       } else {
-        result = await ref
+        final patientResult = await ref
             .read(patientLoginViewModelProvider.notifier)
             .mobileExistPatient(mobile);
-      }
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      if (result.isEmpty) {
-        _snack('User not found');
-        return;
-      }
-
-      // Demo/review numbers skip the verification gate so reviewers can always
-      // reach the OTP screen regardless of the seeded account's verified flag.
-      if (isDoctor && !isDemoNumber(mobile)) {
-        final doctor = result.first as DoctorDetails;
-        final isNotVerified = (doctor.isverified) == 1;
-        if (isNotVerified) {
-          _showStatusDialog(
-            icon: Icons.hourglass_top_rounded,
-            iconColor: kWarning,
-            iconBg: kAmberLight,
-            title: 'Under Verification',
-            message:
-                'Your account is currently being reviewed by our team. '
-                'You will be notified once verification is complete.',
-            buttonLabel: 'OK, Got it',
-          );
+        if (patientResult.isEmpty) {
+          _snack('User not found');
           return;
         }
       }
 
-      // Real users get a server-generated OTP via SMS. Demo/review numbers use
-      // the fixed local OTP (123456) and skip the send-OTP API entirely.
+      // Real users get a server-generated OTP via SMS.
       if (!isDemoNumber(mobile)) {
         final otpRes = await ref
             .read(doctorLoginViewModelProvider.notifier)

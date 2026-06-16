@@ -66,4 +66,11 @@ class DoctorLoginUsecase {
     return doctorLoginRepository.verifyOtp(payload);
   }
 
+  Future<List<DoctorDetails>> fetchDoctorsByClinic(String clinicId) {
+    return doctorLoginRepository.fetchDoctorsByClinic(clinicId);
+  }
+
+  Future<List<DoctorDetails>> getDoctorProfileByClinic({String? clinicId, int? doctorId}) {
+    return doctorLoginRepository.getDoctorProfileByClinic(clinicId: clinicId, doctorId: doctorId);
+  }
 }

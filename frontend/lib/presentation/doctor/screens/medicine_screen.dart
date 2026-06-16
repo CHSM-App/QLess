@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
+import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
@@ -439,7 +440,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
       ),
 
       // ── FAB ─────────────────────────────────────────────────────────────
-      floatingActionButton: AnimatedSlide(
+      floatingActionButton: ref.read(tokenProvider).roleId == 3 ? null : AnimatedSlide(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
         offset: _fabVisible ? Offset.zero : const Offset(0, 0.6),
@@ -566,33 +567,40 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   }
 
   // ── List (mobile) ─────────────────────────────────────────────────────────
-  Widget _buildList(List<Medicine> medicines, [ScrollController? controller]) =>
-      ListView.separated(
-        controller: controller,
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 140),
-        itemCount: medicines.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 6),
-        itemBuilder: (_, i) => _MedicineCard(
-          medicine: medicines[i],
-          onDelete: () => _confirmDelete(medicines[i]),
-        ),
-      );
+  Widget _buildList(List<Medicine> medicines, [ScrollController? controller]) {
+    final showDelete = ref.read(tokenProvider).roleId != 3;
+    return ListView.separated(
+      controller: controller,
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 140),
+      itemCount: medicines.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 6),
+      itemBuilder: (_, i) => _MedicineCard(
+        medicine: medicines[i],
+        showDelete: showDelete,
+        onDelete: () => _confirmDelete(medicines[i]),
+      ),
+    );
+  }
 
   // ── Grid (tablet / desktop) ───────────────────────────────────────────────
-  Widget _buildGrid(List<Medicine> medicines) => GridView.builder(
-    padding: const EdgeInsets.fromLTRB(12, 6, 12, 120),
-    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-      maxCrossAxisExtent: 320,
-      childAspectRatio: 3.6,
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-    ),
-    itemCount: medicines.length,
-    itemBuilder: (_, i) => _MedicineCard(
-      medicine: medicines[i],
-      onDelete: () => _confirmDelete(medicines[i]),
-    ),
-  );
+  Widget _buildGrid(List<Medicine> medicines) {
+    final showDelete = ref.read(tokenProvider).roleId != 3;
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 120),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+        maxCrossAxisExtent: 320,
+        childAspectRatio: 3.6,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+      ),
+      itemCount: medicines.length,
+      itemBuilder: (_, i) => _MedicineCard(
+        medicine: medicines[i],
+        showDelete: showDelete,
+        onDelete: () => _confirmDelete(medicines[i]),
+      ),
+    );
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -601,7 +609,8 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
 class _MedicineCard extends StatelessWidget {
   final Medicine medicine;
   final VoidCallback onDelete;
-  const _MedicineCard({required this.medicine, required this.onDelete});
+  final bool showDelete;
+  const _MedicineCard({required this.medicine, required this.onDelete, this.showDelete = true});
 
   @override
   Widget build(BuildContext context) {
@@ -678,6 +687,7 @@ class _MedicineCard extends StatelessWidget {
           ),
 
           // ── Delete button ─────────────────────────────────────────
+          if (showDelete)
           GestureDetector(
             onTap: onDelete,
             child: Container(

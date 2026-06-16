@@ -9,6 +9,8 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
 import 'package:qless/presentation/doctor/screens/doctor_help_center_screen.dart';
+import 'package:qless/domain/models/receptionist_model.dart';
+import 'package:qless/presentation/doctor/screens/receptionist_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
@@ -117,7 +119,10 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                 .checkPhoneDoctor(mobile);
           }
         }
-        final doctorId = next.doctorId;
+        final roleId = ref.read(tokenProvider).roleId;
+        final doctorId = roleId == 3
+            ? ref.read(receptionistLoginViewModelProvider).doctorId
+            : next.doctorId;
         if (doctorId != null && doctorId > 0) _fetchCounts(doctorId);
       },
     );
@@ -130,7 +135,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             .read(doctorLoginViewModelProvider.notifier)
             .checkPhoneDoctor(mobile);
       }
-      final doctorId = s.doctorId;
+      // For receptionist login, use their linked doctorId to fetch reviews/appointments
+      final roleId = ref.read(tokenProvider).roleId;
+      final doctorId = roleId == 3
+          ? ref.read(receptionistLoginViewModelProvider).doctorId
+          : s.doctorId;
       if (doctorId != null && doctorId > 0) _fetchCounts(doctorId);
     });
   }
@@ -514,6 +523,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     double? avgRating,
   }) {
     final hPad = isTablet ? 18.0 : 12.0;
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 90),
       child: Column(
@@ -526,6 +536,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           const SizedBox(height: 10),
           _sectionLabel('Account'),
           _buildAccountSection(s, d),
+          if (isReceptionist) ...[
+            const SizedBox(height: 10),
+            _sectionLabel('Doctor Information'),
+            _buildDoctorInfoCard(s, d),
+            const SizedBox(height: 10),
+            _sectionLabel('Clinic Information'),
+            _buildClinicInfoCard(s, d),
+          ],
           const SizedBox(height: 10),
           _sectionLabel('Availability'),
           _buildAvailabilityCard(),
@@ -544,11 +562,14 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   Widget _buildProfileCard(
       bool isTablet, DoctorLoginState s, DoctorDetails? d,
       {int? patientCount, int? reviewCount, double? avgRating}) {
-    final initials = _initials(d?.name ?? s.name);
-    final name     = d?.name ?? s.name ?? 'Doctor';
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    final rs = isReceptionist ? ref.watch(receptionistLoginViewModelProvider) : null;
+    final displayName = isReceptionist ? (rs?.name ?? 'Receptionist') : (d?.name ?? s.name ?? 'Doctor');
+    final initials = _initials(displayName);
+    final name     = displayName;
     final clinic   = d?.clinicName ?? s.clinic_name ?? '';
-    final spec     = d?.specialization ?? 'General';
-    final qual     = d?.qualification ?? '';
+    final spec     = isReceptionist ? 'Receptionist' : (d?.specialization ?? 'General');
+    final qual     = isReceptionist ? '' : (d?.qualification ?? '');
 
     return Container(
       decoration: _cardDec(),
@@ -667,23 +688,50 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                     ),
                   ),
                 ],
-                const SizedBox(height: 10),
-                _statsRow(d,
-                    showFee: isTablet,
-                    patientCount: patientCount,
-                    reviewCount: reviewCount,
-                    avgRating: avgRating),
+                if (!isReceptionist) ...[
+                  const SizedBox(height: 10),
+                  _statsRow(d,
+                      showFee: isTablet,
+                      patientCount: patientCount,
+                      reviewCount: reviewCount,
+                      avgRating: avgRating),
+                ],
                 const SizedBox(height: 10),
                 Row(
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => Navigator.of(context, rootNavigator: true)
-                            .push(MaterialPageRoute(
-                                builder: (_) => const DoctorEditProfilePage()))
-                            .then((_) {
-                          if (mounted) _refreshProfile();
-                        }),
+                        onTap: () {
+                          final roleId = ref.read(tokenProvider).roleId;
+                          if (roleId == 3) {
+                            final rs = ref.read(receptionistLoginViewModelProvider);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AddReceptionistPage(
+                                  existing: ReceptionistApiModel(
+                                    recepId: rs.recepId,
+                                    name: rs.name,
+                                    mobileNo: rs.mobileNo,
+                                    email: rs.email,
+                                    address: rs.address,
+                                    genderId: rs.genderId,
+                                    clinicId: rs.clinicId,
+                                    doctorId: rs.doctorId,
+                                  ),
+                                  clinicId: rs.clinicId,
+                                ),
+                              ),
+                            );
+                          } else {
+                            Navigator.of(context, rootNavigator: true)
+                                .push(MaterialPageRoute(
+                                    builder: (_) => const DoctorEditProfilePage()))
+                                .then((_) {
+                              if (mounted) _refreshProfile();
+                            });
+                          }
+                        },
                         child: Container(
                           height: 32,
                           decoration: BoxDecoration(
@@ -711,6 +759,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                         ),
                       ),
                     ),
+                    if (!isReceptionist) ...[
                     const SizedBox(width: 8),
                     Expanded(
                       child: GestureDetector(
@@ -743,6 +792,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                         ),
                       ),
                     ),
+                    ],
                   ],
                 ),
               ]),
@@ -808,19 +858,114 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
 
   // ── Account Section ───────────────────────────────────────────────────────
 
-  Widget _buildAccountSection(DoctorLoginState s, DoctorDetails? d) =>
-      _tileCard([
-        _Item(Icons.person_outline_rounded, 'Personal Information',
-            'Name, mobile, specialization',
-            onTap: () => _showPersonalInfoSheet(s, d)),
+  Widget _buildAccountSection(DoctorLoginState s, DoctorDetails? d) {
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    return _tileCard([
+      _Item(Icons.person_outline_rounded, 'Personal Information',
+          'Name, mobile, specialization',
+          onTap: () {
+            if (isReceptionist) {
+              final rs = ref.read(receptionistLoginViewModelProvider);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddReceptionistPage(
+                    existing: ReceptionistApiModel(
+                      recepId: rs.recepId,
+                      name: rs.name,
+                      mobileNo: rs.mobileNo,
+                      email: rs.email,
+                      address: rs.address,
+                      genderId: rs.genderId,
+                      clinicId: rs.clinicId,
+                      doctorId: rs.doctorId,
+                    ),
+                    clinicId: rs.clinicId,
+                  ),
+                ),
+              );
+            } else {
+              _showPersonalInfoSheet(s, d);
+            }
+          }),
+      if (!isReceptionist)
         _Item(Icons.medical_information_outlined, 'Professional Details',
             'Specialization, license',
             onTap: () => _showProfessionalDetailsSheet(s, d)),
-        // _Item(Icons.lock_outline_rounded, 'Password & Security',
-        //     'Change password, 2FA'),
-        // _Item(Icons.payment_outlined, 'Payment & Earnings',
-        //     'Bank account, payouts'),
-      ]);
+      if (!isReceptionist)
+        _Item(Icons.people_outline_rounded, 'Receptionists',
+            'Manage clinic staff access',
+            onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const ReceptionistPage()),
+                )),
+      if (isReceptionist)
+        _Item(Icons.star_outline_rounded, 'Doctor Reviews',
+            'View patient reviews for the doctor',
+            onTap: _showReviewsSheet),
+    ]);
+  }
+
+  Widget _buildDoctorInfoCard(DoctorLoginState s, DoctorDetails? d) {
+    final name   = d?.name           ?? s.name    ?? '—';
+    final spec   = d?.specialization ?? '—';
+    final qual   = d?.qualification  ?? '—';
+    final exp    = d?.experience != null ? '${d!.experience} yrs' : '—';
+    final mobile = s.mobile          ?? '—';
+    final email  = s.email           ?? '—';
+    return _infoCard([
+      _infoRow(Icons.person_outline_rounded,    'Name',           name),
+      _infoRow(Icons.medical_services_outlined, 'Specialization', spec),
+      _infoRow(Icons.school_outlined,           'Qualification',  qual),
+      _infoRow(Icons.work_history_outlined,     'Experience',     exp),
+      _infoRow(Icons.phone_outlined,            'Mobile',         mobile),
+      _infoRow(Icons.email_outlined,            'Email',          email),
+    ]);
+  }
+
+  Widget _buildClinicInfoCard(DoctorLoginState s, DoctorDetails? d) {
+    final clinicName    = d?.clinicName    ?? s.clinic_name ?? '—';
+    final clinicAddress = d?.clinicAddress ?? '—';
+    final clinicContact = d?.clinicContact ?? '—';
+    final clinicEmail   = d?.clinicEmail   ?? '—';
+    return _infoCard([
+      _infoRow(Icons.local_hospital_outlined, 'Clinic Name',  clinicName),
+      _infoRow(Icons.location_on_outlined,    'Address',      clinicAddress),
+      _infoRow(Icons.phone_outlined,          'Contact',      clinicContact),
+      _infoRow(Icons.email_outlined,          'Clinic Email', clinicEmail),
+    ]);
+  }
+
+  Widget _infoCard(List<Widget> rows) => Container(
+    decoration: _cardDec(),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    child: Column(
+      children: rows
+          .expand((w) => [w, const Divider(height: 1, color: kHairline)])
+          .toList()
+        ..removeLast(),
+    ),
+  );
+
+  Widget _infoRow(IconData icon, String label, String value) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 10),
+    child: Row(children: [
+      Container(
+        width: 32, height: 32,
+        decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(9)),
+        child: Icon(icon, size: 15, color: kPrimaryDark),
+      ),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: const TextStyle(fontSize: 10, color: kTextMuted, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 1),
+          Text(value, style: const TextStyle(fontSize: 13, color: kTextPrimary, fontWeight: FontWeight.w600)),
+        ]),
+      ),
+    ]),
+  );
 
 Widget _buildAvailabilityCard() => Container(
       decoration: _cardDec(),

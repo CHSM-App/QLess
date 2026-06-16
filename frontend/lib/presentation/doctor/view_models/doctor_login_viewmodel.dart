@@ -88,7 +88,8 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   }
 
   Future<void> loadFromStorage() async {
-    final name = await TokenStorage.getValue('name');
+    final doctorName = await TokenStorage.getValue('doctor_name');
+    final name = doctorName ?? await TokenStorage.getValue('name');
     final mobile = await TokenStorage.getValue('mobile');
     final email = await TokenStorage.getValue('email');
     final roleId = await TokenStorage.getValue('role_id');
@@ -464,5 +465,49 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       state = state.copyWith(isLoading: false, error: e.toString());
       return OtpResponse(status: 0, message: "Something went wrong");
     }
+  }
+
+  /// Receptionist login: loads linked doctor's full profile using clinic_id
+  /// or doctor_id via the dedicated backend route (doctor_login_vw).
+  Future<void> loadDoctorProfileForReceptionist({String? clinicId, int? doctorId}) async {
+    try {
+      final doctors = await usecase.getDoctorProfileByClinic(clinicId: clinicId, doctorId: doctorId);
+      if (doctors.isEmpty) return;
+      final d = doctors.first;
+      state = state.copyWith(
+        doctorId: d.doctorId,
+        name: d.name,
+        mobile: d.mobile,
+        email: d.email,
+        roleId: d.roleId?.toString(),
+        token: d.Token,
+        clinicId: d.clinicId,
+        clinic_name: d.clinicName,
+        leadTimeMinutes: d.leadTime,
+        phoneCheckResult: AsyncValue.data(doctors),
+      );
+      if (d.name != null) await TokenStorage.saveValue('doctor_name', d.name!);
+      if (d.clinicName != null) await TokenStorage.saveValue('clinic_name', d.clinicName!);
+      if (d.mobile != null) await TokenStorage.saveValue('recep_doctor_mobile', d.mobile!);
+    } catch (_) {}
+  }
+
+  /// Called at receptionist login: fetches the linked doctor's data using
+  /// clinic_id. If doctorId is provided, picks the matching doctor from the
+  /// list (handles multi-doctor clinics). Falls back to first doctor.
+  Future<void> fetchAndLoadDoctorByClinic(String clinicId, {int? doctorId}) async {
+    try {
+      final doctors = await usecase.fetchDoctorsByClinic(clinicId);
+      if (doctors.isEmpty) return;
+      final doctor = doctorId != null
+          ? doctors.firstWhere(
+              (d) => d.doctorId == doctorId,
+              orElse: () => doctors.first,
+            )
+          : doctors.first;
+      final doctorMobile = doctor.mobile;
+      if (doctorMobile == null || doctorMobile.trim().isEmpty) return;
+      await checkPhoneDoctor(doctorMobile.trim());
+    } catch (_) {}
   }
 }

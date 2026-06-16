@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -2960,7 +2961,7 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ── Patient Card ───────────────────────────────────────────────────────────────
-class _PatientCard extends StatelessWidget {
+class _PatientCard extends ConsumerWidget {
   final AppointmentList patient;
   final _Tab tab;
   final bool accessible, selected;
@@ -3008,11 +3009,31 @@ class _PatientCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isReceptionist = ref.watch(tokenProvider).roleId == 3;
     final av = _av;
     final st = patient.status ?? 'unknown';
     final status = st.toLowerCase().trim();
     final isIP = status == 'in_progress';
+
+    // Receptionist can skip ANY booked/skipped patient — not just the next one.
+    VoidCallback? effectiveOnSkip = onSkip;
+    if (isReceptionist && tab == _Tab.today &&
+        (status == 'booked' || status == 'skipped')) {
+      final did = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+      if (did > 0) {
+        effectiveOnSkip ??= () {
+          ref.read(appointmentViewModelProvider.notifier).queueSkip(
+            AppointmentRequestModel(
+              doctorId: did,
+              appointmentId: patient.appointmentId ?? 0,
+              patientId: patient.patientId ?? 0,
+              isNext: 0,
+            ),
+          );
+        };
+      }
+    }
     final isSlotBooking = _isSlotBooking(patient);
     final metaLabel = switch (tab) {
       _Tab.today when isSlotBooking =>
@@ -3173,28 +3194,29 @@ class _PatientCard extends StatelessWidget {
             Row(
               children: [
                 if (tab == _Tab.today) ...[
-                  if (onSkip != null) ...[
+                  if (effectiveOnSkip != null) ...[
                     Expanded(
                       child: _ActionBtn(
                         label: 'Skip',
                         bg: kRedLight,
                         fg: kRedDark,
                         border: kRedBorder,
-                        onTap: onSkip,
+                        onTap: effectiveOnSkip,
                       ),
                     ),
-                    const SizedBox(width: 7),
+                    if (!isReceptionist) const SizedBox(width: 7),
                   ],
-                  Expanded(
-                    flex: 2,
-                    child: _ActionBtn(
-                      label: isIP ? 'Continue' : 'Start Session',
-                      isGrad: accessible,
-                      bg: accessible ? null : kBorder,
-                      fg: accessible ? Colors.white : kTextMuted,
-                      onTap: accessible ? onStart : null,
+                  if (!isReceptionist)
+                    Expanded(
+                      flex: 2,
+                      child: _ActionBtn(
+                        label: isIP ? 'Continue' : 'Start Session',
+                        isGrad: accessible,
+                        bg: accessible ? null : kBorder,
+                        fg: accessible ? Colors.white : kTextMuted,
+                        onTap: accessible ? onStart : null,
+                      ),
                     ),
-                  ),
                 ] else if (tab == _Tab.upcoming) ...[
                   Expanded(
                     child: _ActionBtn(

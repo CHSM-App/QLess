@@ -19,13 +19,17 @@ plugins {
 // still run `flutter run --release` locally without the prod keystore.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
-val hasReleaseKeystore = keystorePropertiesFile.exists()
-if (hasReleaseKeystore) {
+if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
+val hasReleaseKeystore = keystorePropertiesFile.exists() &&
+    !keystoreProperties.getProperty("storeFile").isNullOrBlank() &&
+    !keystoreProperties.getProperty("storePassword").isNullOrBlank() &&
+    !keystoreProperties.getProperty("keyAlias").isNullOrBlank() &&
+    !keystoreProperties.getProperty("keyPassword").isNullOrBlank()
 
 android {
-    namespace = "vengurlatech.qless"
+    namespace = "com.vengurlatech.qless"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -44,7 +48,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "vengurlatech.qless"
+        applicationId = "com.vengurlatech.qless"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -54,10 +58,10 @@ android {
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties.getProperty("storeFile") ?: "")
+                storePassword = keystoreProperties.getProperty("storePassword") ?: ""
+                keyAlias = keystoreProperties.getProperty("keyAlias") ?: ""
+                keyPassword = keystoreProperties.getProperty("keyPassword") ?: ""
             }
         }
     }

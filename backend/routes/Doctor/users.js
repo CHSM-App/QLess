@@ -251,6 +251,21 @@ router.get('/clinicGallery/:clinic_id', async (req, res) => {
 
 
 
+router.get('/getDoctorsByClinic/:clinic_id', async (req, res) => {
+  const { clinic_id } = req.params;
+  try {
+    const result = await db.request()
+      .input('operation', 'FetchDoctors')
+      .input('clinic_id', clinic_id)
+      .execute('sp_doctor_login');
+    res.status(200).json(result.recordset);
+  } catch (error) {
+    res.status(500).json({ success: 0, message: `Failed to fetch clinic doctors: ${error.message}` });
+  }
+});
+
+
+
 router.get('/fetchReceptionistList/:clinic_id', async (req, res) => {
   const { clinic_id } = req.params;
   console.log('[ReceptionistDebug] fetchReceptionistList clinic_id:', clinic_id);

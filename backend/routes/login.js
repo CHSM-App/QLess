@@ -248,6 +248,31 @@ router.post('/logout', async (req, res) => {
 });
 
 
+// Used by receptionist login to load the linked doctor's full profile
+router.get('/getDoctorProfileByClinic', lookupLimiter, async (req, res) => {
+	try {
+		const { clinic_id, doctor_id } = req.query;
+
+		if (doctor_id && parseInt(doctor_id) > 0) {
+			const r = await db.request()
+				.input('doctor_id', parseInt(doctor_id))
+				.query('SELECT * FROM dbo.doctor_login_vw WHERE doctor_id = @doctor_id AND doc_active_status = 0');
+			return res.json(r.recordset);
+		}
+
+		if (clinic_id) {
+			const r = await db.request()
+				.input('clinic_id', clinic_id)
+				.query('SELECT * FROM dbo.doctor_login_vw WHERE clinic_id = @clinic_id AND doc_active_status = 0');
+			return res.json(r.recordset);
+		}
+
+		res.json([]);
+	} catch (err) {
+		res.status(500).json({ error: err.message });
+	}
+});
+
 router.get('/checkPhoneDoctor', lookupLimiter, async (req, res) => {
 	try {
 		const {
@@ -337,13 +362,17 @@ router.get('/mobileExistPatient', lookupLimiter, async (req, res) => {
 
 router.get('/checkPhoneReceptionist', lookupLimiter, async (req, res) => {
 	try {
-		const mobile_no = req.query.mobile_no ?? req.query.mobileNo;
+		let mobile_no = req.query.mobile_no ?? req.query.mobileNo;
+		if (!mobile_no) return res.status(400).json({ error: 'mobile_no is required' });
+		mobile_no = mobile_no.toString().trim().replace(/\D/g, '');
+		if (mobile_no.startsWith('91') && mobile_no.length === 12) mobile_no = mobile_no.slice(2);
 
 		const result = await db.request()
 			.input('operation', 'check_phone_receptionist')
 			.input('mobile_no', mobile_no)
 			.execute('sp_receptionist');
 
+		console.log('[ReceptionistDebug] checkPhoneReceptionist result:', JSON.stringify(result.recordset?.[0]));
 		res.json(result.recordset);
 	} catch (err) {
 		res.status(500).json({ error: err.message });
@@ -474,6 +503,7 @@ router.post('/doctor', uploadHandler(upload.fields([{
 			await fs.move(file.path, dest, {
 				overwrite: true
 			});
+			
 
 			doctorImageUrl = `${PUBLIC_BASE_URL}/uploads/doctor_images/${returnedDoctorId}/${file.filename}`;
 
@@ -794,6 +824,7 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 			address,
 			gender_id,
 			clinic_id,
+			doctor_id,
 		} = req.body;
 		console.log('[ReceptionistDebug] save receptionist body:', {
 			recep_id,
@@ -802,6 +833,7 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 			email,
 			gender_id,
 			clinic_id,
+			doctor_id,
 			hasImage: !!req.file,
 		});
 
@@ -816,6 +848,7 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 		request.input('Address',    address    || null);
 		request.input('gender_id',  gender_id  || null);
 		request.input('clinic_id',  clinic_id  || null);
+		request.input('doctor_id',  doctor_id  || null);
 
 		const result = await request.execute('sp_receptionist');
 

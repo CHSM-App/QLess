@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/otp_response.dart';
+import 'package:qless/domain/models/receptionist_model.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
@@ -191,19 +192,30 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       }
     }
 
+    // Detect receptionist before login so the correct role string reaches
+    // ManageRefreshToken SP (it may use the role to pick which table to query).
+    // Also capture clinic_id here — the same API call gives us everything we
+    // need so we do NOT call checkPhoneReceptionist again after login.
+    String effectiveRole = widget.role;
+    String? receptionistClinicId;
+    int? receptionistDoctorId;
+    ReceptionistApiModel? receptionistProfile;
     if (widget.role == 'doctor') {
-      await ref
-          .read(doctorLoginViewModelProvider.notifier)
-          .checkPhoneDoctor(widget.mobileNumber);
-    } else {
-      await ref
-          .read(patientLoginViewModelProvider.notifier)
-          .checkPhonePatient(widget.mobileNumber);
+      final receptionistCheck = await ref
+          .read(receptionistLoginViewModelProvider.notifier)
+          .mobileExistReceptionist(widget.mobileNumber);
+      if (receptionistCheck.isNotEmpty) {
+        effectiveRole = 'receptionist';
+        receptionistProfile     = receptionistCheck.first;
+        receptionistClinicId    = receptionistProfile.clinicId;
+        receptionistDoctorId    = receptionistProfile.doctorId;
+        debugPrint('[RecepDebug] clinicId=$receptionistClinicId doctorId=$receptionistDoctorId name=${receptionistProfile.name}');
+      }
     }
 
     final result = await ref
         .read(authViewModelProvider.notifier)
-        .login(TokenResponse(mobile: widget.mobileNumber, role: widget.role));
+        .login(TokenResponse(mobile: widget.mobileNumber, role: effectiveRole));
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -217,7 +229,36 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     await _storeFcmToken();
 
     final roleId = ref.read(tokenProvider).roleId ?? 0;
-    if (1 == roleId) {
+
+    if (roleId == 1) {
+      // Doctor: load their own profile
+      await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .checkPhoneDoctor(widget.mobileNumber);
+    } else if (roleId == 3) {
+      // Receptionist: use doctor_mobile from mobileExistReceptionist to load
+      // the doctor's full profile directly via checkPhoneDoctor.
+      await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .loadDoctorProfileForReceptionist(
+            clinicId: receptionistClinicId,
+            doctorId: receptionistDoctorId,
+          );
+      // Save full receptionist profile (name, mobile, email, address, gender).
+      if (receptionistProfile != null) {
+        await ref
+            .read(receptionistLoginViewModelProvider.notifier)
+            .setProfileFromCheck(receptionistProfile);
+      }
+    } else if (roleId == 2) {
+      await ref
+          .read(patientLoginViewModelProvider.notifier)
+          .checkPhonePatient(widget.mobileNumber);
+    }
+
+    if (!mounted) return;
+
+    if (roleId == 1 || roleId == 3) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const DoctorBottomNav()),

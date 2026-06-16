@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
+import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
@@ -156,8 +157,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   int get _doctorId =>
       ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
 
-  String get _doctorName =>
-      ref.read(doctorLoginViewModelProvider).name ?? 'Doctor';
+  String get _doctorName {
+    if (ref.read(tokenProvider).roleId == 3) {
+      return ref.read(receptionistLoginViewModelProvider).name ?? 'Receptionist';
+    }
+    return ref.read(doctorLoginViewModelProvider).name ?? 'Doctor';
+  }
 
   Future<void> _loadData({bool force = false}) async {
     if (_doctorId == 0) return;
@@ -535,9 +540,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     ref.watch(doctorSettingsViewModelProvider
         .select((s) => s.doctorSchedule));
 
-    final doctorName = ref.watch(
-      doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'),
-    );
+    final isReceptionist = ref.watch(tokenProvider).roleId == 3;
+    final doctorName = isReceptionist
+        ? (ref.watch(receptionistLoginViewModelProvider).name ?? 'Receptionist')
+        : ref.watch(doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'));
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -971,7 +977,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   ),
                   const SizedBox(height: 1),
                   Text(
-                    'Dr. $doctorName',
+                    ref.read(tokenProvider).roleId == 3
+                        ? doctorName
+                        : 'Dr. $doctorName',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

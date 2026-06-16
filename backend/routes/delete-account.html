@@ -359,7 +359,7 @@
     document.getElementById('successBox').style.display = 'block';
     showSnackbar();
 
-    fetch('/login/delete-account/request', {
+    fetch('/delete-account/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

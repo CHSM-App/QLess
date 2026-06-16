@@ -21,6 +21,8 @@ ReceptionistApiModel _$ReceptionistApiModelFromJson(
   createdAt: json['created_at'] as String?,
   roleId: (json['role_id'] as num?)?.toInt(),
   Token: json['token'] as String?,
+  doctorId: (json['doctor_id'] as num?)?.toInt(),
+  doctorMobile: json['doctor_mobile'] as String?,
 );
 
 Map<String, dynamic> _$ReceptionistApiModelToJson(
@@ -38,4 +40,6 @@ Map<String, dynamic> _$ReceptionistApiModelToJson(
   'created_at': instance.createdAt,
   'role_id': instance.roleId,
   'token': instance.Token,
+  'doctor_id': instance.doctorId,
+  'doctor_mobile': instance.doctorMobile,
 };

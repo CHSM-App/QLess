@@ -56,6 +56,12 @@ abstract class ApiService {
   @GET("login/checkPhoneDoctor")
   Future<List<DoctorDetails>> checkPhoneDoctor(@Query("mobile") String mobile);
 
+  @GET("login/getDoctorProfileByClinic")
+  Future<List<DoctorDetails>> getDoctorProfileByClinic(
+    @Query("clinic_id") String? clinicId,
+    @Query("doctor_id") int? doctorId,
+  );
+
   @GET("login/mobileExistDoctor")
   Future<List<DoctorDetails>> mobileExistDoctor(@Query("mobile") String mobile);
 
@@ -90,6 +96,11 @@ abstract class ApiService {
 
   @GET("doctor/users/clinicGallery/{clinic_id}")
   Future<List<DoctorDetails>> fetchClinicGallery(
+    @Path("clinic_id") String clinicId,
+  );
+
+  @GET("doctor/users/getDoctorsByClinic/{clinic_id}")
+  Future<List<DoctorDetails>> getDoctorsByClinic(
     @Path("clinic_id") String clinicId,
   );
 
@@ -406,7 +417,7 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Path("clinic_id") String clinicId,
   );
 
-  @GET("users/fetchReceptionistList/{clinic_id}")
+  @GET("doctor/users/fetchReceptionistList/{clinic_id}")
   Future<List<ReceptionistApiModel>> fetchReceptionistList(
     @Path("clinic_id") int clinicId,
   );
@@ -414,14 +425,15 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   @MultiPart()
   @POST("login/receptionist")
   Future<dynamic> addReceptionist(
-    @Part(name: "recep_id")  int?           recepId,
-    @Part(name: "name")      String         name,
-    @Part(name: "mobile_no") String         mobileNo,
-    @Part(name: "email")     String?        email,
-    @Part(name: "address")   String?        address,
-    @Part(name: "gender_id") int            genderId,
-    @Part(name: "clinic_id") int            clinicId,
-    @Part(name: "image")     MultipartFile? image,
+    @Part(name: "recep_id")   int?           recepId,
+    @Part(name: "name")       String         name,
+    @Part(name: "mobile_no")  String         mobileNo,
+    @Part(name: "email")      String?        email,
+    @Part(name: "address")    String?        address,
+    @Part(name: "gender_id")  int            genderId,
+    @Part(name: "clinic_id")  int            clinicId,
+    @Part(name: "image")      MultipartFile? image,
+    @Part(name: "doctor_id")  int?           doctorId,
   );
 
   @DELETE("login/deletereceptionist/{recep_id}")

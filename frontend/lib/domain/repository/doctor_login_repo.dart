@@ -27,6 +27,8 @@ abstract class DoctorLoginRepository {
 
   Future<List<String>> fetchClinicGallery(String clinicId);
   Future<dynamic> deleteClinicGallery(String clinicId, List<String> imageUrls);
+  Future<List<DoctorDetails>> fetchDoctorsByClinic(String clinicId);
+  Future<List<DoctorDetails>> getDoctorProfileByClinic({String? clinicId, int? doctorId});
 
 
   //send otp

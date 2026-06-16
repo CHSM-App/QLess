@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:644313122183:android:383980469e9142aa3cff22",
         "android_client_info": {
-          "package_name": "vengurlatech.qless"
+          "package_name": "com.vengurlatech.qless"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "644313122183-djf5mlrbie5rkpua257qktu9raldkf93.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "vengurlatech.qless",
+            "package_name": "com.vengurlatech.qless",
             "certificate_hash": "9b63be1a9c7b39bcc7767df6e30ce701ea3990b2"
           }
         },

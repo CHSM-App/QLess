@@ -18,6 +18,10 @@ class ReceptionistApiModel {
   final int? roleId;
   @JsonKey(name: 'token')
   final String? Token;
+  @JsonKey(name: 'doctor_id')
+  final int? doctorId;
+  @JsonKey(name: 'doctor_mobile')
+  final String? doctorMobile;
 
   const ReceptionistApiModel({
     this.recepId,
@@ -32,12 +36,20 @@ class ReceptionistApiModel {
     this.createdAt,
     this.roleId,
     this.Token,
+    this.doctorId,
+    this.doctorMobile,
   });
 
   bool get isActive => activeStatus == 1;
 
-  factory ReceptionistApiModel.fromJson(Map<String, dynamic> json) =>
-      _$ReceptionistApiModelFromJson(json);
+  factory ReceptionistApiModel.fromJson(Map<String, dynamic> json) {
+    // clinic_id may come as INT from SQL Server — normalise to String before generated parser runs
+    final raw = json['clinic_id'];
+    if (raw != null && raw is! String) {
+      json = Map<String, dynamic>.from(json)..['clinic_id'] = raw.toString();
+    }
+    return _$ReceptionistApiModelFromJson(json);
+  }
 
   Map<String, dynamic> toJson() => _$ReceptionistApiModelToJson(this);
 }

@@ -131,6 +131,16 @@ class DoctorLoginImpl implements DoctorLoginRepository {
     });
   }
 
+  @override
+  Future<List<DoctorDetails>> fetchDoctorsByClinic(String clinicId) {
+    return apiService.getDoctorsByClinic(clinicId);
+  }
+
+  @override
+  Future<List<DoctorDetails>> getDoctorProfileByClinic({String? clinicId, int? doctorId}) {
+    return apiService.getDoctorProfileByClinic(clinicId, doctorId);
+  }
+
   
   @override
   Future<OtpResponse> sendOtp(OtpResponse payload) {

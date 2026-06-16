@@ -20,8 +20,11 @@ bool isDemoNumber(String mobile) {
   const doctorEnd = 9876000030;
   const patientStart = 9878000001;
   const patientEnd = 9878000050;
+  const receptionistStart = 9877000001;
+  const receptionistEnd = 9877000030;
   return (n >= doctorStart && n <= doctorEnd) ||
-      (n >= patientStart && n <= patientEnd);
+      (n >= patientStart && n <= patientEnd) ||
+      (n >= receptionistStart && n <= receptionistEnd);
 }
 
 /// The fixed demo OTP for a demo number, or `null` for real users.
