@@ -559,6 +559,9 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         return usecase.startSession(AppointmentRequestModel.fromJson(payload));
       case OfflineOperation.endSession:
         return usecase.endSession(AppointmentRequestModel.fromJson(payload));
+      case OfflineOperation.walkInBook:
+        // Handled by ReceptionistLoginViewmodel.syncPendingWalkIns — skip here.
+        return AppointmentResponseModel(success: true, message: 'Skipped');
     }
   }
 

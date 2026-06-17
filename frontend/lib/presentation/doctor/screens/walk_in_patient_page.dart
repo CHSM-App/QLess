@@ -9,6 +9,8 @@ import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_leave_model.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
+import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/domain/models/patients.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 
@@ -170,18 +172,224 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
   bool    _booking  = false;
   String? _bookError;
 
+  // ── Patient lookup (Practo-style) ────────────────────────────────────────
+  Patients? _foundPatient;         // existing patient found by mobile
+  bool      _checkingMobile = false;
+  int?      _resolvedPatientId;    // existing patient selected for self-booking
+  int?      _familyMemberId;       // existing family member's member_id (→ patient_id in appt)
+  int?      _familyHeadPatientId;  // primary patient's id when adding NEW family member
+  int?      _familyGenderId;       // gender selected when adding new family member
+
   @override
   void initState() {
     super.initState();
+    _mobileCtr.addListener(_onMobileChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _init());
   }
 
   @override
   void dispose() {
+    _mobileCtr.removeListener(_onMobileChanged);
     _nameCtr.dispose();
     _mobileCtr.dispose();
     _symptomsCtr.dispose();
     super.dispose();
+  }
+
+  // ── Mobile lookup ─────────────────────────────────────────────────────────
+  void _onMobileChanged() {
+    final digits = _mobileCtr.text.trim().replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 10) {
+      _lookupMobile(digits);
+    } else if (_foundPatient != null || _resolvedPatientId != null || _familyMemberId != null || _familyHeadPatientId != null || _familyGenderId != null) {
+      setState(() { _foundPatient = null; _resolvedPatientId = null; _familyMemberId = null; _familyHeadPatientId = null; _familyGenderId = null; });
+    }
+  }
+
+  Future<void> _lookupMobile(String mobile) async {
+    final api = _api;
+    if (api == null) return;
+    setState(() { _checkingMobile = true; });
+    try {
+      final results = await api.checkPhonePatient(mobile);
+      if (!mounted) return;
+      if (results.isNotEmpty) {
+        setState(() { _foundPatient = results.first; _checkingMobile = false; });
+        _showPatientSheet(results.first);
+      } else {
+        setState(() { _foundPatient = null; _resolvedPatientId = null; _checkingMobile = false; });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _checkingMobile = false; });
+    }
+  }
+
+  void _showPatientSheet(Patients patient) {
+    final familyNameCtr = TextEditingController();
+    int? selectedGender = 1;
+    final api = _api;
+    final membersFuture = (api != null && patient.patientId != null)
+        ? api.fetchFamilyMembers(patient.patientId!)
+        : Future.value(<FamilyMember>[]);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Handle
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: _kBorder, borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 16),
+              const Text('Patient Found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _kTextPrimary)),
+              const SizedBox(height: 4),
+              Text('${patient.name} · ${patient.mobileNo}',
+                  style: const TextStyle(fontSize: 13, color: _kTextSec)),
+              const SizedBox(height: 16),
+
+              // Book for primary patient
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      _resolvedPatientId   = patient.patientId;
+                      _familyMemberId      = null;
+                      _familyHeadPatientId = null;
+                      _familyGenderId      = null;
+                      _foundPatient        = null;
+                      _nameCtr.text        = patient.name ?? _nameCtr.text;
+                    });
+                    Navigator.pop(ctx);
+                    if (_canBook) _book();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _kPrimary, foregroundColor: Colors.white,
+                    elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: Text('Book for ${patient.name}',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: _kBorder),
+              const SizedBox(height: 12),
+              const Text('Family Members', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kTextSec)),
+              const SizedBox(height: 8),
+
+              // Existing family members list
+              FutureBuilder<List<FamilyMember>>(
+                future: membersFuture,
+                builder: (_, snap) {
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary)),
+                    );
+                  }
+                  final members = snap.data ?? [];
+                  if (members.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.only(bottom: 4),
+                      child: Text('No family members yet', style: TextStyle(fontSize: 13, color: _kTextMuted)),
+                    );
+                  }
+                  return Column(
+                    children: members.map((m) => _FamilyMemberTile(
+                      member: m,
+                      onBook: () {
+                        setState(() {
+                          _familyMemberId      = m.memberId!;
+                          _familyHeadPatientId = null;
+                          _familyGenderId      = null;
+                          _resolvedPatientId   = null;
+                          _foundPatient        = null;
+                          _nameCtr.text        = m.memberName ?? '';
+                        });
+                        Navigator.pop(ctx);
+                        if (_canBook) _book();
+                      },
+                    )).toList(),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: _kBorder),
+              const SizedBox(height: 12),
+
+              // Add new family member
+              const Text('Add new family member:', style: TextStyle(fontSize: 12, color: _kTextSec)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: familyNameCtr,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  hintText: 'Name',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _kBorder)),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _kBorder)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(children: [
+                _GenderChip(label: 'Male',   value: 1, selected: selectedGender == 1, onTap: () => setSheet(() => selectedGender = 1)),
+                const SizedBox(width: 8),
+                _GenderChip(label: 'Female', value: 2, selected: selectedGender == 2, onTap: () => setSheet(() => selectedGender = 2)),
+                const SizedBox(width: 8),
+                _GenderChip(label: 'Other',  value: 3, selected: selectedGender == 3, onTap: () => setSheet(() => selectedGender = 3)),
+              ]),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () async {
+                    final memberName = familyNameCtr.text.trim();
+                    if (memberName.isEmpty) return;
+                    Navigator.pop(ctx);
+                    if (!mounted) return;
+                    setState(() {
+                      _foundPatient        = null;
+                      _resolvedPatientId   = null;
+                      _familyMemberId      = null;
+                      _familyHeadPatientId = patient.patientId;
+                      _familyGenderId      = selectedGender;
+                      _nameCtr.text        = memberName;
+                    });
+                    if (_canBook) {
+                      await _book();
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Booking for $memberName — select date & session, then press Book'),
+                        backgroundColor: _kInfo,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ));
+                    }
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _kPrimary,
+                    side: const BorderSide(color: _kPrimary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Add & Book Family Member',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
   }
 
   ApiService? get _api {
@@ -349,6 +557,9 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
 
     setState(() { _booking = true; _bookError = null; });
     try {
+      final isNewFamily      = _familyHeadPatientId != null;
+      final isExistingFamily = _familyMemberId != null;
+      final isFamilyBooking  = isNewFamily || isExistingFamily;
       final body = <String, dynamic>{
         'name':             _nameCtr.text.trim(),
         'mobile_no':        _mobileCtr.text.trim(),
@@ -356,9 +567,15 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
         'appointment_date': _fmtDateApi(_selectedDate!),
         'slot_id':          _selectedSlotId,
         'start_time':       isQueue ? null : _toApiTime(_selectedTime!),
-        'user_type':        1,
-        if (_symptomsCtr.text.trim().isNotEmpty)
-          'symptoms': _symptomsCtr.text.trim(),
+        'user_type':        isFamilyBooking ? 2 : 1,
+        // existing family member → patient_id = member_id (no family record creation needed)
+        if (isExistingFamily) 'patient_id': _familyMemberId,
+        // new family member → backend creates family_members record, uses member_id for appt
+        if (isNewFamily) 'family_id': _familyHeadPatientId,
+        if (isNewFamily && _familyGenderId != null) 'gender_id': _familyGenderId,
+        // self-booking existing patient
+        if (!isFamilyBooking && _resolvedPatientId != null) 'patient_id': _resolvedPatientId,
+        if (_symptomsCtr.text.trim().isNotEmpty) 'symptoms': _symptomsCtr.text.trim(),
       }..removeWhere((_, v) => v == null);
 
       final isOnline = ref.read(connectivityNotifierProvider).isOnline;
@@ -376,6 +593,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
+        setState(() { _foundPatient = null; _resolvedPatientId = null; _familyMemberId = null; _familyHeadPatientId = null; _familyGenderId = null; });
         Navigator.of(context).pop();
       } else {
         setState(() { _bookError = resp.message ?? 'Booking failed'; });
@@ -513,6 +731,54 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
             maxLength: 10,
             formatters: [FilteringTextInputFormatter.digitsOnly],
           ),
+
+          // ── Patient lookup result ────────────────────────────────────
+          if (_checkingMobile) ...[
+            const SizedBox(height: 8),
+            const Row(children: [
+              SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary)),
+              SizedBox(width: 8),
+              Text('Checking...', style: TextStyle(fontSize: 12, color: _kTextSec)),
+            ]),
+          ] else if (_foundPatient != null && _resolvedPatientId == null) ...[
+            const SizedBox(height: 8),
+            GestureDetector(
+              onTap: () => _showPatientSheet(_foundPatient!),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _kPrimaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: _kPrimary.withValues(alpha: 0.4)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.person_rounded, size: 16, color: _kPrimary),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(
+                    '${_foundPatient!.name} found on this number — tap to select',
+                    style: const TextStyle(fontSize: 12, color: _kPrimary, fontWeight: FontWeight.w600),
+                  )),
+                  const Icon(Icons.chevron_right_rounded, size: 18, color: _kPrimary),
+                ]),
+              ),
+            ),
+          ] else if (_resolvedPatientId != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: _kGreenLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _kGreen.withValues(alpha: 0.5)),
+              ),
+              child: Row(children: [
+                const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF38A169)),
+                const SizedBox(width: 8),
+                Text('Booking for ${_nameCtr.text}',
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF38A169), fontWeight: FontWeight.w600)),
+              ]),
+            ),
+          ],
 
           // ── Error ────────────────────────────────────────────────────
           if (_bookError != null) ...[
@@ -1240,6 +1506,69 @@ class _ErrorBody extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
         ),
       ]),
+    ),
+  );
+}
+
+class _GenderChip extends StatelessWidget {
+  final String label;
+  final int    value;
+  final bool   selected;
+  final VoidCallback onTap;
+  const _GenderChip({required this.label, required this.value, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color:        selected ? _kPrimary : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border:       Border.all(color: selected ? _kPrimary : _kBorder),
+      ),
+      child: Text(label,
+        style: TextStyle(
+          fontSize:   13,
+          fontWeight: FontWeight.w500,
+          color:      selected ? Colors.white : _kTextSec,
+        ),
+      ),
+    ),
+  );
+}
+
+class _FamilyMemberTile extends StatelessWidget {
+  final FamilyMember member;
+  final VoidCallback onBook;
+  const _FamilyMemberTile({required this.member, required this.onBook});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    decoration: BoxDecoration(
+      border: Border.all(color: _kBorder),
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: ListTile(
+      leading: CircleAvatar(
+        backgroundColor: _kPrimaryLight,
+        child: Text(
+          member.avatarLetter,
+          style: const TextStyle(color: _kPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+        ),
+      ),
+      title: Text(member.memberName ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _kTextPrimary)),
+      subtitle: Text(
+        [member.genderName, member.relationName].where((s) => s != null && s.isNotEmpty).join(' · '),
+        style: const TextStyle(fontSize: 12, color: _kTextSec),
+      ),
+      trailing: TextButton(
+        onPressed: onBook,
+        style: TextButton.styleFrom(foregroundColor: _kPrimary),
+        child: const Text('Book', style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
     ),
   );
 }

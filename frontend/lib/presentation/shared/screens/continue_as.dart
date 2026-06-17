@@ -267,7 +267,7 @@ class _PortraitLayout extends StatelessWidget {
                       // Role cards
                       _RoleCard(
                         role: 'doctor',
-                        title: 'Continue as Doctor',
+                        title: 'Continue as Doctor & Receptionist',
                         subtitle: 'Manage appointments & patients',
                         chips: const ['Practice tools', 'Verified'],
                         icon: _RoleCardIcon.doctor,

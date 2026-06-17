@@ -2016,31 +2016,44 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
 // Finds or creates a patient by mobile, then books the appointment.
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/walkInBook', async (req, res) => {
-  const { name, mobile_no, doctor_id, appointment_date, start_time, slot_id, user_type, symptoms } = req.body;
+  const { name, mobile_no, doctor_id, appointment_date, start_time, slot_id, user_type, symptoms, gender_id, family_id, patient_id: existingPatientId } = req.body;
 
   if (!name || !mobile_no || !doctor_id || !appointment_date) {
     return res.status(400).json({ success: false, message: 'name, mobile_no, doctor_id, appointment_date required' });
   }
 
   try {
-    // Step 1: Find patient by mobile
-    let patient_id = null;
-    const checkRes = await db.request()
-      .input('operation', 'check_phone_patient')
-      .input('mobile_no', mobile_no)
-      .execute('sp_patients');
-    if (checkRes.recordset.length > 0) {
-      patient_id = checkRes.recordset[0].patient_id;
+    let patient_id;
+
+    if (family_id) {
+      // Family member booking: insert into family_members, then book appointment under the
+      // primary patient's id (family_id) with user_type=2.
+      const famRes = await db.request()
+        .input('operation', 'Insert')
+        .input('member_id', null)
+        .input('family_id', parseInt(family_id))
+        .input('name', String(name).trim())
+        .input('Gender_id', gender_id ? parseInt(gender_id) : null)
+        .input('relation_id', null)
+        .input('DOB', null)
+        .input('mobile_no', mobile_no)
+        .execute('sp_family_members');
+      patient_id = famRes.recordset[0]?.member_id;
+      log.info(`walkInBook family: family_id=${family_id} member_id=${patient_id} recordset=${JSON.stringify(famRes.recordset)}`);
+      if (!patient_id) throw new Error('Failed to create family member record');
+    } else if (existingPatientId) {
+      // Existing patient returning — use their patient_id directly.
+      patient_id = parseInt(existingPatientId);
     } else {
-      // Create minimal shadow profile via the standard SP (same path as patient self-register)
+      // New first-time walk-in — create a shadow profile in patients table.
       const insertRes = await db.request()
         .input('operation', 'Insert')
         .input('patient_id', null)
-        .input('name', name)
+        .input('name', String(name).trim())
         .input('mobile_no', mobile_no)
         .input('email', null)
         .input('Address', null)
-        .input('gender_id', null)
+        .input('gender_id', gender_id ? parseInt(gender_id) : null)
         .input('DOB', null)
         .input('blood_group_id', null)
         .input('weight', null)
@@ -2073,6 +2086,7 @@ router.post('/walkInBook', async (req, res) => {
       .execute('sp_appointment');
 
     const booked = bookRes.recordset[0].success === 1;
+    log.info(`walkInBook: patient_id=${patient_id} user_type=${user_type} family_id=${family_id||null} booked=${booked} msg=${bookRes.recordset[0].message}`);
     if (booked) emitQueueUpdate(req, 'booked', doctor_id);
 
     return res.json({

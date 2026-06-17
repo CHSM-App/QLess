@@ -462,7 +462,7 @@ class _LandscapeLayout extends StatelessWidget {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                isDoctor ? 'Doctor Portal' : 'Patient Portal',
+                                isDoctor ? 'Doctor & Receptionist Portal' : 'Patient Portal',
                                 style: const TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.white,
