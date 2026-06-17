@@ -38,6 +38,7 @@ final appointmentViewModelProvider =
 
 final receptionistLoginViewModelProvider =
     StateNotifierProvider<ReceptionistLoginViewmodel, ReceptionistLoginState>((ref) {
-  final usecase = ref.watch(receptionistUsecaseProvider);
-  return ReceptionistLoginViewmodel(usecase);
+  final usecase      = ref.watch(receptionistUsecaseProvider);
+  final offlineStore = ref.watch(offlineQueueStoreProvider);
+  return ReceptionistLoginViewmodel(usecase, offlineStore);
 });

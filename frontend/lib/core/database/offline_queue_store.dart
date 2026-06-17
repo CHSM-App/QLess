@@ -21,6 +21,7 @@ enum OfflineOperation {
   queuePauseEmergency,
   startSession,
   endSession,
+  walkInBook,
 }
 
 extension OfflineOperationX on OfflineOperation {
@@ -35,6 +36,7 @@ extension OfflineOperationX on OfflineOperation {
       case OfflineOperation.queuePauseEmergency: return 'queuePauseEmergency';
       case OfflineOperation.startSession:        return 'startSession';
       case OfflineOperation.endSession:          return 'endSession';
+      case OfflineOperation.walkInBook:          return 'walkInBook';
     }
   }
 
@@ -49,6 +51,7 @@ extension OfflineOperationX on OfflineOperation {
       case 'queuePauseEmergency': return OfflineOperation.queuePauseEmergency;
       case 'startSession':        return OfflineOperation.startSession;
       case 'endSession':          return OfflineOperation.endSession;
+      case 'walkInBook':          return OfflineOperation.walkInBook;
       default: throw ArgumentError('Unknown offline operation: $s');
     }
   }
@@ -190,6 +193,9 @@ class OfflineQueueStore {
           await _db.updateAppointmentStatus(appointmentId, 'completed');
         }
         break;
+      case OfflineOperation.walkInBook:
+        // No local queue mutation needed — the booking appears after sync.
+        break;
     }
   }
 
@@ -208,6 +214,44 @@ class OfflineQueueStore {
       appointmentId: request.appointmentId,
     );
     debugPrint('[OfflineQueueStore] Enqueued offline op: ${op.name}');
+  }
+
+  /// Enqueue a walk-in booking made while offline.
+  Future<void> enqueueWalkInBook(Map<String, dynamic> body, int? doctorId) async {
+    await _db.enqueuePendingOp(
+      operation: OfflineOperation.walkInBook.name,
+      payload:   body,
+      doctorId:  doctorId,
+    );
+    debugPrint('[OfflineQueueStore] Enqueued offline walkInBook for doctor $doctorId');
+  }
+
+  /// Flush all pending walk-in bookings by calling [executor].
+  /// Returns the number successfully sent.
+  Future<int> flushPendingWalkIns(
+    Future<void> Function(Map<String, dynamic> body) executor,
+  ) async {
+    final rows = await _db.getPendingOps();
+    final walkInRows = rows.where(
+      (r) => (r['operation'] as String?) == OfflineOperation.walkInBook.name,
+    ).toList();
+    if (walkInRows.isEmpty) return 0;
+
+    int flushed = 0;
+    for (final row in walkInRows) {
+      final id = row['id'] as int;
+      try {
+        final payload = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+        await executor(payload);
+        await deletePendingOp(id);
+        flushed++;
+        debugPrint('[OfflineQueueStore] Flushed walkInBook op $id');
+      } catch (e) {
+        await incrementRetry(id);
+        debugPrint('[OfflineQueueStore] Failed walkInBook op $id: $e');
+      }
+    }
+    return flushed;
   }
 
   Future<void> enqueueEmergencyPause(int queueId, int doctorId) async {

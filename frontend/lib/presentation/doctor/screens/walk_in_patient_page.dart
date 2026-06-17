@@ -10,6 +10,7 @@ import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_leave_model.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 
 // ── Colours ─────────────────────────────────────────────────────────────────
 const _kPrimary      = Color(0xFF26C6B0);
@@ -360,14 +361,17 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
           'symptoms': _symptomsCtr.text.trim(),
       }..removeWhere((_, v) => v == null);
 
-      final resp = await ref.read(receptionistLoginViewModelProvider.notifier).walkInBook(body);
+      final isOnline = ref.read(connectivityNotifierProvider).isOnline;
+      final resp = await ref.read(receptionistLoginViewModelProvider.notifier)
+          .walkInBook(body, isOnline: isOnline);
       if (!mounted) return;
 
       if (resp.success == true) {
+        final isOfflineQueued = resp.message?.contains('offline') == true;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(resp.message ?? 'Walk-in patient booked successfully'),
-            backgroundColor: _kPrimary,
+            backgroundColor: isOfflineQueued ? _kAmber : _kPrimary,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -545,6 +549,13 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Sync pending walk-in bookings when connectivity is restored.
+    ref.listen<ConnectivityState>(connectivityNotifierProvider, (prev, next) {
+      if ((prev?.isOffline ?? false) && next.isOnline) {
+        ref.read(receptionistLoginViewModelProvider.notifier).syncPendingWalkIns();
+      }
+    });
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7FDFC),
       appBar: AppBar(
