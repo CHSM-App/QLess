@@ -2266,7 +2266,7 @@ class _ApiService implements ApiService {
       Options(method: 'DELETE', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'login/deletereceptionist/${recepId}',
+            'doctor/index/deletereceptionist/${recepId}',
             queryParameters: queryParameters,
             data: _data,
           )

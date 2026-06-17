@@ -441,7 +441,7 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Part(name: "doctor_id")  int?           doctorId,
   );
 
-  @DELETE("login/deletereceptionist/{recep_id}")
+  @DELETE("doctor/index/deletereceptionist/{recep_id}")
   Future<dynamic> deleteReceptionist(
     @Path("recep_id") int recepId,
   );
