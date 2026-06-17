@@ -14,6 +14,7 @@ import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart'
 import 'package:qless/presentation/doctor/screens/doctor_patient_history.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
+import 'package:qless/presentation/doctor/screens/walk_in_patient_page.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
@@ -668,6 +669,15 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               //     child: _buildWeeklyPerformance(list),
               //   ),
               // ),
+
+              // ── WALK-IN CARD (receptionist only) ─────────────────────
+              if (ref.watch(tokenProvider).roleId == 3)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child: _buildWalkInCard(),
+                  ),
+                ),
 
               // ── QUICK ACTIONS ────────────────────────────────────────
               SliverToBoxAdapter(
@@ -2098,7 +2108,53 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // HOME QUICK ACTIONS  (Edit Medicine, Schedule, History)
   // ─────────────────────────────────────────────────────────────────────────
 
+  Widget _buildWalkInCard() {
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const WalkInPatientPage()),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [kPrimaryLight, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFB2EBE4)),
+          boxShadow: kSoftShadow,
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFB2EBE4)),
+            ),
+            alignment: Alignment.center,
+            child: const Icon(Icons.person_add_rounded, size: 20, color: kPrimaryDark),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Add Walk-in Patient',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+              SizedBox(height: 2),
+              Text('Book appointment for walk-in patient',
+                  style: TextStyle(fontSize: 11, color: kTextSecondary)),
+            ]),
+          ),
+          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kTextSecondary),
+        ]),
+      ),
+    );
+  }
+
   Widget _buildHomeQuickActions() {
+    final isReceptionist = ref.watch(tokenProvider).roleId == 3;
     return Container(
       decoration: BoxDecoration(
         gradient: kCardGlassGradient,
@@ -2133,46 +2189,76 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             ],
           ),
           const SizedBox(height: 10),
-          Row(children: [
-            _homeActionTile(
-              icon: Icons.medication_rounded,
-              label: 'Add\nMedicine',
-              accent: kPurple,
-              bg: kPurpleLight,
-              fg: kPurpleDark,
-              border: kPurpleBorder,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const AddMedicinePage()),
+          if (isReceptionist)
+            Row(children: [
+              _homeActionTile(
+                icon: Icons.calendar_today_rounded,
+                label: 'Edit\nSchedule',
+                accent: kAmber,
+                bg: kAmberLight,
+                fg: kAmberDark,
+                border: kAmberBorder,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()),
+                ),
               ),
-            ),
-            const SizedBox(width: 7),
-            _homeActionTile(
-              icon: Icons.calendar_today_rounded,
-              label: 'Edit\nSchedule',
-              accent: kAmber,
-              bg: kAmberLight,
-              fg: kAmberDark,
-              border: kAmberBorder,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const DoctorAvailabilityPage()),
+              const SizedBox(width: 7),
+              _homeActionTile(
+                icon: Icons.people_alt_rounded,
+                label: 'Patient\nList',
+                accent: kGreen,
+                bg: kGreenLight,
+                fg: kGreenDark,
+                border: kGreenBorder,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const DoctorPatientHistoryScreen()),
+                ),
               ),
-            ),
-            const SizedBox(width: 7),
-            _homeActionTile(
-              icon: Icons.history_rounded,
-              label: 'Patient\nHistory',
-              accent: kGreen,
-              bg: kGreenLight,
-              fg: kGreenDark,
-              border: kGreenBorder,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const DoctorPatientHistoryScreen()),
+              const SizedBox(width: 7),
+              const Expanded(child: SizedBox()),
+            ])
+          else
+            Row(children: [
+              _homeActionTile(
+                icon: Icons.medication_rounded,
+                label: 'Add\nMedicine',
+                accent: kPurple,
+                bg: kPurpleLight,
+                fg: kPurpleDark,
+                border: kPurpleBorder,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const AddMedicinePage()),
+                ),
               ),
-            ),
-          ]),
+              const SizedBox(width: 7),
+              _homeActionTile(
+                icon: Icons.calendar_today_rounded,
+                label: 'Edit\nSchedule',
+                accent: kAmber,
+                bg: kAmberLight,
+                fg: kAmberDark,
+                border: kAmberBorder,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const DoctorAvailabilityPage()),
+                ),
+              ),
+              const SizedBox(width: 7),
+              _homeActionTile(
+                icon: Icons.history_rounded,
+                label: 'Patient\nHistory',
+                accent: kGreen,
+                bg: kGreenLight,
+                fg: kGreenDark,
+                border: kGreenBorder,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const DoctorPatientHistoryScreen()),
+                ),
+              ),
+            ]),
         ],
       ),
     );

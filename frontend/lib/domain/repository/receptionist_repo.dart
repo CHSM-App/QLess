@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
 
 abstract class ReceptionistRepository {
@@ -12,4 +13,6 @@ abstract class ReceptionistRepository {
   Future<List<ReceptionistApiModel>> mobileExistReceptionist(String mobileNo);
 
   Future<dynamic> deleteReceptionist(int recepId);
+
+  Future<AppointmentResponseModel> walkInBook(Map<String, dynamic> body);
 }

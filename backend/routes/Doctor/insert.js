@@ -2011,6 +2011,81 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WALK-IN PATIENT BOOK (Receptionist)
+// Finds or creates a patient by mobile, then books the appointment.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/walkInBook', async (req, res) => {
+  const { name, mobile_no, doctor_id, appointment_date, start_time, slot_id, user_type, symptoms } = req.body;
+
+  if (!name || !mobile_no || !doctor_id || !appointment_date) {
+    return res.status(400).json({ success: false, message: 'name, mobile_no, doctor_id, appointment_date required' });
+  }
+
+  try {
+    // Step 1: Find patient by mobile
+    let patient_id = null;
+    const checkRes = await db.request()
+      .input('operation', 'check_phone_patient')
+      .input('mobile_no', mobile_no)
+      .execute('sp_patients');
+    if (checkRes.recordset.length > 0) {
+      patient_id = checkRes.recordset[0].patient_id;
+    } else {
+      // Create minimal shadow profile via the standard SP (same path as patient self-register)
+      const insertRes = await db.request()
+        .input('operation', 'Insert')
+        .input('patient_id', null)
+        .input('name', name)
+        .input('mobile_no', mobile_no)
+        .input('email', null)
+        .input('Address', null)
+        .input('gender_id', null)
+        .input('DOB', null)
+        .input('blood_group_id', null)
+        .input('weight', null)
+        .execute('sp_patients');
+      patient_id = insertRes.recordset[0]?.patient_id;
+      if (!patient_id) throw new Error('Failed to create patient profile');
+    }
+
+    // Step 2: Check doctor leave
+    const blockRes = await db.request()
+      .input('operation', 'IS_BLOCKED')
+      .input('doctor_id', doctor_id)
+      .input('from_date', appointment_date)
+      .execute('sp_doctor_leave');
+
+    if (blockRes.recordset?.[0]?.blocked === 1) {
+      return res.json({ success: false, message: 'Doctor is on leave on this date. Please pick another date.' });
+    }
+
+    // Step 3: Book appointment
+    const bookRes = await db.request()
+      .input('operation', 'BOOK')
+      .input('user_type', user_type || 1)
+      .input('doctor_id', doctor_id)
+      .input('patient_id', patient_id)
+      .input('appointment_date', appointment_date)
+      .input('start_time', start_time || null)
+      .input('slot_id', slot_id || null)
+      .input('symptoms', symptoms || '')
+      .execute('sp_appointment');
+
+    const booked = bookRes.recordset[0].success === 1;
+    if (booked) emitQueueUpdate(req, 'booked', doctor_id);
+
+    return res.json({
+      success: booked,
+      message: bookRes.recordset[0].message,
+      patient_id,
+    });
+
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Walk-in booking failed', error: error.message });
+  }
+});
+
 
 
 

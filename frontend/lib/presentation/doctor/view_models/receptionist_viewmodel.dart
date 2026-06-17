@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
+import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
 import 'package:qless/domain/usecase/receptionist_usecase.dart';
 
@@ -268,6 +269,21 @@ class ReceptionistLoginViewmodel
     if (r.genderId != null) await TokenStorage.saveValue('recep_gender_id', r.genderId.toString());
     if (r.clinicId != null) await TokenStorage.saveValue('recep_clinic_id', r.clinicId!);
     if (r.doctorId != null) await TokenStorage.saveValue('recep_doctor_id', r.doctorId.toString());
+  }
+
+  Future<AppointmentResponseModel> walkInBook(Map<String, dynamic> body) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final result = await usecase.walkInBook(body);
+      state = state.copyWith(isLoading: false);
+      return result;
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString().replaceFirst('Exception: ', ''),
+      );
+      rethrow;
+    }
   }
 
   Future<void> logout() async {

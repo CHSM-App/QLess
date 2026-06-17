@@ -847,8 +847,8 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 		request.input('email',      email      || null);
 		request.input('Address',    address    || null);
 		request.input('gender_id',  gender_id  || null);
-		request.input('clinic_id',  clinic_id  || null);
-		request.input('doctor_id',  doctor_id  || null);
+		request.input('clinic_id',  (clinic_id != null && clinic_id !== undefined && String(clinic_id) !== '0') ? clinic_id : null);
+		request.input('doctor_id',  (doctor_id != null && doctor_id !== undefined) ? doctor_id : null);
 
 		const result = await request.execute('sp_receptionist');
 

@@ -208,7 +208,8 @@ bool _passesDateFilter(AppointmentList a, _DateFilter df,
 //  MAIN SCREEN
 // ════════════════════════════════════════════════════════════════════
 class PatientListScreen extends ConsumerStatefulWidget {
-  const PatientListScreen({super.key});
+  final int? doctorId;
+  const PatientListScreen({super.key, this.doctorId});
 
   @override
   ConsumerState<PatientListScreen> createState() => _PatientListScreenState();
@@ -275,7 +276,11 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     );
     _idSub = ref.listenManual<int?>(
       doctorLoginViewModelProvider.select((s) => s.doctorId),
-      (_, next) { if (next != null && next > 0) _refresh(force: false); },
+      (_, next) {
+        // If doctorId is overridden (receptionist mode), skip this listener.
+        if (widget.doctorId != null) return;
+        if (next != null && next > 0) _refresh(force: false);
+      },
     );
     WidgetsBinding.instance.addPostFrameCallback(
       (_) { if (mounted) _refresh(force: false); },
@@ -290,7 +295,10 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     super.dispose();
   }
 
-  int get _doctorId => ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+  int get _doctorId =>
+      widget.doctorId ??
+      ref.read(doctorLoginViewModelProvider).doctorId ??
+      0;
 
   void _refresh({required bool force}) {
     if (_hasFetched && !force) return;

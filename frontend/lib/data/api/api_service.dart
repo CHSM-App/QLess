@@ -222,6 +222,11 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("doctor/insert/walkInBook")
+  Future<AppointmentResponseModel> walkInBook(
+    @Body() Map<String, dynamic> body,
+  );
+
   @POST("doctor/insert/addQueueStartTime/")
   Future<dynamic> updateLeadTime(
      @Body() DoctorDetails doctor
@@ -419,7 +424,7 @@ Future<AppointmentResponseModel> queuePauseEmergency(
 
   @GET("doctor/users/fetchReceptionistList/{clinic_id}")
   Future<List<ReceptionistApiModel>> fetchReceptionistList(
-    @Path("clinic_id") int clinicId,
+    @Path("clinic_id") String clinicId,
   );
 
   @MultiPart()
@@ -431,7 +436,7 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Part(name: "email")      String?        email,
     @Part(name: "address")    String?        address,
     @Part(name: "gender_id")  int            genderId,
-    @Part(name: "clinic_id")  int            clinicId,
+    @Part(name: "clinic_id")  String?        clinicId,
     @Part(name: "image")      MultipartFile? image,
     @Part(name: "doctor_id")  int?           doctorId,
   );

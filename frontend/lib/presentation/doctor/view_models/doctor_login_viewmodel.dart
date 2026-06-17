@@ -263,6 +263,12 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       if (d.name != null) await TokenStorage.saveValue('name', d.name!);
       if (d.clinicName != null)
         await TokenStorage.saveValue('clinic_name', d.clinicName!);
+      if (d.clinicId != null &&
+          d.clinicId!.trim().isNotEmpty &&
+          d.clinicId!.trim().toLowerCase() != 'null' &&
+          d.clinicId!.trim() != '0') {
+        await TokenStorage.saveValue('clinic_id', d.clinicId!.trim());
+      }
     } catch (e, st) {
       state = state.copyWith(
         // Preserve the cached details on failure; only surface an error state

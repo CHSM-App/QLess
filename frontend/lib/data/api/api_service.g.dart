@@ -1107,6 +1107,34 @@ class _ApiService implements ApiService {
   }
 
   @override
+  Future<AppointmentResponseModel> walkInBook(Map<String, dynamic> body) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    final _data = <String, dynamic>{};
+    _data.addAll(body);
+    final _options = _setStreamType<AppointmentResponseModel>(
+      Options(method: 'POST', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'doctor/insert/walkInBook',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<Map<String, dynamic>>(_options);
+    late AppointmentResponseModel _value;
+    try {
+      _value = AppointmentResponseModel.fromJson(_result.data!);
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
   Future<dynamic> updateLeadTime(DoctorDetails doctor) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -2137,7 +2165,9 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<ReceptionistApiModel>> fetchReceptionistList(int clinicId) async {
+  Future<List<ReceptionistApiModel>> fetchReceptionistList(
+    String clinicId,
+  ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -2176,7 +2206,7 @@ class _ApiService implements ApiService {
     String? email,
     String? address,
     int genderId,
-    int clinicId,
+    String? clinicId,
     MultipartFile? image,
     int? doctorId,
   ) async {
@@ -2197,7 +2227,9 @@ class _ApiService implements ApiService {
       _data.fields.add(MapEntry('address', address));
     }
     _data.fields.add(MapEntry('gender_id', genderId.toString()));
-    _data.fields.add(MapEntry('clinic_id', clinicId.toString()));
+    if (clinicId != null) {
+      _data.fields.add(MapEntry('clinic_id', clinicId));
+    }
     if (image != null) {
       _data.files.add(MapEntry('image', image));
     }

@@ -5,8 +5,10 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/data/api/api_service.dart';
+import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
 import 'package:qless/domain/repository/receptionist_repo.dart';
+
 
 class ReceptionistImpl implements ReceptionistRepository {
   final ApiService apiService;
@@ -30,7 +32,7 @@ class ReceptionistImpl implements ReceptionistRepository {
       recept.email ?? "",
       recept.address ?? "",
       recept.genderId ?? 0,
-      int.tryParse(recept.clinicId ?? '') ?? 0,
+      recept.clinicId,
       multipartImage,
       recept.doctorId,
     );
@@ -38,8 +40,7 @@ class ReceptionistImpl implements ReceptionistRepository {
 
   @override
   Future<List<ReceptionistApiModel>> fetchReceptionistList(String clinicId) {
-    final id = int.tryParse(clinicId) ?? 0;
-    return apiService.fetchReceptionistList(id);
+    return apiService.fetchReceptionistList(clinicId);
   }
 
   @override
@@ -71,6 +72,7 @@ class ReceptionistImpl implements ReceptionistRepository {
       }
     }
 
+
     return response;
   }
 
@@ -82,5 +84,32 @@ class ReceptionistImpl implements ReceptionistRepository {
   @override
   Future<dynamic> deleteReceptionist(int recepId) {
     return apiService.deleteReceptionist(recepId);
+  }
+  
+  @override
+  Future<dynamic> updateReceptionist(ReceptionistApiModel recept, {File? image}) async {
+    MultipartFile? multipartImage;
+    if (image != null) {
+      multipartImage = await MultipartFile.fromFile(
+        image.path,
+        filename: p.basename(image.path),
+      );
+    }
+    return apiService.addReceptionist(
+      recept.recepId,
+      recept.name ?? "",
+      recept.mobileNo ?? "",
+      recept.email ?? "",
+      recept.address ?? "",
+      recept.genderId ?? 0,
+      recept.clinicId,
+      multipartImage,
+      recept.doctorId,
+    );
+  }
+
+  @override
+  Future<AppointmentResponseModel> walkInBook(Map<String, dynamic> body) {
+    return apiService.walkInBook(body);
   }
 }

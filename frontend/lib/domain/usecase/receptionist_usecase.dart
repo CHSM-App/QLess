@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
 import 'package:qless/domain/repository/receptionist_repo.dart';
 
@@ -26,5 +27,9 @@ class ReceptionistUsecase {
 
   Future<dynamic> deleteReceptionist(int recepId) {
     return receptionistRepository.deleteReceptionist(recepId);
+  }
+
+  Future<AppointmentResponseModel> walkInBook(Map<String, dynamic> body) {
+    return receptionistRepository.walkInBook(body);
   }
 }

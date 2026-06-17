@@ -40,7 +40,8 @@ const _genderRev = {1: 'Male', 2: 'Female', 3: 'Other'};
 
 String? _parseClinicId(String? value) {
   final cleaned = value?.trim();
-  if (cleaned == null || cleaned.isEmpty || cleaned.toLowerCase() == 'null') {
+  if (cleaned == null || cleaned.isEmpty ||
+      cleaned.toLowerCase() == 'null' || cleaned == '0') {
     return null;
   }
   return cleaned;
