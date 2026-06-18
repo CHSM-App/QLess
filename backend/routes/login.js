@@ -810,6 +810,7 @@ router.get('/delete-account', (req, res) => {
 
 
 // ════════════════════════════════════════════════════════════════════
+
 //  RECEPTIONIST — CREATE / UPDATE  (same pattern as /patient)
 // ════════════════════════════════════════════════════════════════════
 router.post('/receptionist', uploadHandler(upload.single("image")), async (req, res) => {
@@ -837,18 +838,21 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 			hasImage: !!req.file,
 		});
 
-		const operation = recep_id && recep_id > 0 ? 'Update' : 'Insert';
+		const parsedRecepId  = recep_id  ? parseInt(recep_id)  : null;
+		const parsedGenderId = gender_id ? parseInt(gender_id) : null;
+		const parsedDoctorId = doctor_id ? parseInt(doctor_id) : null;
+		const operation = parsedRecepId && parsedRecepId > 0 ? 'Update' : 'Insert';
 
 		const request = db.request();
 		request.input('operation',  operation);
-		request.input('recep_id',   recep_id  || null);
+		request.input('recep_id',   parsedRecepId);
 		request.input('name',       name);
 		request.input('mobile_no',  mobile_no);
 		request.input('email',      email      || null);
 		request.input('Address',    address    || null);
-		request.input('gender_id',  gender_id  || null);
+		request.input('gender_id',  parsedGenderId);
 		request.input('clinic_id',  (clinic_id != null && clinic_id !== undefined && String(clinic_id) !== '0') ? clinic_id : null);
-		request.input('doctor_id',  (doctor_id != null && doctor_id !== undefined) ? doctor_id : null);
+		request.input('doctor_id',  parsedDoctorId);
 
 		const result = await request.execute('sp_receptionist');
 
@@ -889,8 +893,20 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 		});
 
 	} catch (err) {
+		console.error('[ReceptionistDebug] save receptionist CATCH full:', {
+			message:         err?.message,
+			code:            err?.code,
+			number:          err?.number,
+			state:           err?.state,
+			class:           err?.class,
+			lineNumber:      err?.lineNumber,
+			procName:        err?.procName,
+			originalMessage: err?.originalError?.message,
+			preceding:       err?.precedingErrors?.map(e => e.message),
+		});
+		const errMsg = err?.originalError?.message || err?.message || err?.toString() || 'Unknown error';
 		await cleanupFiles(req).catch(() => {});
-		res.status(500).json({ success: false, error: err.message });
+		res.status(500).json({ success: false, error: errMsg });
 	}
 });
 

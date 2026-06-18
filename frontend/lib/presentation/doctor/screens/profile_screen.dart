@@ -705,7 +705,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           final roleId = ref.read(tokenProvider).roleId;
                           if (roleId == 3) {
                             final rs = ref.read(receptionistLoginViewModelProvider);
-                            Navigator.push(
+                            Navigator.push<ReceptionistApiModel>(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => AddReceptionistPage(
@@ -722,7 +722,12 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                                   clinicId: rs.clinicId,
                                 ),
                               ),
-                            );
+                            ).then((updated) {
+                              if (updated != null && mounted) {
+                                ref.read(receptionistLoginViewModelProvider.notifier)
+                                    .setProfileFromCheck(updated);
+                              }
+                            });
                           } else {
                             Navigator.of(context, rootNavigator: true)
                                 .push(MaterialPageRoute(
@@ -1567,8 +1572,10 @@ Widget _buildAvailabilityCard() => Container(
                                   .read(tokenProvider.notifier)
                                   .clearTokens();
                               await ref
-                                  .read(doctorLoginViewModelProvider
-                                      .notifier)
+                                  .read(doctorLoginViewModelProvider.notifier)
+                                  .logout();
+                              await ref
+                                  .read(receptionistLoginViewModelProvider.notifier)
                                   .logout();
                               if (mounted) {
                                 Navigator.of(context,

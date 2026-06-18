@@ -165,6 +165,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
   int?      _selectedSlotId;
   DoctorAvailabilityModel? _selectedAvail;
   String?   _selectedTime;
+  Set<String> _bookedTimes = {};
 
   String? _estimatedWaitTime;
   bool    _isEstimateLoading = false;
@@ -501,6 +502,25 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
     }
   }
 
+  Future<void> _fetchBookedSlots() async {
+    final doctorId = ref.read(receptionistLoginViewModelProvider).doctorId;
+    if (doctorId == null || _selectedDate == null) return;
+    final api = _api;
+    if (api == null) return;
+    final ds = _fmtDateApi(_selectedDate!);
+    try {
+      final slots = await api.getBookedSlots(doctorId);
+      if (!mounted) return;
+      final times = <String>{};
+      for (final s in slots) {
+        if (s.bookingDate?.startsWith(ds) == true && s.startTime != null) {
+          times.add(_fmtTime(s.startTime));
+        }
+      }
+      setState(() => _bookedTimes = times);
+    } catch (_) {}
+  }
+
   void _pickDate(DateTime date) {
     final day      = _kDayNames[(date.weekday - 1).clamp(0, 6)];
     final sessions = (_grouped[day] ?? [])
@@ -513,11 +533,13 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
       _selectedSlotId    = avail?.slotId;
       _selectedAvail     = avail;
       _selectedTime      = null;
+      _bookedTimes       = {};
       _estimatedWaitTime = null;
       _isEstimateLoading = false;
       _bookError         = null;
     });
 
+    _fetchBookedSlots();
     if (avail != null && _isQueueSession(avail)) {
       _fetchQueueEstimate();
     }
@@ -700,6 +722,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
                 slots:      _buildTimeSlots(_selectedAvail!),
                 selected:   _selectedTime,
                 isToday:    _dayIsToday,
+                booked:     _bookedTimes,
                 onSelected: (t) => setState(() => _selectedTime = t),
               ),
               const SizedBox(height: 16),
@@ -1289,11 +1312,13 @@ class _SlotPicker extends StatelessWidget {
   final List<String>         slots;
   final String?              selected;
   final bool                 isToday;
+  final Set<String>          booked;
   final ValueChanged<String> onSelected;
 
   const _SlotPicker({
     required this.slots, required this.selected,
     required this.onSelected, this.isToday = false,
+    this.booked = const {},
   });
 
   @override
@@ -1323,19 +1348,19 @@ class _SlotPicker extends StatelessWidget {
       if (morning.isNotEmpty) ...[
         _SlotGroupHeader(icon: Icons.wb_sunny_outlined, label: 'Morning'),
         const SizedBox(height: 8),
-        _SlotGrid(slots: morning, selected: selected, nowMins: nowMins, onSelected: onSelected),
+        _SlotGrid(slots: morning, selected: selected, nowMins: nowMins, booked: booked, onSelected: onSelected),
         const SizedBox(height: 14),
       ],
       if (afternoon.isNotEmpty) ...[
         _SlotGroupHeader(icon: Icons.wb_twilight_outlined, label: 'Afternoon'),
         const SizedBox(height: 8),
-        _SlotGrid(slots: afternoon, selected: selected, nowMins: nowMins, onSelected: onSelected),
+        _SlotGrid(slots: afternoon, selected: selected, nowMins: nowMins, booked: booked, onSelected: onSelected),
         const SizedBox(height: 14),
       ],
       if (evening.isNotEmpty) ...[
         _SlotGroupHeader(icon: Icons.nights_stay_outlined, label: 'Evening'),
         const SizedBox(height: 8),
-        _SlotGrid(slots: evening, selected: selected, nowMins: nowMins, onSelected: onSelected),
+        _SlotGrid(slots: evening, selected: selected, nowMins: nowMins, booked: booked, onSelected: onSelected),
       ],
     ]);
   }
@@ -1358,30 +1383,35 @@ class _SlotGrid extends StatelessWidget {
   final List<String>         slots;
   final String?              selected;
   final int                  nowMins;
+  final Set<String>          booked;
   final ValueChanged<String> onSelected;
 
-  const _SlotGrid({required this.slots, required this.selected, required this.nowMins, required this.onSelected});
+  const _SlotGrid({required this.slots, required this.selected, required this.nowMins, required this.onSelected, this.booked = const {}});
 
   @override
   Widget build(BuildContext context) => Wrap(
     spacing: 8, runSpacing: 8,
     children: slots.map((slot) {
-      final isSel  = selected == slot;
-      final isPast = nowMins >= 0 && _slotMins(slot) <= nowMins;
+      final isSel     = selected == slot;
+      final isPast    = nowMins >= 0 && _slotMins(slot) <= nowMins;
+      final isBooked  = booked.contains(slot);
+      final disabled  = isPast || isBooked;
 
       return GestureDetector(
-        onTap: isPast ? null : () => onSelected(slot),
+        onTap: disabled ? null : () => onSelected(slot),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: isPast ? const Color(0xFFF7F8FA) : (isSel ? _kPrimary : Colors.white),
+            color: disabled ? const Color(0xFFF7F8FA) : (isSel ? _kPrimary : Colors.white),
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: isPast ? _kBorder : (isSel ? _kPrimary : _kBorder)),
+            border: Border.all(color: disabled ? _kBorder : (isSel ? _kPrimary : _kBorder)),
           ),
-          child: Text(slot,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                  color: isPast ? _kTextMuted : (isSel ? Colors.white : _kTextPrimary))),
+          child: Text(
+            isBooked ? '$slot ✕' : slot,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                color: disabled ? _kTextMuted : (isSel ? Colors.white : _kTextPrimary)),
+          ),
         ),
       );
     }).toList(),

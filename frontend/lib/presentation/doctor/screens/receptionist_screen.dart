@@ -86,10 +86,13 @@ class _ReceptionistPageState extends ConsumerState<ReceptionistPage> {
   }
 
   Future<void> _loadList() async {
-    final clinicId = _clinicId;
+    String? clinicId = _clinicId;
     if (clinicId == null) {
-      return;
+      // State may not yet be loaded — fall back to TokenStorage directly.
+      final stored = await TokenStorage.getValue('clinic_id');
+      clinicId = _parseClinicId(stored);
     }
+    if (clinicId == null) return;
     await ref
         .read(receptionistLoginViewModelProvider.notifier)
         .fetchReceptionistList(clinicId);
@@ -165,16 +168,17 @@ class _ReceptionistPageState extends ConsumerState<ReceptionistPage> {
                         .read(receptionistLoginViewModelProvider.notifier)
                         .deleteReceptionist(r.recepId!);
                     final error = ref.read(receptionistLoginViewModelProvider).error;
-                    if (error != null) {
-                      if (mounted) {
+                    if (mounted) {
+                      if (error != null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text(error)),
                         );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Receptionist removed.')),
+                        );
                       }
-                    } else if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Receptionist removed.')),
-                      );
+                      _loadList();
                     }
                   },
                   style: ElevatedButton.styleFrom(

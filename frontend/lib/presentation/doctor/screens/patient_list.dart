@@ -3024,10 +3024,9 @@ class _PatientCard extends ConsumerWidget {
     final status = st.toLowerCase().trim();
     final isIP = status == 'in_progress';
 
-    // Receptionist can skip ANY booked/skipped patient — not just the next one.
+    // Receptionist can skip only 'booked' patients — not already-skipped ones.
     VoidCallback? effectiveOnSkip = onSkip;
-    if (isReceptionist && tab == _Tab.today &&
-        (status == 'booked' || status == 'skipped')) {
+    if (isReceptionist && tab == _Tab.today && status == 'booked') {
       final did = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
       if (did > 0) {
         effectiveOnSkip ??= () {
