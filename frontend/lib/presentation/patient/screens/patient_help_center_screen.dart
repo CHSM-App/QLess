@@ -165,7 +165,7 @@ class _HelpHeader extends StatelessWidget {
                         SizedBox(height: 1),
                         Text(
                           'Guides for appointments and health records',
-                          style: TextStyle(fontSize: 11, color: _textMuted),
+                          style: TextStyle(fontSize: 12, color: _textMuted),
                         ),
                       ],
                     ),
@@ -177,10 +177,11 @@ class _HelpHeader extends StatelessWidget {
                 controller: searchCtrl,
                 onChanged: onChanged,
                 textInputAction: TextInputAction.search,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
                 decoration: InputDecoration(
                   hintText: 'Search booking, family, prescription...',
                   hintStyle:
-                      const TextStyle(color: _textMuted, fontSize: 13),
+                      const TextStyle(color: _textMuted, fontSize: 12, fontWeight: FontWeight.w500),
                   prefixIcon: const Icon(
                     Icons.search_rounded,
                     size: 18,
@@ -377,14 +378,14 @@ class _HelpSectionCard extends StatelessWidget {
             section.title,
             style: const TextStyle(
               fontSize: 14,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: _textPrimary,
             ),
           ),
           subtitle: Text(
             section.summary,
             style:
-                const TextStyle(fontSize: 11, color: _textMuted, height: 1.35),
+                const TextStyle(fontSize: 12, color: _textMuted, height: 1.35),
           ),
           iconColor: _primary,
           collapsedIconColor: _textMuted,
@@ -421,7 +422,7 @@ class _HelpTopicTile extends StatelessWidget {
             topic.title,
             style: const TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w600,
               color: _textPrimary,
             ),
           ),
@@ -474,8 +475,8 @@ class _StepLine extends StatelessWidget {
             child: Text(
               '$index',
               style: const TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
                 color: _primaryDark,
               ),
             ),
@@ -555,7 +556,7 @@ class _EmptyHelpSearch extends StatelessWidget {
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: _textPrimary,
               ),
             ),

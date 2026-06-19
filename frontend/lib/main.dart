@@ -175,9 +175,12 @@ class HealthcareApp extends StatelessWidget {
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       builder: (context, child) {
-        return Stack(
-          children: [
-            child!,
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: Stack(
+            children: [
+              child!,
             Padding(
               padding: const EdgeInsets.only(
                 bottom: kBottomNavigationBarHeight,
@@ -188,8 +191,24 @@ class HealthcareApp extends StatelessWidget {
               ),
             ),
           ],
+          ),
         );
       },
+      theme: ThemeData(
+        fontFamily: 'Roboto',
+        textTheme: const TextTheme(
+          displayLarge:   TextStyle(fontSize: 29,   fontWeight: FontWeight.w800),
+          headlineMedium: TextStyle(fontSize: 22,   fontWeight: FontWeight.w800),
+          titleLarge:     TextStyle(fontSize: 16,   fontWeight: FontWeight.w800),
+          titleMedium:    TextStyle(fontSize: 14,   fontWeight: FontWeight.w700),
+          labelLarge:     TextStyle(fontSize: 14,   fontWeight: FontWeight.w600),
+          bodyLarge:      TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
+          bodyMedium:     TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500),
+          bodySmall:      TextStyle(fontSize: 12,   fontWeight: FontWeight.w500),
+          labelSmall:     TextStyle(fontSize: 11,   fontWeight: FontWeight.w700),
+        ),
+        colorScheme: const ColorScheme.light(primary: Color(0xFF26C6B0)),
+      ),
       themeMode: ThemeMode.light,
       routes: {
         '/notifications': (_) => const NotificationsScreen(),

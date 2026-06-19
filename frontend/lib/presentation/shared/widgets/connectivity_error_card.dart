@@ -177,7 +177,7 @@ class ConnectivityErrorCard extends ConsumerWidget {
                   style: const TextStyle(
                     color: Color(0xFF92400E),
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 4),

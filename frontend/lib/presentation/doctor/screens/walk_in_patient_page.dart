@@ -248,10 +248,10 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
               // Handle
               Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: _kBorder, borderRadius: BorderRadius.circular(2)))),
               const SizedBox(height: 16),
-              const Text('Patient Found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _kTextPrimary)),
+              const Text('Patient Found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _kTextPrimary)),
               const SizedBox(height: 4),
               Text('${patient.name} · ${patient.mobileNo}',
-                  style: const TextStyle(fontSize: 13, color: _kTextSec)),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextSec)),
               const SizedBox(height: 16),
 
               // Book for primary patient
@@ -282,7 +282,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
               const SizedBox(height: 16),
               const Divider(height: 1, color: _kBorder),
               const SizedBox(height: 12),
-              const Text('Family Members', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kTextSec)),
+              const Text('Family Members', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _kTextSec)),
               const SizedBox(height: 8),
 
               // Existing family members list
@@ -299,7 +299,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
                   if (members.isEmpty) {
                     return const Padding(
                       padding: EdgeInsets.only(bottom: 4),
-                      child: Text('No family members yet', style: TextStyle(fontSize: 13, color: _kTextMuted)),
+                      child: Text('No family members yet', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted)),
                     );
                   }
                   return Column(
@@ -331,6 +331,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
               TextField(
                 controller: familyNameCtr,
                 textCapitalization: TextCapitalization.words,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
                 decoration: InputDecoration(
                   hintText: 'Name',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -465,6 +466,9 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
       _leaveRanges = leaves;
       _initLoading = false;
     });
+
+    // Auto-select today so receptionist lands directly on today's sessions.
+    _pickDate(DateTime.now());
   }
 
   bool _isQueueSession(DoctorAvailabilityModel avail) {
@@ -665,21 +669,8 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
       child: Form(
         key: _formKey,
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // ── Doctor card ──────────────────────────────────────────────
-          _DoctorCard(doctor: _doctor),
-          const SizedBox(height: 14),
-
-          // ── Calendar strip ───────────────────────────────────────────
-          _WalkCalendarStrip(
-            grouped:        _grouped,
-            leaveRanges:    _leaveRanges,
-            selectedDate:   _selectedDate,
-            onDateSelected: _pickDate,
-          ),
-          if (_selectedDate != null) ...[
-            const SizedBox(height: 10),
-            _DateBadge(date: _selectedDate!),
-          ],
+          // ── Today badge (auto-selected, no calendar needed) ──────────
+          if (_selectedDate != null) _DateBadge(date: _selectedDate!),
 
           // ── No sessions for day ──────────────────────────────────────
           if (_selectedDate != null && sessions.isEmpty) ...[
@@ -779,7 +770,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
                   const SizedBox(width: 8),
                   Expanded(child: Text(
                     '${_foundPatient!.name} found on this number — tap to select',
-                    style: const TextStyle(fontSize: 12, color: _kPrimary, fontWeight: FontWeight.w600),
+                    style: const TextStyle(fontSize: 12, color: _kPrimary, fontWeight: FontWeight.w500),
                   )),
                   const Icon(Icons.chevron_right_rounded, size: 18, color: _kPrimary),
                 ]),
@@ -798,7 +789,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
                 const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF38A169)),
                 const SizedBox(width: 8),
                 Text('Booking for ${_nameCtr.text}',
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF38A169), fontWeight: FontWeight.w600)),
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF38A169), fontWeight: FontWeight.w500)),
               ]),
             ),
           ],
@@ -817,7 +808,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
 
   Widget _label(String t) => Text(
     t.toUpperCase(),
-    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTextMuted, letterSpacing: 0.8),
+    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted, letterSpacing: 0.8),
   );
 
   Widget _infoBox({
@@ -856,7 +847,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text('Walk-in Patient',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: _kTextPrimary)),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _kTextPrimary)),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(1),
           child: Container(height: 1, color: _kBorder),
@@ -886,8 +877,8 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Selected slot', style: TextStyle(fontSize: 11, color: _kTextMuted)),
-              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kTextPrimary)),
+              const Text('Selected slot', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted)),
+              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kTextPrimary)),
             ]),
           ]),
         ),
@@ -909,7 +900,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
                 : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Icon(_isQueue ? Icons.confirmation_number_rounded : Icons.calendar_month_rounded, size: 17),
                     const SizedBox(width: 8),
-                    const Text('Book Walk-in Patient', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                    const Text('Book Walk-in Patient', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                   ]),
           ),
         ),
@@ -947,7 +938,7 @@ class _DoctorCard extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(d?.name != null ? 'Dr. ${d!.name}' : 'Doctor',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _kTextPrimary)),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: _kTextPrimary)),
           if (d?.specialization != null) ...[
             const SizedBox(height: 2),
             Text(d!.specialization!, style: const TextStyle(fontSize: 12, color: _kTextSec)),
@@ -958,7 +949,7 @@ class _DoctorCard extends StatelessWidget {
               const Icon(Icons.location_on_outlined, size: 12, color: _kTextMuted),
               const SizedBox(width: 3),
               Flexible(child: Text(d!.clinicName!,
-                  style: const TextStyle(fontSize: 11, color: _kTextMuted),
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted),
                   maxLines: 1, overflow: TextOverflow.ellipsis)),
             ]),
           ],
@@ -1052,7 +1043,7 @@ class _WalkCalendarStripState extends State<_WalkCalendarStrip> {
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('SELECT DATE'.toUpperCase(),
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTextMuted, letterSpacing: 0.8)),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted, letterSpacing: 0.8)),
       const SizedBox(height: 10),
       SizedBox(
         height: 86,
@@ -1067,7 +1058,7 @@ class _WalkCalendarStripState extends State<_WalkCalendarStrip> {
                 alignment: Alignment.bottomLeft,
                 padding: const EdgeInsets.only(right: 10, bottom: 10),
                 child: Text(item.label!,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTextMuted)),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted)),
               );
             }
             final dt    = item.dt!;
@@ -1094,12 +1085,12 @@ class _WalkCalendarStripState extends State<_WalkCalendarStrip> {
                   ),
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Text(_kDayAbbr[dt.weekday - 1],
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500,
                           color: isSel ? Colors.white.withOpacity(0.8)
                               : (avail ? (dt.weekday >= 6 ? _kPrimary : _kTextMuted) : _kTextMuted.withOpacity(0.3)))),
                     const SizedBox(height: 4),
                     Text('${dt.day}',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
                           color: isSel ? Colors.white : (avail ? _kTextPrimary : _kTextMuted.withOpacity(0.3)))),
                     const SizedBox(height: 4),
                     Container(width: 5, height: 5,
@@ -1138,7 +1129,7 @@ class _DateBadge extends StatelessWidget {
     child: Row(children: [
       const Icon(Icons.event_rounded, size: 14, color: _kPrimary),
       const SizedBox(width: 8),
-      Text(_fmtFull(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimary)),
+      Text(_fmtFull(date), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _kPrimary)),
     ]),
   );
 }
@@ -1224,7 +1215,7 @@ class _QueueSection extends StatelessWidget {
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('QUEUE BOOKING'.toUpperCase(),
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTextMuted, letterSpacing: 0.8)),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted, letterSpacing: 0.8)),
       const SizedBox(height: 8),
 
       // Open / closed status
@@ -1237,7 +1228,7 @@ class _QueueSection extends StatelessWidget {
           Icon(noteIcon, size: 15, color: noteColor),
           const SizedBox(width: 8),
           Expanded(child: Text(noteText,
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: noteColor))),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: noteColor))),
         ]),
       ),
       const SizedBox(height: 8),
@@ -1288,15 +1279,15 @@ class _EstimateBanner extends StatelessWidget {
         const Icon(Icons.hourglass_top_rounded, size: 14, color: _kInfo),
       const SizedBox(width: 8),
       if (_isLoading)
-        const Text('Fetching estimated wait time…', style: TextStyle(fontSize: 12, color: _kTextMuted))
+        const Text('Fetching estimated wait time…', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted))
       else
         Expanded(
           child: RichText(
             text: TextSpan(
-              style: const TextStyle(fontSize: 12, color: _kInfo),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kInfo),
               children: [
                 const TextSpan(text: 'Estimated wait: '),
-                TextSpan(text: _text, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                TextSpan(text: _text, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
               ],
             ),
           ),
@@ -1343,7 +1334,7 @@ class _SlotPicker extends StatelessWidget {
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('SELECT TIME SLOT'.toUpperCase(),
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kTextMuted, letterSpacing: 0.8)),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _kTextMuted, letterSpacing: 0.8)),
       const SizedBox(height: 12),
       if (morning.isNotEmpty) ...[
         _SlotGroupHeader(icon: Icons.wb_sunny_outlined, label: 'Morning'),
@@ -1375,7 +1366,7 @@ class _SlotGroupHeader extends StatelessWidget {
   Widget build(BuildContext context) => Row(children: [
     Icon(icon, size: 13, color: _kTextMuted),
     const SizedBox(width: 5),
-    Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _kTextMuted)),
+    Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted)),
   ]);
 }
 
@@ -1409,7 +1400,7 @@ class _SlotGrid extends StatelessWidget {
           ),
           child: Text(
             isBooked ? '$slot ✕' : slot,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500,
                 color: disabled ? _kTextMuted : (isSel ? Colors.white : _kTextPrimary)),
           ),
         ),
@@ -1438,19 +1429,19 @@ class _SymptomsBox extends StatelessWidget {
         style: TextStyle(fontSize: 13, color: _kTextPrimary),
         children: [
           TextSpan(text: 'Symptoms ', style: TextStyle(fontWeight: FontWeight.w600)),
-          TextSpan(text: '(optional)', style: TextStyle(fontSize: 12, color: _kTextSec)),
+          TextSpan(text: '(optional)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextSec)),
         ],
       )),
       const SizedBox(height: 10),
       TextField(
         controller: controller,
         maxLines: 3, maxLength: 300,
-        style: const TextStyle(fontSize: 13, color: _kTextPrimary),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
         decoration: InputDecoration(
           hintText: 'e.g. Fever since 2 days, headache…',
-          hintStyle: const TextStyle(fontSize: 13, color: _kTextMuted),
+          hintStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted),
           filled: true, fillColor: Colors.white,
-          counterStyle: const TextStyle(fontSize: 11, color: _kTextMuted),
+          counterStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextMuted),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(color: _kPrimary.withOpacity(0.25))),
@@ -1493,10 +1484,10 @@ class _Field extends StatelessWidget {
     maxLength: maxLength,
     inputFormatters: formatters,
     validator: validator,
-    style: const TextStyle(fontSize: 13, color: _kTextPrimary),
+    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
     decoration: InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(fontSize: 12, color: _kTextSec),
+      labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextSec),
       prefixIcon: Icon(icon, size: 16, color: _kTextSec),
       counterText: '',
       filled: true, fillColor: Colors.white,
@@ -1525,7 +1516,7 @@ class _ErrorBody extends StatelessWidget {
         const Icon(Icons.error_outline_rounded, size: 40, color: _kError),
         const SizedBox(height: 12),
         Text(error, textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: _kTextSec)),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: _kTextSec)),
         const SizedBox(height: 16),
         ElevatedButton.icon(
           onPressed: onRetry,
@@ -1560,7 +1551,7 @@ class _GenderChip extends StatelessWidget {
       child: Text(label,
         style: TextStyle(
           fontSize:   13,
-          fontWeight: FontWeight.w500,
+          fontWeight: FontWeight.w600,
           color:      selected ? Colors.white : _kTextSec,
         ),
       ),
@@ -1588,7 +1579,7 @@ class _FamilyMemberTile extends StatelessWidget {
           style: const TextStyle(color: _kPrimary, fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
-      title: Text(member.memberName ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: _kTextPrimary)),
+      title: Text(member.memberName ?? '', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: _kTextPrimary)),
       subtitle: Text(
         [member.genderName, member.relationName].where((s) => s != null && s.isNotEmpty).join(' · '),
         style: const TextStyle(fontSize: 12, color: _kTextSec),

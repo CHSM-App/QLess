@@ -856,7 +856,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Edit Profile',
                   style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                      fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
               SizedBox(height: 1),
               Text('Update your personal & clinic info',
                   style: TextStyle(fontSize: 11, color: kTextSecondary)),
@@ -892,7 +892,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
             ),
             indicatorPadding: const EdgeInsets.all(3),
             indicatorSize: TabBarIndicatorSize.tab,
-            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             unselectedLabelStyle:
                 const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             dividerColor: Colors.transparent,
@@ -1086,7 +1086,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
               keyboardType: keyboard,
               inputFormatters: inputFormatters,
               maxLines: maxLines,
-              style: const TextStyle(fontSize: 13, color: kTextPrimary),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 contentPadding:
@@ -1141,7 +1141,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
             keyboardType: TextInputType.phone,
             enabled: false,
             readOnly: true,
-            style: const TextStyle(fontSize: 13, color: kTextPrimary),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
             decoration: const InputDecoration(
               border: InputBorder.none,
               contentPadding:
@@ -1209,9 +1209,9 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
                 enabled: !_isVerifyingOtp,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    fontSize: 15,
-                    color: kTextPrimary,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: Color(0xFF1A1D2E),
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 6),
                 decoration: const InputDecoration(
                     hintText: '• • • • • •',
@@ -1352,7 +1352,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down_rounded,
                   color: kTextMuted, size: 17),
-              style: const TextStyle(fontSize: 13, color: kTextPrimary),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               items: _specs
@@ -1471,7 +1471,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage>
           : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
               const Text('Save Changes',
                   style:
-                      TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                      TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               if (_isMobileChanged)
                 const Text('Verify mobile number first',
                     style: TextStyle(
@@ -1860,7 +1860,7 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
               controller: _searchCtrl,
               focusNode: _focusNode,
               onChanged: _onSearchChanged,
-              style: const TextStyle(fontSize: 14, color: kTextPrimary),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
               decoration: InputDecoration(
                 hintText: 'Search for a place...',
                 hintStyle:

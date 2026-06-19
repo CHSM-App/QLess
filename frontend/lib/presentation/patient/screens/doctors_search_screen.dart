@@ -553,7 +553,7 @@ Widget build(BuildContext context) {
               ? '$count favorite${count == 1 ? '' : 's'}'
               : '$count doctor${count == 1 ? '' : 's'} found',
           style: const TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               color: kTextSecondary,
               fontWeight: FontWeight.w500),
         ),
@@ -726,7 +726,7 @@ class _SpecChip extends StatelessWidget {
           child: Text(label,
               style: TextStyle(
                   fontSize: 11,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: selected ? Colors.white : accent)),
         ),
       );
@@ -875,7 +875,7 @@ class _DoctorCard extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                                fontSize: 11, color: kTextMuted)),
+                                fontSize: 12, color: kTextMuted)),
                       ),
                     ]),
                   ],

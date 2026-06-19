@@ -28,7 +28,7 @@ class SomethingWentWrongRetry extends StatelessWidget {
         ) ??
         TextStyle(
           fontSize: 16,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           color: colorScheme.onSurface,
         );
     return Center(

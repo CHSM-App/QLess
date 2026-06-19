@@ -246,7 +246,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                 'Remove Medicine?',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: kTextPrimary,
                 ),
               ),
@@ -467,8 +467,8 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                     Text(
                       'Add Medicine',
                       style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                         color: Colors.white,
                         letterSpacing: 0.2,
                       ),
@@ -549,7 +549,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                           _types[i],
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             color: sel ? Colors.white : kTextSecondary,
                             letterSpacing: 0.1,
                           ),
@@ -675,8 +675,8 @@ class _MedicineCard extends StatelessWidget {
                   child: Text(
                     medicine.medTypeName ?? '—',
                     style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: style.fg,
                       letterSpacing: 0.2,
                     ),
@@ -725,9 +725,9 @@ class _CountRow extends StatelessWidget {
         Text(
           '$count medicine${count != 1 ? 's' : ''}',
           style: const TextStyle(
-            fontSize: 10.5,
+            fontSize: 12,
             color: kTextSecondary,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             letterSpacing: 0.1,
           ),
         ),
@@ -742,9 +742,9 @@ class _CountRow extends StatelessWidget {
           child: Text(
             '$total total',
             style: const TextStyle(
-              fontSize: 9.5,
+              fontSize: 11,
               color: kPrimaryDark,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
             ),
           ),

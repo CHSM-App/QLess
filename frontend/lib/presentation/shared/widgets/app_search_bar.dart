@@ -53,7 +53,7 @@ class AppSearchBar extends StatelessWidget {
             controller: controller,
             focusNode: focusNode,
             onChanged: onChanged,
-            style: TextStyle(fontSize: 12, color: textColor),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
             decoration: InputDecoration(
               hintText: hintText,
               hintStyle: TextStyle(color: hintColor, fontSize: 12),

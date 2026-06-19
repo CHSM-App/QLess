@@ -149,6 +149,7 @@ const _kDosageOpts = {
 //  MedicineEntry
 // ════════════════════════════════════════════════════════════════════
 class MedicineEntry {
+    final GlobalKey cardKey = GlobalKey(); 
   MedicineType type;
   int?    medicineId;
   String? selectedName;
@@ -273,7 +274,7 @@ class _SlotPickerFieldState extends State<SlotPickerField> {
     final ac = widget.accentColor;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
-        Text(widget.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.1)),
+        Text(widget.label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kTextSecondary, letterSpacing: 0.1)),
         const SizedBox(width: 4),
         Text('(${widget.subLabel})', style: const TextStyle(fontSize: 10, color: kTextMuted)),
       ]),
@@ -290,7 +291,7 @@ class _SlotPickerFieldState extends State<SlotPickerField> {
             border: Border.all(color: _open ? ac : kBorder, width: _open ? 1.5 : 1.0),
           ),
           child: Row(children: [
-            Expanded(child: Text(_display, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: ac))),
+       Expanded(child: Text(_display, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary))),
             Icon(_open ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded, color: kTextMuted, size: 18),
           ]),
         ),
@@ -357,7 +358,7 @@ class _InlineDrumPanelState extends State<_InlineDrumPanel> {
           child: Row(children: [
             Icon(Icons.tune_rounded, color: ac, size: 13),
             const SizedBox(width: 5),
-            Text('Select per slot', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: ac)),
+            Text('Select per slot', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: ac)),
             const Spacer(),
             GestureDetector(onTap: widget.onDismiss,
                 child: const Icon(Icons.close_rounded, color: kTextMuted, size: 15)),
@@ -396,16 +397,15 @@ class _InlineDrumPanelState extends State<_InlineDrumPanel> {
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Set', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+              child: const Text('Set', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           ),
         ),
       ]),
     );
   }
-
-  Widget _slotLbl(String t) => Expanded(child: Text(t, textAlign: TextAlign.center,
-      style: const TextStyle(fontSize: 10, color: kTextMuted, fontWeight: FontWeight.w500)));
+Widget _slotLbl(String t) => Expanded(child: Text(t, textAlign: TextAlign.center,
+   style: const TextStyle(fontSize: 13, color: Colors.black, fontWeight: FontWeight.w800)));
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -478,7 +478,7 @@ class _DrumPickerState extends State<_DrumPicker> {
               return Center(child: Text(widget.opts[i], style: TextStyle(
                 fontSize: isSel ? 18 : 13,
                 fontWeight: isSel ? FontWeight.w700 : FontWeight.w400,
-                color: isSel ? ac : kTextMuted,
+               color: isSel ? Colors.black : Colors.black54,
               )));
             },
           ),
@@ -655,8 +655,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     _doctorIdSub.close();
     super.dispose();
   }
-
-  void _addMed() => setState(() => _meds.add(MedicineEntry()));
+  void _addMed() {
+  setState(() => _meds.insert(0, MedicineEntry()));
+}
+  // void _addMed() => setState(() => _meds.add(MedicineEntry()));
   void _delMed(int i) => setState(() => _meds.removeAt(i));
 
   void _maybeFetchMedicines(int doctorId) {
@@ -949,19 +951,48 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   bool get _isDesktop => _width >= _kDesktopBreak;
   bool get _isTablet  => _width >= _kTabletBreak;
 
-  @override
-  Widget build(BuildContext context) {
-    final state       = ref.watch(prescriptionViewModelProvider);
-    final doctorState = ref.watch(doctorLoginViewModelProvider);
-    // valueOrNull (not .value): on an AsyncError, Riverpod's `.value` RETHROWS
-    // the error during build — offline that crashed the whole screen. We want
-    // a graceful empty catalog instead.
-    final medicines   = doctorState.medicines?.valueOrNull ?? const <Medicine>[];
+  // @override
+  // Widget build(BuildContext context) {
+  //   final state       = ref.watch(prescriptionViewModelProvider);
+  //   final doctorState = ref.watch(doctorLoginViewModelProvider);
+  //   // valueOrNull (not .value): on an AsyncError, Riverpod's `.value` RETHROWS
+  //   // the error during build — offline that crashed the whole screen. We want
+  //   // a graceful empty catalog instead.
+  //   final medicines   = doctorState.medicines?.valueOrNull ?? const <Medicine>[];
 
-    return Stack(children: [
-      Scaffold(
-        backgroundColor: kBg,
-        body: Column(children: [
+  //   return Stack(children: [
+  //     Scaffold(
+  //       backgroundColor: kBg,
+  //       body: Column(children: [
+  //         _buildHeader(),
+  //         Expanded(
+  //           child: _isDesktop
+  //               ? _desktopBody(medicines)
+  //               : _mobileBody(medicines),
+  //         ),
+  //       ]),
+  //     ),
+  //     if (state.isLoading)
+  //       Container(
+  //         color: Colors.black.withOpacity(0.28),
+  //         child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
+  //       ),
+  //   ]);
+  // }
+
+  @override
+Widget build(BuildContext context) {
+  final state       = ref.watch(prescriptionViewModelProvider);
+  final doctorState = ref.watch(doctorLoginViewModelProvider);
+  final medicines   = doctorState.medicines?.valueOrNull ?? const <Medicine>[];
+
+  return Stack(children: [
+    Scaffold(
+      backgroundColor: kBg,
+      resizeToAvoidBottomInset: true,
+      body: GestureDetector(                          // ← हे add करा
+        onTap: () => FocusScope.of(context).unfocus(), // ← keyboard dismiss
+        child: Column(children: [
           _buildHeader(),
           Expanded(
             child: _isDesktop
@@ -970,13 +1001,14 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           ),
         ]),
       ),
-      if (state.isLoading)
-        Container(
-          color: Colors.black.withOpacity(0.28),
-          child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
-        ),
-    ]);
-  }
+    ),
+    if (state.isLoading)
+      Container(
+        color: Colors.black.withOpacity(0.28),
+        child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
+      ),
+  ]);
+}
 
   // ── Header — matches PatientListScreen header exactly ────────────
   Widget _buildHeader() => Container(
@@ -1016,7 +1048,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           const SizedBox(width: 8),
           const Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('New Prescription', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+              Text('New Prescription', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
               SizedBox(height: 1),
               Text('Fill in consultation details', style: TextStyle(fontSize: 11, color: kTextSecondary)),
             ]),
@@ -1151,7 +1183,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       ),
       const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(widget.patientName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+        Text(widget.patientName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
             overflow: TextOverflow.ellipsis),
         const SizedBox(height: 4),
         Wrap(spacing: 5, runSpacing: 4, children: [
@@ -1177,7 +1209,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         _secLabel(label), _gap(8),
         TextField(
           controller: ctrl, maxLines: 3,
-          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: _ideco(hint),
         ),
       ]));
@@ -1204,18 +1236,19 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       ),
     ],
   );
-
-  List<Widget> _buildMedCards(List<Medicine> medicines) => List.generate(_meds.length, (i) =>
+List<Widget> _buildMedCards(List<Medicine> medicines) =>
+  List.generate(_meds.length, (i) =>
     Padding(
+      key: _meds[i].cardKey,
       padding: const EdgeInsets.only(bottom: 12),
       child: _MedCard(
-        index: i, entry: _meds[i], medicines: medicines,
+        index: _meds.length - i,  // ← i+1 ऐवजी हे
+        entry: _meds[i], medicines: medicines,
         onDelete: () => _delMed(i),
         rebuild: () => setState(() {}),
       ),
     ),
   );
-
   Widget _emptyMeds() => _card(child: Center(child: Padding(
     padding: const EdgeInsets.symmetric(vertical: 22),
     child: Column(children: [
@@ -1262,7 +1295,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     _gap(10),
     TextField(
       controller: _advCtrl, maxLines: 3,
-      style: const TextStyle(fontSize: 13, color: kTextPrimary),
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
       decoration: _ideco('Advice / instructions for patient…'),
     ),
   ]));
@@ -1333,7 +1366,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   Widget _secLabel(String t, {bool bare = false}) => Row(children: [
     Container(width: 3, height: 14, decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(2))),
     const SizedBox(width: 7),
-    Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary, letterSpacing: -0.2)),
+    Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary, letterSpacing: -0.2)),
   ]);
 
   Widget _chip(String t, {required Color bg, required Color fg}) => Container(
@@ -1481,8 +1514,8 @@ void _onTypeChange(MedicineType t) {
         child: Icon(e.type.icon, color: tc, size: 14),
       ),
       const SizedBox(width: 9),
-      Text('Medicine ${widget.index + 1}',
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+  Text('Medicine ${widget.index}',  
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary)),
       const SizedBox(width: 7),
       _TypePill(value: e.type, onChanged: _onTypeChange),
       const Spacer(),
@@ -1653,7 +1686,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
       else ...[
         TextField(
           onChanged: (v) => setState(() => e.searchText = v),
-          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: _ideco('Search ${e.type.label} name…').copyWith(
             prefixIcon: Padding(padding: const EdgeInsets.symmetric(horizontal: 11),
                 child: Icon(Icons.search_rounded, color: e.type.color, size: 16)),
@@ -1712,7 +1745,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _lbl(label), _gap(5),
         TextField(controller: ctrl, onChanged: onChanged,
-          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: _ideco(hint)),
       ]);
 
@@ -1736,7 +1769,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     Expanded(child: ch[0]), const SizedBox(width: 8), Expanded(child: ch[1]),
   ]);
 
-  Widget _lbl(String t) => Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kTextSecondary, letterSpacing: 0.1));
+  Widget _lbl(String t) => Text(t, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kTextSecondary, letterSpacing: 0.1));
 
   Widget _gap(double h) => SizedBox(height: h);
 

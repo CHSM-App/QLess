@@ -446,7 +446,7 @@ String? _networkImageUrl;   // ← add this
                             )
                           : const Text('Save Changes',
                               style: TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w700)),
+                                  fontSize: 14, fontWeight: FontWeight.w600)),
                     ),
                   ),
                 ],
@@ -488,7 +488,7 @@ String? _networkImageUrl;   // ← add this
         'Edit Profile',
         style: TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             color: kTextPrimary,
             letterSpacing: -0.2),
       ),
@@ -893,7 +893,7 @@ Widget _sourceOption({
             const SizedBox(width: 8),
             Text(title,
                 style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: kTextPrimary)),
           ]),
@@ -962,7 +962,7 @@ Widget _sourceOption({
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: kError, width: 1.5),
         ),
-        errorStyle: const TextStyle(fontSize: 10.5, color: kError),
+        errorStyle: const TextStyle(fontSize: 9.5, color: kError),
       );
 
   Widget _field({
@@ -986,7 +986,7 @@ Widget _sourceOption({
           maxLines: maxLines,
           keyboardType: keyboardType,
           textCapitalization: capitalization,
-          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: _dec(hint: hint, icon: icon, iconColor: iconColor),
           validator: validator,
         ),
@@ -1007,7 +1007,7 @@ Widget _sourceOption({
           enableInteractiveSelection: false,
           maxLength: 10,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: InputDecoration(
             hintText: '10-digit number',
             hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
@@ -1030,7 +1030,7 @@ Widget _sourceOption({
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: kError),
             ),
-            errorStyle: const TextStyle(fontSize: 10.5, color: kError),
+            errorStyle: const TextStyle(fontSize: 9.5, color: kError),
           ),
           validator: (v) {
             if (v == null || v.trim().isEmpty) return 'Mobile is required';
@@ -1190,7 +1190,7 @@ Widget _sourceOption({
           inputFormatters: [
             FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,1}')),
           ],
-          style: const TextStyle(fontSize: 13, color: kTextPrimary),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: InputDecoration(
             hintText: 'e.g. 65.5',
             hintStyle:
@@ -1229,7 +1229,7 @@ Widget _sourceOption({
               borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: kError),
             ),
-            errorStyle: const TextStyle(fontSize: 10.5, color: kError),
+            errorStyle: const TextStyle(fontSize: 9.5, color: kError),
           ),
           validator: _validateWeight,
         ),

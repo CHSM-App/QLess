@@ -305,7 +305,7 @@ class _DoctorAvailabilityPageState
               Expanded(
                 child: Text("Today's bookings",
                     style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
+                        fontSize: 16, fontWeight: FontWeight.w800)),
               ),
             ],
           ),
@@ -388,7 +388,7 @@ class _DoctorAvailabilityPageState
             Icon(Icons.warning_amber_rounded, color: kError, size: 22),
             SizedBox(width: 8),
             Text('Existing bookings',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
           ],
         ),
         content: Column(
@@ -548,7 +548,7 @@ class _DoctorAvailabilityPageState
                           "Changes apply from tomorrow. Today's bookings "
                           'are unaffected.',
                           style: TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 12,
                               color: kTextSecondary,
                               fontWeight: FontWeight.w500),
                         ),
@@ -602,7 +602,7 @@ class _DoctorAvailabilityPageState
         title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Availability',
               style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w700,
+                  fontSize: 16, fontWeight: FontWeight.w800,
                   color: kTextPrimary, letterSpacing: -0.2)),
           Text('Set your weekly schedule',
               style: const TextStyle(fontSize: 11, color: kTextMuted)),
@@ -631,7 +631,7 @@ class _DoctorAvailabilityPageState
               icon: const Icon(Icons.beach_access_rounded, size: 16),
               label: const Text('Leave',
                   style: TextStyle(
-                      fontSize: 12.5, fontWeight: FontWeight.w700)),
+                      fontSize: 13, fontWeight: FontWeight.w600)),
             ),
           ),
         ],
@@ -671,7 +671,7 @@ class _DoctorAvailabilityPageState
                         color: Colors.white, strokeWidth: 2.5))
                 : const Text('Save Schedule',
                     style: TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w700)),
+                        fontSize: 14, fontWeight: FontWeight.w600)),
           ),
         ),
       );
@@ -836,7 +836,7 @@ class _DayCard extends StatelessWidget {
               alignment: Alignment.center,
               child: Text(schedule.shortName,
                   style: TextStyle(
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: FontWeight.w700,
                       color: schedule.isEnabled ? kPrimary : kTextMuted,
                       letterSpacing: 0.5)),
@@ -854,7 +854,7 @@ class _DayCard extends StatelessWidget {
                         ? 'No slots added'
                         : '${schedule.timeSlots.length} time slot${schedule.timeSlots.length > 1 ? 's' : ''}')
                     : 'Unavailable',
-                style: const TextStyle(fontSize: 11, color: kTextMuted),
+                style: const TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w500),
               ),
             ])),
             if (schedule.isEnabled)
@@ -1168,8 +1168,8 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
                   keyboardType: TextInputType.number,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600,
-                      color: kTextPrimary),
+                      fontSize: 14, fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1D2E)),
                   decoration: const InputDecoration(
                     border: InputBorder.none,
                     hintText: 'e.g. 20',

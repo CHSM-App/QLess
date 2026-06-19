@@ -226,7 +226,7 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
                 'Remove Member',
                 style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     color: kTextPrimary),
               ),
               const SizedBox(height: 6),

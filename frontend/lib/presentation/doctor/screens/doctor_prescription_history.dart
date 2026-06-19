@@ -290,7 +290,7 @@ Widget _buildHeader() => Container(
         const Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Prescription Details',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
                     color: kTextPrimary)),
             SizedBox(height: 1),
             Text('View consultation summary',
@@ -328,7 +328,7 @@ Widget _buildHeader() => Container(
                 decoration: const BoxDecoration(color: kSuccess, shape: BoxShape.circle)),
             const SizedBox(width: 4),
             const Text('Completed', style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700, color: kGreenDark)),
+                fontSize: 11, fontWeight: FontWeight.w700, color: kGreenDark)),
           ]),
         ),
       ]),
@@ -364,7 +364,7 @@ Widget _buildHeader() => Container(
       ElevatedButton.icon(
         onPressed: _fetchDetails,
         icon: const Icon(Icons.refresh_rounded, size: 15),
-        label: const Text('Retry', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+        label: const Text('Retry', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         style: ElevatedButton.styleFrom(
           backgroundColor: kPrimary, foregroundColor: Colors.white, elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 11),
@@ -497,7 +497,7 @@ Widget _buildHeader() => Container(
                 decoration: const BoxDecoration(color: kSuccess, shape: BoxShape.circle)),
             const SizedBox(width: 4),
             const Text('Done', style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700, color: kGreenDark)),
+                fontSize: 11, fontWeight: FontWeight.w700, color: kGreenDark)),
           ]),
         ),
       ]),
@@ -576,7 +576,7 @@ Widget _buildHeader() => Container(
               Column(crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center, children: [
                 const Text('Follow-up Date', style: TextStyle(
-                    fontSize: 10, fontWeight: FontWeight.w600, color: kTextSecondary)),
+                    fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
                 const SizedBox(height: 2),
                 Text(_fmtDate(date), style: const TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
@@ -664,7 +664,7 @@ Widget _buildHeader() => Container(
                 border: Border.all(color: tc.withOpacity(0.35)),
               ),
               child: Text(tl, style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w700, color: tcD)),
+                  fontSize: 11, fontWeight: FontWeight.w700, color: tcD)),
             ),
           ]),
         ),

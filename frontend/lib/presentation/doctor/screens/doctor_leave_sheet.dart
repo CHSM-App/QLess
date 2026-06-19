@@ -112,7 +112,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('Reason (optional)',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,6 +128,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
             TextField(
               controller: reasonCtrl,
               maxLength: 200,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
               decoration: InputDecoration(
                 hintText: 'e.g. Personal leave, Conference',
                 isDense: true,
@@ -197,7 +198,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                 SizedBox(width: 8),
                 Text('Existing bookings',
                     style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w700)),
+                        fontSize: 16, fontWeight: FontWeight.w800)),
               ],
             ),
             content: Text(
@@ -246,7 +247,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         title: const Text('Remove this leave?',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         content: const Text(
           'The dates re-open for booking. Already-cancelled appointments '
           'are NOT restored — those patients were already asked to rebook.',
@@ -313,7 +314,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                       child: Text('Leave',
                           style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                               color: _kTextPrimary)),
                     ),
                     if (busy)
@@ -335,7 +336,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                     "can't book these dates, and existing bookings are "
                     'cancelled with a notification.',
                     style:
-                        TextStyle(fontSize: 11.5, color: _kTextMuted),
+                        TextStyle(fontSize: 12, color: _kTextMuted, fontWeight: FontWeight.w500),
                   ),
                 ),
               ),
@@ -356,8 +357,9 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                             SizedBox(height: 8),
                             Text('No upcoming leaves',
                                 style: TextStyle(
-                                    fontSize: 13,
-                                    color: _kTextSecondary)),
+                                    fontSize: 12,
+                                    color: _kTextSecondary,
+                                    fontWeight: FontWeight.w500)),
                           ],
                         ),
                       )
@@ -393,7 +395,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                                         style: const TextStyle(
                                             fontSize: 13.5,
                                             fontWeight:
-                                                FontWeight.w700,
+                                                FontWeight.w600,
                                             color: _kTextPrimary),
                                       ),
                                       if ((l.reason ?? '')
@@ -402,9 +404,9 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                                         const SizedBox(height: 3),
                                         Text(l.reason!.trim(),
                                             style: const TextStyle(
-                                                fontSize: 11.5,
+                                                fontSize: 12,
                                                 color:
-                                                    _kTextSecondary)),
+                                                    _kTextSecondary, fontWeight: FontWeight.w500)),
                                       ],
                                     ],
                                   ),
@@ -444,7 +446,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
                     label: const Text('Add Leave',
                         style: TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w700)),
+                            fontWeight: FontWeight.w600)),
                   ),
                 ),
               ),

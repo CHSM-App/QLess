@@ -753,8 +753,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                               Text(
                                 'Edit Profile',
                                 style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                   letterSpacing: 0.2,
                                 ),
@@ -786,8 +786,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                               Text(
                                 'Reviews',
                                 style: TextStyle(
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                   color: kAmberDark,
                                   letterSpacing: 0.2,
                                 ),
@@ -840,7 +840,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           v,
           style: const TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w600,
             color: kTextPrimary,
             letterSpacing: -0.2,
             height: 1.1,
@@ -1531,7 +1531,7 @@ Widget _buildAvailabilityCard() => Container(
                       const Text('Log Out?',
                           style: TextStyle(
                               fontSize: 16,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                               color: kTextPrimary)),
                       const SizedBox(height: 6),
                       const Text(
@@ -1922,7 +1922,7 @@ class _ProfessionalDetailsSheet extends StatelessWidget {
                   'Professional Details',
                   style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       color: kTextPrimary),
                 ),
               ),
@@ -2056,7 +2056,7 @@ class _PersonalInfoSheet extends StatelessWidget {
                       Text(name,
                           style: const TextStyle(
                               fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                               color: kTextPrimary)),
                       const SizedBox(height: 3),
                       Container(
@@ -2069,7 +2069,7 @@ class _PersonalInfoSheet extends StatelessWidget {
                             style: TextStyle(
                                 fontSize: 11,
                                 color: kPrimary,
-                                fontWeight: FontWeight.w600)),
+                                fontWeight: FontWeight.w700)),
                       ),
                     ]),
               ),
@@ -2229,7 +2229,7 @@ class _ReviewsSheet extends StatelessWidget {
                       'Reviews (${reviews.length})',
                       style: const TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           color: kTextPrimary),
                     ),
                     if (avgRating != null)

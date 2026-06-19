@@ -235,8 +235,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               Text(
                 title,
                 style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                   color: kTextPrimary,
                   letterSpacing: -0.3,
                 ),
@@ -268,7 +268,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                   child: Text(
                     buttonLabel,
                     style: const TextStyle(
-                      fontSize: 14.5,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.2,
                     ),
@@ -433,7 +433,7 @@ class _LandscapeLayout extends StatelessWidget {
                         const Text(
                           'HealthConnect',
                           style: TextStyle(
-                            fontSize: 28,
+                            fontSize: 29,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
                             letterSpacing: -0.5,
@@ -464,9 +464,9 @@ class _LandscapeLayout extends StatelessWidget {
                               Text(
                                 isDoctor ? 'Doctor & Receptionist Portal' : 'Patient Portal',
                                 style: const TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 11,
                                   color: Colors.white,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                   letterSpacing: 0.3,
                                 ),
                               ),
@@ -547,7 +547,7 @@ class _LandscapeLayout extends StatelessWidget {
                             const Text(
                               'Welcome Back',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 color: kTextPrimary,
                                 letterSpacing: -0.5,
@@ -588,7 +588,7 @@ class _LandscapeLayout extends StatelessWidget {
                               Text(
                                 'We\'ll send a verification code via SMS',
                                 style: TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 12,
                                   color: kTextMuted,
                                 ),
                               ),
@@ -653,7 +653,7 @@ class _PortraitLayout extends StatelessWidget {
 
         final heroVPad = isVerySmall ? 16.0 : (isSmall ? 20.0 : 24.0);
         final heroBottomPad = isVerySmall ? 44.0 : (isSmall ? 52.0 : 64.0);
-        final titleSize = isVerySmall ? 22.0 : (isSmall ? 26.0 : 32.0);
+        final titleSize = isVerySmall ? 22.0 : (isSmall ? 26.0 : 29.0);
         final logoSize = isVerySmall ? 44.0 : (isSmall ? 50.0 : 56.0);
         final gapBeforeTitle = isVerySmall ? 16.0 : (isSmall ? 20.0 : 28.0);
         final gapTopRowToLogo = isVerySmall ? 16.0 : (isSmall ? 20.0 : 28.0);
@@ -733,7 +733,7 @@ class _PortraitLayout extends StatelessWidget {
                                         style: const TextStyle(
                                           fontSize: 11,
                                           color: Colors.white,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.w700,
                                           letterSpacing: 0.4,
                                         ),
                                       ),
@@ -889,7 +889,7 @@ class _PortraitLayout extends StatelessWidget {
                                           'Sign In',
                                           style: TextStyle(
                                             fontSize: 16,
-                                            fontWeight: FontWeight.w700,
+                                            fontWeight: FontWeight.w800,
                                             color: kTextPrimary,
                                           ),
                                         ),
@@ -897,7 +897,7 @@ class _PortraitLayout extends StatelessWidget {
                                         Text(
                                           'Use your registered mobile',
                                           style: TextStyle(
-                                            fontSize: 11.5,
+                                            fontSize: 12,
                                             color: kTextSecondary,
                                           ),
                                         ),
@@ -927,7 +927,7 @@ class _PortraitLayout extends StatelessWidget {
                                       child: Text(
                                         'We\'ll send a 6-digit code via SMS',
                                         style: TextStyle(
-                                          fontSize: 11.5,
+                                          fontSize: 12,
                                           color: kTextMuted,
                                         ),
                                       ),
@@ -976,7 +976,7 @@ class _FieldLabel extends StatelessWidget {
             text,
             style: const TextStyle(
               fontSize: 12.5,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
               color: kTextPrimary,
               letterSpacing: 0.2,
             ),
@@ -1080,8 +1080,8 @@ class _MobileField extends StatelessWidget {
                 LengthLimitingTextInputFormatter(10),
               ],
               style: const TextStyle(
-                fontSize: 15,
-                color: kTextPrimary,
+                fontSize: 14,
+                color: Color(0xFF1A1D2E),
                 fontWeight: FontWeight.w600,
                 letterSpacing: 0.5,
               ),
@@ -1089,8 +1089,8 @@ class _MobileField extends StatelessWidget {
                 hintText: '98765 43210',
                 hintStyle: TextStyle(
                   color: kTextMuted,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w400,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
                   letterSpacing: 0.5,
                 ),
                 counterText: '',
@@ -1161,8 +1161,8 @@ class _LoginButton extends StatelessWidget {
                         Text(
                           'Continue',
                           style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: Colors.white,
                             letterSpacing: 0.3,
                           ),
@@ -1296,7 +1296,7 @@ class _SecureFooter extends StatelessWidget {
           Text(
             'Protected by end-to-end encryption',
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 12,
               color: kTextMuted,
               fontWeight: FontWeight.w500,
             ),
@@ -1330,9 +1330,9 @@ class _FeaturePill extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 11.5,
+                fontSize: 11,
                 color: Colors.white,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],

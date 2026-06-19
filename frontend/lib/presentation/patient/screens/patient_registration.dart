@@ -716,7 +716,7 @@ class _PatientRegistrationScreenState
           const Text(
             'Optional',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               color: kTextMuted,
               fontWeight: FontWeight.w500,
             ),
@@ -729,8 +729,8 @@ class _PatientRegistrationScreenState
   // ── Input decoration factory ────────────────────────────────────────────
   static const _inputStyle = TextStyle(
     fontSize: 14,
-    color: kTextPrimary,
-    fontWeight: FontWeight.w500,
+    color: Color(0xFF1A1D2E),
+    fontWeight: FontWeight.w600,
   );
 
   static InputDecoration _decor({
@@ -743,7 +743,7 @@ class _PatientRegistrationScreenState
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: kTextMuted, fontSize: 14),
+      hintStyle: const TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500),
       prefixIcon: prefixWidget ?? Icon(icon, color: kTextMuted, size: 20),
       suffixIcon: suffix,
       filled: true,
@@ -773,7 +773,7 @@ class _PatientRegistrationScreenState
           ? const EdgeInsets.symmetric(horizontal: 16, vertical: 14)
           : const EdgeInsets.symmetric(vertical: 16),
       errorStyle: const TextStyle(
-          fontSize: 11.5, color: kError, fontWeight: FontWeight.w500),
+          fontSize: 9.5, color: kError, fontWeight: FontWeight.w600),
     );
   }
 }
@@ -858,7 +858,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 12,
                         color: kTextSecondary,
                         fontWeight: FontWeight.w500,
                       ),
@@ -885,7 +885,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: kPrimaryDarker,
                         letterSpacing: 0.2,
@@ -1043,8 +1043,8 @@ class _SubmitButton extends StatelessWidget {
                         Text(
                           'Create Account',
                           style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
                             color: Colors.white,
                             letterSpacing: 0.3,
                           ),

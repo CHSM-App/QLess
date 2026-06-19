@@ -82,7 +82,7 @@ class _ConnectivityBanner extends StatelessWidget {
             message,
             style: TextStyle(
               color:      textColor,
-              fontSize:   13,
+              fontSize:   12,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.2,
             ),

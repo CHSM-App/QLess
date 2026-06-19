@@ -263,7 +263,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     color: kTextPrimary,
                     letterSpacing: -0.2),
               ),
@@ -465,7 +465,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           color: kTextPrimary)),
                   const SizedBox(height: 3),
                   // Spec + exp badges

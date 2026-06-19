@@ -425,7 +425,7 @@ class _LandscapeLayout extends StatelessWidget {
                             const Text(
                               'Get Started',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w800,
                                 color: kTextPrimary,
                                 letterSpacing: -0.5,
@@ -568,7 +568,7 @@ class _RoleCard extends StatelessWidget {
                         title,
                         style: const TextStyle(
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           color: kTextPrimary,
                           letterSpacing: -0.2,
                         ),
@@ -633,8 +633,8 @@ class _MiniChip extends StatelessWidget {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 10.5,
-            fontWeight: FontWeight.w600,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
             color: color,
             letterSpacing: 0.1,
           ),
@@ -653,7 +653,7 @@ class _LegalText extends StatelessWidget {
         textAlign: TextAlign.center,
         text: const TextSpan(
           style: TextStyle(
-            fontSize: 11.5,
+            fontSize: 12,
             color: kTextMuted,
             height: 1.55,
           ),
@@ -691,7 +691,7 @@ class _SecureFooter extends StatelessWidget {
           Text(
             'Protected by end-to-end encryption',
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 12,
               color: kTextMuted,
               fontWeight: FontWeight.w500,
             ),
@@ -724,9 +724,9 @@ class _FeaturePill extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 11.5,
+                fontSize: 11,
                 color: Colors.white,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],

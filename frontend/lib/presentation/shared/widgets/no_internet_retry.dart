@@ -29,7 +29,7 @@ class NoInternetRetry extends StatelessWidget {
         ) ??
         TextStyle(
           fontSize: 16,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
           color: colorScheme.onSurface,
         );
     final bodyStyle = theme.textTheme.bodySmall?.copyWith(

@@ -401,7 +401,7 @@ class _AddFamilyMemberScreenState
                 _isEditing ? 'Edit Member' : 'Add New Member',
                 style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     color: kTextPrimary,
                     letterSpacing: -0.2),
               ),
@@ -488,7 +488,7 @@ class _AddFamilyMemberScreenState
   Widget _nameField() => TextFormField(
     controller: _nameCtrl,
     textCapitalization: TextCapitalization.words,
-    style: const TextStyle(fontSize: 14, color: kTextPrimary),
+    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
     decoration: _dec('Enter full name'),
     validator: (v) =>
         (v == null || v.trim().isEmpty) ? 'Name is required' : null,
@@ -531,7 +531,7 @@ class _AddFamilyMemberScreenState
     controller: _dobCtrl,
     readOnly: true,
     onTap: _pickDate,
-    style: const TextStyle(fontSize: 13, color: kTextPrimary),
+    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
     decoration: _dec(
       'DD/MM/YYYY',
       suffix: GestureDetector(
@@ -571,7 +571,7 @@ class _AddFamilyMemberScreenState
   Widget _mobileField() => TextFormField(
     controller: _mobileCtrl,
     keyboardType: TextInputType.phone,
-    style: const TextStyle(fontSize: 14, color: kTextPrimary),
+    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
     inputFormatters: [
       FilteringTextInputFormatter.digitsOnly,
       LengthLimitingTextInputFormatter(10),

@@ -175,7 +175,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
               'Notifications',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
-                fontSize: 18,
+                fontSize: 22,
                 color: isDark ? Colors.white : _textPrimary,
               ),
             ),
@@ -268,7 +268,7 @@ class _SectionLabel extends StatelessWidget {
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          fontSize: 10.5,
+          fontSize: 11,
           letterSpacing: 0.9,
           fontWeight: FontWeight.w800,
           color: isDark ? Colors.white54 : _textSecondary,

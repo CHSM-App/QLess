@@ -328,7 +328,7 @@ class _PatientPrescriptionListScreenState
             const Text('Prescriptions',
                 style: TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     color: kTextPrimary,
                     letterSpacing: -0.2)),
           ],
@@ -1167,7 +1167,7 @@ class _DateFilterSheetState extends State<_DateFilterSheet> {
           Row(children: [
             const Text('Filter by Date',
                 style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                    fontSize: 15, fontWeight: FontWeight.w800, color: kTextPrimary)),
             const Spacer(),
             TextButton(
               onPressed: () => setState(() {
@@ -1523,7 +1523,7 @@ class _PatientPrescriptionViewScreenState
           const Text('Prescription Details',
               style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: kTextPrimary,
                   letterSpacing: -0.2)),
         ]),

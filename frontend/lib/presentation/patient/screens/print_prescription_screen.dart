@@ -438,7 +438,7 @@ Future<void> _printPdf() async {
                         'Prescription PDF',
                         style: TextStyle(
                           color: kTextDark,
-                          fontSize: 17,
+                          fontSize: 16,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -496,7 +496,7 @@ Future<void> _printPdf() async {
                 'Generating Prescription PDF',
                 style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: kTextDark,
                 ),
               ),
@@ -622,7 +622,7 @@ Future<void> _printPdf() async {
               'Failed to generate PDF',
               style: TextStyle(
                   fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: kTextDark),
             ),
             const SizedBox(height: 8),

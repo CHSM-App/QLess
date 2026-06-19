@@ -552,7 +552,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
           ),
           const SizedBox(height: 12),
           const Text('Cancel Appointment',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
           const SizedBox(height: 6),
           Text('Cancel appointment for ${p.patientName ?? 'this patient'}?',
               textAlign: TextAlign.center,
@@ -614,7 +614,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
             ),
             const SizedBox(height: 10),
             Text(name,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary),
                 textAlign: TextAlign.center),
             if (p.gender != null || p.dob != null) ...[
               const SizedBox(height: 4),
@@ -767,7 +767,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
             ),
             const SizedBox(height: 12),
             const Text('Close Queue?',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
             const SizedBox(height: 6),
             const Text('Are you sure you want to close this queue?',
                 textAlign: TextAlign.center,
@@ -3356,7 +3356,7 @@ class _DetailPanel extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               name,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: kTextPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 2),
@@ -3885,7 +3885,7 @@ class _PatientDateFilterSheetState extends State<_PatientDateFilterSheet> {
           Row(children: [
             const Text('Filter by Date',
                 style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                    fontSize: 15, fontWeight: FontWeight.w800, color: kTextPrimary)),
             const Spacer(),
             TextButton(
               onPressed: () => setState(() {

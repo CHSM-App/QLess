@@ -170,7 +170,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                   'My Profile',
                   style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       color: kTextPrimary,
                       letterSpacing: -0.2),
                 ),
@@ -763,7 +763,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
               const Text('Log Out?',
                   style: TextStyle(
                       fontSize: 16,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       color: kTextPrimary)),
               const SizedBox(height: 6),
               const Text(
@@ -963,7 +963,7 @@ class _PersonalInfoSheet extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Personal Information',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
               ),
             ),
           ),

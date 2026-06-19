@@ -507,7 +507,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 12,
                         color: kTextSecondary,
                         fontWeight: FontWeight.w500,
                         height: 1.2,
@@ -540,7 +540,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: kPrimaryDarker,
                         letterSpacing: 0.2,
@@ -735,7 +735,7 @@ class _LandscapeLayout extends StatelessWidget {
                     const Text(
                       'Enter the\n6-digit code',
                       style: TextStyle(
-                        fontSize: 26,
+                        fontSize: 22,
                         fontWeight: FontWeight.w800,
                         color: kTextPrimary,
                         height: 1.15,
@@ -933,7 +933,7 @@ class _OtpCard extends StatelessWidget {
                 'Verification Code',
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: kTextPrimary,
                   letterSpacing: -0.2,
                 ),
@@ -1059,9 +1059,9 @@ class _ErrorText extends StatelessWidget {
                       child: Text(
                         'Incorrect OTP. Please try again.',
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           color: Color(0xFFC53030),
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -1137,8 +1137,8 @@ class _VerifyButton extends StatelessWidget {
                       Text(
                         'Verify & Continue',
                         style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
                           color: enabled ? Colors.white : kTextMuted,
                           letterSpacing: 0.3,
                         ),
@@ -1232,7 +1232,7 @@ class _ResendRow extends StatelessWidget {
                             'Resend',
                             style: TextStyle(
                               fontSize: 12,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               color: kPrimaryDarker,
                             ),
                           ),
@@ -1286,7 +1286,7 @@ class _ChangeNumberLink extends StatelessWidget {
                 'Change',
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: kPrimaryDarker,
                 ),
               ),
@@ -1313,7 +1313,7 @@ class _SecureFooter extends StatelessWidget {
           Text(
             'Protected by end-to-end encryption',
             style: TextStyle(
-              fontSize: 11.5,
+              fontSize: 12,
               color: kTextMuted,
               fontWeight: FontWeight.w500,
             ),
@@ -1371,33 +1371,26 @@ class _OtpBoxState extends State<_OtpBox> {
   @override
   Widget build(BuildContext context) {
     final filled = widget.controller.text.isNotEmpty;
-    final double fontSize = (widget.boxWidth * 0.46).clamp(16.0, 22.0);
-
     final Color bg;
     final Color borderColor;
     final double borderWidth;
-    final Color textColor;
 
     if (widget.hasError) {
       bg = kRedLight;
       borderColor = kError;
       borderWidth = 1.6;
-      textColor = const Color(0xFFC53030);
     } else if (_isFocused) {
       bg = kPrimaryLight.withOpacity(0.5);
       borderColor = kPrimary;
       borderWidth = 1.8;
-      textColor = kPrimaryDarker;
     } else if (filled) {
       bg = kPrimaryLight;
       borderColor = kPrimary.withOpacity(0.5);
       borderWidth = 1.4;
-      textColor = kPrimaryDarker;
     } else {
       bg = kBgSoft;
       borderColor = kBorderStrong;
       borderWidth = 1;
-      textColor = kTextPrimary;
     }
 
     return KeyboardListener(
@@ -1429,10 +1422,10 @@ class _OtpBoxState extends State<_OtpBox> {
           textAlign: TextAlign.center,
           maxLength: 1,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w800,
-            color: textColor,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF1A1D2E),
             height: 1,
           ),
           decoration: const InputDecoration(

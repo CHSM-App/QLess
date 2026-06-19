@@ -580,7 +580,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
               ),
               const SizedBox(height: 12),
               const Text('Cancel Appointment',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
               const SizedBox(height: 6),
               const Text('Are you sure you want to cancel this appointment?',
                   textAlign: TextAlign.center,
@@ -1333,7 +1333,7 @@ class _AppointmentDateFilterSheetState
           Row(children: [
             const Text('Filter by Date',
                 style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                    fontSize: 15, fontWeight: FontWeight.w800, color: kTextPrimary)),
             const Spacer(),
             TextButton(
               onPressed: () => setState(() {
@@ -2930,7 +2930,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                         minLines: 3,
                         textInputAction: TextInputAction.newline,
                         style: const TextStyle(
-                            fontSize: 13, color: kTextPrimary),
+                            fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
                         decoration: InputDecoration(
                           hintText: 'Write a short review (optional)',
                           hintStyle: const TextStyle(

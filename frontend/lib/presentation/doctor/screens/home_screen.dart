@@ -1,11 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qless/core/network/dio_provider.dart';
+import 'package:qless/data/api/api_service.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
+import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
+import 'package:qless/domain/models/family_member.dart';
+import 'package:qless/domain/models/patients.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
@@ -14,7 +20,8 @@ import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart'
 import 'package:qless/presentation/doctor/screens/doctor_patient_history.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
-import 'package:qless/presentation/doctor/screens/walk_in_patient_page.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+// walk_in_patient_page import removed — inline panel used instead
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
@@ -117,6 +124,7 @@ const List<_Tip> _kDoctorTips = [
 class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   bool _hasFetched = false;
   bool _showAllWaiting = false;
+  bool _walkInExpanded = false;
   late final ProviderSubscription<int?> _doctorIdSub;
 
   // ── Tips carousel state ────────────────────────────────────────────────
@@ -283,7 +291,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
         content: Text(message,
             style: const TextStyle(fontSize: 13.5, color: kTextSecondary, height: 1.4)),
         actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -301,7 +309,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
             child: Text(confirmLabel,
-                style: const TextStyle(fontWeight: FontWeight.w700)),
+                style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -580,17 +588,17 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               ),
 
               // ── TODAY'S STATS STRIP ─────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                  child: _buildStatStrip(
-                    total:   totalToday,
-                    waiting: waiting.length + (current != null ? 1 : 0),
-                    done:    completed.length,
-                    skipped: skipped.length,
-                  ),
-                ),
-              ),
+              // SliverToBoxAdapter(
+              //   child: Padding(
+              //     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              //     child: _buildStatStrip(
+              //       total:   totalToday,
+              //       waiting: waiting.length + (current != null ? 1 : 0),
+              //       done:    completed.length,
+              //       skipped: skipped.length,
+              //     ),
+              //   ),
+              // ),
 
               // ── TODAY'S SCHEDULE CARD  (always shown when slots exist)
               // if (_todayScheduledSlots().isNotEmpty)
@@ -601,6 +609,32 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               //           _buildTodayScheduleCard(_todayScheduledSlots()),
               //     ),
               //   ),
+
+              // ── WALK-IN CARD (receptionist only) ─────────────────────
+              if (ref.watch(tokenProvider).roleId == 3)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildWalkInCard(),
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeInOut,
+                          child: _walkInExpanded
+                              ? Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: _WalkInInlinePanel(
+                                    onBooked: () => setState(() => _walkInExpanded = false),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
 
               // ── SESSION QUEUE CARDS / EMPTY STATE ───────────────────
               if (visibleSessions.isEmpty) ...[
@@ -670,15 +704,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               //   ),
               // ),
 
-              // ── WALK-IN CARD (receptionist only) ─────────────────────
-              if (ref.watch(tokenProvider).roleId == 3)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                    child: _buildWalkInCard(),
-                  ),
-                ),
-
               // ── QUICK ACTIONS ────────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
@@ -688,12 +713,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               ),
 
               // ── DOCTOR TIPS CAROUSEL ─────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                  child: _buildTipsCarousel(),
-                ),
-              ),
+              // SliverToBoxAdapter(
+              //   child: Padding(
+              //     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              //     child: _buildTipsCarousel(),
+              //   ),
+              // ),
 
               // ── UPCOMING LIST HEADER ─────────────────────────────────
               SliverToBoxAdapter(
@@ -746,8 +771,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                                   'No Upcoming Patients',
                                   style: TextStyle(
                                     color: kTextSecondary,
-                                    fontSize: 11.5,
-                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
                                     letterSpacing: -0.1,
                                   ),
                                 ),
@@ -978,8 +1003,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   Text(
                     greeting,
                     style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                       color: kTextSecondary,
                       letterSpacing: 0.1,
                       height: 1.1,
@@ -1026,8 +1051,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   Text(
                     DateFormat('d MMM').format(DateTime.now()),
                     style: const TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: kPrimaryDark,
                       letterSpacing: 0.2,
                     ),
@@ -1283,14 +1308,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
               const Text('Daily progress',
                   style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                       color: kTextSecondary,
                       letterSpacing: 0.2)),
               Text('$done / $total seen',
                   style: const TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                       color: kPrimaryDark)),
             ]),
             const SizedBox(height: 5),
@@ -1322,20 +1347,20 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           total:   total,
           waiting: sessionWaiting,
           done:    done,
-          skipped: sessionSkipped,
+        //  skipped: sessionSkipped,
         ),
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Daily progress',
               style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
                   color: kTextSecondary,
                   letterSpacing: 0.2)),
           Text('$done / $total seen',
               style: const TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   color: kPrimaryDark)),
         ]),
         const SizedBox(height: 5),
@@ -1387,8 +1412,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                       Text(
                         'Close',
                         style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
                           color: kRedDark,
                           letterSpacing: 0.2,
                         ),
@@ -1480,7 +1505,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               'Close Queue?',
               style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: kTextPrimary),
             ),
             const SizedBox(height: 8),
@@ -1516,7 +1541,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                           if (queueSkipped > 0) '$queueSkipped skipped in this queue',
                           if (earlierSlotPending > 0) '$earlierSlotPending from earlier slots',
                         ].join(' · '),
-                        style: const TextStyle(fontSize: 11, color: kAmberDark, height: 1.3),
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kAmberDark, height: 1.3),
                       ),
                     ]),
                   ),
@@ -1541,7 +1566,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   child: const Text('No',
                       style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: kTextSecondary)),
                 ),
               ),
@@ -1561,7 +1586,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   child: const Text('Yes, Close',
                       style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: kRedDark)),
                 ),
               ),
@@ -1604,7 +1629,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               'Emergency Pause?',
               style: TextStyle(
                   fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
                   color: kTextPrimary),
             ),
             const SizedBox(height: 8),
@@ -1631,7 +1656,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   child: const Text('No',
                       style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: kTextSecondary)),
                 ),
               ),
@@ -1651,7 +1676,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   child: const Text('Yes, Pause',
                       style: TextStyle(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w600,
                           color: kPurpleDark)),
                 ),
               ),
@@ -1669,7 +1694,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     required int total,
     required int waiting,
     required int done,
-    required int skipped,
+ //   required int skipped,
   }) {
     return Row(children: [
       _miniStatChip(label: 'Total',   value: total,   accent: kPrimary,   textColor: kPrimaryDark),
@@ -1677,8 +1702,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       _miniStatChip(label: 'Waiting', value: waiting, accent: kPrimary,   textColor: kPrimaryDark),
       const SizedBox(width: 5),
       _miniStatChip(label: 'Done',    value: done,    accent: kGreen,     textColor: kGreenDark),
-      const SizedBox(width: 5),
-      _miniStatChip(label: 'Skipped', value: skipped, accent: kAmber,     textColor: kAmberDark),
+      // const SizedBox(width: 5),
+      // _miniStatChip(label: 'Skipped', value: skipped, accent: kAmber,     textColor: kAmberDark),
     ]);
   }
 
@@ -1706,7 +1731,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 8,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: textColor.withOpacity(0.75),
                 letterSpacing: 0.3,
@@ -1761,8 +1786,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
                 color: isPrimary ? Colors.white : kAmberDark,
                 letterSpacing: 0.2,
               ),
@@ -2110,9 +2135,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   Widget _buildWalkInCard() {
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => const WalkInPatientPage()),
-      ),
+      onTap: () => setState(() => _walkInExpanded = !_walkInExpanded),
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -2141,13 +2164,17 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           const Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Add Walk-in Patient',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
               SizedBox(height: 2),
               Text('Book appointment for walk-in patient',
-                  style: TextStyle(fontSize: 11, color: kTextSecondary)),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
             ]),
           ),
-          const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kTextSecondary),
+          AnimatedRotation(
+            turns: _walkInExpanded ? 0.25 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kTextSecondary),
+          ),
         ]),
       ),
     );
@@ -2180,8 +2207,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               const Text(
                 'Quick Actions',
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.3,
                   color: kTextPrimary,
                 ),
@@ -2304,9 +2331,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               label,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 9.5,
+                fontSize: 11,
                 height: 1.15,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 color: fg,
                 letterSpacing: 0.1,
               ),
@@ -2358,7 +2385,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                     dayLabel,
                     style: const TextStyle(
                       fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w500,
                       color: kTextPrimary,
                       letterSpacing: -0.1,
                       height: 1.15,
@@ -2474,8 +2501,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           child: Text(
             timeLabel,
             style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w800,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
               color: kTextPrimary,
               letterSpacing: -0.1,
             ),
@@ -2715,7 +2742,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                             tip.title,
                             style: const TextStyle(
                               fontSize: 11,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                               letterSpacing: 0.3,
                               color: kPrimaryDark,
                             ),
@@ -2800,8 +2827,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           const Text(
             'No Schedule for Today',
             style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w800,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
               color: kTextPrimary,
               letterSpacing: -0.1,
             ),
@@ -2811,7 +2838,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             'Set your weekly availability to start accepting patients.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 10.5,
+              fontSize: 12,
               color: kTextSecondary,
               fontWeight: FontWeight.w500,
               height: 1.35,
@@ -2839,8 +2866,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   Text(
                     'Set Schedule',
                     style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                       color: Colors.white,
                       letterSpacing: 0.2,
                     ),
@@ -2913,7 +2940,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               Text(
                 name,
                 style: const TextStyle(
-                  fontSize: 11.5,
+                  fontSize: 15,
                   fontWeight: FontWeight.w800,
                   color: kTextPrimary,
                   letterSpacing: -0.1,
@@ -2928,7 +2955,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   if (age != null) '$age yrs'
                 ].join(' · '),
                 style: const TextStyle(
-                  fontSize: 9.5,
+                  fontSize: 12,
                   color: kTextSecondary,
                   fontWeight: FontWeight.w500,
                 ),
@@ -2963,9 +2990,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               const Text(
                 'TOKEN',
                 style: TextStyle(
-                  fontSize: 7.5,
+                  fontSize: 9.5,
                   color: kTextMuted,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.5,
                 ),
               ),
@@ -3051,8 +3078,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           Text(
             label,
             style: TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
               letterSpacing: 0.2,
               color: fg,
             ),
@@ -3071,8 +3098,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 8.5,
-            fontWeight: FontWeight.w800,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
             color: fg,
             letterSpacing: 0.2,
           ),
@@ -3100,8 +3127,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
                 color: kPrimaryDark,
                 letterSpacing: 0.2,
               ),
@@ -3149,8 +3176,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       Text(
         label,
         style: const TextStyle(
-          fontSize: 12.5,
-          fontWeight: FontWeight.w800,
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
           color: kTextPrimary,
           letterSpacing: -0.1,
         ),
@@ -3166,8 +3193,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         child: Text(
           '$count',
           style: TextStyle(
-            fontSize: 9.5,
-            fontWeight: FontWeight.w800,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
             color: accentDark,
           ),
         ),
@@ -3187,4 +3214,566 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
         ),
       );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WALK-IN INLINE PANEL  (shown below the walk-in card on home screen)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WalkInInlinePanel extends ConsumerStatefulWidget {
+  final VoidCallback onBooked;
+  const _WalkInInlinePanel({required this.onBooked});
+
+  @override
+  ConsumerState<_WalkInInlinePanel> createState() => _WalkInInlinePanelState();
+}
+
+class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
+  final _nameCtr   = TextEditingController();
+  final _mobileCtr = TextEditingController();
+
+  bool    _loading = true;
+  String? _error;
+
+  List<DoctorAvailabilityModel> _todaySessions = [];
+  DoctorAvailabilityModel? _selected;
+
+  bool    _booking  = false;
+  String? _bookError;
+
+  // patient lookup — inline (no bottom sheet)
+  Patients?           _foundPatient;
+  bool                _checkingMobile    = false;
+  int?                _resolvedPatientId;
+  int?                _familyMemberId;
+  int?                _familyHeadPatientId;
+  int?                _familyGenderId;
+  List<FamilyMember>  _familyMembers     = [];
+  bool                _loadingMembers    = false;
+  bool                _addingNewMember   = false;
+  final _newMemberCtr = TextEditingController();
+  int  _newMemberGender = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _mobileCtr.addListener(_onMobileChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadSessions());
+  }
+
+  @override
+  void dispose() {
+    _mobileCtr.removeListener(_onMobileChanged);
+    _nameCtr.dispose();
+    _mobileCtr.dispose();
+    _newMemberCtr.dispose();
+    super.dispose();
+  }
+
+  ApiService? get _api {
+    final dio = ref.read(dioProvider).value;
+    if (dio == null) return null;
+    return ApiService(dio);
+  }
+
+  void _clearPatientState() {
+    _foundPatient        = null;
+    _resolvedPatientId   = null;
+    _familyMemberId      = null;
+    _familyHeadPatientId = null;
+    _familyGenderId      = null;
+    _familyMembers       = [];
+    _loadingMembers      = false;
+    _addingNewMember     = false;
+    _newMemberCtr.clear();
+    _newMemberGender     = 1;
+  }
+
+  Future<void> _loadSessions() async {
+    setState(() { _loading = true; _error = null; });
+    final doctorId = ref.read(receptionistLoginViewModelProvider).doctorId;
+    final api = _api;
+    if (doctorId == null || api == null) {
+      setState(() { _loading = false; _error = 'Doctor not linked'; });
+      return;
+    }
+    final dayName = const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][DateTime.now().weekday - 1];
+    try {
+      final avails = await api.getDoctorAvailability(doctorId);
+      final sessions = avails.where((a) {
+        if (a.dayOfWeek != dayName) return false;
+        if (a.isEnabled == false) return false;
+        final mode = a.bookingMode ?? 0;
+        return mode == 1 || mode == 2 || mode == 3;
+      }).toList();
+      if (!mounted) return;
+      setState(() {
+        _todaySessions = sessions;
+        _selected = sessions.length == 1 ? sessions.first : null;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() { _loading = false; _error = 'Could not load sessions'; });
+    }
+  }
+
+  void _onMobileChanged() {
+    final digits = _mobileCtr.text.trim().replaceAll(RegExp(r'\D'), '');
+    if (digits.length == 10) {
+      _lookupMobile(digits);
+    } else if (_foundPatient != null || _resolvedPatientId != null ||
+               _familyMemberId != null || _familyHeadPatientId != null) {
+      setState(() => _clearPatientState());
+    }
+  }
+
+  Future<void> _lookupMobile(String mobile) async {
+    final api = _api;
+    if (api == null) return;
+    setState(() { _checkingMobile = true; });
+    try {
+      final results = await api.checkPhonePatient(mobile);
+      if (!mounted) return;
+      if (results.isNotEmpty) {
+        final p = results.first;
+        setState(() { _foundPatient = p; _checkingMobile = false; _loadingMembers = true; });
+        // load family members inline
+        try {
+          final members = p.patientId != null
+              ? await api.fetchFamilyMembers(p.patientId!)
+              : <FamilyMember>[];
+          if (mounted) setState(() { _familyMembers = members; _loadingMembers = false; });
+        } catch (_) {
+          if (mounted) setState(() { _loadingMembers = false; });
+        }
+      } else {
+        setState(() { _clearPatientState(); _checkingMobile = false; });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _checkingMobile = false; });
+    }
+  }
+
+  // _showPatientSheet removed — options shown inline below mobile field
+
+  String _fmtTime(String? iso) {
+    if (iso == null || iso.isEmpty) return '';
+    DateTime? dt = DateTime.tryParse(iso);
+    int h, m;
+    if (dt != null) { h = dt.hour; m = dt.minute; }
+    else {
+      final p = iso.split(':');
+      h = int.tryParse(p[0]) ?? 0;
+      m = p.length > 1 ? (int.tryParse(p[1]) ?? 0) : 0;
+    }
+    final sf = h < 12 ? 'AM' : 'PM';
+    final dh = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    return '${dh.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')} $sf';
+  }
+
+  String _modeLabel(int? m) => switch (m) { 1 => 'Queue', 2 => 'Slots', 3 => 'Queue+Slots', _ => '' };
+
+  Future<void> _book() async {
+    final name   = _nameCtr.text.trim();
+    final mobile = _mobileCtr.text.trim();
+    if (name.isEmpty) { setState(() { _bookError = 'Patient name is required'; }); return; }
+    if (mobile.length < 10) { setState(() { _bookError = 'Enter valid 10-digit mobile'; }); return; }
+    if (_selected == null) { setState(() { _bookError = 'Please select a session'; }); return; }
+
+    final doctorId = ref.read(receptionistLoginViewModelProvider).doctorId;
+    if (doctorId == null) return;
+
+    setState(() { _booking = true; _bookError = null; });
+
+    final today = DateTime.now();
+    final dateStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+    final mode    = _selected!.bookingMode ?? 0;
+    final isQueue = mode == 1 || mode == 3;
+    final isNewFamily      = _familyHeadPatientId != null;
+    final isExistingFamily = _familyMemberId != null;
+    final isFamilyBooking  = isNewFamily || isExistingFamily;
+
+    final body = <String, dynamic>{
+      'name':             name,
+      'mobile_no':        mobile,
+      'doctor_id':        doctorId,
+      'appointment_date': dateStr,
+      'slot_id':          _selected!.slotId,
+      'start_time':       isQueue ? null : null,
+      'user_type':        isFamilyBooking ? 2 : 1,
+      if (isExistingFamily) 'patient_id': _familyMemberId,
+      if (isNewFamily) 'family_id': _familyHeadPatientId,
+      if (isNewFamily && _familyGenderId != null) 'gender_id': _familyGenderId,
+      if (!isFamilyBooking && _resolvedPatientId != null) 'patient_id': _resolvedPatientId,
+    }..removeWhere((_, v) => v == null);
+
+    try {
+      final isOnline = ref.read(connectivityNotifierProvider).isOnline;
+      final resp = await ref.read(receptionistLoginViewModelProvider.notifier)
+          .walkInBook(body, isOnline: isOnline);
+      if (!mounted) return;
+      if (resp.success == true) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(resp.message ?? 'Walk-in patient booked'),
+          backgroundColor: kPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+        widget.onBooked();
+      } else {
+        setState(() { _bookError = resp.message ?? 'Booking failed'; });
+      }
+    } catch (e) {
+      if (mounted) setState(() { _bookError = e.toString().replaceFirst('Exception: ', ''); });
+    } finally {
+      if (mounted) setState(() { _booking = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bookedFor = _resolvedPatientId != null
+        ? _nameCtr.text
+        : _familyMemberId != null || _familyHeadPatientId != null
+            ? _nameCtr.text
+            : null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kHairline),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: _loading
+          ? const Center(child: Padding(
+              padding: EdgeInsets.all(16),
+              child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+            ))
+          : _error != null
+              ? _errBox(_error!)
+              : _todaySessions.isEmpty
+                  ? _errBox('No sessions scheduled for today')
+                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      // Today label
+                      Row(children: [
+                        const Icon(Icons.event_rounded, size: 14, color: kPrimary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Today  ·  ${const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][DateTime.now().weekday - 1]}, ${DateTime.now().day} ${const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][DateTime.now().month - 1]}',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimary),
+                        ),
+                      ]),
+                      const SizedBox(height: 12),
+
+                      // Session chips
+                      if (_todaySessions.length > 1) ...[
+                        const Text('SELECT SESSION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted, letterSpacing: 0.7)),
+                        const SizedBox(height: 8),
+                      ],
+                      Wrap(
+                        spacing: 8, runSpacing: 8,
+                        children: _todaySessions.map((s) {
+                          final isSel = _selected?.slotId == s.slotId;
+                          return GestureDetector(
+                            onTap: () => setState(() => _selected = s),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSel ? kPrimary : kPrimaryLight.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: isSel ? kPrimary : const Color(0xFFB2EBE4)),
+                              ),
+                              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                Text('${_fmtTime(s.startTime)} – ${_fmtTime(s.endTime)}',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                        color: isSel ? Colors.white : kTextPrimary)),
+                                const SizedBox(height: 2),
+                                Text(_modeLabel(s.bookingMode),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: isSel ? Colors.white70 : kTextMuted)),
+                              ]),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // Name field
+                      _inlineField(controller: _nameCtr, label: 'Patient Name', icon: Icons.person_outline_rounded,
+                          type: TextInputType.name, caps: TextCapitalization.words),
+                      const SizedBox(height: 10),
+
+                      // Mobile field
+                      _inlineField(controller: _mobileCtr, label: 'Mobile Number', icon: Icons.phone_outlined,
+                          type: TextInputType.phone, maxLen: 10,
+                          formatters: [FilteringTextInputFormatter.digitsOnly]),
+
+                      // Patient lookup feedback
+                      if (_checkingMobile) ...[
+                        const SizedBox(height: 8),
+                        const Row(children: [
+                          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary)),
+                          SizedBox(width: 8),
+                          Text('Checking...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted)),
+                        ]),
+                      ] else if (_foundPatient != null && _resolvedPatientId == null &&
+                                 _familyMemberId == null && _familyHeadPatientId == null) ...[
+                        // ── Inline patient options (no bottom sheet) ──────
+                        const SizedBox(height: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: kPrimaryLight.withValues(alpha: 0.5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: kPrimary.withValues(alpha: 0.3)),
+                          ),
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            // Header
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                              child: Row(children: [
+                                const Icon(Icons.person_rounded, size: 14, color: kPrimary),
+                                const SizedBox(width: 6),
+                                Text('${_foundPatient!.name}  ·  ${_foundPatient!.mobileNo ?? ''}',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPrimary)),
+                              ]),
+                            ),
+                            const Divider(height: 1, color: kBorder),
+                            // Book for primary
+                            InkWell(
+                              onTap: () => setState(() {
+                                _resolvedPatientId   = _foundPatient!.patientId;
+                                _nameCtr.text        = _foundPatient!.name ?? _nameCtr.text;
+                                _foundPatient        = null;
+                                _familyMemberId      = null;
+                                _familyHeadPatientId = null;
+                                _familyGenderId      = null;
+                              }),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                child: Row(children: [
+                                  const Icon(Icons.how_to_reg_rounded, size: 14, color: kPrimary),
+                                  const SizedBox(width: 8),
+                                  Text('Book for ${_foundPatient!.name}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPrimary)),
+                                ]),
+                              ),
+                            ),
+                            // Family members
+                            if (_loadingMembers) ...[
+                              const Divider(height: 1, color: kBorder),
+                              const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: Center(child: SizedBox(width: 14, height: 14,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary))),
+                              ),
+                            ] else if (_familyMembers.isNotEmpty) ...[
+                              const Divider(height: 1, color: kBorder),
+                              ..._familyMembers.map((m) => Column(children: [
+                                InkWell(
+                                  onTap: () => setState(() {
+                                    _familyMemberId      = m.memberId!;
+                                    _nameCtr.text        = m.memberName ?? '';
+                                    _foundPatient        = null;
+                                    _resolvedPatientId   = null;
+                                    _familyHeadPatientId = null;
+                                    _familyGenderId      = null;
+                                  }),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                                    child: Row(children: [
+                                      CircleAvatar(radius: 12, backgroundColor: kPrimaryLight,
+                                          child: Text(m.avatarLetter,
+                                              style: const TextStyle(color: kPrimary, fontSize: 11, fontWeight: FontWeight.w700))),
+                                      const SizedBox(width: 8),
+                                      Expanded(child: Text(m.memberName ?? '',
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary))),
+                                      Text([m.genderName, m.relationName].where((s) => s != null && s.isNotEmpty).join(' · '),
+                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted)),
+                                    ]),
+                                  ),
+                                ),
+                                const Divider(height: 1, color: kBorder),
+                              ])),
+                            ],
+                            // Add new family member toggle
+                            InkWell(
+                              onTap: () => setState(() => _addingNewMember = !_addingNewMember),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                child: Row(children: [
+                                  const Icon(Icons.person_add_alt_1_rounded, size: 14, color: kTextSecondary),
+                                  const SizedBox(width: 8),
+                                  const Text('Add new family member',
+                                      style: TextStyle(fontSize: 12, color: kTextSecondary)),
+                                  const Spacer(),
+                                  Icon(_addingNewMember ? Icons.expand_less : Icons.expand_more,
+                                      size: 16, color: kTextMuted),
+                                ]),
+                              ),
+                            ),
+                            if (_addingNewMember) ...[
+                              const Divider(height: 1, color: kBorder),
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                  TextField(
+                                    controller: _newMemberCtr,
+                                    textCapitalization: TextCapitalization.words,
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+                                    decoration: InputDecoration(
+                                      hintText: 'Family member name',
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                      filled: true, fillColor: Colors.white,
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(children: [
+                                    _GenderPill(label: 'Male',   value: 1, selected: _newMemberGender == 1, onTap: () => setState(() => _newMemberGender = 1)),
+                                    const SizedBox(width: 6),
+                                    _GenderPill(label: 'Female', value: 2, selected: _newMemberGender == 2, onTap: () => setState(() => _newMemberGender = 2)),
+                                    const SizedBox(width: 6),
+                                    _GenderPill(label: 'Other',  value: 3, selected: _newMemberGender == 3, onTap: () => setState(() => _newMemberGender = 3)),
+                                  ]),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: () {
+                                        final name = _newMemberCtr.text.trim();
+                                        if (name.isEmpty) return;
+                                        setState(() {
+                                          _familyHeadPatientId = _foundPatient!.patientId;
+                                          _familyGenderId      = _newMemberGender;
+                                          _nameCtr.text        = name;
+                                          _foundPatient        = null;
+                                          _resolvedPatientId   = null;
+                                          _familyMemberId      = null;
+                                          _addingNewMember     = false;
+                                        });
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: kPrimary, foregroundColor: Colors.white,
+                                        elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        padding: const EdgeInsets.symmetric(vertical: 10),
+                                      ),
+                                      child: const Text('Use this member', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                    ),
+                                  ),
+                                ]),
+                              ),
+                            ],
+                          ]),
+                        ),
+                      ] else if (bookedFor != null) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: kGreenLight,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kGreen.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(children: [
+                            const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF38A169)),
+                            const SizedBox(width: 8),
+                            Text('Booking for $bookedFor',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF38A169), fontWeight: FontWeight.w500)),
+                          ]),
+                        ),
+                      ],
+
+                      if (_bookError != null) ...[
+                        const SizedBox(height: 10),
+                        _errBox(_bookError!),
+                      ],
+
+                      const SizedBox(height: 14),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: ElevatedButton(
+                          onPressed: _booking ? null : _book,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimary, foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: _booking
+                              ? const SizedBox(width: 18, height: 18,
+                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : const Text('Book Walk-in Patient',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ]),
+    );
+  }
+
+  Widget _inlineField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType type = TextInputType.text,
+    TextCapitalization caps = TextCapitalization.none,
+    int? maxLen,
+    List<TextInputFormatter>? formatters,
+  }) =>
+      TextField(
+        controller: controller,
+        keyboardType: type,
+        textCapitalization: caps,
+        maxLength: maxLen,
+        inputFormatters: formatters,
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary),
+          prefixIcon: Icon(icon, size: 16, color: kTextSecondary),
+          counterText: '',
+          filled: true, fillColor: const Color(0xFFF7FDFC),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+        ),
+      );
+
+  Widget _errBox(String msg) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: kRedLight, borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: kRed.withValues(alpha: 0.3)),
+    ),
+    child: Text(msg, style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: kRedDark)),
+  );
+}
+
+// Gender pill for walk-in family member sheet
+class _GenderPill extends StatelessWidget {
+  final String label;
+  final int    value;
+  final bool   selected;
+  final VoidCallback onTap;
+  const _GenderPill({required this.label, required this.value, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: selected ? kPrimary : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: selected ? kPrimary : kBorder),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+          color: selected ? Colors.white : kTextSecondary)),
+    ),
+  );
 }

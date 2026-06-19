@@ -188,7 +188,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
         title: const Text('Add Medicine',
             style: TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
                 color: kTextPrimary,
                 letterSpacing: -0.2)),
         bottom: const PreferredSize(
@@ -271,7 +271,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                 Text('New Medicine',
                     style: TextStyle(
                         fontSize: 15,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                         color: Colors.white)),
                 SizedBox(height: 2),
                 Text('Add to your medicine library',
@@ -329,8 +329,8 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
   Widget _fieldLabel(String label, {bool isRequired = false}) => Row(children: [
         Text(label,
             style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
                 color: kTextSecondary,
                 letterSpacing: 0.2)),
         if (isRequired) ...[
@@ -377,10 +377,10 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
           focusNode: focusNode,
           textCapitalization: TextCapitalization.words,
           style: const TextStyle(
-              fontSize: 13, color: kTextPrimary, fontWeight: FontWeight.w500),
+              fontSize: 14, color: Color(0xFF1A1D2E), fontWeight: FontWeight.w600),
           decoration: InputDecoration(
             hintText: 'e.g. Paracetamol',
-            hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
+            hintStyle: const TextStyle(color: kTextMuted, fontSize: 13.5),
             prefixIcon: Container(
               margin: const EdgeInsets.fromLTRB(12, 0, 8, 0),
               width: 32, height: 32,
@@ -409,7 +409,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: kError, width: 1.5)),
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            errorStyle: const TextStyle(fontSize: 11, color: kError),
+            errorStyle: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: kError),
           ),
           validator: (v) => (v == null || v.trim().isEmpty)
               ? 'Medicine name is required'
@@ -446,9 +446,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                             child: Text(
                               m.medicineName ?? '',
                               style: const TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 13.5,
                                   color: kTextPrimary,
-                                  fontWeight: FontWeight.w500),
+                                  fontWeight: FontWeight.w600),
                             ),
                           ),
                           Container(
@@ -460,7 +460,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                             child: Text(
                               m.medTypeName ?? '',
                               style: const TextStyle(
-                                  fontSize: 10,
+                                  fontSize: 11,
                                   fontWeight: FontWeight.w700,
                                   color: kPrimary),
                             ),
@@ -610,10 +610,8 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                     child: Text(type.medTypeName ?? '—',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: sel
-                                ? FontWeight.w700
-                                : FontWeight.w500,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                             color: sel ? Colors.white : kTextSecondary)),
                   ),
                 ],
@@ -658,7 +656,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                       Text('Save Medicine',
                           style: TextStyle(
                               fontSize: 14,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w600,
                               color: Colors.white)),
                     ],
                   ),

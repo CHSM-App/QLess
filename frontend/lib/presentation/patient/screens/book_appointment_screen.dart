@@ -868,7 +868,7 @@ class _AppBar extends StatelessWidget {
         isReschedule ? 'Reschedule' : 'Book Appointment',
         style: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             color: kTextPrimary,
             letterSpacing: -0.2),
       ),
@@ -1876,7 +1876,7 @@ class _QueueCard extends StatelessWidget {
             controller: symptomsController,
             maxLines:   3,
             maxLength:  300,
-            style: const TextStyle(fontSize: 13, color: kTextPrimary),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
             decoration: InputDecoration(
               hintText: 'e.g. Fever since 2 days, headache, sore throat…',
               hintStyle:
@@ -2287,7 +2287,7 @@ class _SymptomsField extends StatelessWidget {
             controller: controller,
             maxLines:   3,
             maxLength:  300,
-            style: const TextStyle(fontSize: 13, color: kTextPrimary),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
             decoration: InputDecoration(
               hintText: 'e.g. Fever since 2 days, headache, sore throat…',
               hintStyle: const TextStyle(fontSize: 13, color: kTextMuted),

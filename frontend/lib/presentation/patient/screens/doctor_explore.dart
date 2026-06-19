@@ -603,7 +603,7 @@ class _SectionTitle extends StatelessWidget {
                   const SizedBox(height: 1),
                   Text(subtitle!,
                       style: const TextStyle(
-                          fontSize: 11, color: _kTextMuted)),
+                          fontSize: 12, color: _kTextMuted)),
                 ],
               ],
             ),
@@ -693,7 +693,7 @@ class _RecentDoctorCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                    fontSize: 10, color: _kTextMuted)),
+                    fontSize: 12, color: _kTextMuted)),
             const SizedBox(height: 7),
             // Experience row
             Row(
@@ -706,8 +706,8 @@ class _RecentDoctorCard extends StatelessWidget {
                       ? '${doctor.experience}y exp'
                       : 'Doctor',
                   style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
                       color: _kTextSecondary),
                 ),
               ],
@@ -815,8 +815,8 @@ class _NearbyDoctorCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(isOpen ? 'Open' : 'Closed',
                         style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                             color: isOpen ? _kSuccess : _kError)),
                   ]),
                 ),
@@ -844,7 +844,7 @@ class _NearbyDoctorCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 10, color: _kTextMuted)),
+                        fontSize: 12, color: _kTextMuted)),
               ),
             ]),
             const SizedBox(height: 8),
@@ -863,8 +863,8 @@ class _NearbyDoctorCard extends StatelessWidget {
                     const SizedBox(width: 3),
                     Text(distLabel,
                         style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
                             color: _kPrimary)),
                   ]),
                 ),
@@ -876,7 +876,7 @@ class _NearbyDoctorCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 10, color: _kTextMuted)),
+                          fontSize: 12, color: _kTextMuted)),
                 ),
             ]),
             const Spacer(),

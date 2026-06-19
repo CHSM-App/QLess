@@ -340,7 +340,7 @@ class _DoctorProfileSetupScreenState
           Expanded(
               child: Text(message,
                   style: const TextStyle(
-                      fontSize: 13.5, fontWeight: FontWeight.w500))),
+                      fontSize: 13.5, fontWeight: FontWeight.w600))),
         ]),
         backgroundColor: kTextPrimary,
         behavior: SnackBarBehavior.floating,
@@ -1134,8 +1134,8 @@ class _DoctorProfileSetupScreenState
             inputFormatters: inputFormatters,
             style: const TextStyle(
                 fontSize: 14,
-                color: kTextPrimary,
-                fontWeight: FontWeight.w500),
+                color: Color(0xFF1A1D2E),
+                fontWeight: FontWeight.w600),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(color: kTextMuted, fontSize: 13.5),
@@ -1174,7 +1174,7 @@ class _DoctorProfileSetupScreenState
               Expanded(
                 child: Text(errorText,
                     style: const TextStyle(
-                        fontSize: 11.5,
+                        fontSize: 9.5,
                         color: kError,
                         fontWeight: FontWeight.w600)),
               ),
@@ -1203,8 +1203,8 @@ class _DoctorProfileSetupScreenState
             maxLines: 3,
             style: const TextStyle(
                 fontSize: 14,
-                color: kTextPrimary,
-                fontWeight: FontWeight.w500),
+                color: Color(0xFF1A1D2E),
+                fontWeight: FontWeight.w600),
             decoration: InputDecoration(
               hintText: hint,
               hintStyle: const TextStyle(color: kTextMuted, fontSize: 13.5),
@@ -1494,7 +1494,7 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontSize: 10.5,
+                        fontSize: 11,
                         fontWeight: FontWeight.w700,
                         color: kPrimaryDarker,
                         letterSpacing: 0.2,
@@ -1655,9 +1655,9 @@ class _StepDot extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 10.5,
+            fontSize: 11,
             fontWeight:
-                isActive ? FontWeight.w800 : FontWeight.w600,
+                isActive ? FontWeight.w800 : FontWeight.w700,
             color: labelColor,
           ),
         ),
@@ -1797,8 +1797,8 @@ class _PrimaryButton extends StatelessWidget {
                   Text(
                     label,
                     style: const TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
                       color: Colors.white,
                       letterSpacing: 0.3,
                     ),
@@ -2156,8 +2156,8 @@ class _ScheduleDayCard extends StatelessWidget {
                 child: Text(
                   schedule.shortName,
                   style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                     color: schedule.isEnabled
                         ? kPrimaryDarker
@@ -2586,9 +2586,9 @@ class _ScheduleTimeSlotCardState
                         FilteringTextInputFormatter.digitsOnly
                       ],
                       style: const TextStyle(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: kTextPrimary),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1D2E)),
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         hintText: 'e.g. 20',
@@ -2863,7 +2863,7 @@ class _FieldLabel extends StatelessWidget {
             label,
             style: const TextStyle(
               fontSize: 12.5,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w500,
               color: kTextPrimary,
               letterSpacing: 0.1,
             ),
@@ -3390,7 +3390,7 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
                       focusNode: _focusNode,
                       onChanged: _onSearchChanged,
                       style: const TextStyle(
-                          fontSize: 14, color: kTextPrimary),
+                          fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
                       decoration: InputDecoration(
                         hintText: 'Search for a place...',
                         hintStyle: const TextStyle(

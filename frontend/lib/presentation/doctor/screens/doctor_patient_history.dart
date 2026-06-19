@@ -449,7 +449,7 @@ class _DoctorPatientHistoryScreenState
           const SizedBox(width: 5),
           Text(label,
               style: const TextStyle(
-                  fontSize: 11, color: _kPrimaryDark, fontWeight: FontWeight.w600)),
+                  fontSize: 11, color: _kPrimaryDark, fontWeight: FontWeight.w700)),
           const SizedBox(width: 5),
           GestureDetector(
             onTap: onRemove,
@@ -719,7 +719,7 @@ class _HistoryDateFilterSheetState extends State<_HistoryDateFilterSheet> {
           Row(children: [
             const Text('Filter by Date',
                 style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: _kTextPrimary)),
+                    fontSize: 15, fontWeight: FontWeight.w800, color: _kTextPrimary)),
             const Spacer(),
             TextButton(
               onPressed: () => setState(() {

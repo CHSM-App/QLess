@@ -450,9 +450,10 @@ class _SearchSurface extends StatelessWidget {
                       focusNode: focusNode,
                       onChanged: onChanged,
                       onSubmitted: onSubmitted,
-                      style: TextStyle(
-                        fontSize: textFontSize,
-                        color: textColor,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF1A1D2E),
                       ),
                       decoration: InputDecoration(
                         border: InputBorder.none,

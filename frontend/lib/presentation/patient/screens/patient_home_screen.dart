@@ -771,7 +771,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                       style: const TextStyle(
                                           color: kTextPrimary,
                                           fontSize: 16,
-                                          fontWeight: FontWeight.w700)),
+                                          fontWeight: FontWeight.w800)),
                                   const SizedBox(height: 5),
                                   GestureDetector(
                                     onTap: _openLocationPicker,
@@ -1092,7 +1092,7 @@ class _LocationSheetState extends State<_LocationSheet> {
                     children: [
                   const Text('Choose Location',
                       style: TextStyle(fontSize: 15,
-                          fontWeight: FontWeight.w700, color: kTextPrimary)),
+                          fontWeight: FontWeight.w800, color: kTextPrimary)),
                   if (widget.currentLocation.isNotEmpty)
                     Text('Current: ${widget.currentLocation}',
                         overflow: TextOverflow.ellipsis,
@@ -1129,8 +1129,8 @@ class _LocationSheetState extends State<_LocationSheet> {
                 focusNode:  _focus,
                 textInputAction: TextInputAction.done,
                 style: const TextStyle(
-                    color: kTextPrimary, fontSize: 13,
-                    fontWeight: FontWeight.w500),
+                    color: Color(0xFF1A1D2E), fontSize: 14,
+                    fontWeight: FontWeight.w600),
                 decoration: InputDecoration(
                   hintText: 'Search city or place…',
                   hintStyle: const TextStyle(color: kTextMuted, fontSize: 13),
@@ -2752,7 +2752,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: 2),
