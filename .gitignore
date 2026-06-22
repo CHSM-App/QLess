@@ -56,3 +56,4 @@ app.*.map.json
 **/*.jks
 **/*.keystore
 **/keystore/
+.claude/
