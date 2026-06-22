@@ -169,7 +169,7 @@ class _PortraitLayout extends StatelessWidget {
                             _BrandLogo(size: logoSize),
                             SizedBox(height: isVerySmall ? 14 : 20),
                             Text(
-                              'HealthConnect',
+                              'QLess',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: titleSize,
@@ -251,25 +251,25 @@ class _PortraitLayout extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 6),
-                      const Padding(
-                        padding: EdgeInsets.only(left: 16),
-                        child: Text(
-                          'Choose how you want to continue',
-                          style: TextStyle(
-                            fontSize: 13.5,
-                            color: kTextSecondary,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
+                      // const Padding(
+                      //   padding: EdgeInsets.only(left: 16),
+                      //   child: Text(
+                      //     'Choose how you want to continue',
+                      //     style: TextStyle(
+                      //       fontSize: 13.5,
+                      //       color: kTextSecondary,
+                      //       height: 1.5,
+                      //     ),
+                      //   ),
+                      // ),
                       const SizedBox(height: 22),
 
                       // Role cards
                       _RoleCard(
                         role: 'doctor',
                         title: 'Continue as Doctor & Receptionist',
-                        subtitle: 'Manage appointments & patients',
-                        chips: const ['Practice tools', 'Verified'],
+                      //  subtitle: 'Manage appointments & patients',
+                       // chips: const ['Practice tools', 'Verified'],
                         icon: _RoleCardIcon.doctor,
                         accentColor: kPrimary,
                         accentBg: kPrimaryLight,
@@ -279,8 +279,8 @@ class _PortraitLayout extends StatelessWidget {
                       _RoleCard(
                         role: 'patient',
                         title: 'Continue as Patient',
-                        subtitle: 'Book & track appointments',
-                        chips: const ['Quick care', '24/7 access'],
+                       // subtitle: 'Book & track appointments',
+                        //chips: const ['Quick care', '24/7 access'],
                         icon: _RoleCardIcon.patient,
                         accentColor: kInfo,
                         accentBg: kInfoLight,
@@ -449,8 +449,8 @@ class _LandscapeLayout extends StatelessWidget {
                         _RoleCard(
                           role: 'doctor',
                           title: 'Continue as Doctor',
-                          subtitle: 'Manage appointments & patients',
-                          chips: const ['Practice tools', 'Verified'],
+                        //  subtitle: 'Manage appointments & patients',
+                         // chips: const ['Practice tools', 'Verified'],
                           icon: _RoleCardIcon.doctor,
                           accentColor: kPrimary,
                           accentBg: kPrimaryLight,
@@ -460,8 +460,8 @@ class _LandscapeLayout extends StatelessWidget {
                         _RoleCard(
                           role: 'patient',
                           title: 'Continue as Patient',
-                          subtitle: 'Book & track appointments',
-                          chips: const ['Quick care', '24/7 access'],
+                          //subtitle: 'Book & track appointments',
+                          //chips: const ['Quick care', '24/7 access'],
                           icon: _RoleCardIcon.patient,
                           accentColor: kInfo,
                           accentBg: kInfoLight,
@@ -492,8 +492,8 @@ enum _RoleCardIcon { doctor, patient }
 class _RoleCard extends StatelessWidget {
   final String role;
   final String title;
-  final String subtitle;
-  final List<String> chips;
+  //final String subtitle;
+ // final List<String> chips;
   final _RoleCardIcon icon;
   final Color accentColor;
   final Color accentBg;
@@ -502,8 +502,8 @@ class _RoleCard extends StatelessWidget {
   const _RoleCard({
     required this.role,
     required this.title,
-    required this.subtitle,
-    required this.chips,
+  //  required this.subtitle,
+   // required this.chips,
     required this.icon,
     required this.accentColor,
     required this.accentBg,
@@ -573,23 +573,23 @@ class _RoleCard extends StatelessWidget {
                           letterSpacing: -0.2,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: kTextSecondary,
-                          height: 1.35,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 4,
-                        children: chips
-                            .map((c) => _MiniChip(label: c, color: accentColor))
-                            .toList(),
-                      ),
+                      // const SizedBox(height: 3),
+                      // Text(
+                      //   subtitle,
+                      //   style: const TextStyle(
+                      //     fontSize: 12,
+                      //     color: kTextSecondary,
+                      //     height: 1.35,
+                      //   ),
+                      // ),
+                      // const SizedBox(height: 8),
+                      // Wrap(
+                      //   spacing: 6,
+                      //   runSpacing: 4,
+                      //   children: chips
+                      //       .map((c) => _MiniChip(label: c, color: accentColor))
+                      //       .toList(),
+                      // ),
                     ],
                   ),
                 ),

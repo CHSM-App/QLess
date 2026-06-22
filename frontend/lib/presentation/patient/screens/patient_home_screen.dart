@@ -2417,24 +2417,26 @@ String _fmtClockTime(String? raw) {
                             ),
                           ),
                           ), // ScaleTransition
-                          const SizedBox(height: 3),
-                          Row(mainAxisSize: MainAxisSize.min, children: [
-                            Opacity(
-                              opacity: _dotBlink.value,
-                              child: Container(
-                                  width: 5,
-                                  height: 5,
-                                  decoration: const BoxDecoration(
-                                      color: kPrimary,
-                                      shape: BoxShape.circle)),
-                            ),
-                            const SizedBox(width: 3),
-                            const Text('live',
-                                style: TextStyle(
-                                    fontSize: 8,
-                                    color: kTextMuted,
-                                    fontWeight: FontWeight.w500)),
-                          ]),
+                          if (queueEvent == 'queue_started') ...[
+                            const SizedBox(height: 3),
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              Opacity(
+                                opacity: _dotBlink.value,
+                                child: Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: const BoxDecoration(
+                                        color: kPrimary,
+                                        shape: BoxShape.circle)),
+                              ),
+                              const SizedBox(width: 3),
+                              const Text('live',
+                                  style: TextStyle(
+                                      fontSize: 8,
+                                      color: kTextMuted,
+                                      fontWeight: FontWeight.w500)),
+                            ]),
+                          ],
                         ],
                       ),
                     ],

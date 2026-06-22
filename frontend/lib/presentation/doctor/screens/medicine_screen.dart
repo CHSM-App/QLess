@@ -515,50 +515,9 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                 onChanged: (_) => setState(() {}),
               ),
 
-              const SizedBox(height: 6),
-
-              // ── Filter chips ────────────────────────────────────────────
-              SizedBox(
-                height: 28,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _types.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 5),
-                  itemBuilder: (_, i) {
-                    final sel = _selectedType == i;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedType = i),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 160),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 11,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: sel ? kPrimaryGradient : null,
-                          color: sel ? null : Colors.white,
-                          border: Border.all(
-                            color: sel
-                                ? kPrimary.withOpacity(0.0)
-                                : kHairline,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          _types[i],
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: sel ? Colors.white : kTextSecondary,
-                            letterSpacing: 0.1,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
+              // const SizedBox(height: 6),
+              // // ── Filter chips ──────────────────────────────────────────
+              // SizedBox(height: 28, child: ListView.separated(...)),
             ],
           ),
         ),

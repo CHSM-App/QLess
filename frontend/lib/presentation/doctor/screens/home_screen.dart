@@ -4433,6 +4433,13 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // ── Queue actions ─────────────────────────────────────────────────────────
 
   Future<void> _onQueueStart(int? queueId) async {
+    final ok = await _confirm(
+      title: 'Start Queue?',
+      message: 'Patients will be notified that the queue is now live.',
+      confirmLabel: 'Start',
+      confirmColor: kPrimaryDark,
+    );
+    if (!ok) return;
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)

@@ -97,6 +97,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   List<String> _galleryImages = [];
   int? _favFetchedDid;
   int? _favFetchedPid;
+  int  _reviewPage = 1;
+  static const _reviewsPerPage = 5;
 
   @override
   void initState() {
@@ -813,32 +815,90 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   }
 
   // ── Reviews card ────────────────────────────────────────────────────
-  Widget _buildReviewsCard(List<ReviewModel> reviews) => _Card(
-        child: reviews.isEmpty
-            ? Row(children: [
-                Container(
-                  width: 32, height: 32,
-                  decoration: BoxDecoration(
-                      color: kPrimaryLight,
-                      borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.rate_review_outlined,
-                      size: 14, color: kPrimary),
+  Widget _buildReviewsCard(List<ReviewModel> reviews) {
+    if (reviews.isEmpty) {
+      return _Card(
+        child: Row(children: [
+          Container(
+            width: 32, height: 32,
+            decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(8)),
+            child: const Icon(Icons.rate_review_outlined,
+                size: 14, color: kPrimary),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+                'No reviews yet. Be the first to share your experience.',
+                style: TextStyle(
+                    fontSize: 12, color: kTextSecondary, height: 1.5)),
+          ),
+        ]),
+      );
+    }
+
+    final visible = reviews.take(_reviewPage * _reviewsPerPage).toList();
+    final hasMore = visible.length < reviews.length;
+
+    return _Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...visible.map((r) => _ReviewTile(review: r)),
+          if (hasMore) ...[
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => setState(() => _reviewPage++),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kPrimary.withOpacity(0.2)),
                 ),
-                const SizedBox(width: 10),
-                const Expanded(
-                  child: Text(
-                      'No reviews yet. Be the first to share your experience.',
+                child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  const Icon(Icons.expand_more_rounded, size: 16, color: kPrimary),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Show more  ·  ${reviews.length - visible.length} remaining',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: kPrimary),
+                  ),
+                ]),
+              ),
+            ),
+          ] else if (reviews.length > _reviewsPerPage) ...[
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => setState(() => _reviewPage = 1),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF7F8FA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: kBorder),
+                ),
+                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                  Icon(Icons.expand_less_rounded, size: 16, color: kTextMuted),
+                  SizedBox(width: 4),
+                  Text('Show less',
                       style: TextStyle(
                           fontSize: 12,
-                          color: kTextSecondary,
-                          height: 1.5)),
-                ),
-              ])
-            : Column(
-                children: reviews
-                    .map((r) => _ReviewTile(review: r))
-                    .toList()),
-      );
+                          fontWeight: FontWeight.w600,
+                          color: kTextMuted)),
+                ]),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════

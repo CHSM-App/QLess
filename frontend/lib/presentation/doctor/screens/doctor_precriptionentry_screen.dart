@@ -1053,7 +1053,6 @@ Widget build(BuildContext context) {
               Text('Fill in consultation details', style: TextStyle(fontSize: 11, color: kTextSecondary)),
             ]),
           ),
-          IconButton(icon: const Icon(Icons.help_outline_rounded, color: kTextMuted, size: 18), onPressed: () {}),
         ]),
       ),
     ),
@@ -1076,8 +1075,9 @@ Widget build(BuildContext context) {
             children: [
               _patientCard(), _gap(12),
               _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
-              _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(10),
-              _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
+              _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'),
+              // _gap(10),
+              // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
             ],
           ),
         ),
@@ -1126,7 +1126,7 @@ Widget build(BuildContext context) {
                 _patientCard(), _gap(12),
                 _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
                 _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(10),
-                _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
+                // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
                 _followUpCard(),
               ],
             ),
@@ -1153,8 +1153,8 @@ Widget build(BuildContext context) {
         children: [
           _patientCard(), _gap(12),
           _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
-          _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(10),
-          _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
+          _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(12),
+          // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
           _medicinesHeader(), _gap(10),
           ..._buildMedCards(medicines),
           if (_meds.isEmpty) _emptyMeds(),
@@ -1192,15 +1192,6 @@ Widget build(BuildContext context) {
           if (widget.queueNumber != null)   _chip('Queue #${widget.queueNumber}', bg: kPrimaryLight, fg: kPrimaryDark),
         ]),
       ])),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-        decoration: BoxDecoration(color: kGreenLight, borderRadius: BorderRadius.circular(8)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Container(width: 6, height: 6, decoration: const BoxDecoration(color: kSuccess, shape: BoxShape.circle)),
-          const SizedBox(width: 4),
-          const Text('Active', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kGreenDark)),
-        ]),
-      ),
     ]));
   }
 

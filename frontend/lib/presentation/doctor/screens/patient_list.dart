@@ -4618,6 +4618,30 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
 
   // ── Queue Controls ────────────────────────────────────────────────────────
 
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    String confirmLabel = 'Confirm',
+    Color confirmColor = kPrimaryDark,
+  }) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: confirmColor),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(confirmLabel, style: const TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   Future<void> _onQueueStart(int? queueId) async {
     final sessions = ref.read(appointmentViewModelProvider).todayQueueResult?.value ?? [];
     String? rawStart;
@@ -4629,6 +4653,13 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       _snack('Queue starts at ${_fmtTime(rawStart)} — please wait.', isError: true);
       return;
     }
+    final ok = await _confirm(
+      title: 'Start Queue?',
+      message: 'Patients will be notified that the queue is now live.',
+      confirmLabel: 'Start',
+      confirmColor: kPrimaryDark,
+    );
+    if (!ok) return;
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier)
           .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
@@ -4639,6 +4670,13 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   }
 
   Future<void> _onQueuePause(int? queueId) async {
+    final ok = await _confirm(
+      title: 'Pause Queue?',
+      message: 'Queue will be paused. Patients will be notified.',
+      confirmLabel: 'Pause',
+      confirmColor: Colors.orange,
+    );
+    if (!ok) return;
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));

@@ -762,35 +762,35 @@ class _PortraitLayout extends StatelessWidget {
                               ],
                             ),
                             SizedBox(height: gapTopRowToLogo),
-                            Row(
-                              children: [
-                                _BrandLogo(size: logoSize),
-                                const SizedBox(width: 14),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'HealthConnect',
-                                      style: TextStyle(
-                                        fontSize: isVerySmall ? 18 : 22,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                        letterSpacing: -0.4,
-                                      ),
-                                    ),
-                                    Text(
-                                      'Care, simplified',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.white.withOpacity(0.85),
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: gapBeforeTitle),
+                            // Row(
+                            //   children: [
+                            //     _BrandLogo(size: logoSize),
+                            //     const SizedBox(width: 14),
+                            //     Column(
+                            //       crossAxisAlignment: CrossAxisAlignment.start,
+                            //       children: [
+                            //         Text(
+                            //           'HealthConnect',
+                            //           style: TextStyle(
+                            //             fontSize: isVerySmall ? 18 : 22,
+                            //             fontWeight: FontWeight.w800,
+                            //             color: Colors.white,
+                            //             letterSpacing: -0.4,
+                            //           ),
+                            //         ),
+                            //         Text(
+                            //           'Care, simplified',
+                            //           style: TextStyle(
+                            //             fontSize: 12,
+                            //             color: Colors.white.withOpacity(0.85),
+                            //             fontWeight: FontWeight.w400,
+                            //           ),
+                            //         ),
+                            //       ],
+                            //     ),
+                            //   ],
+                            // ),
+                        //    SizedBox(height: gapBeforeTitle),
                             Text(
                               isVerySmall ? 'Welcome back 👋' : 'Welcome\nback 👋',
                               style: TextStyle(
@@ -801,18 +801,18 @@ class _PortraitLayout extends StatelessWidget {
                                 height: 1.1,
                               ),
                             ),
-                            SizedBox(height: isVerySmall ? 6 : 10),
-                            Text(
-                              isDoctor
-                                  ? 'Sign in to manage appointments and patients'
-                                  : 'Sign in to book and track your appointments',
-                              style: TextStyle(
-                                fontSize: isVerySmall ? 12.5 : 14,
-                                color: Colors.white.withOpacity(0.88),
-                                height: 1.5,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
+                            // SizedBox(height: isVerySmall ? 6 : 10),
+                            // Text(
+                            //   isDoctor
+                            //       ? 'Sign in to manage appointments and patients'
+                            //       : 'Sign in to book and track your appointments',
+                            //   style: TextStyle(
+                            //     fontSize: isVerySmall ? 12.5 : 14,
+                            //     color: Colors.white.withOpacity(0.88),
+                            //     height: 1.5,
+                            //     fontWeight: FontWeight.w400,
+                            //   ),
+                            // ),
                           ],
                         ),
                       ),
@@ -893,21 +893,21 @@ class _PortraitLayout extends StatelessWidget {
                                             color: kTextPrimary,
                                           ),
                                         ),
-                                        SizedBox(height: 2),
-                                        Text(
-                                          'Use your registered mobile',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: kTextSecondary,
-                                          ),
-                                        ),
+                                        // SizedBox(height: 2),
+                                        // Text(
+                                        //   'Use your registered mobile',
+                                        //   style: TextStyle(
+                                        //     fontSize: 12,
+                                        //     color: kTextSecondary,
+                                        //   ),
+                                        // ),
                                       ],
                                     ),
                                   ),
                                 ],
                               ),
                               const SizedBox(height: 22),
-                              const _FieldLabel(text: 'Mobile Number'),
+                           //   const _FieldLabel(text: 'Mobile Number'),
                               const SizedBox(height: 10),
                               _MobileField(
                                 controller: mobileCtrl,
@@ -918,22 +918,22 @@ class _PortraitLayout extends StatelessWidget {
                               const SizedBox(height: 10),
                               const Padding(
                                 padding: EdgeInsets.only(left: 4),
-                                child: Row(
-                                  children: [
-                                    Icon(Icons.info_outline,
-                                        size: 12, color: kTextMuted),
-                                    SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        'We\'ll send a 6-digit code via SMS',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: kTextMuted,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                // child: Row(
+                                //   children: [
+                                //     Icon(Icons.info_outline,
+                                //         size: 12, color: kTextMuted),
+                                //     SizedBox(width: 6),
+                                //     // Expanded(
+                                //     //   child: Text(
+                                //     //     'We\'ll send a 6-digit code via SMS',
+                                //     //     style: TextStyle(
+                                //     //       fontSize: 12,
+                                //     //       color: kTextMuted,
+                                //     //     ),
+                                //     //   ),
+                                //     // ),
+                                //   ],
+                                // ),
                               ),
                               const SizedBox(height: 22),
                               _LoginButton(
@@ -1086,7 +1086,7 @@ class _MobileField extends StatelessWidget {
                 letterSpacing: 0.5,
               ),
               decoration: const InputDecoration(
-                hintText: '98765 43210',
+                hintText: 'Mobile Number',
                 hintStyle: TextStyle(
                   color: kTextMuted,
                   fontSize: 13.5,
@@ -1159,7 +1159,7 @@ class _LoginButton extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(
-                          'Continue',
+                          'Send OTP ',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,

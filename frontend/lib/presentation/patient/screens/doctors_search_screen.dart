@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
@@ -174,16 +175,28 @@ class DoctorSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
-  final _searchCtrl = TextEditingController();
-  String? _specialty;
-  int?    _selectedMemberId;
-  bool    _favOnly = false;
+
+  final _searchCtrl    = TextEditingController();
+  String?   _specialty;
+  int?      _selectedMemberId;
+  bool      _favOnly         = false;
+  double?   _filterRating;
+  int?      _filterMinExp;
+  double?   _filterMaxDistKm;
+  Position? _userPosition;
   final Map<int, double> _ratings = {};
+
+  int get _activeFilters =>
+      (_specialty != null ? 1 : 0) +
+      (_filterRating != null ? 1 : 0) +
+      (_filterMinExp != null ? 1 : 0) +
+      (_filterMaxDistKm != null ? 1 : 0);
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _fetchUserLocation();
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       await ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid);
       if (!mounted) return;
@@ -204,6 +217,21 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
         setState(() => _specialty = widget.initialSpecialty);
       }
     });
+  }
+
+  Future<void> _fetchUserLocation() async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) return;
+      final pos = await Geolocator.getCurrentPosition(
+          locationSettings:
+              const LocationSettings(accuracy: LocationAccuracy.low));
+      if (mounted) setState(() => _userPosition = pos);
+    } catch (_) {}
   }
 
   Future<void> _loadRatings(List<int> doctorIds) async {
@@ -245,7 +273,19 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
             (d.clinicName?.toLowerCase().contains(q) ?? false);
         final matchS = _specialty == null ||
             (d.specialization?.toLowerCase() == _specialty?.toLowerCase());
-        return matchQ && matchS;
+        final matchR = _filterRating == null ||
+            (_ratings[d.doctorId] ?? 0) >= _filterRating!;
+        final matchE = _filterMinExp == null ||
+            (d.experience ?? 0) >= _filterMinExp!;
+        bool matchD = true;
+        if (_filterMaxDistKm != null && _userPosition != null &&
+            d.latitude != null && d.longitude != null) {
+          final metres = Geolocator.distanceBetween(
+              _userPosition!.latitude, _userPosition!.longitude,
+              d.latitude!, d.longitude!);
+          matchD = metres <= _filterMaxDistKm! * 1000;
+        }
+        return matchQ && matchS && matchR && matchE && matchD;
       }).toList();
 
   List<String> _specialties(List<DoctorDetails> all) {
@@ -287,9 +327,8 @@ Widget build(BuildContext context) {
   final allDoctors  = doctorsState.doctors;
   final members     = famState.allfamilyMembers.maybeWhen(
       data: (m) => m, orElse: () => <FamilyMember>[]);
-  final docs        = _filtered(allDoctors, favMap);
-  final specialties = _specialties(allDoctors);
-  final isLoading   = doctorsState.isLoading;
+  final docs      = _filtered(allDoctors, favMap);
+  final isLoading = doctorsState.isLoading;
 
   return Scaffold(
     backgroundColor: Colors.white,
@@ -336,7 +375,7 @@ Widget build(BuildContext context) {
             duration: const Duration(milliseconds: 180),
             width: 36,
             height: 36,
-            margin: const EdgeInsets.only(right: 14),
+            margin: const EdgeInsets.only(left: 10, right: 14),
             decoration: BoxDecoration(
               color: _favOnly ? kRedLight : kPrimaryLight,
               borderRadius: BorderRadius.circular(10),
@@ -361,17 +400,26 @@ Widget build(BuildContext context) {
         child: Container(color: kBorder, height: 1),
       ),
     ),
-    // Top section (booking row, chips, count) stays fixed — only the doctor
-    // list inside Expanded scrolls.
     body: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildBookingRow(patState, members),
+        // Booking-for row  +  Filter icon
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+          child: Row(children: [
+            Expanded(child: _buildBookingRow(patState, members)),
+            const SizedBox(width: 8),
+            _FilterButton(
+              activeCount: _activeFilters,
+              onTap: () => _openFilterSheet(context, _specialties(allDoctors)),
+            ),
+          ]),
+        ),
 
-        if (!_favOnly)
-          _buildSpecialtyChips(specialties)
-        else
+        if (_favOnly) ...[
+          const SizedBox(height: 6),
           _buildFavStrip(),
+        ],
 
         if (!isLoading) _buildCountBadge(docs.length),
 
@@ -385,10 +433,40 @@ Widget build(BuildContext context) {
   );
 }
 
+  // ── Filter sheet ───────────────────────────────────────────────────
+  void _openFilterSheet(BuildContext context, List<String> specialties) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FilterSheet(
+        specialties:      specialties,
+        selectedSpec:     _specialty,
+        selectedRating:   _filterRating,
+        selectedMinExp:   _filterMinExp,
+        selectedMaxDist:  _filterMaxDistKm,
+        hasLocation:      _userPosition != null,
+        onApply: (spec, rating, minExp, maxDist) {
+          setState(() {
+            _specialty        = spec;
+            _filterRating     = rating;
+            _filterMinExp     = minExp;
+            _filterMaxDistKm  = maxDist;
+          });
+        },
+        onClear: () => setState(() {
+          _specialty       = null;
+          _filterRating    = null;
+          _filterMinExp    = null;
+          _filterMaxDistKm = null;
+        }),
+      ),
+    );
+  }
+
   // ── Booking Row ────────────────────────────────────────────────────
   Widget _buildBookingRow(PatientLoginState patState, List<FamilyMember> members) {
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
         color: kPrimaryLight.withOpacity(0.5),
@@ -1198,6 +1276,394 @@ class _ShimmerCard extends StatelessWidget {
               ],
             ),
           ],
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  FILTER BUTTON  (with active-count badge)
+// ════════════════════════════════════════════════════════════════════
+class _FilterButton extends StatelessWidget {
+  final int          activeCount;
+  final VoidCallback onTap;
+  const _FilterButton({required this.activeCount, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: activeCount > 0 ? kPrimary : kPrimaryLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                    color: activeCount > 0
+                        ? kPrimary
+                        : kPrimary.withOpacity(0.2)),
+              ),
+              child: Icon(Icons.tune_rounded,
+                  size: 18,
+                  color: activeCount > 0 ? Colors.white : kPrimary),
+            ),
+            if (activeCount > 0)
+              Positioned(
+                top: -4, right: -4,
+                child: Container(
+                  width: 16, height: 16,
+                  decoration: const BoxDecoration(
+                      color: kError, shape: BoxShape.circle),
+                  alignment: Alignment.center,
+                  child: Text('$activeCount',
+                      style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ),
+              ),
+          ],
+        ),
+      );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  FILTER SHEET  — Amazon/Flipkart style two-panel bottom sheet
+// ════════════════════════════════════════════════════════════════════
+class _FilterSheet extends StatefulWidget {
+  final List<String> specialties;
+  final String?      selectedSpec;
+  final double?      selectedRating;
+  final int?         selectedMinExp;
+  final double?      selectedMaxDist;
+  final bool         hasLocation;
+  final void Function(String? spec, double? rating, int? minExp, double? maxDist) onApply;
+  final VoidCallback onClear;
+
+  const _FilterSheet({
+    required this.specialties,
+    required this.onApply,
+    required this.onClear,
+    this.selectedSpec,
+    this.selectedRating,
+    this.selectedMinExp,
+    this.selectedMaxDist,
+    this.hasLocation = false,
+  });
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  int _activePanel = 0;
+  late String?  _spec;
+  late double?  _rating;
+  late int?     _minExp;
+  double?       _maxDist;
+
+  static const _panels = ['Category', 'Rating', 'Experience', 'Distance'];
+
+  @override
+  void initState() {
+    super.initState();
+    _spec     = widget.selectedSpec;
+    _rating   = widget.selectedRating;
+    _minExp   = widget.selectedMinExp;
+    _maxDist  = widget.selectedMaxDist;
+  }
+
+  int get _active =>
+      (_spec != null ? 1 : 0) + (_rating != null ? 1 : 0) +
+      (_minExp != null ? 1 : 0) + (_maxDist != null ? 1 : 0);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.72,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(children: [
+        // Handle + Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: Column(children: [
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                  color: kBorder, borderRadius: BorderRadius.circular(99)),
+            ),
+            const SizedBox(height: 12),
+            Row(children: [
+              const Text('Filters',
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  setState(() { _spec = null; _rating = null; _minExp = null; });
+                  widget.onClear();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kRedLight.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text('Clear all',
+                      style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600, color: kError)),
+                ),
+              ),
+            ]),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        Container(height: 1, color: kBorder),
+
+        // Two-panel body
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left: filter category tabs
+              Container(
+                width: 120,
+                color: const Color(0xFFF7F8FA),
+                child: ListView.builder(
+                  padding: EdgeInsets.zero,
+                  itemCount: _panels.length,
+                  itemBuilder: (_, i) {
+                    final sel = _activePanel == i;
+                    final hasBadge = (i == 0 && _spec != null) ||
+                        (i == 1 && _rating != null) ||
+                        (i == 2 && _minExp != null);
+                    return GestureDetector(
+                      onTap: () => setState(() => _activePanel = i),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: sel ? Colors.white : Colors.transparent,
+                          border: Border(
+                            left: BorderSide(
+                              color: sel ? kPrimary : Colors.transparent,
+                              width: 3,
+                            ),
+                          ),
+                        ),
+                        child: Row(children: [
+                          Expanded(
+                            child: Text(_panels[i],
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: sel
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: sel ? kPrimary : kTextSecondary)),
+                          ),
+                          if (hasBadge)
+                            Container(
+                              width: 7, height: 7,
+                              decoration: const BoxDecoration(
+                                  color: kPrimary, shape: BoxShape.circle),
+                            ),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Container(width: 1, color: kBorder),
+
+              // Right: options
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(14),
+                  child: _buildRightPanel(),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Apply button
+        Container(
+          padding: EdgeInsets.fromLTRB(
+              16, 10, 16, 10 + MediaQuery.of(context).padding.bottom),
+          decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: kBorder))),
+          child: SizedBox(
+            width: double.infinity,
+            height: 46,
+            child: ElevatedButton(
+              onPressed: () {
+                widget.onApply(_spec, _rating, _minExp, _maxDist);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kPrimary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                _active == 0 ? 'Apply Filters' : 'Apply  ·  $_active active',
+                style: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildRightPanel() {
+    switch (_activePanel) {
+      case 0:  return _categoryPanel();
+      case 1:  return _ratingPanel();
+      case 2:  return _experiencePanel();
+      case 3:  return _distancePanel();
+      default: return const SizedBox();
+    }
+  }
+
+  Widget _categoryPanel() {
+    final all = ['All', ...widget.specialties];
+    return Wrap(
+      spacing: 8, runSpacing: 8,
+      children: all.map((s) {
+        final sel = s == 'All'
+            ? _spec == null
+            : _spec?.toLowerCase() == s.toLowerCase();
+        return GestureDetector(
+          onTap: () => setState(() => _spec = s == 'All' ? null : s),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: sel ? kPrimary : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: sel ? kPrimary : kBorder),
+            ),
+            child: Text(s,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: sel ? Colors.white : kTextPrimary)),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _ratingPanel() {
+    const opts = [
+      (label: '4★ & above', val: 4.0),
+      (label: '3★ & above', val: 3.0),
+      (label: '2★ & above', val: 2.0),
+      (label: '1★ & above', val: 1.0),
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _optionTile('Any rating', _rating == null,
+          () => setState(() => _rating = null)),
+      const SizedBox(height: 6),
+      ...opts.map((o) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _optionTile(o.label, _rating == o.val,
+                () => setState(() => _rating = o.val)),
+          )),
+    ]);
+  }
+
+  Widget _experiencePanel() {
+    const opts = [
+      (label: '0 – 5 yrs',  val: 0),
+      (label: '5 – 10 yrs', val: 5),
+      (label: '10+ yrs',    val: 10),
+      (label: '15+ yrs',    val: 15),
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _optionTile('Any experience', _minExp == null,
+          () => setState(() => _minExp = null)),
+      const SizedBox(height: 6),
+      ...opts.map((o) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _optionTile(o.label, _minExp == o.val,
+                () => setState(() => _minExp = o.val)),
+          )),
+    ]);
+  }
+
+  Widget _distancePanel() {
+    const opts = [
+      (label: 'Within 1 km',  val: 1.0),
+      (label: 'Within 5 km',  val: 5.0),
+      (label: 'Within 10 km', val: 10.0),
+      (label: 'Within 25 km', val: 25.0),
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (!widget.hasLocation)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Text(
+            'Enable location access to filter by distance',
+            style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+          ),
+        ),
+      _optionTile('Any distance', _maxDist == null,
+          () => setState(() => _maxDist = null)),
+      const SizedBox(height: 6),
+      ...opts.map((o) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _optionTile(o.label, _maxDist == o.val,
+                () => setState(() => _maxDist = o.val)),
+          )),
+    ]);
+  }
+
+  Widget _optionTile(String label, bool sel, VoidCallback onTap) =>
+      GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: sel ? kPrimaryLight : Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: sel ? kPrimary.withOpacity(0.4) : kBorder),
+          ),
+          child: Row(children: [
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                      color: sel ? kPrimary : kTextPrimary)),
+            ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              width: 18, height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: sel ? kPrimary : Colors.white,
+                border: Border.all(
+                    color: sel ? kPrimary : kBorder, width: 1.5),
+              ),
+              child: sel
+                  ? const Icon(Icons.check_rounded, size: 11, color: Colors.white)
+                  : null,
+            ),
+          ]),
         ),
       );
 }

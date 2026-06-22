@@ -375,11 +375,17 @@ void dispose() {
       final mins    = qd.estimatedMinutes;
       final arrival = qd.estimatedArrivalTime;
       final ahead   = qd.patientsAhead;
+      String fmtMins(int m) {
+        if (m < 60) return '~$m min';
+        final h = m ~/ 60;
+        final rem = m % 60;
+        return rem == 0 ? '~$h hr' : '~$h hr $rem min';
+      }
       if (mins != null && arrival != null) {
-        label = '~$mins min  ·  arrives around $arrival'
+        label = '${fmtMins(mins)}  ·  arrives around $arrival'
             '${ahead != null ? '  ($ahead ahead)' : ''}';
       } else if (mins != null) {
-        label = '~$mins min wait';
+        label = '${fmtMins(mins)} wait';
       } else if (arrival != null) {
         label = 'Arrives around $arrival';
       }
@@ -590,9 +596,9 @@ void dispose() {
             onBack:       () => Navigator.pop(context),
             onFavToggle:  _handleFavoriteToggle,
           ),
-          SliverToBoxAdapter(
-            child: _StatsRow(doctor: widget.doctor),
-          ),
+          // SliverToBoxAdapter(
+          //   child: _StatsRow(doctor: widget.doctor),
+          // ),
           SliverToBoxAdapter(
             child: _BookingFor(
               patState:         patState,
@@ -849,7 +855,7 @@ class _AppBar extends StatelessWidget {
         ? doctor.name![0].toUpperCase() : 'D';
 
     return SliverAppBar(
-      expandedHeight:   150,
+      expandedHeight:   185,
       pinned:           true,
       backgroundColor:  Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -990,41 +996,59 @@ class _AppBar extends StatelessWidget {
             ],
           ),
 
-          // Address (no icon here now)
           if (doctor.clinicAddress != null) ...[
             const SizedBox(height: 4),
             Text(
               doctor.clinicAddress!,
-              style: const TextStyle(
-                fontSize: 10,
-                color: kTextMuted,
-              ),
+              style: const TextStyle(fontSize: 10, color: kTextMuted),
               overflow: TextOverflow.ellipsis,
               maxLines: 1,
             ),
           ],
+          const SizedBox(height: 6),
+          Row(children: [
+            GestureDetector(
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(
+                      builder: (_) => DoctorProfileScreen(doctor: doctor))),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: kPrimary.withOpacity(0.25)),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.person_outline_rounded, size: 12, color: kPrimary),
+                  SizedBox(width: 4),
+                  Text('Profile', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kPrimary)),
+                ]),
+              ),
+            ),
+            if (doctor.latitude != null && doctor.longitude != null) ...[
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => _openGoogleMaps(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: kPrimary.withOpacity(0.25)),
+                  ),
+                  child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.map_rounded, size: 12, color: kPrimary),
+                    SizedBox(width: 4),
+                    Text('Location', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kPrimary)),
+                  ]),
+                ),
+              ),
+            ],
+          ]),
         ],
       ),
     ),
 
-    // 🗺️ Map Icon (RIGHT SIDE)
-    if (doctor.clinicAddress != null)
-      GestureDetector(
-        onTap: () => _openGoogleMaps(context),
-        child: Container(
-          margin: const EdgeInsets.only(right: 10),
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: kPrimary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.map_rounded,
-            size: 18,
-            color: kPrimary,
-          ),
-        ),
-      ),
 
     // Fee
     // if (doctor.consultationFee != null)
@@ -1842,70 +1866,64 @@ class _QueueCard extends StatelessWidget {
       //     ),
       //   ]),
       // ),
-      const SizedBox(height: 12),
-
-      // ── Symptoms field ──────────────────────────────────────────
-      Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: kPrimaryLight.withOpacity(0.4),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kPrimary.withOpacity(0.2)),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.info_outline_rounded,
-                size: 14, color: kPrimary),
-            const SizedBox(width: 6),
-            RichText(
-              text: const TextSpan(
-                style: TextStyle(fontSize: 13, color: kTextPrimary),
-                children: [
-                  TextSpan(text: 'Describe your symptoms ',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
-                  TextSpan(text: '(optional)',
-                      style: TextStyle(
-                          fontSize: 12, color: kTextSecondary,
-                          fontWeight: FontWeight.w400)),
-                ],
+      if (isQueueOpen) ...[
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: kPrimaryLight.withOpacity(0.4),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kPrimary.withOpacity(0.2)),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const Icon(Icons.info_outline_rounded, size: 14, color: kPrimary),
+              const SizedBox(width: 6),
+              RichText(
+                text: const TextSpan(
+                  style: TextStyle(fontSize: 13, color: kTextPrimary),
+                  children: [
+                    TextSpan(text: 'Describe your symptoms ',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    TextSpan(text: '(optional)',
+                        style: TextStyle(
+                            fontSize: 12, color: kTextSecondary,
+                            fontWeight: FontWeight.w400)),
+                  ],
+                ),
+              ),
+            ]),
+            const SizedBox(height: 10),
+            TextField(
+              controller: symptomsController,
+              maxLines:   3,
+              maxLength:  300,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+              decoration: InputDecoration(
+                hintText: 'e.g. Fever since 2 days, headache, sore throat…',
+                hintStyle: const TextStyle(fontSize: 13, color: kTextMuted),
+                filled:      true,
+                fillColor:   Colors.white,
+                counterStyle: const TextStyle(fontSize: 11, color: kTextMuted),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: kPrimary.withOpacity(0.25)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: kPrimary.withOpacity(0.2)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: kPrimary, width: 1.5),
+                ),
               ),
             ),
           ]),
-          const SizedBox(height: 10),
-          TextField(
-            controller: symptomsController,
-            maxLines:   3,
-            maxLength:  300,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
-            decoration: InputDecoration(
-              hintText: 'e.g. Fever since 2 days, headache, sore throat…',
-              hintStyle:
-                  const TextStyle(fontSize: 13, color: kTextMuted),
-              filled:      true,
-              fillColor:   Colors.white,
-              counterStyle:
-                  const TextStyle(fontSize: 11, color: kTextMuted),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide:
-                    BorderSide(color: kPrimary.withOpacity(0.25)),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide:
-                    BorderSide(color: kPrimary.withOpacity(0.2)),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide:
-                    const BorderSide(color: kPrimary, width: 1.5),
-              ),
-            ),
-          ),
-        ]),
-      ),
+        ),
+      ],
     ]);
   }
 }
