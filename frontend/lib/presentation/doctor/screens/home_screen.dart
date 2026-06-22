@@ -1,3 +1,4103 @@
+// import 'dart:async';
+
+// import 'package:flutter/material.dart';
+// import 'package:flutter/services.dart';
+// import 'package:flutter_riverpod/flutter_riverpod.dart';
+// import 'package:intl/intl.dart';
+// import 'package:qless/core/network/dio_provider.dart';
+// import 'package:qless/data/api/api_service.dart';
+// import 'package:qless/domain/models/appointment_list.dart';
+// import 'package:qless/domain/models/appointment_request_model.dart';
+// import 'package:qless/domain/models/doctor_availability_model.dart';
+// import 'package:qless/domain/models/doctor_schedule_model.dart';
+// import 'package:qless/domain/models/family_member.dart';
+// import 'package:qless/domain/models/patients.dart';
+// import 'package:qless/core/network/token_provider.dart';
+// import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+// import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
+// import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
+// import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
+// import 'package:qless/presentation/doctor/screens/doctor_patient_history.dart';
+// import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
+// import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
+// import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
+// import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
+// import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+// // walk_in_patient_page import removed — inline panel used instead
+
+// // ─────────────────────────────────────────────────────────────────────────────
+// // DESIGN TOKENS
+// // ─────────────────────────────────────────────────────────────────────────────
+
+// const kPrimary        = Color(0xFF26C6B0);
+// const kPrimaryDark    = Color(0xFF2BB5A0);
+// const kPrimaryLight   = Color(0xFFD9F5F1);
+// const kPrimaryLighter = Color(0xFFF2FCFA);
+
+// const kTextPrimary    = Color(0xFF2D3748);
+// const kTextSecondary  = Color(0xFF718096);
+// const kTextMuted      = Color(0xFFA0AEC0);
+
+// const kBorder         = Color(0xFFEDF2F7);
+
+// const kGreen          = Color(0xFF68D391);
+// const kGreenDark      = Color(0xFF276749);
+// const kGreenLight     = Color(0xFFF0FFF8);
+// const kGreenBorder    = Color(0xFFC6F6D5);
+
+// const kAmber          = Color(0xFFF6AD55);
+// const kAmberDark      = Color(0xFF975A16);
+// const kAmberLight     = Color(0xFFFFFBEB);
+// const kAmberBorder    = Color(0xFFFCEFC7);
+
+// const kRed            = Color(0xFFFC8181);
+// const kRedDark        = Color(0xFFC53030);
+// const kRedLight       = Color(0xFFFFF5F5);
+// const kRedBorder      = Color(0xFFFED7D7);
+
+// const kPurple         = Color(0xFF9F7AEA);
+// const kPurpleDark     = Color(0xFF6B46C1);
+// const kPurpleLight    = Color(0xFFFAF5FF);
+// const kPurpleBorder   = Color(0xFFE9D5FF);
+
+// // ── Premium medical surface tokens ──────────────────────────────────────────
+// const kSurface         = Colors.white;
+// const kSurfaceTinted   = Color(0xFFF7FDFC);
+// const kBackgroundTop   = Color(0xFFEAF8F5);
+// const kBackgroundBot   = Color(0xFFFBFDFC);
+// const kHairline        = Color(0xFFE8EEF1);
+
+// const List<BoxShadow> kSoftShadow  = <BoxShadow>[];
+// const List<BoxShadow> kFloatShadow = <BoxShadow>[];
+// const List<BoxShadow> kInsetShadow = <BoxShadow>[];
+
+// const LinearGradient kPrimaryGradient = LinearGradient(
+//   colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
+//   begin: Alignment.topLeft,
+//   end: Alignment.bottomRight,
+// );
+// const LinearGradient kCardGlassGradient = LinearGradient(
+//   colors: [Colors.white, Color(0xFFFBFEFD)],
+//   begin: Alignment.topLeft,
+//   end: Alignment.bottomRight,
+// );
+
+// // ─────────────────────────────────────────────────────────────────────────────
+// // QUEUE HOME PAGE
+// // ─────────────────────────────────────────────────────────────────────────────
+
+// class QueueHomePage extends ConsumerStatefulWidget {
+//   const QueueHomePage({super.key});
+
+//   @override
+//   ConsumerState<QueueHomePage> createState() => _QueueHomePageState();
+// }
+
+// // ─────────────────────────────────────────────────────────────────────────────
+// // DOCTOR TIPS  (auto-rotating carousel)
+// // ─────────────────────────────────────────────────────────────────────────────
+
+// class _Tip {
+//   final String emoji;
+//   final String title;
+//   final String body;
+//   const _Tip(this.emoji, this.title, this.body);
+// }
+
+// const List<_Tip> _kDoctorTips = [
+//   _Tip('⏸', 'Pause Queue',
+//       'Tap Pause anytime to take a quick break — patients see the live status update instantly.'),
+//   _Tip('⚠️', 'Emergency Pause',
+//       'Use the warning icon for urgent breaks — the queue order stays intact when you resume.'),
+//   _Tip('⏭', 'Skip a Patient',
+//       'No-show? Tap Skip to move on. Skipped patients can rejoin with a fresh token.'),
+//   _Tip('🗓', 'Set Your Schedule',
+//       'Use Edit Schedule to add weekly time slots, max queue length and slot duration.'),
+//   _Tip('💊', 'Build Medicine Library',
+//       'Add common medicines once in Edit Medicine — pick them faster while prescribing.'),
+//   _Tip('📋', 'Patient History',
+//       'Open Patient History to review past visits, prescriptions and notes in one place.'),
+//   _Tip('🔄', 'Pull to Refresh',
+//       'Swipe down on the home screen to fetch the latest queue and appointment status.'),
+//   _Tip('✕', 'Close the Queue',
+//       'Tap Close at the end of a session — frees the slot and updates today\'s stats.'),
+// ];
+
+// class _QueueHomePageState extends ConsumerState<QueueHomePage> {
+//   bool _hasFetched = false;
+//   bool _walkInExpanded = false;
+//   final Map<int, bool> _patientsExpanded = {};
+//   late final ProviderSubscription<int?> _doctorIdSub;
+
+//   // ── Tips carousel state ────────────────────────────────────────────────
+//   final PageController _tipsController = PageController();
+//   int _currentTip = 0;
+//   Timer? _tipsTimer;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _doctorIdSub = ref.listenManual<int?>(
+//       doctorLoginViewModelProvider.select((s) => s.doctorId),
+//       (_, next) {
+//         if (next != null && next > 0) _loadData();
+//       },
+//     );
+//     WidgetsBinding.instance.addPostFrameCallback((_) {
+//       if (mounted) _loadData();
+//     });
+//     _tipsTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+//       if (!mounted || !_tipsController.hasClients) return;
+//       final next = (_currentTip + 1) % _kDoctorTips.length;
+//       _tipsController.animateToPage(
+//         next,
+//         duration: const Duration(milliseconds: 420),
+//         curve: Curves.easeInOut,
+//       );
+//     });
+//   }
+
+//   @override
+//   void dispose() {
+//     _tipsTimer?.cancel();
+//     _tipsController.dispose();
+//     _doctorIdSub.close();
+//     super.dispose();
+//   }
+
+//   int get _doctorId =>
+//       ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+
+//   String get _doctorName {
+//     if (ref.read(tokenProvider).roleId == 3) {
+//       return ref.read(receptionistLoginViewModelProvider).name ?? 'Receptionist';
+//     }
+//     return ref.read(doctorLoginViewModelProvider).name ?? 'Doctor';
+//   }
+
+//   Future<void> _loadData({bool force = false}) async {
+//     if (_doctorId == 0) return;
+//     if (_hasFetched && !force) return;
+//     _hasFetched = true;
+//     ref.read(appointmentViewModelProvider.notifier).joinClinic(_doctorId);
+//     await Future.wait([
+//       ref
+//           .read(appointmentViewModelProvider.notifier)
+//           .fetchPatientAppointments(_doctorId),
+//       ref
+//           .read(doctorSettingsViewModelProvider.notifier)
+//           .getDoctorSchedule(_doctorId),
+//     ]);
+//   }
+
+//   Future<void> _refreshData() => _loadData(force: true);
+  
+
+//   // ── Queue filters ─────────────────────────────────────────────────────────
+
+//   List<AppointmentList> _todayQueue(List<AppointmentList> all) {
+//     final today = DateTime.now();
+//     return all.where((a) {
+//       if ((a.status?.toLowerCase() ?? '') != 'booked') return false;
+//       if (a.bookingType != 1) return false;
+//       final d = DateTime.tryParse(a.appointmentDate ?? '');
+//       if (d == null) return false;
+//       return d.year == today.year &&
+//           d.month == today.month &&
+//           d.day == today.day;
+//     }).toList()
+//       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+//   }
+
+//   List<AppointmentList> _completedToday(List<AppointmentList> all) {
+//     final today = DateTime.now();
+//     return all.where((a) {
+//       if ((a.status?.toLowerCase() ?? '') != 'completed') return false;
+//       final d = DateTime.tryParse(a.appointmentDate ?? '');
+//       if (d == null) return false;
+//       return d.year == today.year &&
+//           d.month == today.month &&
+//           d.day == today.day;
+//     }).toList();
+//   }
+
+//   List<AppointmentList> _skippedToday(List<AppointmentList> all) {
+//     final today = DateTime.now();
+//     return all.where((a) {
+//       if ((a.status?.toLowerCase() ?? '') != 'skipped') return false;
+//       final d = DateTime.tryParse(a.appointmentDate ?? '');
+//       if (d == null) return false;
+//       return d.year == today.year &&
+//           d.month == today.month &&
+//           d.day == today.day;
+//     }).toList();
+//   }
+
+//   // All today's active patients (booked + in_progress + skipped), sorted by queue number.
+//   List<AppointmentList> _todayActivePatients(List<AppointmentList> all) {
+//     final today = DateTime.now();
+//     return all.where((a) {
+//       final d = DateTime.tryParse(a.appointmentDate ?? '');
+//       if (d == null) return false;
+//       final s = a.status?.toLowerCase().trim() ?? '';
+//       return (s == 'booked' || s == 'in_progress' || s == 'skipped') &&
+//           d.year == today.year && d.month == today.month && d.day == today.day;
+//     }).toList()
+//       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+//   }
+
+//   // All of today's appointments regardless of status (for "Total" stat).
+//   int _todayTotalCount(List<AppointmentList> all) {
+//     final today = DateTime.now();
+//     return all.where((a) {
+//       final d = DateTime.tryParse(a.appointmentDate ?? '');
+//       if (d == null) return false;
+//       return d.year == today.year &&
+//           d.month == today.month &&
+//           d.day == today.day;
+//     }).length;
+//   }
+
+//   // Last 7 days completed-count series (oldest first, today last).
+//   List<({DateTime date, int count})> _lastSevenDaysCompleted(
+//       List<AppointmentList> all) {
+//     final today = DateTime.now();
+//     final start = DateTime(today.year, today.month, today.day)
+//         .subtract(const Duration(days: 6));
+//     final out = <({DateTime date, int count})>[];
+//     for (int i = 0; i < 7; i++) {
+//       final d = start.add(Duration(days: i));
+//       final n = all.where((a) {
+//         if ((a.status?.toLowerCase() ?? '') != 'completed') return false;
+//         final ad = DateTime.tryParse(a.appointmentDate ?? '');
+//         if (ad == null) return false;
+//         return ad.year == d.year && ad.month == d.month && ad.day == d.day;
+//       }).length;
+//       out.add((date: d, count: n));
+//     }
+//     return out;
+//   }
+
+//   // ── Snack ─────────────────────────────────────────────────────────────────
+
+//   void _snack(String msg) {
+//     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+//       content: Text(msg,
+//           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+//       behavior: SnackBarBehavior.floating,
+//       backgroundColor: kPrimaryDark,
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//       duration: const Duration(seconds: 2),
+//       margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+//     ));
+//   }
+
+//   Future<bool> _confirm({
+//     required String title,
+//     required String message,
+//     required String confirmLabel,
+//     Color confirmColor = kPrimaryDark,
+//   }) async {
+//     final ok = await showDialog<bool>(
+//       context: context,
+//       builder: (ctx) => AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//         title: Text(title,
+//             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+//         content: Text(message,
+//             style: const TextStyle(fontSize: 13.5, color: kTextSecondary, height: 1.4)),
+//         actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+//         actions: [
+//           TextButton(
+//             onPressed: () => Navigator.of(ctx).pop(false),
+//             child: const Text('Cancel',
+//                 style: TextStyle(color: kTextSecondary, fontWeight: FontWeight.w600)),
+//           ),
+//           ElevatedButton(
+//             onPressed: () => Navigator.of(ctx).pop(true),
+//             style: ElevatedButton.styleFrom(
+//               backgroundColor: confirmColor,
+//               foregroundColor: Colors.white,
+//               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//             ),
+//             child: Text(confirmLabel,
+//                 style: const TextStyle(fontWeight: FontWeight.w600)),
+//           ),
+//         ],
+//       ),
+//     );
+//     return ok == true;
+//   }
+
+//   // ── Queue actions ─────────────────────────────────────────────────────────
+
+//   Future<void> _onQueueStart(int? queueId) async {
+//     try {
+//       final res = await ref
+//           .read(appointmentViewModelProvider.notifier)
+//           .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+//       _snack(res.message ?? 'Queue started');
+//       await _refreshData();
+//     } catch (_) {
+//       _snack('Failed to start queue');
+//     }
+//   }
+
+//   // Resume a paused queue → start it again, then jump straight to the
+//   // Patient List tab so the doctor can continue seeing patients.
+//   Future<void> _onQueueResume(int? queueId) async {
+//     await _onQueueStart(queueId);
+//     if (!mounted) return;
+//     ref.read(doctorNavTabRequestProvider.notifier).state =
+//         kDoctorPatientListTab;
+//   }
+
+//   Future<void> _onQueuePause(int? queueId) async {
+//     final ok = await _confirm(
+//       title: 'Pause Queue?',
+//       message: 'Waiting patients will be notified that the queue is paused. '
+//                'You can resume any time.',
+//       confirmLabel: 'Pause',
+//       confirmColor: kAmberDark,
+//     );
+//     if (!ok) return;
+
+//     try {
+//       final res = await ref
+//           .read(appointmentViewModelProvider.notifier)
+//           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+//       _snack(res.message ?? 'Queue paused');
+//       await _refreshData();
+//     } catch (_) {
+//       _snack('Failed to pause queue');
+//     }
+//   }
+
+//   Future<void> _onQueueStop(int? queueId) async {
+//     try {
+//       final res = await ref
+//           .read(appointmentViewModelProvider.notifier)
+//           .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+//       _snack(res.message ?? 'Queue closed');
+//       await _refreshData();
+//     } catch (_) {
+//       _snack('Failed to close queue');
+//     }
+//   }
+
+//   Future<void> _onQueueNext(AppointmentList current) async {
+//     try {
+//       final res = await ref
+//           .read(appointmentViewModelProvider.notifier)
+//           .queueNext(AppointmentRequestModel(
+//             doctorId: _doctorId,
+//             appointmentId: current.appointmentId ?? 0,
+//           ));
+//       _snack(res.message ?? 'Next patient');
+//     } catch (_) {
+//       _snack('Failed');
+//     }
+//   }
+
+//   Future<void> _onQueueSkip(AppointmentList current) async {
+//     try {
+//       final res = await ref
+//           .read(appointmentViewModelProvider.notifier)
+//           .queueSkip(AppointmentRequestModel(
+//             doctorId: _doctorId,
+//             appointmentId: current.appointmentId ?? 0,
+//           ));
+//       _snack(res.message ?? 'Patient skipped');
+//     } catch (_) {
+//       _snack('Failed to skip');
+//     }
+//   }
+
+//   // Confirmation happens in the custom dialog at the caller site
+//   // (see "Emergency Pause?" dialog below). No second confirm here.
+//   Future<void> _onQueuePauseEmergency(int? queueId) async {
+//     if (queueId == null) {
+//       _snack('Queue ID not available');
+//       return;
+//     }
+
+//     try {
+//       final res = await ref
+//           .read(appointmentViewModelProvider.notifier)
+//           .queuePauseEmergency(queueId);
+//       _snack(res.message ?? 'Queue paused (emergency)');
+//       await _refreshData();
+//     } catch (_) {
+//       _snack('Failed to pause queue');
+//     }
+//   }
+
+//   // ── Helpers ───────────────────────────────────────────────────────────────
+
+//   int? _calcAge(String? dob) {
+//     if (dob == null) return null;
+//     final d = DateTime.tryParse(dob);
+//     return d == null ? null : DateTime.now().year - d.year;
+//   }
+
+//   String? _ageStr(String? dob) {
+//     final age = _calcAge(dob);
+//     return age == null ? null : '$age yrs';
+//   }
+
+//   DateTime? _instantOf(String? raw) {
+//     final v = raw?.trim();
+//     if (v == null || v.isEmpty || v.toLowerCase() == 'null') return null;
+//     try { return DateTime.parse(v).toUtc(); } catch (_) { return null; }
+//   }
+
+//   Future<void> _startSession(AppointmentList p) async {
+//     final pid = p.patientId ?? 0;
+//     final did = _doctorId;
+//     if (pid == 0 || did == 0) { _snack('Missing info'); return; }
+//     final status = p.status?.toLowerCase() ?? '';
+//     if (status != 'in_progress') {
+//       if (status == 'booked') {
+//         final slotStart = _instantOf(p.startTime);
+//         if (slotStart != null && DateTime.now().toUtc().isBefore(slotStart)) {
+//           _snack('Scheduled for ${_fmtTime(p.startTime)} — start once the slot begins.');
+//           return;
+//         }
+//       }
+//       try {
+//         final res = await ref.read(appointmentViewModelProvider.notifier).startSession(
+//           AppointmentRequestModel(doctorId: did, patientId: pid, appointmentId: p.appointmentId ?? 0),
+//         );
+//         if (!mounted) return;
+//         if (res.success != true) { _snack(res.message ?? 'Could not start session'); return; }
+//       } catch (e) {
+//         if (mounted) _snack('Failed to start session');
+//         return;
+//       }
+//     }
+//     if (!mounted) return;
+//     await Navigator.push(context, MaterialPageRoute(
+//       builder: (_) => PrescriptionScreen(
+//         patientId: pid, doctorId: did,
+//         userTypeId: p.userType ?? 1,
+//         appointmentId: p.appointmentId ?? 0,
+//         patientName: p.patientName ?? 'Patient',
+//         patientAge: _ageStr(p.dob),
+//         patientGender: p.gender,
+//         queueNumber: p.queueNumber,
+//         patientStatus: p.status ?? 'booked',
+//         symptoms: p.symptoms,
+//       ),
+//     ));
+//     if (!mounted) return;
+//     _hasFetched = false;
+//     await _refreshData();
+//   }
+
+//   Future<void> _skipPatient(AppointmentList p) async {
+//     try {
+//       final res = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
+//         AppointmentRequestModel(
+//           doctorId: _doctorId, appointmentId: p.appointmentId ?? 0,
+//           patientId: p.patientId ?? 0, isNext: 0,
+//         ),
+//       );
+//       if (!mounted) return;
+//       _snack(res.message ?? (res.success == true ? 'Patient skipped' : 'Skip failed'));
+//     } catch (_) {
+//       if (mounted) _snack('Failed to skip');
+//     }
+//   }
+
+//   Future<void> _cancelByDoctor(AppointmentList p) async {
+//     try {
+//       final res = await ref.read(appointmentViewModelProvider.notifier).cancelByDoctor(
+//         AppointmentRequestModel(doctorId: _doctorId, appointmentId: p.appointmentId ?? 0),
+//       );
+//       if (!mounted) return;
+//       _snack(res.message ?? (res.success == true ? 'Appointment cancelled' : 'Cancel failed'));
+//     } catch (_) {
+//       if (mounted) _snack('Failed to cancel');
+//     }
+//   }
+
+//   void _cancelConfirm(AppointmentList p) => showDialog(
+//     context: context,
+//     builder: (ctx) => Dialog(
+//       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+//       backgroundColor: Colors.white,
+//       child: Padding(
+//         padding: const EdgeInsets.all(20),
+//         child: Column(mainAxisSize: MainAxisSize.min, children: [
+//           Container(
+//             width: 48, height: 48,
+//             decoration: const BoxDecoration(color: kRedLight, shape: BoxShape.circle),
+//             child: const Icon(Icons.cancel_outlined, color: kRed, size: 22),
+//           ),
+//           const SizedBox(height: 12),
+//           const Text('Cancel Appointment',
+//               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
+//           const SizedBox(height: 6),
+//           Text('Cancel appointment for ${p.patientName ?? 'this patient'}?',
+//               textAlign: TextAlign.center,
+//               style: const TextStyle(fontSize: 13, color: kTextSecondary, height: 1.5)),
+//           const SizedBox(height: 20),
+//           Row(children: [
+//             Expanded(child: OutlinedButton(
+//               onPressed: () => Navigator.pop(ctx),
+//               style: OutlinedButton.styleFrom(
+//                 side: const BorderSide(color: kBorder),
+//                 foregroundColor: kTextSecondary,
+//                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//                 padding: const EdgeInsets.symmetric(vertical: 11),
+//               ),
+//               child: const Text('No', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+//             )),
+//             const SizedBox(width: 10),
+//             Expanded(child: ElevatedButton(
+//               onPressed: () { Navigator.pop(ctx); _cancelByDoctor(p); },
+//               style: ElevatedButton.styleFrom(
+//                 backgroundColor: kRed, foregroundColor: Colors.white, elevation: 0,
+//                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//                 padding: const EdgeInsets.symmetric(vertical: 11),
+//               ),
+//               child: const Text('Yes, Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+//             )),
+//           ]),
+//         ]),
+//       ),
+//     ),
+//   );
+
+//   void _viewPrescription(AppointmentList p) {
+//     if ((p.patientId ?? 0) == 0) { _snack('Missing info'); return; }
+//     Navigator.push(context, MaterialPageRoute(
+//       builder: (_) => DoctorPrescriptionDetailScreen(
+//         appointmentId: p.appointmentId ?? 0,
+//         patientId: p.patientId ?? 0,
+//         patientName: p.patientName ?? 'Patient',
+//         patientAge: _ageStr(p.dob),
+//         patientGender: p.gender,
+//         queueNumber: p.queueNumber,
+//       ),
+//     ));
+//   }
+
+//   String _initials(String name) => name
+//       .trim()
+//       .split(' ')
+//       .take(2)
+//       .map((w) => w.isNotEmpty ? w[0] : '')
+//       .join()
+//       .toUpperCase();
+
+//   QueueState _sessionQueueState(int? status) {
+//     switch (status) {
+//       case 1: return QueueState.running;
+//       case 2: return QueueState.paused;
+//       case 3: return QueueState.stopped;
+//       default: return QueueState.idle;
+//     }
+//   }
+
+//   AppointmentList? _findCurrentPatient(List<AppointmentList> all, int? appointmentId) {
+//     if (appointmentId == null || appointmentId == 0) return null;
+//     try {
+//       return all.firstWhere((a) => a.appointmentId == appointmentId);
+//     } catch (_) {
+//       return null;
+//     }
+//   }
+
+//   String _fmtTime(String? raw) {
+//     if (raw == null) return '';
+//     try {
+//       final dt = DateTime.parse(raw).toUtc();
+//       return DateFormat('h:mm a').format(dt);
+//     } catch (_) {
+//       return raw;
+//     }
+//   }
+
+//   // Format "HH:MM:SS" time-of-day strings from the schedule API.
+//   String _fmtScheduleTime(String? raw) {
+//     if (raw == null || raw.isEmpty) return '';
+//     try {
+//       final parts = raw.split(':');
+//       final h = int.tryParse(parts[0]) ?? 0;
+//       final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
+//       return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, m));
+//     } catch (_) {
+//       return raw;
+//     }
+//   }
+
+//   String _bookingModeLabel(int? mode) {
+//     switch (mode) {
+//       case 2: return 'Slots';
+//       case 3: return 'Queue + Slots';
+//       default: return 'Queue';
+//     }
+//   }
+
+//   // Today's enabled slots from the doctor's weekly schedule.
+//   List<TimeSlotModel> _todayScheduledSlots() {
+//     final schedule = ref.read(doctorSettingsViewModelProvider).doctorSchedule;
+//     final days = schedule?.schedule;
+//     if (days == null || days.isEmpty) return [];
+//     final todayName = DateFormat('EEEE').format(DateTime.now()).toLowerCase();
+//     for (final d in days) {
+//       if ((d.day ?? '').toLowerCase() == todayName) {
+//         if ((d.isEnabled ?? 0) != 1) return [];
+//         final slots = d.slots ?? [];
+//         return [...slots]..sort((a, b) =>
+//             (a.startTime ?? '').compareTo(b.startTime ?? ''));
+//       }
+//     }
+//     return [];
+//   }
+
+//   // ── FILTER: which sessions to show as cards ───────────────────────────────
+//   // Hide a session when:
+//   //   • queue_date is before today → a previous-day session the doctor never
+//   //     closed. The live API already drops these, but the OFFLINE cache keeps
+//   //     serving yesterday's session on a next-day refresh — guard it here so it
+//   //     never renders as if it were today's.
+//   //   • queue_status == 0 (idle) AND start_time == null  → no slot assigned yet, skip it
+//   //   • queue_status == 3 (stopped/closed)               → hide closed queues
+//   bool _shouldShowSession(dynamic session) {
+//     if (_isStaleQueueDate(session.queueDate as String?)) return false; // past day → hide
+//     final qs = session.queueStatus ?? 0;
+//     final hasSlot = session.startTime != null;
+//     if (qs == 3) return false;               // closed → hide
+//     if (qs == 0 && !hasSlot) return false;   // idle + no time slot → hide
+//     return true;
+//   }
+
+//   // True when a session's queue_date is before today (compared by calendar day).
+//   // Null/unparseable dates are treated as not-stale so live rows aren't dropped.
+//   bool _isStaleQueueDate(String? queueDate) {
+//     final d = DateTime.tryParse(queueDate ?? '');
+//     if (d == null) return false;
+//     final now = DateTime.now();
+//     return DateTime(d.year, d.month, d.day)
+//         .isBefore(DateTime(now.year, now.month, now.day));
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // BUILD
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final hour = DateTime.now().hour;
+//     final greeting = hour < 12
+//         ? 'Good Morning 👋'
+//         : hour < 17
+//             ? 'Good Afternoon 👋'
+//             : 'Good Evening 👋';
+
+//     final vmState           = ref.watch(appointmentViewModelProvider);
+//     final appointmentsAsync = vmState.patientAppointmentsList;
+
+//     // Watch settings so the page rebuilds when today's schedule loads.
+//     ref.watch(doctorSettingsViewModelProvider
+//         .select((s) => s.doctorSchedule));
+
+//     final isReceptionist = ref.watch(tokenProvider).roleId == 3;
+//     final doctorName = isReceptionist
+//         ? (ref.watch(receptionistLoginViewModelProvider).name ?? 'Receptionist')
+//         : ref.watch(doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'));
+
+//     return Scaffold(
+//       backgroundColor: Colors.white,
+//       body: appointmentsAsync.when(
+//         loading: () => _buildLoadingBody(greeting, doctorName),
+//         error: (e, _) => _buildErrorBody(e, greeting, doctorName),
+//         data: (list) {
+//           final todayQueue = _todayQueue(list);
+//           final current    = todayQueue.isNotEmpty ? todayQueue.first : null;
+//           final completed  = _completedToday(list);
+//           final skipped    = _skippedToday(list);
+
+//           // All today's sessions from API
+//           final allSessions = vmState.todayQueueResult?.value ?? [];
+
+//           // Filter: only show sessions that should be visible
+//           final visibleSessions = allSessions.where(_shouldShowSession).toList();
+
+//           // Today's active patients — filtered per-session inside the queue card loop
+//           final todayActivePts = _todayActivePatients(list);
+
+//           final totalToday = _todayTotalCount(list);
+
+//           return _buildRefreshableScrollView(
+//             slivers: [
+//               // ── HEADER ──────────────────────────────────────────────
+//               SliverToBoxAdapter(
+//                 child: _buildHeader(greeting, doctorName),
+//               ),
+
+//               // ── TODAY'S STATS STRIP ─────────────────────────────────
+//               // SliverToBoxAdapter(
+//               //   child: Padding(
+//               //     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+//               //     child: _buildStatStrip(
+//               //       total:   totalToday,
+//               //       waiting: waiting.length + (current != null ? 1 : 0),
+//               //       done:    completed.length,
+//               //       skipped: skipped.length,
+//               //     ),
+//               //   ),
+//               // ),
+
+//               // ── TODAY'S SCHEDULE CARD  (always shown when slots exist)
+//               // if (_todayScheduledSlots().isNotEmpty)
+//               //   SliverToBoxAdapter(
+//               //     child: Padding(
+//               //       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+//               //       child:
+//               //           _buildTodayScheduleCard(_todayScheduledSlots()),
+//               //     ),
+//               //   ),
+
+//               // ── WALK-IN CARD (receptionist only) ─────────────────────
+//               if (ref.watch(tokenProvider).roleId == 3)
+//                 SliverToBoxAdapter(
+//                   child: Padding(
+//                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+//                     child: Column(
+//                       crossAxisAlignment: CrossAxisAlignment.start,
+//                       children: [
+//                         _buildWalkInCard(),
+//                         AnimatedSize(
+//                           duration: const Duration(milliseconds: 250),
+//                           curve: Curves.easeInOut,
+//                           child: _walkInExpanded
+//                               ? Padding(
+//                                   padding: const EdgeInsets.only(top: 10),
+//                                   child: _WalkInInlinePanel(
+//                                     onBooked: () => setState(() => _walkInExpanded = false),
+//                                   ),
+//                                 )
+//                               : const SizedBox.shrink(),
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+//                 ),
+
+//               // ── SESSION QUEUE CARDS / EMPTY STATE ───────────────────
+//               if (visibleSessions.isEmpty) ...[
+//                 if (_todayScheduledSlots().isEmpty)
+//                   SliverToBoxAdapter(
+//                     child: Padding(
+//                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+//                       child: _buildNoLiveSessions(),
+//                     ),
+//                   ),
+//               ] else
+//                 SliverPadding(
+//                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+//                   sliver: SliverList(
+//                     delegate: SliverChildBuilderDelegate(
+//                       (_, i) {
+//                         final session   = visibleSessions[i];
+//                         final sessionQs = _sessionQueueState(session.queueStatus);
+//                         final currentPt = _findCurrentPatient(list, session.currentServing);
+//                         final nextQNo   = session.currentQueueNo != null &&
+//                                 session.currentQueueNo! < (session.totalQueue ?? 0)
+//                             ? session.currentQueueNo! + 1
+//                             : null;
+//                         final slotLbl = (session.startTime != null)
+//                             ? '${_fmtTime(session.startTime)} – ${_fmtTime(session.endTime)}'
+//                             : null;
+
+//                         final sessionSkipped = skipped
+//                             .where((a) => a.queueId == session.queueId)
+//                             .length;
+//                         final sessionTotal   = session.totalQueue ?? 0;
+//                         final sessionDone    = session.completedCount ?? 0;
+//                         final sessionServing = (session.currentServing ?? 0) > 0 ? 1 : 0;
+//                         final sessionWaiting = (sessionTotal - sessionDone - sessionServing - sessionSkipped)
+//                             .clamp(0, sessionTotal);
+
+//                         // Patients belonging to this session
+//                         final sessionPts = todayActivePts
+//                             .where((p) => p.queueId == session.queueId)
+//                             .toList();
+//                         final sessionHasIP = sessionPts.any(
+//                             (p) => (p.status?.toLowerCase() ?? '') == 'in_progress');
+//                         final sessionBooked = sessionPts
+//                             .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+//                             .toList()
+//                           ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+//                         final sessionNextQNo = sessionBooked.isNotEmpty
+//                             ? sessionBooked.first.queueNumber
+//                             : null;
+
+//                         return Padding(
+//                           padding: const EdgeInsets.only(bottom: 14),
+//                           child: _buildQueueCard(
+//                             current:        currentPt,
+//                             nextQueueNo:    nextQNo,
+//                             total:          sessionTotal,
+//                             done:           sessionDone,
+//                             sessionWaiting: sessionWaiting,
+//                             sessionSkipped: sessionSkipped,
+//                             queueState:     sessionQs,
+//                             queueId:        session.queueId,
+//                             slotLabel:      slotLbl,
+//                             isOnlySession:  i == 0,
+//                             sessionPts:     sessionPts,
+//                             sessionHasIP:   sessionHasIP,
+//                             sessionNextQNo: sessionNextQNo,
+//                           ),
+//                         );
+//                       },
+//                       childCount: visibleSessions.length,
+//                     ),
+//                   ),
+//                 ),
+
+//               // ── WEEKLY PERFORMANCE CHART ─────────────────────────────
+//               // SliverToBoxAdapter(
+//               //   child: Padding(
+//               //     padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+//               //     child: _buildWeeklyPerformance(list),
+//               //   ),
+//               // ),
+
+//               // ── QUICK ACTIONS ────────────────────────────────────────
+//               SliverToBoxAdapter(
+//                 child: Padding(
+//                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+//                   child: _buildHomeQuickActions(),
+//                 ),
+//               ),
+
+//               // ── DOCTOR TIPS CAROUSEL ─────────────────────────────────
+//               // SliverToBoxAdapter(
+//               //   child: Padding(
+//               //     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+//               //     child: _buildTipsCarousel(),
+//               //   ),
+//               // ),
+
+//               // ── RECENTLY SEEN ────────────────────────────────────────
+//               if (completed.isNotEmpty) ...[
+//                 SliverToBoxAdapter(
+//                   child: Padding(
+//                     padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
+//                     child: _sectionHeader(
+//                       'Recently Seen',
+//                       completed.length,
+//                       kGreen,
+//                       kGreenLight,
+//                       kGreenDark,
+//                     ),
+//                   ),
+//                 ),
+//                 SliverPadding(
+//                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+//                   sliver: SliverList(
+//                     delegate: SliverChildBuilderDelegate(
+//                       (_, i) {
+//                         final p = completed.take(5).toList()[i];
+//                         return Padding(
+//                           padding: const EdgeInsets.only(bottom: 8),
+//                           child: _buildCompletedPatientCard(p),
+//                         );
+//                       },
+//                       childCount: completed.length > 5 ? 5 : completed.length,
+//                     ),
+//                   ),
+//                 ),
+//               ],
+
+//               const SliverToBoxAdapter(child: SizedBox(height: 80)),
+//             ],
+//           );
+//         },
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // LOADING / ERROR BODIES
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildRefreshableScrollView({
+//     required List<Widget> slivers,
+//   }) {
+//     return RefreshIndicator(
+//       color: kPrimary,
+//       onRefresh: _refreshData,
+//       child: CustomScrollView(
+//         physics: const AlwaysScrollableScrollPhysics(),
+//         slivers: slivers,
+//       ),
+//     );
+//   }
+
+//   Widget _buildLoadingBody(String greeting, String doctorName) =>
+//       _buildRefreshableScrollView(
+//         slivers: [
+//           SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
+//           const SliverFillRemaining(
+//             child: Center(child: CircularProgressIndicator(color: kPrimary)),
+//           ),
+//         ],
+//       );
+
+//   Widget _buildErrorBody(Object e, String greeting, String doctorName) =>
+//       _buildRefreshableScrollView(
+//         slivers: [
+//           SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
+//           SliverFillRemaining(
+//             child: Center(
+//               child: Column(
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: [
+//                   Container(
+//                     width: 48,
+//                     height: 48,
+//                     decoration: BoxDecoration(
+//                         color: kRedLight,
+//                         shape: BoxShape.circle,
+//                         border: Border.all(color: kRedBorder)),
+//                     child:
+//                         const Icon(Icons.error_outline, color: kRed, size: 22),
+//                   ),
+//                   const SizedBox(height: 10),
+//                   Text('$e',
+//                       style:
+//                           const TextStyle(color: kTextMuted, fontSize: 12)),
+//                   const SizedBox(height: 12),
+//                   TextButton(
+//                     onPressed: _refreshData,
+//                     style: TextButton.styleFrom(foregroundColor: kPrimary),
+//                     child: const Text('Retry'),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ],
+//       );
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // HEADER
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildHeader(String greeting, String doctorName) {
+//     final initials = _initials(doctorName);
+//     return SafeArea(
+//       bottom: false,
+//       child: Padding(
+//         padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
+//         child: Row(
+//           crossAxisAlignment: CrossAxisAlignment.center,
+//           children: [
+//             Container(
+//               padding: const EdgeInsets.all(1.5),
+//               decoration: BoxDecoration(
+//                 shape: BoxShape.circle,
+//                 gradient: kPrimaryGradient,
+//               ),
+//               child: Container(
+//                 width: 40,
+//                 height: 40,
+//                 decoration: const BoxDecoration(
+//                   color: Colors.white,
+//                   shape: BoxShape.circle,
+//                 ),
+//                 alignment: Alignment.center,
+//                 child: ShaderMask(
+//                   shaderCallback: (b) => kPrimaryGradient.createShader(b),
+//                   child: Text(
+//                     initials,
+//                     style: const TextStyle(
+//                       fontSize: 14,
+//                       fontWeight: FontWeight.w800,
+//                       color: Colors.white,
+//                       letterSpacing: 0.4,
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//             ),
+//             const SizedBox(width: 10),
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: [
+//                   Text(
+//                     greeting,
+//                     style: const TextStyle(
+//                       fontSize: 12,
+//                       fontWeight: FontWeight.w500,
+//                       color: kTextSecondary,
+//                       letterSpacing: 0.1,
+//                       height: 1.1,
+//                     ),
+//                   ),
+//                   const SizedBox(height: 1),
+//                   Text(
+//                     ref.read(tokenProvider).roleId == 3
+//                         ? doctorName
+//                         : 'Dr. $doctorName',
+//                     maxLines: 1,
+//                     overflow: TextOverflow.ellipsis,
+//                     style: const TextStyle(
+//                       fontSize: 15,
+//                       fontWeight: FontWeight.w800,
+//                       color: kTextPrimary,
+//                       letterSpacing: -0.3,
+//                       height: 1.15,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             const SizedBox(width: 8),
+//             Container(
+//               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//               decoration: BoxDecoration(
+//                 color: Colors.white,
+//                 borderRadius: BorderRadius.circular(20),
+//                 border: Border.all(color: kPrimary.withOpacity(0.18)),
+//               ),
+//               child: Row(
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: [
+//                   Container(
+//                     width: 5,
+//                     height: 5,
+//                     decoration: const BoxDecoration(
+//                       color: kPrimary,
+//                       shape: BoxShape.circle,
+//                     ),
+//                   ),
+//                   const SizedBox(width: 4),
+//                   Text(
+//                     DateFormat('d MMM').format(DateTime.now()),
+//                     style: const TextStyle(
+//                       fontSize: 11,
+//                       fontWeight: FontWeight.w700,
+//                       color: kPrimaryDark,
+//                       letterSpacing: 0.2,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             // const SizedBox(width: 6),
+//             // Container(
+//             //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+//             //   decoration: BoxDecoration(
+//             //     gradient: kPrimaryGradient,
+//             //     borderRadius: BorderRadius.circular(20),
+//             //   ),
+//             //   child: Row(
+//             //     mainAxisSize: MainAxisSize.min,
+//             //     children: const [
+//             //       Icon(Icons.verified_rounded,
+//             //           color: Colors.white, size: 11),
+//             //       SizedBox(width: 3),
+//             //       Text(
+//             //         'Pro',
+//             //         style: TextStyle(
+//             //           fontSize: 10,
+//             //           fontWeight: FontWeight.w800,
+//             //           color: Colors.white,
+//             //           letterSpacing: 0.3,
+//             //         ),
+//             //       ),
+//             //     ],
+//             //   ),
+//             // ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+
+// //notification icon
+//   // Widget _headerBtn({
+//   //   required IconData icon,
+//   //   bool badge = false,
+//   //   required VoidCallback onTap,
+//   // }) {
+//   //   return GestureDetector(
+//   //     onTap: onTap,
+//   //     child: Stack(children: [
+//   //       Container(
+//   //         width: 36,
+//   //         height: 36,
+//   //         decoration: BoxDecoration(
+//   //           color: const Color(0xFFF7F8FA),
+//   //           borderRadius: BorderRadius.circular(10),
+//   //           border: Border.all(color: kBorder),
+//   //         ),
+//   //         child: Icon(icon, color: kTextPrimary, size: 17),
+//   //       ),
+//   //       if (badge)
+//   //         Positioned(
+//   //           right: 7,
+//   //           top: 7,
+//   //           child: Container(
+//   //             width: 7,
+//   //             height: 7,
+//   //             decoration:
+//   //                 const BoxDecoration(color: kAmber, shape: BoxShape.circle),
+//   //           ),
+//   //         ),
+//   //     ]),
+//   //   );
+//   // }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // STAT STRIP  (global across all sessions)
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildStatStrip({
+//     required int total,
+//     required int waiting,
+//     required int done,
+//     required int skipped,
+//   }) {
+//     return Row(children: [
+//       _statCard(
+//           icon: Icons.groups_2_rounded,
+//           label: 'Total',
+//           value: total.toString().padLeft(2, '0'),
+//           accent: kPrimary,
+//           valueColor: kTextPrimary),
+//       const SizedBox(width: 7),
+//       _statCard(
+//           icon: Icons.hourglass_top_rounded,
+//           label: 'Waiting',
+//           value: waiting.toString().padLeft(2, '0'),
+//           accent: kPrimary,
+//           valueColor: kPrimaryDark),
+//       const SizedBox(width: 7),
+//       _statCard(
+//           icon: Icons.check_circle_rounded,
+//           label: 'Done',
+//           value: done.toString().padLeft(2, '0'),
+//           accent: kGreen,
+//           valueColor: kGreenDark),
+//       const SizedBox(width: 7),
+//       _statCard(
+//           icon: Icons.skip_next_rounded,
+//           label: 'Skipped',
+//           value: skipped.toString().padLeft(2, '0'),
+//           accent: kAmber,
+//           valueColor: kAmberDark),
+//     ]);
+//   }
+
+//   Widget _statCard({
+//     required IconData icon,
+//     required String label,
+//     required String value,
+//     required Color valueColor,
+//     required Color accent,
+//   }) {
+//     return Expanded(
+//       child: Container(
+//         decoration: BoxDecoration(
+//           gradient: kCardGlassGradient,
+//           borderRadius: BorderRadius.circular(13),
+//           border: Border.all(color: kHairline),
+//           boxShadow: kSoftShadow,
+//         ),
+//         padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Row(
+//               children: [
+//                 Container(
+//                   width: 20,
+//                   height: 20,
+//                   decoration: BoxDecoration(
+//                     color: accent.withOpacity(0.12),
+//                     borderRadius: BorderRadius.circular(6),
+//                     border: Border.all(color: accent.withOpacity(0.18)),
+//                   ),
+//                   alignment: Alignment.center,
+//                   child: Icon(icon, size: 11, color: accent),
+//                 ),
+//                 const Spacer(),
+//                 Text(
+//                   label,
+//                   style: const TextStyle(
+//                     fontSize: 9,
+//                     fontWeight: FontWeight.w700,
+//                     color: kTextSecondary,
+//                     letterSpacing: 0.1,
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             const SizedBox(height: 4),
+//             Text(
+//               value,
+//               style: TextStyle(
+//                 fontSize: 19,
+//                 fontWeight: FontWeight.w800,
+//                 color: valueColor,
+//                 height: 1,
+//                 letterSpacing: -0.5,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // LIVE QUEUE CARD
+//   // When idle (queue_status == 0 but has a slot) → compact card (screenshot style)
+//   // When running/paused → full card with patient info, token row, actions
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildQueueCard({
+//     required AppointmentList? current,
+//     required int? nextQueueNo,
+//     required int total,
+//     required int done,
+//     required int sessionWaiting,
+//     required int sessionSkipped,
+//     required QueueState queueState,
+//     int? queueId,
+//     String? slotLabel,
+//     bool isOnlySession = false,
+//     List<AppointmentList> sessionPts = const [],
+//     bool sessionHasIP = false,
+//     int? sessionNextQNo,
+//   }) {
+//     final isIdle    = queueState == QueueState.idle;
+//     final isRunning = queueState == QueueState.running;
+//     final isStopped = queueState == QueueState.stopped;
+//     final isPaused  = queueState == QueueState.paused;
+//     // Emergency-paused reads as "paused" but hides Close — the queue must be
+//     // resumed (or normally paused) before it can be closed.
+//     final isEmergency = ref
+//         .read(appointmentViewModelProvider.notifier)
+//         .isEmergencyPaused(queueId);
+
+//     // Highlighted border so the live queue card stands out from
+//     // surrounding stat strips / sections — state-driven accent.
+//     final Color borderColor = isRunning
+//         ? kPrimary.withOpacity(0.55)
+//         : isPaused
+//             ? kAmber.withOpacity(0.65)
+//             : isStopped
+//                 ? kHairline
+//                 : kPrimary.withOpacity(0.25); // idle
+//     final double borderWidth = (isRunning || isPaused) ? 1.6 : 1.0;
+//     final List<BoxShadow> cardShadow = isRunning
+//         ? [
+//             BoxShadow(
+//               color: kPrimary.withOpacity(0.12),
+//               blurRadius: 14,
+//               offset: const Offset(0, 4),
+//             ),
+//           ]
+//         : isPaused
+//             ? [
+//                 BoxShadow(
+//                   color: kAmber.withOpacity(0.14),
+//                   blurRadius: 12,
+//                   offset: const Offset(0, 3),
+//                 ),
+//               ]
+//             : kSoftShadow;
+
+//     // ── COMPACT CARD for Idle sessions with siblings present ──────────────
+//     if (isIdle && !isOnlySession) {
+//       return Container(
+//         decoration: BoxDecoration(
+//           gradient: kCardGlassGradient,
+//           borderRadius: BorderRadius.circular(14),
+//           border: Border.all(color: borderColor, width: borderWidth),
+//           boxShadow: cardShadow,
+//         ),
+//         padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Row(children: [
+//               _pulseDot(),
+//               const SizedBox(width: 5),
+//               _queueStateBadge(queueState),
+//               const Spacer(),
+//               if (slotLabel != null) _slotPill(slotLabel),
+//             ]),
+//             const SizedBox(height: 10),
+//             Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+//               const Text('Daily progress',
+//                   style: TextStyle(
+//                       fontSize: 12,
+//                       fontWeight: FontWeight.w500,
+//                       color: kTextSecondary,
+//                       letterSpacing: 0.2)),
+//               Text('$done / $total seen',
+//                   style: const TextStyle(
+//                       fontSize: 12,
+//                       fontWeight: FontWeight.w700,
+//                       color: kPrimaryDark)),
+//             ]),
+//             const SizedBox(height: 5),
+//             _gradientProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
+//           ],
+//         ),
+//       );
+//     }
+
+//     // ── FULL CARD for Running / Paused sessions ────────────────────────────
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: kCardGlassGradient,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: borderColor, width: borderWidth),
+//         boxShadow: cardShadow,
+//       ),
+//       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+//       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//         Row(children: [
+//           _pulseDot(),
+//           const SizedBox(width: 5),
+//           _queueStateBadge(queueState),
+//           const Spacer(),
+//           if (slotLabel != null) _slotPill(slotLabel),
+//         ]),
+//         const SizedBox(height: 10),
+//         _buildSessionMiniStats(
+//           total:   total,
+//           waiting: sessionWaiting,
+//           done:    done,
+//         //  skipped: sessionSkipped,
+//         ),
+//         const SizedBox(height: 10),
+//         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+//           const Text('Daily progress',
+//               style: TextStyle(
+//                   fontSize: 12,
+//                   fontWeight: FontWeight.w500,
+//                   color: kTextSecondary,
+//                   letterSpacing: 0.2)),
+//           Text('$done / $total seen',
+//               style: const TextStyle(
+//                   fontSize: 12,
+//                   fontWeight: FontWeight.w700,
+//                   color: kPrimaryDark)),
+//         ]),
+//         const SizedBox(height: 5),
+//         _gradientProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
+//         const SizedBox(height: 10),
+
+//         Row(children: [
+//           Expanded(
+//             child: _actionBtn(
+//               label: isRunning
+//                   ? 'Pause'
+//                   : isPaused
+//                       ? 'Resume'
+//                       : 'Start',
+//               icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+//               onTap: isRunning
+//                   ? () => _onQueuePause(queueId)
+//                   : isPaused
+//                       ? () => _onQueueResume(queueId)
+//                       : () => _onQueueStart(queueId),
+//               isPrimary: !isRunning,
+//             ),
+//           ),
+//           // Close is hidden while emergency-paused.
+//           if (!isEmergency) ...[
+//           const SizedBox(width: 6),
+//           Expanded(
+//             child: Opacity(
+//               // Close is only valid once the queue is live (running/paused).
+//               // Before Start (idle) or after Stop it stays disabled.
+//               opacity: (isStopped || isIdle) ? 0.4 : 1.0,
+//               child: GestureDetector(
+//                 onTap: (isStopped || isIdle)
+//                     ? null
+//                     : () => _showCloseDialog(queueId),
+//                 child: Container(
+//                   padding: const EdgeInsets.symmetric(vertical: 9),
+//                   decoration: BoxDecoration(
+//                     color: kRedLight,
+//                     borderRadius: BorderRadius.circular(11),
+//                     border: Border.all(color: kRedBorder),
+//                   ),
+//                   alignment: Alignment.center,
+//                   child: Row(
+//                     mainAxisAlignment: MainAxisAlignment.center,
+//                     children: const [
+//                       Icon(Icons.close_rounded, size: 13, color: kRedDark),
+//                       SizedBox(width: 4),
+//                       Text(
+//                         'Close',
+//                         style: TextStyle(
+//                           fontSize: 13,
+//                           fontWeight: FontWeight.w600,
+//                           color: kRedDark,
+//                           letterSpacing: 0.2,
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               ),
+//             ),
+//           ),
+//           ],
+//           const SizedBox(width: 6),
+//           GestureDetector(
+//             onTap: () => _showEmergencyDialog(queueId),
+//             child: Container(
+//               padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 11),
+//               decoration: BoxDecoration(
+//                 color: kPurpleLight,
+//                 borderRadius: BorderRadius.circular(11),
+//                 border: Border.all(color: kPurpleBorder),
+//               ),
+//               child: const Icon(Icons.warning_amber_rounded,
+//                   color: kPurpleDark, size: 16),
+//             ),
+//           ),
+//         ]),
+
+//         // ── Patient list inside the card ─────────────────────────────
+//         if (sessionPts.isNotEmpty) ...[
+//           const SizedBox(height: 10),
+//           const Divider(height: 1, color: kHairline),
+//           const SizedBox(height: 6),
+//           GestureDetector(
+//             onTap: () => setState(() {
+//               final key = queueId ?? 0;
+//               _patientsExpanded[key] = !(_patientsExpanded[key] ?? true);
+//             }),
+//             child: Padding(
+//               padding: const EdgeInsets.symmetric(vertical: 4),
+//               child: Row(children: [
+//                 const Text(
+//                   'Patients',
+//                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary),
+//                 ),
+//                 const SizedBox(width: 6),
+//                 Container(
+//                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+//                   decoration: BoxDecoration(
+//                     color: kPrimaryLight,
+//                     borderRadius: BorderRadius.circular(20),
+//                   ),
+//                   child: Text(
+//                     '${sessionPts.length}',
+//                     style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kPrimaryDark),
+//                   ),
+//                 ),
+//                 const Spacer(),
+//                 AnimatedRotation(
+//                   turns: (_patientsExpanded[queueId ?? 0] ?? true) ? 0.5 : 0.0,
+//                   duration: const Duration(milliseconds: 220),
+//                   child: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: kTextSecondary),
+//                 ),
+//               ]),
+//             ),
+//           ),
+//           if (_patientsExpanded[queueId ?? 0] ?? true) ...[
+//             const SizedBox(height: 4),
+//             ...sessionPts.map((p) => Padding(
+//               padding: const EdgeInsets.only(bottom: 6),
+//               child: _buildActionPatientCard(p, queueState, sessionHasIP, sessionNextQNo),
+//             )),
+//           ],
+//         ],
+//       ]),
+//     );
+//   }
+
+//   // ── Dialogs ───────────────────────────────────────────────────────────────
+
+//   Future<void> _showCloseDialog(int? queueId) async {
+//     // Mirror the patient-list close flow: count every patient that closing
+//     // will cancel — this queue's pending (booked / in_progress), its skipped,
+//     // and earlier-time slot patients still pending — and warn only when > 0.
+//     final vmState     = ref.read(appointmentViewModelProvider);
+//     final appts       = vmState.patientAppointmentsList.value ?? <AppointmentList>[];
+//     final sessions    = vmState.todayQueueResult?.value ?? [];
+
+//     final matchingSession = sessions.where((s) => s.queueId == queueId).toList();
+//     final queueStartTime  = matchingSession.isEmpty
+//         ? null
+//         : DateTime.tryParse(matchingSession.first.startTime ?? '');
+
+//     final queuePending = appts.where((p) {
+//       if (p.queueId != queueId) return false;
+//       final st = (p.status?.toLowerCase() ?? '');
+//       return st == 'booked' || st == 'in_progress';
+//     }).length;
+
+//     final queueSkipped = appts.where((p) {
+//       if (p.queueId != queueId) return false;
+//       return (p.status?.toLowerCase() ?? '') == 'skipped';
+//     }).length;
+
+//     final earlierSlotPending = queueStartTime == null
+//         ? 0
+//         : appts.where((p) {
+//             if (p.bookingType != 2) return false;
+//             final st = (p.status?.toLowerCase() ?? '');
+//             if (st != 'booked' && st != 'skipped') return false;
+//             final pTime = DateTime.tryParse(p.startTime ?? '');
+//             return pTime != null && pTime.isBefore(queueStartTime);
+//           }).length;
+
+//     final totalCancel = queuePending + queueSkipped + earlierSlotPending;
+//     final confirmed = await showDialog<bool>(
+//       context: context,
+//       barrierDismissible: false,
+//       builder: (ctx) => AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+//         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+//         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+//         content: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             Container(
+//               width: 52,
+//               height: 52,
+//               decoration: BoxDecoration(
+//                   color: kRedLight,
+//                   shape: BoxShape.circle,
+//                   border: Border.all(color: kRedBorder)),
+//               child: const Icon(Icons.close_rounded, color: kRed, size: 26),
+//             ),
+//             const SizedBox(height: 14),
+//             const Text(
+//               'Close Queue?',
+//               style: TextStyle(
+//                   fontSize: 16,
+//                   fontWeight: FontWeight.w800,
+//                   color: kTextPrimary),
+//             ),
+//             const SizedBox(height: 8),
+//             const Text(
+//               'Are you sure you want to close this queue?',
+//               textAlign: TextAlign.center,
+//               style: TextStyle(
+//                   fontSize: 12, color: kTextSecondary, height: 1.5),
+//             ),
+//             if (totalCancel > 0) ...[
+//               const SizedBox(height: 12),
+//               Container(
+//                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//                 decoration: BoxDecoration(
+//                   color: kAmberLight,
+//                   borderRadius: BorderRadius.circular(10),
+//                   border: Border.all(color: kAmberBorder),
+//                 ),
+//                 child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//                   const Icon(Icons.warning_amber_rounded, size: 16, color: kAmberDark),
+//                   const SizedBox(width: 8),
+//                   Expanded(
+//                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//                       Text(
+//                         '$totalCancel patient${totalCancel == 1 ? '' : 's'} will be cancelled',
+//                         style: const TextStyle(
+//                             fontSize: 12, fontWeight: FontWeight.w700, color: kAmberDark),
+//                       ),
+//                       const SizedBox(height: 2),
+//                       Text(
+//                         [
+//                           if (queuePending > 0) '$queuePending pending in this queue',
+//                           if (queueSkipped > 0) '$queueSkipped skipped in this queue',
+//                           if (earlierSlotPending > 0) '$earlierSlotPending from earlier slots',
+//                         ].join(' · '),
+//                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kAmberDark, height: 1.3),
+//                       ),
+//                     ]),
+//                   ),
+//                 ]),
+//               ),
+//             ],
+//             const SizedBox(height: 4),
+//           ],
+//         ),
+//         actions: [
+//           Row(children: [
+//             Expanded(
+//               child: GestureDetector(
+//                 onTap: () => Navigator.pop(ctx, false),
+//                 child: Container(
+//                   padding: const EdgeInsets.symmetric(vertical: 12),
+//                   decoration: BoxDecoration(
+//                     color: const Color(0xFFF3F4F6),
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                   alignment: Alignment.center,
+//                   child: const Text('No',
+//                       style: TextStyle(
+//                           fontSize: 13,
+//                           fontWeight: FontWeight.w600,
+//                           color: kTextSecondary)),
+//                 ),
+//               ),
+//             ),
+//             const SizedBox(width: 10),
+//             Expanded(
+//               child: GestureDetector(
+//                 onTap: () => Navigator.pop(ctx, true),
+//                 child: Container(
+//                   padding: const EdgeInsets.symmetric(vertical: 12),
+//                   decoration: BoxDecoration(
+//                     color: kRedLight,
+//                     borderRadius: BorderRadius.circular(12),
+//                     border: Border.all(color: kRedBorder),
+//                   ),
+//                   alignment: Alignment.center,
+//                   child: const Text('Yes, Close',
+//                       style: TextStyle(
+//                           fontSize: 13,
+//                           fontWeight: FontWeight.w600,
+//                           color: kRedDark)),
+//                 ),
+//               ),
+//             ),
+//           ]),
+//         ],
+//       ),
+//     );
+//     if (confirmed == true) await _onQueueStop(queueId);
+//   }
+
+//   Future<void> _showEmergencyDialog(int? queueId) async {
+//     if (ref.read(appointmentViewModelProvider.notifier)
+//         .isEmergencyPaused(queueId)) {
+//       _snack('Already emergency paused');
+//       return;
+//     }
+//     final confirmed = await showDialog<bool>(
+//       context: context,
+//       barrierDismissible: false,
+//       builder: (ctx) => AlertDialog(
+//         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+//         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+//         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+//         content: Column(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             Container(
+//               width: 52,
+//               height: 52,
+//               decoration: BoxDecoration(
+//                   color: kPurpleLight,
+//                   shape: BoxShape.circle,
+//                   border: Border.all(color: kPurpleBorder)),
+//               child: const Icon(Icons.warning_amber_rounded,
+//                   color: kPurple, size: 26),
+//             ),
+//             const SizedBox(height: 14),
+//             const Text(
+//               'Emergency Pause?',
+//               style: TextStyle(
+//                   fontSize: 16,
+//                   fontWeight: FontWeight.w800,
+//                   color: kTextPrimary),
+//             ),
+//             const SizedBox(height: 8),
+//             const Text(
+//               'Queue is Emergency Pause. Do you want to pause immediately?',
+//               textAlign: TextAlign.center,
+//               style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5),
+//             ),
+//             const SizedBox(height: 4),
+//           ],
+//         ),
+//         actions: [
+//           Row(children: [
+//             Expanded(
+//               child: GestureDetector(
+//                 onTap: () => Navigator.pop(ctx, false),
+//                 child: Container(
+//                   padding: const EdgeInsets.symmetric(vertical: 12),
+//                   decoration: BoxDecoration(
+//                     color: const Color(0xFFF3F4F6),
+//                     borderRadius: BorderRadius.circular(12),
+//                   ),
+//                   alignment: Alignment.center,
+//                   child: const Text('No',
+//                       style: TextStyle(
+//                           fontSize: 13,
+//                           fontWeight: FontWeight.w600,
+//                           color: kTextSecondary)),
+//                 ),
+//               ),
+//             ),
+//             const SizedBox(width: 10),
+//             Expanded(
+//               child: GestureDetector(
+//                 onTap: () => Navigator.pop(ctx, true),
+//                 child: Container(
+//                   padding: const EdgeInsets.symmetric(vertical: 12),
+//                   decoration: BoxDecoration(
+//                     color: kPurpleLight,
+//                     borderRadius: BorderRadius.circular(12),
+//                     border: Border.all(color: kPurpleBorder),
+//                   ),
+//                   alignment: Alignment.center,
+//                   child: const Text('Yes, Pause',
+//                       style: TextStyle(
+//                           fontSize: 13,
+//                           fontWeight: FontWeight.w600,
+//                           color: kPurpleDark)),
+//                 ),
+//               ),
+//             ),
+//           ]),
+//         ],
+//       ),
+//     );
+//     if (confirmed == true) await _onQueuePauseEmergency(queueId);
+//   }
+
+//   // ── Session mini stat strip (inside each card) ─────────────────────────
+
+//   Widget _buildSessionMiniStats({
+//     required int total,
+//     required int waiting,
+//     required int done,
+//  //   required int skipped,
+//   }) {
+//     return Row(children: [
+//       _miniStatChip(label: 'Total',   value: total,   accent: kPrimary,   textColor: kPrimaryDark),
+//       const SizedBox(width: 5),
+//       _miniStatChip(label: 'Waiting', value: waiting, accent: kPrimary,   textColor: kPrimaryDark),
+//       const SizedBox(width: 5),
+//       _miniStatChip(label: 'Done',    value: done,    accent: kGreen,     textColor: kGreenDark),
+//       // const SizedBox(width: 5),
+//       // _miniStatChip(label: 'Skipped', value: skipped, accent: kAmber,     textColor: kAmberDark),
+//     ]);
+//   }
+
+//   Widget _miniStatChip({
+//     required String label,
+//     required int value,
+//     required Color accent,
+//     required Color textColor,
+//   }) {
+//     return Expanded(
+//       child: Container(
+//         padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+//         decoration: BoxDecoration(
+//           gradient: LinearGradient(
+//             colors: [accent.withOpacity(0.10), accent.withOpacity(0.04)],
+//             begin: Alignment.topLeft,
+//             end: Alignment.bottomRight,
+//           ),
+//           borderRadius: BorderRadius.circular(10),
+//           border: Border.all(color: accent.withOpacity(0.18)),
+//         ),
+//         child: Column(
+//           crossAxisAlignment: CrossAxisAlignment.start,
+//           children: [
+//             Text(
+//               label,
+//               style: TextStyle(
+//                 fontSize: 11,
+//                 fontWeight: FontWeight.w700,
+//                 color: textColor.withOpacity(0.75),
+//                 letterSpacing: 0.3,
+//               ),
+//             ),
+//             const SizedBox(height: 2),
+//             Text(
+//               value.toString().padLeft(2, '0'),
+//               style: TextStyle(
+//                 fontSize: 16,
+//                 fontWeight: FontWeight.w800,
+//                 color: textColor,
+//                 height: 1,
+//                 letterSpacing: -0.4,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _actionBtn({
+//     required String label,
+//     IconData? icon,
+//     required VoidCallback onTap,
+//     required bool isPrimary,
+//   }) {
+//     return GestureDetector(
+//       onTap: onTap,
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 220),
+//         padding: const EdgeInsets.symmetric(vertical: 9),
+//         decoration: BoxDecoration(
+//           gradient: isPrimary ? kPrimaryGradient : null,
+//           color: isPrimary ? null : kAmberLight,
+//           borderRadius: BorderRadius.circular(11),
+//           border: isPrimary ? null : Border.all(color: kAmberBorder),
+//         ),
+//         alignment: Alignment.center,
+//         child: Row(
+//           mainAxisAlignment: MainAxisAlignment.center,
+//           children: [
+//             if (icon != null) ...[
+//               Icon(icon,
+//                   size: 14,
+//                   color: isPrimary ? Colors.white : kAmberDark),
+//               const SizedBox(width: 4),
+//             ],
+//             Text(
+//               label,
+//               style: TextStyle(
+//                 fontSize: 13,
+//                 fontWeight: FontWeight.w600,
+//                 color: isPrimary ? Colors.white : kAmberDark,
+//                 letterSpacing: 0.2,
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _buildTokenRow({
+//     required int currentNo,
+//     required int nextNo,
+//     required int total,
+//   }) {
+//     return Row(children: [
+//       Expanded(
+//         child: Container(
+//           padding: const EdgeInsets.symmetric(vertical: 12),
+//           decoration: const BoxDecoration(
+//             gradient: LinearGradient(
+//               colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
+//               begin: Alignment.topLeft,
+//               end: Alignment.bottomRight,
+//             ),
+//             borderRadius: BorderRadius.all(Radius.circular(13)),
+//           ),
+//           child: Column(children: [
+//             const Text('Current',
+//                 style: TextStyle(
+//                     fontSize: 8,
+//                     fontWeight: FontWeight.w700,
+//                     letterSpacing: 0.7,
+//                     color: Colors.white70)),
+//             const SizedBox(height: 3),
+//             Text(currentNo.toString().padLeft(2, '0'),
+//                 style: const TextStyle(
+//                     fontSize: 32,
+//                     fontWeight: FontWeight.w800,
+//                     color: Colors.white,
+//                     height: 1)),
+//           ]),
+//         ),
+//       ),
+//       const SizedBox(width: 8),
+//       Expanded(
+//         child: Container(
+//           padding: const EdgeInsets.symmetric(vertical: 12),
+//           decoration: BoxDecoration(
+//             color: kPrimaryLighter,
+//             borderRadius: BorderRadius.circular(13),
+//             border: Border.all(color: kPrimaryLight),
+//           ),
+//           child: Column(children: [
+//             const Text('Up Next',
+//                 style: TextStyle(
+//                     fontSize: 8,
+//                     fontWeight: FontWeight.w700,
+//                     letterSpacing: 0.7,
+//                     color: kTextSecondary)),
+//             const SizedBox(height: 3),
+//             Text(nextNo > 0 ? nextNo.toString().padLeft(2, '0') : '--',
+//                 style: const TextStyle(
+//                     fontSize: 32,
+//                     fontWeight: FontWeight.w800,
+//                     color: kTextPrimary,
+//                     height: 1)),
+//           ]),
+//         ),
+//       ),
+//       const SizedBox(width: 8),
+//       Expanded(
+//         child: Container(
+//           padding: const EdgeInsets.symmetric(vertical: 12),
+//           decoration: BoxDecoration(
+//             color: kGreenLight,
+//             borderRadius: BorderRadius.circular(13),
+//             border: Border.all(color: kGreenBorder),
+//           ),
+//           child: Column(children: [
+//             const Text('Remaining',
+//                 style: TextStyle(
+//                     fontSize: 8,
+//                     fontWeight: FontWeight.w700,
+//                     letterSpacing: 0.7,
+//                     color: kGreenDark)),
+//             const SizedBox(height: 3),
+//             Text(total.toString().padLeft(2, '0'),
+//                 style: const TextStyle(
+//                     fontSize: 32,
+//                     fontWeight: FontWeight.w800,
+//                     color: kGreenDark,
+//                     height: 1)),
+//           ]),
+//         ),
+//       ),
+//     ]);
+//   }
+
+//   Widget _buildCurrentPatientBand(AppointmentList? patient) {
+//     if (patient == null) {
+//       return Container(
+//         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+//         decoration: BoxDecoration(
+//           color: kPrimaryLighter,
+//           borderRadius: BorderRadius.circular(13),
+//           border: Border.all(color: kPrimaryLight),
+//         ),
+//         child: const Center(
+//             child: Text('No patients in queue today',
+//                 style: TextStyle(color: kTextMuted, fontSize: 12))),
+//       );
+//     }
+
+//     final name     = patient.patientName ?? patient.bookingFor ?? 'Unknown';
+//     final age      = _calcAge(patient.dob);
+//     final initials = _initials(name);
+
+//     return Container(
+//       padding: const EdgeInsets.all(12),
+//       decoration: BoxDecoration(
+//         color: kPrimaryLighter,
+//         borderRadius: BorderRadius.circular(13),
+//         border: Border.all(color: kPrimaryLight),
+//       ),
+//       child: Row(children: [
+//         Stack(children: [
+//           Container(
+//             width: 48,
+//             height: 48,
+//             decoration: const BoxDecoration(
+//               gradient: LinearGradient(
+//                 colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
+//                 begin: Alignment.topLeft,
+//                 end: Alignment.bottomRight,
+//               ),
+//               shape: BoxShape.circle,
+//             ),
+//             alignment: Alignment.center,
+//             child: Text(initials,
+//                 style: const TextStyle(
+//                     fontSize: 15,
+//                     fontWeight: FontWeight.w800,
+//                     color: Colors.white)),
+//           ),
+//           Positioned(
+//             bottom: 0,
+//             right: 0,
+//             child: Container(
+//               width: 12,
+//               height: 12,
+//               decoration: BoxDecoration(
+//                 color: kGreen,
+//                 shape: BoxShape.circle,
+//                 border: Border.all(color: kPrimaryLighter, width: 2),
+//               ),
+//             ),
+//           ),
+//         ]),
+//         const SizedBox(width: 10),
+//         Expanded(
+//           child: Column(
+//               crossAxisAlignment: CrossAxisAlignment.start,
+//               children: [
+//                 Text(name,
+//                     style: const TextStyle(
+//                         fontSize: 14,
+//                         fontWeight: FontWeight.w700,
+//                         color: kTextPrimary),
+//                     overflow: TextOverflow.ellipsis),
+//                 const SizedBox(height: 2),
+//                 Text(
+//                   [
+//                     if (patient.gender != null) patient.gender!,
+//                     if (age != null) '$age yrs',
+//                     'Token ${(patient.queueNumber ?? 0).toString().padLeft(2, '0')}',
+//                   ].join(' · '),
+//                   style: const TextStyle(fontSize: 10, color: kTextSecondary),
+//                 ),
+//                 const SizedBox(height: 5),
+//                 Row(children: [
+//                   Container(
+//                       width: 7,
+//                       height: 7,
+//                       decoration: const BoxDecoration(
+//                           color: kPrimary, shape: BoxShape.circle)),
+//                   const SizedBox(width: 4),
+//                   const Text('In Consultation',
+//                       style: TextStyle(
+//                           fontSize: 10,
+//                           fontWeight: FontWeight.w700,
+//                           color: kPrimaryDark)),
+//                 ]),
+//               ]),
+//         ),
+//         Container(
+//           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+//           decoration: BoxDecoration(
+//               color: kPrimary, borderRadius: BorderRadius.circular(8)),
+//           child: const Text('Now',
+//               style: TextStyle(
+//                   fontSize: 10,
+//                   fontWeight: FontWeight.w700,
+//                   color: Colors.white)),
+//         ),
+//       ]),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // QUICK ACTIONS
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildQuickActions(AppointmentList? current) {
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(18),
+//         border: Border.all(color: kBorder),
+//       ),
+//       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+//       child:
+//           Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//         const Text('Quick Actions',
+//             style: TextStyle(
+//                 fontSize: 11,
+//                 fontWeight: FontWeight.w700,
+//                 letterSpacing: 1.1,
+//                 color: kPrimary)),
+//         const SizedBox(height: 10),
+//         Row(children: [
+//           Expanded(
+//             child: _quickBtn(
+//               label: '✓  Mark Complete',
+//               bg: kGreenLight,
+//               fg: kGreenDark,
+//               border: kGreenBorder,
+//               enabled: current != null,
+//               onTap: current != null ? () => _onQueueNext(current) : null,
+//             ),
+//           ),
+//           const SizedBox(width: 8),
+//           Expanded(
+//             child: _quickBtn(
+//               label: '⏭  Skip Patient',
+//               bg: kAmberLight,
+//               fg: kAmberDark,
+//               border: kAmberBorder,
+//               enabled: current != null,
+//               onTap: current != null ? () => _onQueueSkip(current) : null,
+//             ),
+//           ),
+//         ]),
+//         const SizedBox(height: 10),
+//         Row(children: [
+//           _shortcutTile(
+//               icon: Icons.folder_open_rounded,
+//               label: 'Records',
+//               bg: kGreenLight,
+//               fg: kGreenDark,
+//               border: kGreenBorder),
+//           const SizedBox(width: 6),
+//           _shortcutTile(
+//               icon: Icons.medication_rounded,
+//               label: 'Prescribe',
+//               bg: kPurpleLight,
+//               fg: kPurpleDark,
+//               border: kPurpleBorder),
+//           const SizedBox(width: 6),
+//           _shortcutTile(
+//               icon: Icons.calendar_today_rounded,
+//               label: 'Schedule',
+//               bg: kAmberLight,
+//               fg: kAmberDark,
+//               border: kAmberBorder),
+//           const SizedBox(width: 6),
+//           _shortcutTile(
+//               icon: Icons.notifications_rounded,
+//               label: 'Notify',
+//               bg: kRedLight,
+//               fg: kRedDark,
+//               border: kRedBorder),
+//         ]),
+//       ]),
+//     );
+//   }
+
+//   Widget _quickBtn({
+//     required String label,
+//     required Color bg,
+//     required Color fg,
+//     required Color border,
+//     required bool enabled,
+//     required VoidCallback? onTap,
+//   }) {
+//     return Opacity(
+//       opacity: enabled ? 1.0 : 0.42,
+//       child: GestureDetector(
+//         onTap: onTap,
+//         child: Container(
+//           padding: const EdgeInsets.symmetric(vertical: 11),
+//           decoration: BoxDecoration(
+//             color: bg,
+//             borderRadius: BorderRadius.circular(11),
+//             border: Border.all(color: border),
+//           ),
+//           alignment: Alignment.center,
+//           child: Text(label,
+//               style: TextStyle(
+//                   fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
+//         ),
+//       ),
+//     );
+//   }
+
+//   Widget _shortcutTile({
+//     required IconData icon,
+//     required String label,
+//     required Color bg,
+//     required Color fg,
+//     required Color border,
+//   }) {
+//     return Expanded(
+//       child: Container(
+//         padding: const EdgeInsets.symmetric(vertical: 9),
+//         decoration: BoxDecoration(
+//           color: bg,
+//           borderRadius: BorderRadius.circular(11),
+//           border: Border.all(color: border),
+//         ),
+//         child: Column(children: [
+//           Icon(icon, size: 18, color: fg),
+//           const SizedBox(height: 4),
+//           Text(label,
+//               style: TextStyle(
+//                   fontSize: 9, fontWeight: FontWeight.w700, color: fg)),
+//         ]),
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // HOME QUICK ACTIONS  (Edit Medicine, Schedule, History)
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildWalkInCard() {
+//     return GestureDetector(
+//       onTap: () => setState(() => _walkInExpanded = !_walkInExpanded),
+//       child: Container(
+//         decoration: BoxDecoration(
+//           gradient: LinearGradient(
+//             colors: [kPrimaryLight, Colors.white],
+//             begin: Alignment.topLeft,
+//             end: Alignment.bottomRight,
+//           ),
+//           borderRadius: BorderRadius.circular(14),
+//           border: Border.all(color: const Color(0xFFB2EBE4)),
+//           boxShadow: kSoftShadow,
+//         ),
+//         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+//         child: Row(children: [
+//           Container(
+//             width: 42,
+//             height: 42,
+//             decoration: BoxDecoration(
+//               color: Colors.white,
+//               borderRadius: BorderRadius.circular(12),
+//               border: Border.all(color: const Color(0xFFB2EBE4)),
+//             ),
+//             alignment: Alignment.center,
+//             child: const Icon(Icons.person_add_rounded, size: 20, color: kPrimaryDark),
+//           ),
+//           const SizedBox(width: 12),
+//           const Expanded(
+//             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//               Text('Add Walk-in Patient',
+//                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
+//               SizedBox(height: 2),
+//               Text('Book appointment for walk-in patient',
+//                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
+//             ]),
+//           ),
+//           AnimatedRotation(
+//             turns: _walkInExpanded ? 0.25 : 0,
+//             duration: const Duration(milliseconds: 200),
+//             child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kTextSecondary),
+//           ),
+//         ]),
+//       ),
+//     );
+//   }
+
+//   Widget _buildHomeQuickActions() {
+//     final isReceptionist = ref.watch(tokenProvider).roleId == 3;
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: kCardGlassGradient,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: kHairline),
+//         boxShadow: kSoftShadow,
+//       ),
+//       padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(
+//             children: [
+//               Container(
+//                 width: 3,
+//                 height: 12,
+//                 decoration: BoxDecoration(
+//                   gradient: kPrimaryGradient,
+//                   borderRadius: BorderRadius.circular(3),
+//                 ),
+//               ),
+//               const SizedBox(width: 7),
+//               const Text(
+//                 'Quick Actions',
+//                 style: TextStyle(
+//                   fontSize: 14,
+//                   fontWeight: FontWeight.w700,
+//                   letterSpacing: 0.3,
+//                   color: kTextPrimary,
+//                 ),
+//               ),
+//             ],
+//           ),
+//           const SizedBox(height: 10),
+//           if (isReceptionist)
+//             Row(children: [
+//               _homeActionTile(
+//                 icon: Icons.calendar_today_rounded,
+//                 label: 'Edit\nSchedule',
+//                 accent: kAmber,
+//                 bg: kAmberLight,
+//                 fg: kAmberDark,
+//                 border: kAmberBorder,
+//                 onTap: () => Navigator.of(context).push(
+//                   MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()),
+//                 ),
+//               ),
+//               const SizedBox(width: 7),
+//               _homeActionTile(
+//                 icon: Icons.people_alt_rounded,
+//                 label: 'Patient\nList',
+//                 accent: kGreen,
+//                 bg: kGreenLight,
+//                 fg: kGreenDark,
+//                 border: kGreenBorder,
+//                 onTap: () => Navigator.of(context).push(
+//                   MaterialPageRoute(
+//                       builder: (_) => const DoctorPatientHistoryScreen()),
+//                 ),
+//               ),
+//               const SizedBox(width: 7),
+//               const Expanded(child: SizedBox()),
+//             ])
+//           else
+//             Row(children: [
+//               _homeActionTile(
+//                 icon: Icons.medication_rounded,
+//                 label: 'Add\nMedicine',
+//                 accent: kPurple,
+//                 bg: kPurpleLight,
+//                 fg: kPurpleDark,
+//                 border: kPurpleBorder,
+//                 onTap: () => Navigator.of(context).push(
+//                   MaterialPageRoute(
+//                       builder: (_) => const AddMedicinePage()),
+//                 ),
+//               ),
+//               const SizedBox(width: 7),
+//               _homeActionTile(
+//                 icon: Icons.calendar_today_rounded,
+//                 label: 'Edit\nSchedule',
+//                 accent: kAmber,
+//                 bg: kAmberLight,
+//                 fg: kAmberDark,
+//                 border: kAmberBorder,
+//                 onTap: () => Navigator.of(context).push(
+//                   MaterialPageRoute(
+//                       builder: (_) => const DoctorAvailabilityPage()),
+//                 ),
+//               ),
+//               const SizedBox(width: 7),
+//               _homeActionTile(
+//                 icon: Icons.history_rounded,
+//                 label: 'Patient\nHistory',
+//                 accent: kGreen,
+//                 bg: kGreenLight,
+//                 fg: kGreenDark,
+//                 border: kGreenBorder,
+//                 onTap: () => Navigator.of(context).push(
+//                   MaterialPageRoute(
+//                       builder: (_) => const DoctorPatientHistoryScreen()),
+//                 ),
+//               ),
+//             ]),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Widget _homeActionTile({
+//     required IconData icon,
+//     required String label,
+//     required Color accent,
+//     required Color bg,
+//     required Color fg,
+//     required Color border,
+//     required VoidCallback onTap,
+//   }) {
+//     return Expanded(
+//       child: GestureDetector(
+//         onTap: onTap,
+//         child: Container(
+//           padding: const EdgeInsets.fromLTRB(6, 9, 6, 9),
+//           decoration: BoxDecoration(
+//             gradient: LinearGradient(
+//               colors: [bg, Colors.white],
+//               begin: Alignment.topLeft,
+//               end: Alignment.bottomRight,
+//             ),
+//             borderRadius: BorderRadius.circular(12),
+//             border: Border.all(color: border),
+//           ),
+//           child: Column(children: [
+//             Container(
+//               width: 28,
+//               height: 28,
+//               decoration: BoxDecoration(
+//                 color: Colors.white,
+//                 borderRadius: BorderRadius.circular(9),
+//                 border: Border.all(color: border),
+//               ),
+//               alignment: Alignment.center,
+//               child: Icon(icon, size: 15, color: fg),
+//             ),
+//             const SizedBox(height: 6),
+//             Text(
+//               label,
+//               textAlign: TextAlign.center,
+//               style: TextStyle(
+//                 fontSize: 11,
+//                 height: 1.15,
+//                 fontWeight: FontWeight.w700,
+//                 color: fg,
+//                 letterSpacing: 0.1,
+//               ),
+//             ),
+//           ]),
+//         ),
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // TODAY'S SCHEDULE CARD  (single unified card with day + slots + edit)
+//   // Shown when no live queue sessions exist for today.
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildTodayScheduleCard(List<TimeSlotModel> slots) {
+//     final dayLabel =
+//         DateFormat('EEEE, d MMMM').format(DateTime.now());
+
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: kCardGlassGradient,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: kHairline),
+//         boxShadow: kSoftShadow,
+//       ),
+//       padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(children: [
+//             Container(
+//               width: 30,
+//               height: 30,
+//               decoration: BoxDecoration(
+//                 gradient: kPrimaryGradient,
+//                 borderRadius: BorderRadius.circular(9),
+//               ),
+//               alignment: Alignment.center,
+//               child: const Icon(Icons.calendar_today_rounded,
+//                   size: 14, color: Colors.white),
+//             ),
+//             const SizedBox(width: 10),
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     dayLabel,
+//                     style: const TextStyle(
+//                       fontSize: 12.5,
+//                       fontWeight: FontWeight.w500,
+//                       color: kTextPrimary,
+//                       letterSpacing: -0.1,
+//                       height: 1.15,
+//                     ),
+//                   ),
+//                   const SizedBox(height: 1),
+//                   Text(
+//                     "${slots.length} slot${slots.length == 1 ? '' : 's'} scheduled",
+//                     style: const TextStyle(
+//                       fontSize: 10,
+//                       color: kTextSecondary,
+//                       fontWeight: FontWeight.w500,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//             GestureDetector(
+//               onTap: () => Navigator.of(context).push(
+//                 MaterialPageRoute(
+//                     builder: (_) => const DoctorAvailabilityPage()),
+//               ),
+//               child: Container(
+//                 padding: const EdgeInsets.symmetric(
+//                     horizontal: 9, vertical: 5),
+//                 decoration: BoxDecoration(
+//                   gradient: LinearGradient(
+//                     colors: [kPrimaryLight, kPrimaryLighter],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                   borderRadius: BorderRadius.circular(20),
+//                   border: Border.all(color: kPrimary.withOpacity(0.22)),
+//                 ),
+//                 child: Row(
+//                   mainAxisSize: MainAxisSize.min,
+//                   children: const [
+//                     Icon(Icons.edit_calendar_rounded,
+//                         size: 11, color: kPrimaryDark),
+//                     SizedBox(width: 3),
+//                     Text(
+//                       'Edit',
+//                       style: TextStyle(
+//                         fontSize: 10,
+//                         fontWeight: FontWeight.w800,
+//                         color: kPrimaryDark,
+//                         letterSpacing: 0.2,
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//             ),
+//           ]),
+//           const SizedBox(height: 10),
+//           Container(
+//             height: 1,
+//             decoration: BoxDecoration(
+//               gradient: LinearGradient(
+//                 colors: [
+//                   kHairline.withOpacity(0),
+//                   kHairline,
+//                   kHairline.withOpacity(0),
+//                 ],
+//               ),
+//             ),
+//           ),
+//           const SizedBox(height: 9),
+//           ...List.generate(slots.length, (i) {
+//             final slot = slots[i];
+//             final isLast = i == slots.length - 1;
+//             return Padding(
+//               padding: EdgeInsets.only(bottom: isLast ? 0 : 6),
+//               child: _scheduleSlotRow(slot),
+//             );
+//           }),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Widget _scheduleSlotRow(TimeSlotModel slot) {
+//     final timeLabel = '${_fmtScheduleTime(slot.startTime)} – '
+//         '${_fmtScheduleTime(slot.endTime)}';
+//     final modeLbl = _bookingModeLabel(slot.bookingMode);
+//     final isQueueMode = slot.bookingMode == 1 || slot.bookingMode == 3;
+//     final detail = isQueueMode
+//         ? (slot.maxQueueLength != null ? 'Max ${slot.maxQueueLength}' : null)
+//         : (slot.slotDuration != null ? '${slot.slotDuration}m' : null);
+
+//     return Container(
+//       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+//       decoration: BoxDecoration(
+//         gradient: LinearGradient(
+//           colors: [kPrimaryLighter, Colors.white],
+//           begin: Alignment.topLeft,
+//           end: Alignment.bottomRight,
+//         ),
+//         borderRadius: BorderRadius.circular(11),
+//         border: Border.all(color: kPrimaryLight.withOpacity(0.7)),
+//       ),
+//       child: Row(children: [
+//         Container(
+//           width: 3,
+//           height: 18,
+//           decoration: BoxDecoration(
+//             gradient: kPrimaryGradient,
+//             borderRadius: BorderRadius.circular(3),
+//           ),
+//         ),
+//         const SizedBox(width: 9),
+//         Expanded(
+//           child: Text(
+//             timeLabel,
+//             style: const TextStyle(
+//               fontSize: 13,
+//               fontWeight: FontWeight.w600,
+//               color: kTextPrimary,
+//               letterSpacing: -0.1,
+//             ),
+//           ),
+//         ),
+//         Container(
+//           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+//           decoration: BoxDecoration(
+//             color: kPrimary.withOpacity(0.10),
+//             borderRadius: BorderRadius.circular(6),
+//             border: Border.all(color: kPrimary.withOpacity(0.15)),
+//           ),
+//           child: Text(
+//             modeLbl,
+//             style: const TextStyle(
+//               fontSize: 9,
+//               fontWeight: FontWeight.w800,
+//               color: kPrimaryDark,
+//               letterSpacing: 0.2,
+//             ),
+//           ),
+//         ),
+//         if (detail != null) ...[
+//           const SizedBox(width: 5),
+//           Text(
+//             detail,
+//             style: const TextStyle(
+//               fontSize: 10,
+//               fontWeight: FontWeight.w700,
+//               color: kTextSecondary,
+//             ),
+//           ),
+//         ],
+//       ]),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // WEEKLY PERFORMANCE  (mini bar chart of last 7 days)
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildWeeklyPerformance(List<AppointmentList> all) {
+//     final series = _lastSevenDaysCompleted(all);
+//     final maxVal =
+//         series.fold<int>(0, (m, e) => e.count > m ? e.count : m);
+//     final total = series.fold<int>(0, (s, e) => s + e.count);
+//     final todayIdx = series.length - 1;
+
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(18),
+//         border: Border.all(color: kBorder),
+//       ),
+//       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(children: [
+//             const Text('This Week',
+//                 style: TextStyle(
+//                     fontSize: 11,
+//                     fontWeight: FontWeight.w700,
+//                     letterSpacing: 1.1,
+//                     color: kPrimary)),
+//             const Spacer(),
+//             Container(
+//               padding:
+//                   const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//               decoration: BoxDecoration(
+//                 color: kPrimaryLight,
+//                 borderRadius: BorderRadius.circular(20),
+//               ),
+//               child: Text('$total seen',
+//                   style: const TextStyle(
+//                       fontSize: 10,
+//                       fontWeight: FontWeight.w700,
+//                       color: kPrimaryDark)),
+//             ),
+//           ]),
+//           const SizedBox(height: 12),
+//           SizedBox(
+//             height: 84,
+//             child: Row(
+//               crossAxisAlignment: CrossAxisAlignment.end,
+//               children: List.generate(series.length, (i) {
+//                 final e = series[i];
+//                 final ratio = maxVal == 0 ? 0.0 : e.count / maxVal;
+//                 final isToday = i == todayIdx;
+//                 final barH = (ratio * 60).clamp(4.0, 60.0);
+//                 return Expanded(
+//                   child: Padding(
+//                     padding: EdgeInsets.symmetric(
+//                         horizontal: i == 0 || i == series.length - 1
+//                             ? 2
+//                             : 3),
+//                     child: Column(
+//                       mainAxisAlignment: MainAxisAlignment.end,
+//                       children: [
+//                         Text(
+//                           e.count == 0 ? '·' : '${e.count}',
+//                           style: TextStyle(
+//                               fontSize: 9,
+//                               fontWeight: FontWeight.w700,
+//                               color: isToday ? kPrimaryDark : kTextMuted),
+//                         ),
+//                         const SizedBox(height: 3),
+//                         ClipRRect(
+//                           borderRadius: BorderRadius.circular(6),
+//                           child: AnimatedContainer(
+//                             duration: const Duration(milliseconds: 300),
+//                             height: barH,
+//                             decoration: BoxDecoration(
+//                               gradient: isToday
+//                                   ? const LinearGradient(
+//                                       begin: Alignment.topCenter,
+//                                       end: Alignment.bottomCenter,
+//                                       colors: [
+//                                         Color(0xFF4DD9C8),
+//                                         Color(0xFF2BB5A0),
+//                                       ],
+//                                     )
+//                                   : null,
+//                               color:
+//                                   isToday ? null : kPrimaryLight,
+//                             ),
+//                           ),
+//                         ),
+//                         const SizedBox(height: 5),
+//                         Text(
+//                           DateFormat('E').format(e.date)[0],
+//                           style: TextStyle(
+//                               fontSize: 9,
+//                               fontWeight: FontWeight.w700,
+//                               color: isToday ? kPrimaryDark : kTextMuted),
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+//                 );
+//               }),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // DOCTOR TIPS  (auto-rotating carousel)
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildTipsCarousel() {
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: const LinearGradient(
+//           begin: Alignment.topLeft,
+//           end: Alignment.bottomRight,
+//           colors: [Color(0xFFEAF8F5), Color(0xFFFAFEFD)],
+//         ),
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: kPrimary.withOpacity(0.15)),
+//         boxShadow: kSoftShadow,
+//       ),
+//       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(
+//             children: [
+//               Container(
+//                 padding: const EdgeInsets.symmetric(
+//                     horizontal: 7, vertical: 2),
+//                 decoration: BoxDecoration(
+//                   gradient: kPrimaryGradient,
+//                   borderRadius: BorderRadius.circular(20),
+//                 ),
+//                 child: Row(
+//                   mainAxisSize: MainAxisSize.min,
+//                   children: const [
+//                     Icon(Icons.tips_and_updates_rounded,
+//                         size: 10, color: Colors.white),
+//                     SizedBox(width: 3),
+//                     Text(
+//                       'TIP',
+//                       style: TextStyle(
+//                         fontSize: 8.5,
+//                         fontWeight: FontWeight.w800,
+//                         color: Colors.white,
+//                         letterSpacing: 0.5,
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//               const Spacer(),
+//               Text(
+//                 '${_currentTip + 1} / ${_kDoctorTips.length}',
+//                 style: const TextStyle(
+//                   fontSize: 9.5,
+//                   fontWeight: FontWeight.w700,
+//                   color: kTextSecondary,
+//                 ),
+//               ),
+//             ],
+//           ),
+//           const SizedBox(height: 8),
+//           SizedBox(
+//             height: 64,
+//             child: PageView.builder(
+//               controller: _tipsController,
+//               itemCount: _kDoctorTips.length,
+//               onPageChanged: (i) => setState(() => _currentTip = i),
+//               itemBuilder: (_, i) {
+//                 final tip = _kDoctorTips[i];
+//                 return Row(
+//                   crossAxisAlignment: CrossAxisAlignment.start,
+//                   children: [
+//                     Container(
+//                       width: 36,
+//                       height: 36,
+//                       decoration: BoxDecoration(
+//                         color: Colors.white,
+//                         borderRadius: BorderRadius.circular(10),
+//                         border: Border.all(color: kPrimaryLight),
+//                       ),
+//                       alignment: Alignment.center,
+//                       child: Text(tip.emoji,
+//                           style: const TextStyle(fontSize: 18)),
+//                     ),
+//                     const SizedBox(width: 10),
+//                     Expanded(
+//                       child: Column(
+//                         crossAxisAlignment: CrossAxisAlignment.start,
+//                         children: [
+//                           Text(
+//                             tip.title,
+//                             style: const TextStyle(
+//                               fontSize: 11,
+//                               fontWeight: FontWeight.w700,
+//                               letterSpacing: 0.3,
+//                               color: kPrimaryDark,
+//                             ),
+//                           ),
+//                           const SizedBox(height: 2),
+//                           Text(
+//                             tip.body,
+//                             maxLines: 2,
+//                             overflow: TextOverflow.ellipsis,
+//                             style: const TextStyle(
+//                               fontSize: 10.5,
+//                               height: 1.35,
+//                               color: kTextPrimary,
+//                               fontWeight: FontWeight.w500,
+//                             ),
+//                           ),
+//                         ],
+//                       ),
+//                     ),
+//                   ],
+//                 );
+//               },
+//             ),
+//           ),
+//           const SizedBox(height: 7),
+//           Row(
+//             mainAxisAlignment: MainAxisAlignment.center,
+//             children: List.generate(_kDoctorTips.length, (i) {
+//               final active = i == _currentTip;
+//               return AnimatedContainer(
+//                 duration: const Duration(milliseconds: 240),
+//                 curve: Curves.easeOut,
+//                 margin: const EdgeInsets.symmetric(horizontal: 2.5),
+//                 width: active ? 18 : 5,
+//                 height: 5,
+//                 decoration: BoxDecoration(
+//                   gradient: active ? kPrimaryGradient : null,
+//                   color: active ? null : kPrimaryLight,
+//                   borderRadius: BorderRadius.circular(3),
+//                 ),
+//               );
+//             }),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // NO LIVE SESSIONS EMPTY STATE
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildNoLiveSessions() {
+//     return Container(
+//       width: double.infinity,
+//       padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+//       decoration: BoxDecoration(
+//         gradient: kCardGlassGradient,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: kHairline),
+//         boxShadow: kSoftShadow,
+//       ),
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           Container(
+//             width: 48,
+//             height: 48,
+//             decoration: BoxDecoration(
+//               gradient: LinearGradient(
+//                 colors: [kPrimaryLight, Colors.white],
+//                 begin: Alignment.topCenter,
+//                 end: Alignment.bottomCenter,
+//               ),
+//               shape: BoxShape.circle,
+//               border: Border.all(color: kPrimaryLight),
+//             ),
+//             child: const Icon(Icons.event_busy_rounded,
+//                 color: kPrimary, size: 22),
+//           ),
+//           const SizedBox(height: 10),
+//           const Text(
+//             'No Schedule for Today',
+//             style: TextStyle(
+//               fontSize: 14,
+//               fontWeight: FontWeight.w700,
+//               color: kTextPrimary,
+//               letterSpacing: -0.1,
+//             ),
+//           ),
+//           const SizedBox(height: 3),
+//           const Text(
+//             'Set your weekly availability to start accepting patients.',
+//             textAlign: TextAlign.center,
+//             style: TextStyle(
+//               fontSize: 12,
+//               color: kTextSecondary,
+//               fontWeight: FontWeight.w500,
+//               height: 1.35,
+//             ),
+//           ),
+//           const SizedBox(height: 12),
+//           GestureDetector(
+//             onTap: () => Navigator.of(context).push(
+//               MaterialPageRoute(
+//                   builder: (_) => const DoctorAvailabilityPage()),
+//             ),
+//             child: Container(
+//               padding: const EdgeInsets.symmetric(
+//                   horizontal: 14, vertical: 9),
+//               decoration: BoxDecoration(
+//                 gradient: kPrimaryGradient,
+//                 borderRadius: BorderRadius.circular(11),
+//               ),
+//               child: Row(
+//                 mainAxisSize: MainAxisSize.min,
+//                 children: const [
+//                   Icon(Icons.calendar_today_rounded,
+//                       color: Colors.white, size: 13),
+//                   SizedBox(width: 6),
+//                   Text(
+//                     'Set Schedule',
+//                     style: TextStyle(
+//                       fontSize: 13,
+//                       fontWeight: FontWeight.w600,
+//                       color: Colors.white,
+//                       letterSpacing: 0.2,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // PATIENT CARD
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _patientCard(AppointmentList p) {
+//     final name     = p.patientName ?? p.bookingFor ?? 'Unknown';
+//     final initials = _initials(name);
+//     final age      = _calcAge(p.dob);
+//     final status   = p.status ?? 'booked';
+
+//     final palettes = [
+//       (kPrimaryLighter, kPrimaryLight, kPrimary),
+//       (kPurpleLight,    kPurpleBorder, kPurple),
+//       (kAmberLight,     kAmberBorder,  kAmber),
+//       (kRedLight,       kRedBorder,    kRed),
+//     ];
+//     final (avBg, avBd, avFg) =
+//         palettes[(p.queueNumber ?? 0) % palettes.length];
+
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: kCardGlassGradient,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: kHairline),
+//         boxShadow: kSoftShadow,
+//       ),
+//       padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+//       child: Row(children: [
+//         Container(
+//           width: 38,
+//           height: 38,
+//           decoration: BoxDecoration(
+//             gradient: LinearGradient(
+//               colors: [avBg, Colors.white],
+//               begin: Alignment.topLeft,
+//               end: Alignment.bottomRight,
+//             ),
+//             borderRadius: BorderRadius.circular(11),
+//             border: Border.all(color: avBd),
+//           ),
+//           alignment: Alignment.center,
+//           child: Text(
+//             initials,
+//             style: TextStyle(
+//               fontSize: 12,
+//               fontWeight: FontWeight.w800,
+//               color: avFg,
+//               letterSpacing: 0.4,
+//             ),
+//           ),
+//         ),
+//         const SizedBox(width: 9),
+//         Expanded(
+//           child: Column(
+//             crossAxisAlignment: CrossAxisAlignment.start,
+//             children: [
+//               Text(
+//                 name,
+//                 style: const TextStyle(
+//                   fontSize: 15,
+//                   fontWeight: FontWeight.w800,
+//                   color: kTextPrimary,
+//                   letterSpacing: -0.1,
+//                   height: 1.15,
+//                 ),
+//                 overflow: TextOverflow.ellipsis,
+//               ),
+//               const SizedBox(height: 1),
+//               Text(
+//                 [
+//                   if (p.gender != null) p.gender!,
+//                   if (age != null) '$age yrs'
+//                 ].join(' · '),
+//                 style: const TextStyle(
+//                   fontSize: 12,
+//                   color: kTextSecondary,
+//                   fontWeight: FontWeight.w500,
+//                 ),
+//               ),
+//               const SizedBox(height: 4),
+//               Row(children: [
+//                 _statusChip(status),
+//                 if (p.specialization != null) ...[
+//                   const SizedBox(width: 4),
+//                   _tagChip(p.specialization!,
+//                       bg: kPrimaryLighter, fg: kPrimaryDark),
+//                 ],
+//               ]),
+//             ],
+//           ),
+//         ),
+//         const SizedBox(width: 7),
+//         Container(
+//           padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
+//           decoration: BoxDecoration(
+//             gradient: LinearGradient(
+//               colors: [avBg, Colors.white],
+//               begin: Alignment.topCenter,
+//               end: Alignment.bottomCenter,
+//             ),
+//             borderRadius: BorderRadius.circular(9),
+//             border: Border.all(color: avBd),
+//           ),
+//           child: Column(
+//             crossAxisAlignment: CrossAxisAlignment.center,
+//             children: [
+//               const Text(
+//                 'TOKEN',
+//                 style: TextStyle(
+//                   fontSize: 9.5,
+//                   color: kTextMuted,
+//                   fontWeight: FontWeight.w700,
+//                   letterSpacing: 0.5,
+//                 ),
+//               ),
+//               const SizedBox(height: 1),
+//               Text(
+//                 (p.queueNumber ?? 0).toString().padLeft(2, '0'),
+//                 style: TextStyle(
+//                   fontSize: 17,
+//                   fontWeight: FontWeight.w800,
+//                   color: avFg,
+//                   height: 1,
+//                   letterSpacing: -0.4,
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ]),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // TODAY'S PATIENT CARD (with action buttons)
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _buildActionPatientCard(
+//     AppointmentList p,
+//     QueueState qs,
+//     bool hasIP,
+//     int? nextBookedQNo,
+//   ) {
+//     final isReceptionist = ref.read(tokenProvider).roleId == 3;
+//     final name     = p.patientName ?? 'Patient';
+//     final initials = _initials(name);
+//     final age      = _calcAge(p.dob);
+//     final status   = p.status?.toLowerCase().trim() ?? '';
+//     final isIP     = status == 'in_progress';
+//     final isSkipped = status == 'skipped';
+//     final isBooked  = status == 'booked';
+//     final queueActive = qs == QueueState.running || qs == QueueState.paused;
+
+//     bool accessible = false;
+//     if (isIP) {
+//       accessible = true;
+//     } else if (isSkipped) {
+//       accessible = true;
+//     } else if (queueActive && isBooked) {
+//       accessible = !hasIP && p.queueNumber == nextBookedQNo;
+//     }
+//     final effectiveAccessible = isSkipped ? accessible : queueActive && accessible;
+//     // Receptionist can skip any booked patient when queue is active (mirrors patient_list.dart line 3029)
+//     final VoidCallback? effectiveSkip = isBooked && queueActive && (isReceptionist || accessible)
+//         ? () => _skipPatient(p) : null;
+
+//     final palettes = [
+//       (kPrimaryLighter, kPrimaryLight, kPrimary),
+//       (kPurpleLight,    kPurpleBorder, kPurple),
+//       (kAmberLight,     kAmberBorder,  kAmber),
+//       (kRedLight,       kRedBorder,    kRed),
+//     ];
+//     final (avBg, avBd, avFg) = palettes[(p.queueNumber ?? 0) % palettes.length];
+
+//     final Color borderColor = isIP
+//         ? kPrimary.withValues(alpha: 0.6)
+//         : isSkipped
+//             ? kAmber.withValues(alpha: 0.6)
+//             : kHairline;
+
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: kCardGlassGradient,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: borderColor, width: (isIP || isSkipped) ? 1.5 : 1),
+//         boxShadow: kSoftShadow,
+//       ),
+//       padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(children: [
+//             Container(
+//               width: 36, height: 36,
+//               decoration: BoxDecoration(
+//                 color: avBg,
+//                 borderRadius: BorderRadius.circular(10),
+//                 border: Border.all(color: avBd),
+//               ),
+//               alignment: Alignment.center,
+//               child: Text(initials,
+//                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: avFg)),
+//             ),
+//             const SizedBox(width: 9),
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(name,
+//                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kTextPrimary, height: 1.15),
+//                       overflow: TextOverflow.ellipsis),
+//                   const SizedBox(height: 1),
+//                   Text(
+//                     [if (p.gender != null) p.gender!, if (age != null) '$age yrs'].join(' · '),
+//                     style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500),
+//                   ),
+//                   if (isIP || isSkipped) ...[
+//                     const SizedBox(height: 3),
+//                     _statusChip(status),
+//                   ],
+//                 ],
+//               ),
+//             ),
+//             if (p.queueNumber != null) ...[
+//               const SizedBox(width: 7),
+//               Container(
+//                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
+//                 decoration: BoxDecoration(
+//                   color: avBg,
+//                   borderRadius: BorderRadius.circular(9),
+//                   border: Border.all(color: avBd),
+//                 ),
+//                 child: Column(
+//                   crossAxisAlignment: CrossAxisAlignment.center,
+//                   children: [
+//                     const Text('TOKEN', style: TextStyle(fontSize: 8, color: kTextMuted, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+//                     const SizedBox(height: 1),
+//                     Text((p.queueNumber ?? 0).toString().padLeft(2, '0'),
+//                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: avFg, height: 1)),
+//                   ],
+//                 ),
+//               ),
+//             ],
+//           ]),
+//           const SizedBox(height: 8),
+//           Row(children: [
+//             if (effectiveSkip != null) ...[
+//               Expanded(
+//                 child: GestureDetector(
+//                   onTap: effectiveSkip,
+//                   child: Container(
+//                     padding: const EdgeInsets.symmetric(vertical: 8),
+//                     decoration: BoxDecoration(
+//                       color: kRedLight, borderRadius: BorderRadius.circular(9),
+//                       border: Border.all(color: kRedBorder),
+//                     ),
+//                     alignment: Alignment.center,
+//                     child: const Text('Skip', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kRedDark)),
+//                   ),
+//                 ),
+//               ),
+//               if (!isReceptionist) const SizedBox(width: 7),
+//             ],
+//             if (!isReceptionist)
+//               Expanded(
+//                 flex: 2,
+//                 child: GestureDetector(
+//                   onTap: effectiveAccessible ? () => _startSession(p) : null,
+//                   child: Container(
+//                     padding: const EdgeInsets.symmetric(vertical: 8),
+//                     decoration: BoxDecoration(
+//                       gradient: effectiveAccessible ? kPrimaryGradient : null,
+//                       color: effectiveAccessible ? null : kHairline,
+//                       borderRadius: BorderRadius.circular(9),
+//                     ),
+//                     alignment: Alignment.center,
+//                     child: Text(
+//                       isIP ? 'Continue' : isSkipped ? 'Recall' : 'Start Session',
+//                       style: TextStyle(
+//                         fontSize: 12, fontWeight: FontWeight.w700,
+//                         color: effectiveAccessible ? Colors.white : kTextMuted,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//           ]),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Widget _buildCompletedPatientCard(AppointmentList p) {
+//     final name     = p.patientName ?? 'Patient';
+//     final initials = _initials(name);
+//     final age      = _calcAge(p.dob);
+
+//     const avBg = kPrimaryLighter;
+//     const avBd = kPrimaryLight;
+//     const avFg = kPrimaryDark;
+
+//     return Container(
+//       decoration: BoxDecoration(
+//         gradient: kCardGlassGradient,
+//         borderRadius: BorderRadius.circular(12),
+//         border: Border.all(color: kHairline),
+//         boxShadow: kSoftShadow,
+//       ),
+//       padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+//       child: Column(
+//         crossAxisAlignment: CrossAxisAlignment.start,
+//         children: [
+//           Row(children: [
+//             Container(
+//               width: 36, height: 36,
+//               decoration: BoxDecoration(
+//                 color: avBg,
+//                 borderRadius: BorderRadius.circular(10),
+//                 border: Border.all(color: avBd),
+//               ),
+//               alignment: Alignment.center,
+//               child: Text(initials,
+//                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: avFg)),
+//             ),
+//             const SizedBox(width: 9),
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(name,
+//                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: kTextPrimary, height: 1.15),
+//                       overflow: TextOverflow.ellipsis),
+//                   const SizedBox(height: 1),
+//                   Text(
+//                     [if (p.gender != null) p.gender!, if (age != null) '$age yrs'].join(' · '),
+//                     style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ]),
+//           const SizedBox(height: 8),
+//           GestureDetector(
+//             onTap: () => _viewPrescription(p),
+//             child: Container(
+//               width: double.infinity,
+//               padding: const EdgeInsets.symmetric(vertical: 8),
+//               decoration: BoxDecoration(
+//                 color: kPurpleLight,
+//                 borderRadius: BorderRadius.circular(9),
+//                 border: Border.all(color: kPurpleBorder),
+//               ),
+//               alignment: Alignment.center,
+//               child: const Text('View Prescription',
+//                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPurpleDark)),
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   // ─────────────────────────────────────────────────────────────────────────
+//   // BADGES & CHIPS
+//   // ─────────────────────────────────────────────────────────────────────────
+
+//   Widget _statusChip(String status) {
+//     Color bg, fg, dot;
+//     switch (status.toLowerCase()) {
+//       case 'in_progress':
+//         bg = kPrimaryLighter; fg = kPrimaryDark; dot = kPrimary;
+//         break;
+//       case 'skipped':
+//         bg = kAmberLight; fg = kAmberDark; dot = kAmber;
+//         break;
+//       case 'completed':
+//         bg = kGreenLight; fg = kGreenDark; dot = kGreen;
+//         break;
+//       default:
+//         bg = kRedLight; fg = kRedDark; dot = kRed;
+//     }
+//     return _badgeDot(
+//         status == 'in_progress'
+//             ? 'In Progress'
+//             : status[0].toUpperCase() + status.substring(1),
+//         bg, fg, dot);
+//   }
+
+//   Widget _queueStateBadge(QueueState state) {
+//     late String label;
+//     late Color bg, fg, dot;
+//     switch (state) {
+//       case QueueState.running:
+//         label = 'Running'; bg = kPrimaryLighter; fg = kPrimaryDark; dot = kPrimary;
+//         break;
+//       case QueueState.paused:
+//         label = 'Paused'; bg = kAmberLight; fg = kAmberDark; dot = kAmber;
+//         break;
+//       case QueueState.stopped:
+//         label = 'Closed';
+//         bg = const Color(0xFFF3F4F6);
+//         fg = const Color(0xFF6B7280);
+//         dot = const Color(0xFF9CA3AF);
+//         break;
+//       case QueueState.idle:
+//         label = 'Idle'; bg = kRedLight; fg = kRedDark; dot = kRed;
+//         break;
+//     }
+//     return _badgeDot(label, bg, fg, dot);
+//   }
+
+//   Widget _badgeDot(String label, Color bg, Color fg, Color dot) =>
+//       Container(
+//         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+//         decoration: BoxDecoration(
+//           color: bg,
+//           borderRadius: BorderRadius.circular(20),
+//           border: Border.all(color: dot.withOpacity(0.18)),
+//         ),
+//         child: Row(mainAxisSize: MainAxisSize.min, children: [
+//           Container(
+//             width: 5,
+//             height: 5,
+//             decoration: BoxDecoration(
+//               color: dot,
+//               shape: BoxShape.circle,
+//             ),
+//           ),
+//           const SizedBox(width: 4),
+//           Text(
+//             label,
+//             style: TextStyle(
+//               fontSize: 11,
+//               fontWeight: FontWeight.w700,
+//               letterSpacing: 0.2,
+//               color: fg,
+//             ),
+//           ),
+//         ]),
+//       );
+
+//   Widget _tagChip(String label, {required Color bg, required Color fg}) =>
+//       Container(
+//         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+//         decoration: BoxDecoration(
+//           color: bg,
+//           borderRadius: BorderRadius.circular(6),
+//           border: Border.all(color: fg.withOpacity(0.15)),
+//         ),
+//         child: Text(
+//           label,
+//           style: TextStyle(
+//             fontSize: 11,
+//             fontWeight: FontWeight.w700,
+//             color: fg,
+//             letterSpacing: 0.2,
+//           ),
+//         ),
+//       );
+
+//   // ── Premium helpers ─────────────────────────────────────────────────────
+
+//   Widget _slotPill(String label) => Container(
+//         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+//         decoration: BoxDecoration(
+//           gradient: LinearGradient(
+//             colors: [kPrimaryLight, kPrimaryLighter],
+//             begin: Alignment.topLeft,
+//             end: Alignment.bottomRight,
+//           ),
+//           borderRadius: BorderRadius.circular(20),
+//           border: Border.all(color: kPrimary.withOpacity(0.18)),
+//         ),
+//         child: Row(
+//           mainAxisSize: MainAxisSize.min,
+//           children: [
+//             const Icon(Icons.schedule_rounded, size: 9, color: kPrimaryDark),
+//             const SizedBox(width: 3),
+//             Text(
+//               label,
+//               style: const TextStyle(
+//                 fontSize: 11,
+//                 fontWeight: FontWeight.w700,
+//                 color: kPrimaryDark,
+//                 letterSpacing: 0.2,
+//               ),
+//             ),
+//           ],
+//         ),
+//       );
+
+//   Widget _gradientProgress(double value) => ClipRRect(
+//         borderRadius: BorderRadius.circular(20),
+//         child: Container(
+//           height: 6,
+//           decoration: BoxDecoration(
+//             color: kPrimaryLight.withOpacity(0.6),
+//             borderRadius: BorderRadius.circular(20),
+//           ),
+//           child: FractionallySizedBox(
+//             widthFactor: value.clamp(0.0, 1.0),
+//             alignment: Alignment.centerLeft,
+//             child: Container(
+//               decoration: BoxDecoration(
+//                 gradient: kPrimaryGradient,
+//                 borderRadius: BorderRadius.circular(20),
+//               ),
+//             ),
+//           ),
+//         ),
+//       );
+
+//   Widget _sectionHeader(String label, int count, Color accent, Color accentLight, Color accentDark) {
+//     return Row(children: [
+//       Container(
+//         width: 3,
+//         height: 14,
+//         decoration: BoxDecoration(
+//           gradient: LinearGradient(
+//             colors: [accent, accent.withOpacity(0.5)],
+//             begin: Alignment.topCenter,
+//             end: Alignment.bottomCenter,
+//           ),
+//           borderRadius: BorderRadius.circular(3),
+//         ),
+//       ),
+//       const SizedBox(width: 7),
+//       Text(
+//         label,
+//         style: const TextStyle(
+//           fontSize: 14,
+//           fontWeight: FontWeight.w700,
+//           color: kTextPrimary,
+//           letterSpacing: -0.1,
+//         ),
+//       ),
+//       const SizedBox(width: 6),
+//       Container(
+//         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+//         decoration: BoxDecoration(
+//           color: accentLight,
+//           borderRadius: BorderRadius.circular(20),
+//           border: Border.all(color: accent.withOpacity(0.18)),
+//         ),
+//         child: Text(
+//           '$count',
+//           style: TextStyle(
+//             fontSize: 11,
+//             fontWeight: FontWeight.w700,
+//             color: accentDark,
+//           ),
+//         ),
+//       ),
+//     ]);
+//   }
+
+//   Widget _pulseDot() => TweenAnimationBuilder<double>(
+//         tween: Tween(begin: 0.4, end: 1.0),
+//         duration: const Duration(milliseconds: 900),
+//         builder: (_, v, child) => Opacity(opacity: v, child: child),
+//         onEnd: () => setState(() {}),
+//         child: Container(
+//           width: 7,
+//           height: 7,
+//           decoration:
+//               const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
+//         ),
+//       );
+// }
+
+// // ─────────────────────────────────────────────────────────────────────────────
+// // WALK-IN INLINE PANEL  (shown below the walk-in card on home screen)
+// // ─────────────────────────────────────────────────────────────────────────────
+
+// class _WalkInInlinePanel extends ConsumerStatefulWidget {
+//   final VoidCallback onBooked;
+//   const _WalkInInlinePanel({required this.onBooked});
+
+//   @override
+//   ConsumerState<_WalkInInlinePanel> createState() => _WalkInInlinePanelState();
+// }
+
+// class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
+//   final _nameCtr   = TextEditingController();
+//   final _mobileCtr = TextEditingController();
+
+//   bool    _loading = true;
+//   String? _error;
+
+//   List<DoctorAvailabilityModel> _todaySessions = [];
+//   DoctorAvailabilityModel? _selected;
+
+//   bool    _booking  = false;
+//   String? _bookError;
+
+//   // patient lookup — inline (no bottom sheet)
+//   Patients?           _foundPatient;
+//   bool                _checkingMobile    = false;
+//   int?                _resolvedPatientId;
+//   int?                _familyMemberId;
+//   int?                _familyHeadPatientId;
+//   int?                _familyGenderId;
+//   List<FamilyMember>  _familyMembers     = [];
+//   bool                _loadingMembers    = false;
+//   bool                _addingNewMember   = false;
+//   final _newMemberCtr = TextEditingController();
+//   int  _newMemberGender = 1;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _mobileCtr.addListener(_onMobileChanged);
+//     WidgetsBinding.instance.addPostFrameCallback((_) => _loadSessions());
+//   }
+
+//   @override
+//   void dispose() {
+//     _mobileCtr.removeListener(_onMobileChanged);
+//     _nameCtr.dispose();
+//     _mobileCtr.dispose();
+//     _newMemberCtr.dispose();
+//     super.dispose();
+//   }
+
+//   ApiService? get _api {
+//     final dio = ref.read(dioProvider).value;
+//     if (dio == null) return null;
+//     return ApiService(dio);
+//   }
+
+//   void _clearPatientState() {
+//     _foundPatient        = null;
+//     _resolvedPatientId   = null;
+//     _familyMemberId      = null;
+//     _familyHeadPatientId = null;
+//     _familyGenderId      = null;
+//     _familyMembers       = [];
+//     _loadingMembers      = false;
+//     _addingNewMember     = false;
+//     _newMemberCtr.clear();
+//     _newMemberGender     = 1;
+//   }
+
+//   Future<void> _loadSessions() async {
+//     setState(() { _loading = true; _error = null; });
+//     final doctorId = ref.read(receptionistLoginViewModelProvider).doctorId;
+//     final api = _api;
+//     if (doctorId == null || api == null) {
+//       setState(() { _loading = false; _error = 'Doctor not linked'; });
+//       return;
+//     }
+//     final dayName = const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][DateTime.now().weekday - 1];
+//     try {
+//       final avails = await api.getDoctorAvailability(doctorId);
+//       final sessions = avails.where((a) {
+//         if (a.dayOfWeek != dayName) return false;
+//         if (a.isEnabled == false) return false;
+//         final mode = a.bookingMode ?? 0;
+//         return mode == 1 || mode == 2 || mode == 3;
+//       }).toList();
+//       if (!mounted) return;
+//       setState(() {
+//         _todaySessions = sessions;
+//         _selected = sessions.length == 1 ? sessions.first : null;
+//         _loading = false;
+//       });
+//     } catch (_) {
+//       if (mounted) setState(() { _loading = false; _error = 'Could not load sessions'; });
+//     }
+//   }
+
+//   void _onMobileChanged() {
+//     final digits = _mobileCtr.text.trim().replaceAll(RegExp(r'\D'), '');
+//     if (digits.length == 10) {
+//       _lookupMobile(digits);
+//     } else if (_foundPatient != null || _resolvedPatientId != null ||
+//                _familyMemberId != null || _familyHeadPatientId != null) {
+//       setState(() => _clearPatientState());
+//     }
+//   }
+
+//   Future<void> _lookupMobile(String mobile) async {
+//     final api = _api;
+//     if (api == null) return;
+//     setState(() { _checkingMobile = true; });
+//     try {
+//       final results = await api.checkPhonePatient(mobile);
+//       if (!mounted) return;
+//       if (results.isNotEmpty) {
+//         final p = results.first;
+//         setState(() { _foundPatient = p; _checkingMobile = false; _loadingMembers = true; });
+//         // load family members inline
+//         try {
+//           final members = p.patientId != null
+//               ? await api.fetchFamilyMembers(p.patientId!)
+//               : <FamilyMember>[];
+//           if (mounted) setState(() { _familyMembers = members; _loadingMembers = false; });
+//         } catch (_) {
+//           if (mounted) setState(() { _loadingMembers = false; });
+//         }
+//       } else {
+//         setState(() { _clearPatientState(); _checkingMobile = false; });
+//       }
+//     } catch (_) {
+//       if (mounted) setState(() { _checkingMobile = false; });
+//     }
+//   }
+
+//   // _showPatientSheet removed — options shown inline below mobile field
+
+//   String _fmtTime(String? iso) {
+//     if (iso == null || iso.isEmpty) return '';
+//     DateTime? dt = DateTime.tryParse(iso);
+//     int h, m;
+//     if (dt != null) { h = dt.hour; m = dt.minute; }
+//     else {
+//       final p = iso.split(':');
+//       h = int.tryParse(p[0]) ?? 0;
+//       m = p.length > 1 ? (int.tryParse(p[1]) ?? 0) : 0;
+//     }
+//     final sf = h < 12 ? 'AM' : 'PM';
+//     final dh = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+//     return '${dh.toString().padLeft(2,'0')}:${m.toString().padLeft(2,'0')} $sf';
+//   }
+
+//   String _modeLabel(int? m) => switch (m) { 1 => 'Queue', 2 => 'Slots', 3 => 'Queue+Slots', _ => '' };
+
+//   Future<void> _book() async {
+//     final name   = _nameCtr.text.trim();
+//     final mobile = _mobileCtr.text.trim();
+//     if (name.isEmpty) { setState(() { _bookError = 'Patient name is required'; }); return; }
+//     if (mobile.length < 10) { setState(() { _bookError = 'Enter valid 10-digit mobile'; }); return; }
+//     if (_selected == null) { setState(() { _bookError = 'Please select a session'; }); return; }
+
+//     final doctorId = ref.read(receptionistLoginViewModelProvider).doctorId;
+//     if (doctorId == null) return;
+
+//     setState(() { _booking = true; _bookError = null; });
+
+//     final today = DateTime.now();
+//     final dateStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+//     final mode    = _selected!.bookingMode ?? 0;
+//     final isQueue = mode == 1 || mode == 3;
+//     final isNewFamily      = _familyHeadPatientId != null;
+//     final isExistingFamily = _familyMemberId != null;
+//     final isFamilyBooking  = isNewFamily || isExistingFamily;
+
+//     final body = <String, dynamic>{
+//       'name':             name,
+//       'mobile_no':        mobile,
+//       'doctor_id':        doctorId,
+//       'appointment_date': dateStr,
+//       'slot_id':          _selected!.slotId,
+//       'start_time':       isQueue ? null : null,
+//       'user_type':        isFamilyBooking ? 2 : 1,
+//       if (isExistingFamily) 'patient_id': _familyMemberId,
+//       if (isNewFamily) 'family_id': _familyHeadPatientId,
+//       if (isNewFamily && _familyGenderId != null) 'gender_id': _familyGenderId,
+//       if (!isFamilyBooking && _resolvedPatientId != null) 'patient_id': _resolvedPatientId,
+//     }..removeWhere((_, v) => v == null);
+
+//     try {
+//       final isOnline = ref.read(connectivityNotifierProvider).isOnline;
+//       final resp = await ref.read(receptionistLoginViewModelProvider.notifier)
+//           .walkInBook(body, isOnline: isOnline);
+//       if (!mounted) return;
+//       if (resp.success == true) {
+//         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+//           content: Text(resp.message ?? 'Walk-in patient booked'),
+//           backgroundColor: kPrimary,
+//           behavior: SnackBarBehavior.floating,
+//           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//         ));
+//         widget.onBooked();
+//       } else {
+//         setState(() { _bookError = resp.message ?? 'Booking failed'; });
+//       }
+//     } catch (e) {
+//       if (mounted) setState(() { _bookError = e.toString().replaceFirst('Exception: ', ''); });
+//     } finally {
+//       if (mounted) setState(() { _booking = false; });
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final bookedFor = _resolvedPatientId != null
+//         ? _nameCtr.text
+//         : _familyMemberId != null || _familyHeadPatientId != null
+//             ? _nameCtr.text
+//             : null;
+
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: Colors.white,
+//         borderRadius: BorderRadius.circular(14),
+//         border: Border.all(color: kHairline),
+//       ),
+//       padding: const EdgeInsets.all(14),
+//       child: _loading
+//           ? const Center(child: Padding(
+//               padding: EdgeInsets.all(16),
+//               child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+//             ))
+//           : _error != null
+//               ? _errBox(_error!)
+//               : _todaySessions.isEmpty
+//                   ? _errBox('No sessions scheduled for today')
+//                   : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//                       // Today label
+//                       Row(children: [
+//                         const Icon(Icons.event_rounded, size: 14, color: kPrimary),
+//                         const SizedBox(width: 6),
+//                         Text(
+//                           'Today  ·  ${const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][DateTime.now().weekday - 1]}, ${DateTime.now().day} ${const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][DateTime.now().month - 1]}',
+//                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimary),
+//                         ),
+//                       ]),
+//                       const SizedBox(height: 12),
+
+//                       // Session chips
+//                       if (_todaySessions.length > 1) ...[
+//                         const Text('SELECT SESSION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted, letterSpacing: 0.7)),
+//                         const SizedBox(height: 8),
+//                       ],
+//                       Wrap(
+//                         spacing: 8, runSpacing: 8,
+//                         children: _todaySessions.map((s) {
+//                           final isSel = _selected?.slotId == s.slotId;
+//                           return GestureDetector(
+//                             onTap: () => setState(() => _selected = s),
+//                             child: AnimatedContainer(
+//                               duration: const Duration(milliseconds: 150),
+//                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+//                               decoration: BoxDecoration(
+//                                 color: isSel ? kPrimary : kPrimaryLight.withValues(alpha: 0.5),
+//                                 borderRadius: BorderRadius.circular(10),
+//                                 border: Border.all(color: isSel ? kPrimary : const Color(0xFFB2EBE4)),
+//                               ),
+//                               child: Column(mainAxisSize: MainAxisSize.min, children: [
+//                                 Text('${_fmtTime(s.startTime)} – ${_fmtTime(s.endTime)}',
+//                                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+//                                         color: isSel ? Colors.white : kTextPrimary)),
+//                                 const SizedBox(height: 2),
+//                                 Text(_modeLabel(s.bookingMode),
+//                                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: isSel ? Colors.white70 : kTextMuted)),
+//                               ]),
+//                             ),
+//                           );
+//                         }).toList(),
+//                       ),
+//                       const SizedBox(height: 14),
+
+//                       // Name field
+//                       _inlineField(controller: _nameCtr, label: 'Patient Name', icon: Icons.person_outline_rounded,
+//                           type: TextInputType.name, caps: TextCapitalization.words),
+//                       const SizedBox(height: 10),
+
+//                       // Mobile field
+//                       _inlineField(controller: _mobileCtr, label: 'Mobile Number', icon: Icons.phone_outlined,
+//                           type: TextInputType.phone, maxLen: 10,
+//                           formatters: [FilteringTextInputFormatter.digitsOnly]),
+
+//                       // Patient lookup feedback
+//                       if (_checkingMobile) ...[
+//                         const SizedBox(height: 8),
+//                         const Row(children: [
+//                           SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary)),
+//                           SizedBox(width: 8),
+//                           Text('Checking...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted)),
+//                         ]),
+//                       ] else if (_foundPatient != null && _resolvedPatientId == null &&
+//                                  _familyMemberId == null && _familyHeadPatientId == null) ...[
+//                         // ── Inline patient options (no bottom sheet) ──────
+//                         const SizedBox(height: 8),
+//                         Container(
+//                           decoration: BoxDecoration(
+//                             color: kPrimaryLight.withValues(alpha: 0.5),
+//                             borderRadius: BorderRadius.circular(12),
+//                             border: Border.all(color: kPrimary.withValues(alpha: 0.3)),
+//                           ),
+//                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//                             // Header
+//                             Padding(
+//                               padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+//                               child: Row(children: [
+//                                 const Icon(Icons.person_rounded, size: 14, color: kPrimary),
+//                                 const SizedBox(width: 6),
+//                                 Text('${_foundPatient!.name}  ·  ${_foundPatient!.mobileNo ?? ''}',
+//                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPrimary)),
+//                               ]),
+//                             ),
+//                             const Divider(height: 1, color: kBorder),
+//                             // Book for primary
+//                             InkWell(
+//                               onTap: () => setState(() {
+//                                 _resolvedPatientId   = _foundPatient!.patientId;
+//                                 _nameCtr.text        = _foundPatient!.name ?? _nameCtr.text;
+//                                 _foundPatient        = null;
+//                                 _familyMemberId      = null;
+//                                 _familyHeadPatientId = null;
+//                                 _familyGenderId      = null;
+//                               }),
+//                               child: Padding(
+//                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//                                 child: Row(children: [
+//                                   const Icon(Icons.how_to_reg_rounded, size: 14, color: kPrimary),
+//                                   const SizedBox(width: 8),
+//                                   Text('Book for ${_foundPatient!.name}',
+//                                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPrimary)),
+//                                 ]),
+//                               ),
+//                             ),
+//                             // Family members
+//                             if (_loadingMembers) ...[
+//                               const Divider(height: 1, color: kBorder),
+//                               const Padding(
+//                                 padding: EdgeInsets.all(10),
+//                                 child: Center(child: SizedBox(width: 14, height: 14,
+//                                     child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary))),
+//                               ),
+//                             ] else if (_familyMembers.isNotEmpty) ...[
+//                               const Divider(height: 1, color: kBorder),
+//                               ..._familyMembers.map((m) => Column(children: [
+//                                 InkWell(
+//                                   onTap: () => setState(() {
+//                                     _familyMemberId      = m.memberId!;
+//                                     _nameCtr.text        = m.memberName ?? '';
+//                                     _foundPatient        = null;
+//                                     _resolvedPatientId   = null;
+//                                     _familyHeadPatientId = null;
+//                                     _familyGenderId      = null;
+//                                   }),
+//                                   child: Padding(
+//                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+//                                     child: Row(children: [
+//                                       CircleAvatar(radius: 12, backgroundColor: kPrimaryLight,
+//                                           child: Text(m.avatarLetter,
+//                                               style: const TextStyle(color: kPrimary, fontSize: 11, fontWeight: FontWeight.w700))),
+//                                       const SizedBox(width: 8),
+//                                       Expanded(child: Text(m.memberName ?? '',
+//                                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary))),
+//                                       Text([m.genderName, m.relationName].where((s) => s != null && s.isNotEmpty).join(' · '),
+//                                           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted)),
+//                                     ]),
+//                                   ),
+//                                 ),
+//                                 const Divider(height: 1, color: kBorder),
+//                               ])),
+//                             ],
+//                             // Add new family member toggle
+//                             InkWell(
+//                               onTap: () => setState(() => _addingNewMember = !_addingNewMember),
+//                               child: Padding(
+//                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//                                 child: Row(children: [
+//                                   const Icon(Icons.person_add_alt_1_rounded, size: 14, color: kTextSecondary),
+//                                   const SizedBox(width: 8),
+//                                   const Text('Add new family member',
+//                                       style: TextStyle(fontSize: 12, color: kTextSecondary)),
+//                                   const Spacer(),
+//                                   Icon(_addingNewMember ? Icons.expand_less : Icons.expand_more,
+//                                       size: 16, color: kTextMuted),
+//                                 ]),
+//                               ),
+//                             ),
+//                             if (_addingNewMember) ...[
+//                               const Divider(height: 1, color: kBorder),
+//                               Padding(
+//                                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+//                                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+//                                   TextField(
+//                                     controller: _newMemberCtr,
+//                                     textCapitalization: TextCapitalization.words,
+//                                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+//                                     decoration: InputDecoration(
+//                                       hintText: 'Family member name',
+//                                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//                                       filled: true, fillColor: Colors.white,
+//                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
+//                                       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
+//                                       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+//                                     ),
+//                                   ),
+//                                   const SizedBox(height: 8),
+//                                   Row(children: [
+//                                     _GenderPill(label: 'Male',   value: 1, selected: _newMemberGender == 1, onTap: () => setState(() => _newMemberGender = 1)),
+//                                     const SizedBox(width: 6),
+//                                     _GenderPill(label: 'Female', value: 2, selected: _newMemberGender == 2, onTap: () => setState(() => _newMemberGender = 2)),
+//                                     const SizedBox(width: 6),
+//                                     _GenderPill(label: 'Other',  value: 3, selected: _newMemberGender == 3, onTap: () => setState(() => _newMemberGender = 3)),
+//                                   ]),
+//                                   const SizedBox(height: 10),
+//                                   SizedBox(
+//                                     width: double.infinity,
+//                                     child: ElevatedButton(
+//                                       onPressed: () {
+//                                         final name = _newMemberCtr.text.trim();
+//                                         if (name.isEmpty) return;
+//                                         setState(() {
+//                                           _familyHeadPatientId = _foundPatient!.patientId;
+//                                           _familyGenderId      = _newMemberGender;
+//                                           _nameCtr.text        = name;
+//                                           _foundPatient        = null;
+//                                           _resolvedPatientId   = null;
+//                                           _familyMemberId      = null;
+//                                           _addingNewMember     = false;
+//                                         });
+//                                       },
+//                                       style: ElevatedButton.styleFrom(
+//                                         backgroundColor: kPrimary, foregroundColor: Colors.white,
+//                                         elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+//                                         padding: const EdgeInsets.symmetric(vertical: 10),
+//                                       ),
+//                                       child: const Text('Use this member', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+//                                     ),
+//                                   ),
+//                                 ]),
+//                               ),
+//                             ],
+//                           ]),
+//                         ),
+//                       ] else if (bookedFor != null) ...[
+//                         const SizedBox(height: 8),
+//                         Container(
+//                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//                           decoration: BoxDecoration(
+//                             color: kGreenLight,
+//                             borderRadius: BorderRadius.circular(10),
+//                             border: Border.all(color: kGreen.withValues(alpha: 0.5)),
+//                           ),
+//                           child: Row(children: [
+//                             const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF38A169)),
+//                             const SizedBox(width: 8),
+//                             Text('Booking for $bookedFor',
+//                                 style: const TextStyle(fontSize: 12, color: Color(0xFF38A169), fontWeight: FontWeight.w500)),
+//                           ]),
+//                         ),
+//                       ],
+
+//                       if (_bookError != null) ...[
+//                         const SizedBox(height: 10),
+//                         _errBox(_bookError!),
+//                       ],
+
+//                       const SizedBox(height: 14),
+
+//                       SizedBox(
+//                         width: double.infinity,
+//                         height: 44,
+//                         child: ElevatedButton(
+//                           onPressed: _booking ? null : _book,
+//                           style: ElevatedButton.styleFrom(
+//                             backgroundColor: kPrimary, foregroundColor: Colors.white,
+//                             elevation: 0,
+//                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//                           ),
+//                           child: _booking
+//                               ? const SizedBox(width: 18, height: 18,
+//                                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+//                               : const Text('Book Walk-in Patient',
+//                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+//                         ),
+//                       ),
+//                     ]),
+//     );
+//   }
+
+//   Widget _inlineField({
+//     required TextEditingController controller,
+//     required String label,
+//     required IconData icon,
+//     TextInputType type = TextInputType.text,
+//     TextCapitalization caps = TextCapitalization.none,
+//     int? maxLen,
+//     List<TextInputFormatter>? formatters,
+//   }) =>
+//       TextField(
+//         controller: controller,
+//         keyboardType: type,
+//         textCapitalization: caps,
+//         maxLength: maxLen,
+//         inputFormatters: formatters,
+//         style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+//         decoration: InputDecoration(
+//           labelText: label,
+//           labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary),
+//           prefixIcon: Icon(icon, size: 16, color: kTextSecondary),
+//           counterText: '',
+//           filled: true, fillColor: const Color(0xFFF7FDFC),
+//           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+//           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+//           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
+//           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+//         ),
+//       );
+
+//   Widget _errBox(String msg) => Container(
+//     width: double.infinity,
+//     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//     decoration: BoxDecoration(
+//       color: kRedLight, borderRadius: BorderRadius.circular(10),
+//       border: Border.all(color: kRed.withValues(alpha: 0.3)),
+//     ),
+//     child: Text(msg, style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: kRedDark)),
+//   );
+// }
+
+// // Gender pill for walk-in family member sheet
+// class _GenderPill extends StatelessWidget {
+//   final String label;
+//   final int    value;
+//   final bool   selected;
+//   final VoidCallback onTap;
+//   const _GenderPill({required this.label, required this.value, required this.selected, required this.onTap});
+
+//   @override
+//   Widget build(BuildContext context) => GestureDetector(
+//     onTap: onTap,
+//     child: Container(
+//       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+//       decoration: BoxDecoration(
+//         color: selected ? kPrimary : Colors.white,
+//         borderRadius: BorderRadius.circular(20),
+//         border: Border.all(color: selected ? kPrimary : kBorder),
+//       ),
+//       child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+//           color: selected ? Colors.white : kTextSecondary)),
+//     ),
+//   );
+// }
+
+
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -18,67 +4118,97 @@ import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_patient_history.dart';
+import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
+import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
-// walk_in_patient_page import removed — inline panel used instead
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS
 // ─────────────────────────────────────────────────────────────────────────────
 
-const kPrimary        = Color(0xFF26C6B0);
-const kPrimaryDark    = Color(0xFF2BB5A0);
-const kPrimaryLight   = Color(0xFFD9F5F1);
-const kPrimaryLighter = Color(0xFFF2FCFA);
+// Page & card surfaces
+const kPageBg         = Color(0xFFF8F9FB); // grey-50
+const kCardBg         = Colors.white;
+const kCardBorder     = Color(0xFFE2E8F0);
 
-const kTextPrimary    = Color(0xFF2D3748);
-const kTextSecondary  = Color(0xFF718096);
-const kTextMuted      = Color(0xFFA0AEC0);
+// Primary (teal)
+const kPrimary        = Color(0xFF1D9E75);
+const kPrimaryDark    = Color(0xFF0F6E56);
+const kPrimaryLight   = Color(0xFFE1F5EE);
+const kPrimaryLighter = Color(0xFFF0FBF8);
 
-const kBorder         = Color(0xFFEDF2F7);
+// Text
+const kTextPrimary    = Color(0xFF0F172A);
+const kTextSecondary  = Color(0xFF64748B);
+const kTextMuted      = Color(0xFF94A3B8);
 
-const kGreen          = Color(0xFF68D391);
-const kGreenDark      = Color(0xFF276749);
-const kGreenLight     = Color(0xFFF0FFF8);
-const kGreenBorder    = Color(0xFFC6F6D5);
+const kBorder         = Color(0xFFE2E8F0);
+const kHairline       = Color(0xFFE2E8F0);
 
-const kAmber          = Color(0xFFF6AD55);
-const kAmberDark      = Color(0xFF975A16);
-const kAmberLight     = Color(0xFFFFFBEB);
-const kAmberBorder    = Color(0xFFFCEFC7);
+// Green
+const kGreen          = Color(0xFF22C55E);
+const kGreenDark      = Color(0xFF166534);
+const kGreenLight     = Color(0xFFF0FDF4);
+const kGreenBorder    = Color(0xFFBBF7D0);
 
-const kRed            = Color(0xFFFC8181);
-const kRedDark        = Color(0xFFC53030);
-const kRedLight       = Color(0xFFFFF5F5);
-const kRedBorder      = Color(0xFFFED7D7);
+// Amber
+const kAmber          = Color(0xFFF59E0B);
+const kAmberDark      = Color(0xFF92400E);
+const kAmberLight     = Color(0xFFFEF3C7);
+const kAmberBorder    = Color(0xFFFDE68A);
 
-const kPurple         = Color(0xFF9F7AEA);
-const kPurpleDark     = Color(0xFF6B46C1);
-const kPurpleLight    = Color(0xFFFAF5FF);
-const kPurpleBorder   = Color(0xFFE9D5FF);
+// Red
+const kRed            = Color(0xFFEF4444);
+const kRedDark        = Color(0xFF7F1D1D);
+const kRedLight       = Color(0xFFFEE2E2);
+const kRedBorder      = Color(0xFFFECACA);
 
-// ── Premium medical surface tokens ──────────────────────────────────────────
-const kSurface         = Colors.white;
-const kSurfaceTinted   = Color(0xFFF7FDFC);
-const kBackgroundTop   = Color(0xFFEAF8F5);
-const kBackgroundBot   = Color(0xFFFBFDFC);
-const kHairline        = Color(0xFFE8EEF1);
+// Purple
+const kPurple         = Color(0xFF8B5CF6);
+const kPurpleDark     = Color(0xFF4C1D95);
+const kPurpleLight    = Color(0xFFEDE9FE);
+const kPurpleBorder   = Color(0xFFDDD6FE);
 
-const List<BoxShadow> kSoftShadow  = <BoxShadow>[];
-const List<BoxShadow> kFloatShadow = <BoxShadow>[];
-const List<BoxShadow> kInsetShadow = <BoxShadow>[];
+// Blue (waiting stat)
+const kBlueLight      = Color(0xFFEFF6FF);
+const kBlueBorder     = Color(0xFFBFDBFE);
+const kBlueDark       = Color(0xFF1E40AF);
 
-const LinearGradient kPrimaryGradient = LinearGradient(
-  colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
-const LinearGradient kCardGlassGradient = LinearGradient(
-  colors: [Colors.white, Color(0xFFFBFEFD)],
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-);
+// No shadows, no gradients
+const List<BoxShadow> kNoShadow = [];
+
+int? _minutesFromTimeString(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final value = raw.trim();
+  final dt = DateTime.tryParse(value);
+  if (dt != null) {
+    final local = dt.isUtc ? dt.toLocal() : dt;
+    return local.hour * 60 + local.minute;
+  }
+
+  final match = RegExp(r'(\d{1,2}):(\d{2})\s*([AP]M)?',
+          caseSensitive: false)
+      .firstMatch(value);
+  if (match == null) return null;
+
+  var hour = int.tryParse(match.group(1) ?? '');
+  final minute = int.tryParse(match.group(2) ?? '');
+  if (hour == null || minute == null) return null;
+
+  final suffix = match.group(3)?.toUpperCase();
+  if (suffix == 'PM' && hour != 12) hour += 12;
+  if (suffix == 'AM' && hour == 12) hour = 0;
+  return hour * 60 + minute;
+}
+
+bool _hasSessionEndedToday(String? endTime) {
+  final endMinutes = _minutesFromTimeString(endTime);
+  if (endMinutes == null) return false;
+  final now = DateTime.now();
+  return now.hour * 60 + now.minute >= endMinutes;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // QUEUE HOME PAGE
@@ -90,10 +4220,6 @@ class QueueHomePage extends ConsumerStatefulWidget {
   @override
   ConsumerState<QueueHomePage> createState() => _QueueHomePageState();
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DOCTOR TIPS  (auto-rotating carousel)
-// ─────────────────────────────────────────────────────────────────────────────
 
 class _Tip {
   final String emoji;
@@ -123,11 +4249,10 @@ const List<_Tip> _kDoctorTips = [
 
 class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   bool _hasFetched = false;
-  bool _showAllWaiting = false;
   bool _walkInExpanded = false;
+  final Map<int, bool> _patientsExpanded = {};
   late final ProviderSubscription<int?> _doctorIdSub;
 
-  // ── Tips carousel state ────────────────────────────────────────────────
   final PageController _tipsController = PageController();
   int _currentTip = 0;
   Timer? _tipsTimer;
@@ -163,8 +4288,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     super.dispose();
   }
 
-  int get _doctorId =>
-      ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+  int get _doctorId => ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
 
   String get _doctorName {
     if (ref.read(tokenProvider).roleId == 3) {
@@ -179,17 +4303,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     _hasFetched = true;
     ref.read(appointmentViewModelProvider.notifier).joinClinic(_doctorId);
     await Future.wait([
-      ref
-          .read(appointmentViewModelProvider.notifier)
-          .fetchPatientAppointments(_doctorId),
-      ref
-          .read(doctorSettingsViewModelProvider.notifier)
-          .getDoctorSchedule(_doctorId),
+      ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId),
+      ref.read(doctorSettingsViewModelProvider.notifier).getDoctorSchedule(_doctorId),
     ]);
   }
 
   Future<void> _refreshData() => _loadData(force: true);
-  
 
   // ── Queue filters ─────────────────────────────────────────────────────────
 
@@ -200,15 +4319,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       if (a.bookingType != 1) return false;
       final d = DateTime.tryParse(a.appointmentDate ?? '');
       if (d == null) return false;
-      return d.year == today.year &&
-          d.month == today.month &&
-          d.day == today.day;
+      return d.year == today.year && d.month == today.month && d.day == today.day;
     }).toList()
       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
   }
-
-  List<AppointmentList> _waitingList(List<AppointmentList> queue) =>
-      queue.length > 1 ? queue.skip(1).toList() : [];
 
   List<AppointmentList> _completedToday(List<AppointmentList> all) {
     final today = DateTime.now();
@@ -216,9 +4330,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       if ((a.status?.toLowerCase() ?? '') != 'completed') return false;
       final d = DateTime.tryParse(a.appointmentDate ?? '');
       if (d == null) return false;
-      return d.year == today.year &&
-          d.month == today.month &&
-          d.day == today.day;
+      return d.year == today.year && d.month == today.month && d.day == today.day;
     }).toList();
   }
 
@@ -228,30 +4340,34 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       if ((a.status?.toLowerCase() ?? '') != 'skipped') return false;
       final d = DateTime.tryParse(a.appointmentDate ?? '');
       if (d == null) return false;
-      return d.year == today.year &&
-          d.month == today.month &&
-          d.day == today.day;
+      return d.year == today.year && d.month == today.month && d.day == today.day;
     }).toList();
   }
 
-  // All of today's appointments regardless of status (for "Total" stat).
+  List<AppointmentList> _todayActivePatients(List<AppointmentList> all) {
+    final today = DateTime.now();
+    return all.where((a) {
+      final d = DateTime.tryParse(a.appointmentDate ?? '');
+      if (d == null) return false;
+      final s = a.status?.toLowerCase().trim() ?? '';
+      return (s == 'booked' || s == 'in_progress' || s == 'skipped') &&
+          d.year == today.year && d.month == today.month && d.day == today.day;
+    }).toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+  }
+
   int _todayTotalCount(List<AppointmentList> all) {
     final today = DateTime.now();
     return all.where((a) {
       final d = DateTime.tryParse(a.appointmentDate ?? '');
       if (d == null) return false;
-      return d.year == today.year &&
-          d.month == today.month &&
-          d.day == today.day;
+      return d.year == today.year && d.month == today.month && d.day == today.day;
     }).length;
   }
 
-  // Last 7 days completed-count series (oldest first, today last).
-  List<({DateTime date, int count})> _lastSevenDaysCompleted(
-      List<AppointmentList> all) {
+  List<({DateTime date, int count})> _lastSevenDaysCompleted(List<AppointmentList> all) {
     final today = DateTime.now();
-    final start = DateTime(today.year, today.month, today.day)
-        .subtract(const Duration(days: 6));
+    final start = DateTime(today.year, today.month, today.day).subtract(const Duration(days: 6));
     final out = <({DateTime date, int count})>[];
     for (int i = 0; i < 7; i++) {
       final d = start.add(Duration(days: i));
@@ -270,8 +4386,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+      content: Text(msg, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
       behavior: SnackBarBehavior.floating,
       backgroundColor: kPrimaryDark,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -290,8 +4405,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         content: Text(message,
             style: const TextStyle(fontSize: 13.5, color: kTextSecondary, height: 1.4)),
         actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
@@ -308,8 +4422,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: Text(confirmLabel,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(confirmLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
         ],
       ),
@@ -331,25 +4444,20 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
-  // Resume a paused queue → start it again, then jump straight to the
-  // Patient List tab so the doctor can continue seeing patients.
   Future<void> _onQueueResume(int? queueId) async {
     await _onQueueStart(queueId);
     if (!mounted) return;
-    ref.read(doctorNavTabRequestProvider.notifier).state =
-        kDoctorPatientListTab;
+    ref.read(doctorNavTabRequestProvider.notifier).state = kDoctorPatientListTab;
   }
 
   Future<void> _onQueuePause(int? queueId) async {
     final ok = await _confirm(
       title: 'Pause Queue?',
-      message: 'Waiting patients will be notified that the queue is paused. '
-               'You can resume any time.',
+      message: 'Waiting patients will be notified that the queue is paused. You can resume any time.',
       confirmLabel: 'Pause',
       confirmColor: kAmberDark,
     );
     if (!ok) return;
-
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
@@ -401,14 +4509,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
-  // Confirmation happens in the custom dialog at the caller site
-  // (see "Emergency Pause?" dialog below). No second confirm here.
   Future<void> _onQueuePauseEmergency(int? queueId) async {
-    if (queueId == null) {
-      _snack('Queue ID not available');
-      return;
-    }
-
+    if (queueId == null) { _snack('Queue ID not available'); return; }
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
@@ -426,6 +4528,149 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (dob == null) return null;
     final d = DateTime.tryParse(dob);
     return d == null ? null : DateTime.now().year - d.year;
+  }
+
+  String? _ageStr(String? dob) {
+    final age = _calcAge(dob);
+    return age == null ? null : '$age yrs';
+  }
+
+  DateTime? _instantOf(String? raw) {
+    final v = raw?.trim();
+    if (v == null || v.isEmpty || v.toLowerCase() == 'null') return null;
+    try { return DateTime.parse(v).toUtc(); } catch (_) { return null; }
+  }
+
+  Future<void> _startSession(AppointmentList p) async {
+    final pid = p.patientId ?? 0;
+    final did = _doctorId;
+    if (pid == 0 || did == 0) { _snack('Missing info'); return; }
+    final status = p.status?.toLowerCase() ?? '';
+    if (status != 'in_progress') {
+      if (status == 'booked') {
+        final slotStart = _instantOf(p.startTime);
+        if (slotStart != null && DateTime.now().toUtc().isBefore(slotStart)) {
+          _snack('Scheduled for ${_fmtTime(p.startTime)} — start once the slot begins.');
+          return;
+        }
+      }
+      try {
+        final res = await ref.read(appointmentViewModelProvider.notifier).startSession(
+          AppointmentRequestModel(doctorId: did, patientId: pid, appointmentId: p.appointmentId ?? 0),
+        );
+        if (!mounted) return;
+        if (res.success != true) { _snack(res.message ?? 'Could not start session'); return; }
+      } catch (e) {
+        if (mounted) _snack('Failed to start session');
+        return;
+      }
+    }
+    if (!mounted) return;
+    await Navigator.push(context, MaterialPageRoute(
+      builder: (_) => PrescriptionScreen(
+        patientId: pid, doctorId: did,
+        userTypeId: p.userType ?? 1,
+        appointmentId: p.appointmentId ?? 0,
+        patientName: p.patientName ?? 'Patient',
+        patientAge: _ageStr(p.dob),
+        patientGender: p.gender,
+        queueNumber: p.queueNumber,
+        patientStatus: p.status ?? 'booked',
+        symptoms: p.symptoms,
+      ),
+    ));
+    if (!mounted) return;
+    _hasFetched = false;
+    await _refreshData();
+  }
+
+  Future<void> _skipPatient(AppointmentList p) async {
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
+        AppointmentRequestModel(
+          doctorId: _doctorId, appointmentId: p.appointmentId ?? 0,
+          patientId: p.patientId ?? 0, isNext: 0,
+        ),
+      );
+      if (!mounted) return;
+      _snack(res.message ?? (res.success == true ? 'Patient skipped' : 'Skip failed'));
+    } catch (_) {
+      if (mounted) _snack('Failed to skip');
+    }
+  }
+
+  Future<void> _cancelByDoctor(AppointmentList p) async {
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier).cancelByDoctor(
+        AppointmentRequestModel(doctorId: _doctorId, appointmentId: p.appointmentId ?? 0),
+      );
+      if (!mounted) return;
+      _snack(res.message ?? (res.success == true ? 'Appointment cancelled' : 'Cancel failed'));
+    } catch (_) {
+      if (mounted) _snack('Failed to cancel');
+    }
+  }
+
+  void _cancelConfirm(AppointmentList p) => showDialog(
+    context: context,
+    builder: (ctx) => Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      backgroundColor: Colors.white,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 48, height: 48,
+            decoration: const BoxDecoration(color: kRedLight, shape: BoxShape.circle),
+            child: const Icon(Icons.cancel_outlined, color: kRed, size: 22),
+          ),
+          const SizedBox(height: 12),
+          const Text('Cancel Appointment',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+          const SizedBox(height: 6),
+          Text('Cancel appointment for ${p.patientName ?? 'this patient'}?',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 13, color: kTextSecondary, height: 1.5)),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: OutlinedButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: kBorder),
+                foregroundColor: kTextSecondary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+              ),
+              child: const Text('No', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            )),
+            const SizedBox(width: 10),
+            Expanded(child: ElevatedButton(
+              onPressed: () { Navigator.pop(ctx); _cancelByDoctor(p); },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: kRed, foregroundColor: Colors.white, elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(vertical: 11),
+              ),
+              child: const Text('Yes, Cancel', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            )),
+          ]),
+        ]),
+      ),
+    ),
+  );
+
+  void _viewPrescription(AppointmentList p) {
+    if ((p.patientId ?? 0) == 0) { _snack('Missing info'); return; }
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => DoctorPrescriptionDetailScreen(
+        appointmentId: p.appointmentId ?? 0,
+        patientId: p.patientId ?? 0,
+        patientName: p.patientName ?? 'Patient',
+        patientAge: _ageStr(p.dob),
+        patientGender: p.gender,
+        queueNumber: p.queueNumber,
+      ),
+    ));
   }
 
   String _initials(String name) => name
@@ -447,11 +4692,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   AppointmentList? _findCurrentPatient(List<AppointmentList> all, int? appointmentId) {
     if (appointmentId == null || appointmentId == 0) return null;
-    try {
-      return all.firstWhere((a) => a.appointmentId == appointmentId);
-    } catch (_) {
-      return null;
-    }
+    try { return all.firstWhere((a) => a.appointmentId == appointmentId); }
+    catch (_) { return null; }
   }
 
   String _fmtTime(String? raw) {
@@ -459,12 +4701,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     try {
       final dt = DateTime.parse(raw).toUtc();
       return DateFormat('h:mm a').format(dt);
-    } catch (_) {
-      return raw;
-    }
+    } catch (_) { return raw; }
   }
 
-  // Format "HH:MM:SS" time-of-day strings from the schedule API.
   String _fmtScheduleTime(String? raw) {
     if (raw == null || raw.isEmpty) return '';
     try {
@@ -472,9 +4711,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       final h = int.tryParse(parts[0]) ?? 0;
       final m = int.tryParse(parts.length > 1 ? parts[1] : '0') ?? 0;
       return DateFormat('h:mm a').format(DateTime(2000, 1, 1, h, m));
-    } catch (_) {
-      return raw;
-    }
+    } catch (_) { return raw; }
   }
 
   String _bookingModeLabel(int? mode) {
@@ -485,7 +4722,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
-  // Today's enabled slots from the doctor's weekly schedule.
   List<TimeSlotModel> _todayScheduledSlots() {
     final schedule = ref.read(doctorSettingsViewModelProvider).doctorSchedule;
     final days = schedule?.schedule;
@@ -495,32 +4731,21 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       if ((d.day ?? '').toLowerCase() == todayName) {
         if ((d.isEnabled ?? 0) != 1) return [];
         final slots = d.slots ?? [];
-        return [...slots]..sort((a, b) =>
-            (a.startTime ?? '').compareTo(b.startTime ?? ''));
+        return [...slots]..sort((a, b) => (a.startTime ?? '').compareTo(b.startTime ?? ''));
       }
     }
     return [];
   }
 
-  // ── FILTER: which sessions to show as cards ───────────────────────────────
-  // Hide a session when:
-  //   • queue_date is before today → a previous-day session the doctor never
-  //     closed. The live API already drops these, but the OFFLINE cache keeps
-  //     serving yesterday's session on a next-day refresh — guard it here so it
-  //     never renders as if it were today's.
-  //   • queue_status == 0 (idle) AND start_time == null  → no slot assigned yet, skip it
-  //   • queue_status == 3 (stopped/closed)               → hide closed queues
   bool _shouldShowSession(dynamic session) {
-    if (_isStaleQueueDate(session.queueDate as String?)) return false; // past day → hide
+    if (_isStaleQueueDate(session.queueDate as String?)) return false;
     final qs = session.queueStatus ?? 0;
     final hasSlot = session.startTime != null;
-    if (qs == 3) return false;               // closed → hide
-    if (qs == 0 && !hasSlot) return false;   // idle + no time slot → hide
+    if (qs == 3) return false;
+    if (qs == 0 && !hasSlot) return false;
     return true;
   }
 
-  // True when a session's queue_date is before today (compared by calendar day).
-  // Null/unparseable dates are treated as not-stale so live rows aren't dropped.
   bool _isStaleQueueDate(String? queueDate) {
     final d = DateTime.tryParse(queueDate ?? '');
     if (d == null) return false;
@@ -538,16 +4763,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final hour = DateTime.now().hour;
     final greeting = hour < 12
         ? 'Good Morning 👋'
-        : hour < 17
-            ? 'Good Afternoon 👋'
-            : 'Good Evening 👋';
+        : hour < 17 ? 'Good Afternoon 👋' : 'Good Evening 👋';
 
     final vmState           = ref.watch(appointmentViewModelProvider);
     final appointmentsAsync = vmState.patientAppointmentsList;
 
-    // Watch settings so the page rebuilds when today's schedule loads.
-    ref.watch(doctorSettingsViewModelProvider
-        .select((s) => s.doctorSchedule));
+    ref.watch(doctorSettingsViewModelProvider.select((s) => s.doctorSchedule));
 
     final isReceptionist = ref.watch(tokenProvider).roleId == 3;
     final doctorName = isReceptionist
@@ -555,62 +4776,24 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         : ref.watch(doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'));
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg, // ← grey-50
       body: appointmentsAsync.when(
         loading: () => _buildLoadingBody(greeting, doctorName),
         error: (e, _) => _buildErrorBody(e, greeting, doctorName),
         data: (list) {
-          final todayQueue = _todayQueue(list);
-          final current    = todayQueue.isNotEmpty ? todayQueue.first : null;
-          final waiting    = _waitingList(todayQueue);
-          final completed  = _completedToday(list);
-          final skipped    = _skippedToday(list);
-
-          // All today's sessions from API
-          final allSessions = vmState.todayQueueResult?.value ?? [];
-          
-
-          // Filter: only show sessions that should be visible
+          final todayQueue     = _todayQueue(list);
+          final current        = todayQueue.isNotEmpty ? todayQueue.first : null;
+          final completed      = _completedToday(list);
+          final skipped        = _skippedToday(list);
+          final allSessions    = vmState.todayQueueResult?.value ?? [];
           final visibleSessions = allSessions.where(_shouldShowSession).toList();
-
-          // Limit waiting list
-          final visibleWaiting = _showAllWaiting
-              ? waiting
-              : waiting.take(3).toList();
-
-          final totalToday = _todayTotalCount(list);
+          final todayActivePts = _todayActivePatients(list);
 
           return _buildRefreshableScrollView(
             slivers: [
-              // ── HEADER ──────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: _buildHeader(greeting, doctorName),
-              ),
+              SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
 
-              // ── TODAY'S STATS STRIP ─────────────────────────────────
-              // SliverToBoxAdapter(
-              //   child: Padding(
-              //     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-              //     child: _buildStatStrip(
-              //       total:   totalToday,
-              //       waiting: waiting.length + (current != null ? 1 : 0),
-              //       done:    completed.length,
-              //       skipped: skipped.length,
-              //     ),
-              //   ),
-              // ),
-
-              // ── TODAY'S SCHEDULE CARD  (always shown when slots exist)
-              // if (_todayScheduledSlots().isNotEmpty)
-              //   SliverToBoxAdapter(
-              //     child: Padding(
-              //       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-              //       child:
-              //           _buildTodayScheduleCard(_todayScheduledSlots()),
-              //     ),
-              //   ),
-
-              // ── WALK-IN CARD (receptionist only) ─────────────────────
+              // ── WALK-IN CARD (receptionist only) ───────────────────
               if (ref.watch(tokenProvider).roleId == 3)
                 SliverToBoxAdapter(
                   child: Padding(
@@ -636,7 +4819,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   ),
                 ),
 
-              // ── SESSION QUEUE CARDS / EMPTY STATE ───────────────────
+              // ── SESSION QUEUE CARDS / EMPTY STATE ──────────────────
               if (visibleSessions.isEmpty) ...[
                 if (_todayScheduledSlots().isEmpty)
                   SliverToBoxAdapter(
@@ -652,7 +4835,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                     delegate: SliverChildBuilderDelegate(
                       (_, i) {
                         final session   = visibleSessions[i];
-                        final qs        = _sessionQueueState(session.queueStatus);
+                        final sessionQs = _sessionQueueState(session.queueStatus);
                         final currentPt = _findCurrentPatient(list, session.currentServing);
                         final nextQNo   = session.currentQueueNo != null &&
                                 session.currentQueueNo! < (session.totalQueue ?? 0)
@@ -661,33 +4844,41 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                         final slotLbl = (session.startTime != null)
                             ? '${_fmtTime(session.startTime)} – ${_fmtTime(session.endTime)}'
                             : null;
-
-                        // ── Per-session stat strip ───────────────────
-                        // Skipped count not in TodayQueueModel — derive from
-                        // today's appointments filtered by this session's queueId.
-                        final sessionSkipped   = skipped
-                            .where((a) => a.queueId == session.queueId)
-                            .length;
-                        final sessionTotal     = session.totalQueue ?? 0;
-                        final sessionDone      = session.completedCount ?? 0;
-                        final sessionServing   = (session.currentServing ?? 0) > 0 ? 1 : 0;
-                        final sessionWaiting   = (sessionTotal - sessionDone - sessionServing - sessionSkipped)
+                        final sessionSkipped = skipped.where((a) => a.queueId == session.queueId).length;
+                        final sessionTotal   = session.totalQueue ?? 0;
+                        final sessionDone    = session.completedCount ?? 0;
+                        final sessionServing = (session.currentServing ?? 0) > 0 ? 1 : 0;
+                        final sessionWaiting = (sessionTotal - sessionDone - sessionServing - sessionSkipped)
                             .clamp(0, sessionTotal);
+                        final sessionPts = todayActivePts
+                            .where((p) => p.queueId == session.queueId)
+                            .toList();
+                        final sessionHasIP = sessionPts.any(
+                            (p) => (p.status?.toLowerCase() ?? '') == 'in_progress');
+                        final sessionBooked = sessionPts
+                            .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+                            .toList()
+                          ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+                        final sessionNextQNo = sessionBooked.isNotEmpty
+                            ? sessionBooked.first.queueNumber
+                            : null;
 
                         return Padding(
-                          padding: EdgeInsets.only(
-                              bottom: i < visibleSessions.length - 1 ? 8 : 0),
+                          padding: const EdgeInsets.only(bottom: 14),
                           child: _buildQueueCard(
-                            current:          currentPt,
-                            nextQueueNo:      nextQNo,
-                            total:            sessionTotal,
-                            done:             sessionDone,
-                            sessionWaiting:   sessionWaiting,
-                            sessionSkipped:   sessionSkipped,
-                            queueState:       qs,
-                            queueId:          session.queueId,
-                            slotLabel:        slotLbl,
-                            isOnlySession:    i == 0, // first session always full card
+                            current:        currentPt,
+                            nextQueueNo:    nextQNo,
+                            total:          sessionTotal,
+                            done:           sessionDone,
+                            sessionWaiting: sessionWaiting,
+                            sessionSkipped: sessionSkipped,
+                            queueState:     sessionQs,
+                            queueId:        session.queueId,
+                            slotLabel:      slotLbl,
+                            isOnlySession:  i == 0,
+                            sessionPts:     sessionPts,
+                            sessionHasIP:   sessionHasIP,
+                            sessionNextQNo: sessionNextQNo,
                           ),
                         );
                       },
@@ -696,15 +4887,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   ),
                 ),
 
-              // ── WEEKLY PERFORMANCE CHART ─────────────────────────────
-              // SliverToBoxAdapter(
-              //   child: Padding(
-              //     padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
-              //     child: _buildWeeklyPerformance(list),
-              //   ),
-              // ),
-
-              // ── QUICK ACTIONS ────────────────────────────────────────
+              // ── QUICK ACTIONS ───────────────────────────────────────
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
@@ -712,171 +4895,27 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                 ),
               ),
 
-              // ── DOCTOR TIPS CAROUSEL ─────────────────────────────────
-              // SliverToBoxAdapter(
-              //   child: Padding(
-              //     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-              //     child: _buildTipsCarousel(),
-              //   ),
-              // ),
-
-              // ── UPCOMING LIST HEADER ─────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
-                  child: _sectionHeader(
-                    'Upcoming',
-                    waiting.length,
-                    kPrimary,
-                    kPrimaryLight,
-                    kPrimaryDark,
-                  ),
-                ),
-              ),
-
-              // ── WAITING PATIENT CARDS ────────────────────────────────
-              waiting.isEmpty
-                  ? SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          decoration: BoxDecoration(
-                            gradient: kCardGlassGradient,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: kHairline),
-                            boxShadow: kSoftShadow,
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [kPrimaryLight, Colors.white],
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                    ),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: kPrimaryLight),
-                                  ),
-                                  child: const Icon(Icons.inbox_rounded,
-                                      color: kPrimary, size: 20),
-                                ),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'No Upcoming Patients',
-                                  style: TextStyle(
-                                    color: kTextSecondary,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.1,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                const Text(
-                                  'New bookings will appear here',
-                                  style: TextStyle(
-                                    color: kTextMuted,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  : SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (_, i) => Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: _patientCard(visibleWaiting[i]),
-                          ),
-                          childCount: visibleWaiting.length,
-                        ),
-                      ),
-                    ),
-
-              // ── SHOW ALL / SHOW LESS ─────────────────────────────────
-              if (waiting.length > 3)
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _showAllWaiting = !_showAllWaiting),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [kPrimaryLight, kPrimaryLighter],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: kPrimary.withOpacity(0.2)),
-                        ),
-                        alignment: Alignment.center,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _showAllWaiting
-                                  ? 'Show Less'
-                                  : 'Show All  (${waiting.length - 3} more)',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: kPrimaryDark,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              _showAllWaiting
-                                  ? Icons.keyboard_arrow_up_rounded
-                                  : Icons.keyboard_arrow_down_rounded,
-                              size: 18,
-                              color: kPrimaryDark,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-
-              // ── RECENTLY SEEN ────────────────────────────────────────
+              // ── RECENTLY SEEN ───────────────────────────────────────
               if (completed.isNotEmpty) ...[
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
-                    child: _sectionHeader(
-                      'Recently Seen',
-                      completed.length,
-                      kGreen,
-                      kGreenLight,
-                      kGreenDark,
-                    ),
+                    child: _sectionHeader('Recently Seen', completed.length,
+                        kGreen, kGreenLight, kGreenDark),
                   ),
                 ),
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (_, i) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: _patientCard(completed.take(5).toList()[i]),
-                      ),
-                      childCount:
-                          completed.length > 5 ? 5 : completed.length,
+                      (_, i) {
+                        final p = completed.take(5).toList()[i];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _buildCompletedPatientCard(p),
+                        );
+                      },
+                      childCount: completed.length > 5 ? 5 : completed.length,
                     ),
                   ),
                 ),
@@ -891,12 +4930,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // LOADING / ERROR BODIES
+  // SCROLL / LOADING / ERROR
   // ─────────────────────────────────────────────────────────────────────────
 
-  Widget _buildRefreshableScrollView({
-    required List<Widget> slivers,
-  }) {
+  Widget _buildRefreshableScrollView({required List<Widget> slivers}) {
     return RefreshIndicator(
       color: kPrimary,
       onRefresh: _refreshData,
@@ -923,315 +4960,119 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
           SliverFillRemaining(
             child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                        color: kRedLight,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: kRedBorder)),
-                    child:
-                        const Icon(Icons.error_outline, color: kRed, size: 22),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                  width: 48, height: 48,
+                  decoration: BoxDecoration(
+                    color: kRedLight, shape: BoxShape.circle,
+                    border: Border.all(color: kRedBorder),
                   ),
-                  const SizedBox(height: 10),
-                  Text('$e',
-                      style:
-                          const TextStyle(color: kTextMuted, fontSize: 12)),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: _refreshData,
-                    style: TextButton.styleFrom(foregroundColor: kPrimary),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+                  child: const Icon(Icons.error_outline, color: kRed, size: 22),
+                ),
+                const SizedBox(height: 10),
+                Text('$e', style: const TextStyle(color: kTextMuted, fontSize: 12)),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _refreshData,
+                  style: TextButton.styleFrom(foregroundColor: kPrimary),
+                  child: const Text('Retry'),
+                ),
+              ]),
             ),
           ),
         ],
       );
 
   // ─────────────────────────────────────────────────────────────────────────
-  // HEADER
+  // HEADER  (dark teal — same solid color, no gradient)
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildHeader(String greeting, String doctorName) {
     final initials = _initials(doctorName);
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(1.5),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: kPrimaryGradient,
-              ),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: kBorder)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 42, height: 42,
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
                   shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF9FE1CB), width: 2),
                 ),
                 alignment: Alignment.center,
-                child: ShaderMask(
-                  shaderCallback: (b) => kPrimaryGradient.createShader(b),
-                  child: Text(
-                    initials,
+                child: Text(initials,
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      letterSpacing: 0.4,
+                      fontSize: 14, fontWeight: FontWeight.w700,
+                      color: kPrimaryDark, letterSpacing: 0.4,
+                    )),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(greeting,
+                        style: const TextStyle(
+                          fontSize: 11, fontWeight: FontWeight.w500,
+                          color: kTextSecondary, height: 1.1,
+                        )),
+                    const SizedBox(height: 2),
+                    Text(
+                      ref.read(tokenProvider).roleId == 3 ? doctorName : 'Dr. $doctorName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700,
+                        color: kTextPrimary, letterSpacing: -0.3, height: 1.15,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    greeting,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: kTextSecondary,
-                      letterSpacing: 0.1,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    ref.read(tokenProvider).roleId == 3
-                        ? doctorName
-                        : 'Dr. $doctorName',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: kTextPrimary,
-                      letterSpacing: -0.3,
-                      height: 1.15,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: kPrimary.withOpacity(0.18)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF9FE1CB)),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Container(
-                    width: 5,
-                    height: 5,
+                    width: 5, height: 5,
                     decoration: const BoxDecoration(
-                      color: kPrimary,
-                      shape: BoxShape.circle,
+                      color: kPrimary, shape: BoxShape.circle,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 5),
                   Text(
                     DateFormat('d MMM').format(DateTime.now()),
                     style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: kPrimaryDark,
-                      letterSpacing: 0.2,
+                      fontSize: 11, fontWeight: FontWeight.w600,
+                      color: kPrimaryDark, letterSpacing: 0.2,
                     ),
                   ),
-                ],
+                ]),
               ),
-            ),
-            // const SizedBox(width: 6),
-            // Container(
-            //   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            //   decoration: BoxDecoration(
-            //     gradient: kPrimaryGradient,
-            //     borderRadius: BorderRadius.circular(20),
-            //   ),
-            //   child: Row(
-            //     mainAxisSize: MainAxisSize.min,
-            //     children: const [
-            //       Icon(Icons.verified_rounded,
-            //           color: Colors.white, size: 11),
-            //       SizedBox(width: 3),
-            //       Text(
-            //         'Pro',
-            //         style: TextStyle(
-            //           fontSize: 10,
-            //           fontWeight: FontWeight.w800,
-            //           color: Colors.white,
-            //           letterSpacing: 0.3,
-            //         ),
-            //       ),
-            //     ],
-            //   ),
-            // ),
-          ],
-        ),
-      ),
-    );
-  }
-
-
-//notification icon
-  // Widget _headerBtn({
-  //   required IconData icon,
-  //   bool badge = false,
-  //   required VoidCallback onTap,
-  // }) {
-  //   return GestureDetector(
-  //     onTap: onTap,
-  //     child: Stack(children: [
-  //       Container(
-  //         width: 36,
-  //         height: 36,
-  //         decoration: BoxDecoration(
-  //           color: const Color(0xFFF7F8FA),
-  //           borderRadius: BorderRadius.circular(10),
-  //           border: Border.all(color: kBorder),
-  //         ),
-  //         child: Icon(icon, color: kTextPrimary, size: 17),
-  //       ),
-  //       if (badge)
-  //         Positioned(
-  //           right: 7,
-  //           top: 7,
-  //           child: Container(
-  //             width: 7,
-  //             height: 7,
-  //             decoration:
-  //                 const BoxDecoration(color: kAmber, shape: BoxShape.circle),
-  //           ),
-  //         ),
-  //     ]),
-  //   );
-  // }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // STAT STRIP  (global across all sessions)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildStatStrip({
-    required int total,
-    required int waiting,
-    required int done,
-    required int skipped,
-  }) {
-    return Row(children: [
-      _statCard(
-          icon: Icons.groups_2_rounded,
-          label: 'Total',
-          value: total.toString().padLeft(2, '0'),
-          accent: kPrimary,
-          valueColor: kTextPrimary),
-      const SizedBox(width: 7),
-      _statCard(
-          icon: Icons.hourglass_top_rounded,
-          label: 'Waiting',
-          value: waiting.toString().padLeft(2, '0'),
-          accent: kPrimary,
-          valueColor: kPrimaryDark),
-      const SizedBox(width: 7),
-      _statCard(
-          icon: Icons.check_circle_rounded,
-          label: 'Done',
-          value: done.toString().padLeft(2, '0'),
-          accent: kGreen,
-          valueColor: kGreenDark),
-      const SizedBox(width: 7),
-      _statCard(
-          icon: Icons.skip_next_rounded,
-          label: 'Skipped',
-          value: skipped.toString().padLeft(2, '0'),
-          accent: kAmber,
-          valueColor: kAmberDark),
-    ]);
-  }
-
-  Widget _statCard({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color valueColor,
-    required Color accent,
-  }) {
-    return Expanded(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: kCardGlassGradient,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: kHairline),
-          boxShadow: kSoftShadow,
-        ),
-        padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    color: accent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: accent.withOpacity(0.18)),
-                  ),
-                  alignment: Alignment.center,
-                  child: Icon(icon, size: 11, color: accent),
-                ),
-                const Spacer(),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    color: kTextSecondary,
-                    letterSpacing: 0.1,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 19,
-                fontWeight: FontWeight.w800,
-                color: valueColor,
-                height: 1,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // LIVE QUEUE CARD
-  // When idle (queue_status == 0 but has a slot) → compact card (screenshot style)
-  // When running/paused → full card with patient info, token row, actions
+  // QUEUE CARD
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildQueueCard({
@@ -1244,94 +5085,62 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     required QueueState queueState,
     int? queueId,
     String? slotLabel,
-    bool isOnlySession = false,  // true when all other sessions are closed/hidden
+    bool isOnlySession = false,
+    List<AppointmentList> sessionPts = const [],
+    bool sessionHasIP = false,
+    int? sessionNextQNo,
   }) {
     final isIdle    = queueState == QueueState.idle;
     final isRunning = queueState == QueueState.running;
     final isStopped = queueState == QueueState.stopped;
     final isPaused  = queueState == QueueState.paused;
-    // Emergency-paused reads as "paused" but hides Close — the queue must be
-    // resumed (or normally paused) before it can be closed.
     final isEmergency = ref
         .read(appointmentViewModelProvider.notifier)
         .isEmergencyPaused(queueId);
 
-    // Highlighted border so the live queue card stands out from
-    // surrounding stat strips / sections — state-driven accent.
     final Color borderColor = isRunning
-        ? kPrimary.withOpacity(0.55)
+        ? kPrimary
         : isPaused
-            ? kAmber.withOpacity(0.65)
-            : isStopped
-                ? kHairline
-                : kPrimary.withOpacity(0.25); // idle
-    final double borderWidth = (isRunning || isPaused) ? 1.6 : 1.0;
-    final List<BoxShadow> cardShadow = isRunning
-        ? [
-            BoxShadow(
-              color: kPrimary.withOpacity(0.12),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ]
-        : isPaused
-            ? [
-                BoxShadow(
-                  color: kAmber.withOpacity(0.14),
-                  blurRadius: 12,
-                  offset: const Offset(0, 3),
-                ),
-              ]
-            : kSoftShadow;
+            ? kAmber
+            : kCardBorder;
+    final double borderWidth = (isRunning || isPaused) ? 2.0 : 1.5;
 
-    // ── COMPACT CARD for Idle sessions with siblings present ──────────────
+    // ── Compact card for idle sessions ──────────────────────────────────
     if (isIdle && !isOnlySession) {
       return Container(
         decoration: BoxDecoration(
-          gradient: kCardGlassGradient,
+          color: kCardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: borderColor, width: borderWidth),
-          boxShadow: cardShadow,
         ),
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              _pulseDot(),
-              const SizedBox(width: 5),
-              _queueStateBadge(queueState),
-              const Spacer(),
-              if (slotLabel != null) _slotPill(slotLabel),
-            ]),
-            const SizedBox(height: 10),
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text('Daily progress',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: kTextSecondary,
-                      letterSpacing: 0.2)),
-              Text('$done / $total seen',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: kPrimaryDark)),
-            ]),
-            const SizedBox(height: 5),
-            _gradientProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            _pulseDot(),
+            const SizedBox(width: 5),
+            _queueStateBadge(queueState),
+            const Spacer(),
+            if (slotLabel != null) _slotPill(slotLabel),
+          ]),
+          const SizedBox(height: 10),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            const Text('Daily progress',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
+            Text('$done / $total seen',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kPrimaryDark)),
+          ]),
+          const SizedBox(height: 5),
+          _solidProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
+        ]),
       );
     }
 
-    // ── FULL CARD for Running / Paused sessions ────────────────────────────
+    // ── Full card ────────────────────────────────────────────────────────
     return Container(
       decoration: BoxDecoration(
-        gradient: kCardGlassGradient,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: borderColor, width: borderWidth),
-        boxShadow: cardShadow,
       ),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1343,135 +5152,142 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           if (slotLabel != null) _slotPill(slotLabel),
         ]),
         const SizedBox(height: 10),
-        _buildSessionMiniStats(
-          total:   total,
-          waiting: sessionWaiting,
-          done:    done,
-        //  skipped: sessionSkipped,
-        ),
+        _buildSessionMiniStats(total: total, waiting: sessionWaiting, done: done),
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           const Text('Daily progress',
-              style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: kTextSecondary,
-                  letterSpacing: 0.2)),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
           Text('$done / $total seen',
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: kPrimaryDark)),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kPrimaryDark)),
         ]),
         const SizedBox(height: 5),
-        _gradientProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
+        _solidProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
         const SizedBox(height: 10),
 
+        // ── Action buttons ─────────────────────────────────────────────
         Row(children: [
           Expanded(
             child: _actionBtn(
-              label: isRunning
-                  ? 'Pause'
-                  : isPaused
-                      ? 'Resume'
-                      : 'Start',
+              label: isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start',
               icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
               onTap: isRunning
                   ? () => _onQueuePause(queueId)
                   : isPaused
                       ? () => _onQueueResume(queueId)
                       : () => _onQueueStart(queueId),
-              isPrimary: !isRunning,
+              bg: isRunning ? kAmberLight : kPrimaryDark,
+              fg: isRunning ? kAmberDark : Colors.white,
+              border: isRunning ? kAmberBorder : kPrimaryDark,
             ),
           ),
-          // Close is hidden while emergency-paused.
           if (!isEmergency) ...[
-          const SizedBox(width: 6),
-          Expanded(
-            child: Opacity(
-              // Close is only valid once the queue is live (running/paused).
-              // Before Start (idle) or after Stop it stays disabled.
-              opacity: (isStopped || isIdle) ? 0.4 : 1.0,
-              child: GestureDetector(
-                onTap: (isStopped || isIdle)
-                    ? null
-                    : () => _showCloseDialog(queueId),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                    color: kRedLight,
-                    borderRadius: BorderRadius.circular(11),
-                    border: Border.all(color: kRedBorder),
-                  ),
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
+            const SizedBox(width: 6),
+            Expanded(
+              child: Opacity(
+                opacity: (isStopped || isIdle) ? 0.4 : 1.0,
+                child: GestureDetector(
+                  onTap: (isStopped || isIdle) ? null : () => _showCloseDialog(queueId),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: kRedLight,
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: kRedBorder),
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
                       Icon(Icons.close_rounded, size: 13, color: kRedDark),
                       SizedBox(width: 4),
-                      Text(
-                        'Close',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kRedDark,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
+                      Text('Close',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kRedDark)),
+                    ]),
                   ),
                 ),
               ),
             ),
-          ),
           ],
           const SizedBox(width: 6),
           GestureDetector(
             onTap: () => _showEmergencyDialog(queueId),
             child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 11),
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 11),
               decoration: BoxDecoration(
                 color: kPurpleLight,
                 borderRadius: BorderRadius.circular(11),
                 border: Border.all(color: kPurpleBorder),
               ),
-              child: const Icon(Icons.warning_amber_rounded,
-                  color: kPurpleDark, size: 16),
+              child: const Icon(Icons.warning_amber_rounded, color: kPurpleDark, size: 16),
             ),
           ),
         ]),
+
+        // ── Patient list ───────────────────────────────────────────────
+        if (sessionPts.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: kHairline),
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => setState(() {
+              final key = queueId ?? 0;
+              _patientsExpanded[key] = !(_patientsExpanded[key] ?? true);
+            }),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(children: [
+                const Text('Patients',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text('${sessionPts.length}',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+                ),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: (_patientsExpanded[queueId ?? 0] ?? true) ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 220),
+                  child: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: kTextSecondary),
+                ),
+              ]),
+            ),
+          ),
+          if (_patientsExpanded[queueId ?? 0] ?? true)
+            ...sessionPts.map((p) => Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: _buildActionPatientCard(p, queueState, sessionHasIP, sessionNextQNo),
+            )),
+        ],
       ]),
     );
   }
 
-  // ── Dialogs ───────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // DIALOGS
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> _showCloseDialog(int? queueId) async {
-    // Mirror the patient-list close flow: count every patient that closing
-    // will cancel — this queue's pending (booked / in_progress), its skipped,
-    // and earlier-time slot patients still pending — and warn only when > 0.
     final vmState     = ref.read(appointmentViewModelProvider);
     final appts       = vmState.patientAppointmentsList.value ?? <AppointmentList>[];
     final sessions    = vmState.todayQueueResult?.value ?? [];
 
     final matchingSession = sessions.where((s) => s.queueId == queueId).toList();
     final queueStartTime  = matchingSession.isEmpty
-        ? null
-        : DateTime.tryParse(matchingSession.first.startTime ?? '');
+        ? null : DateTime.tryParse(matchingSession.first.startTime ?? '');
 
     final queuePending = appts.where((p) {
       if (p.queueId != queueId) return false;
       final st = (p.status?.toLowerCase() ?? '');
       return st == 'booked' || st == 'in_progress';
     }).length;
-
     final queueSkipped = appts.where((p) {
       if (p.queueId != queueId) return false;
       return (p.status?.toLowerCase() ?? '') == 'skipped';
     }).length;
-
-    final earlierSlotPending = queueStartTime == null
-        ? 0
+    final earlierSlotPending = queueStartTime == null ? 0
         : appts.where((p) {
             if (p.bookingType != 2) return false;
             final st = (p.status?.toLowerCase() ?? '');
@@ -1479,8 +5295,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             final pTime = DateTime.tryParse(p.startTime ?? '');
             return pTime != null && pTime.isBefore(queueStartTime);
           }).length;
-
     final totalCancel = queuePending + queueSkipped + earlierSlotPending;
+
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -1488,109 +5304,82 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                  color: kRedLight,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: kRedBorder)),
-              child: const Icon(Icons.close_rounded, color: kRed, size: 26),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: kRedLight, shape: BoxShape.circle,
+              border: Border.all(color: kRedBorder),
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'Close Queue?',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Are you sure you want to close this queue?',
+            child: const Icon(Icons.close_rounded, color: kRed, size: 26),
+          ),
+          const SizedBox(height: 14),
+          const Text('Close Queue?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+          const SizedBox(height: 8),
+          const Text('Are you sure you want to close this queue?',
               textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: 12, color: kTextSecondary, height: 1.5),
-            ),
-            if (totalCancel > 0) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: kAmberLight,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kAmberBorder),
-                ),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Icon(Icons.warning_amber_rounded, size: 16, color: kAmberDark),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(
-                        '$totalCancel patient${totalCancel == 1 ? '' : 's'} will be cancelled',
-                        style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700, color: kAmberDark),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        [
-                          if (queuePending > 0) '$queuePending pending in this queue',
-                          if (queueSkipped > 0) '$queueSkipped skipped in this queue',
-                          if (earlierSlotPending > 0) '$earlierSlotPending from earlier slots',
-                        ].join(' · '),
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kAmberDark, height: 1.3),
-                      ),
-                    ]),
-                  ),
-                ]),
+              style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5)),
+          if (totalCancel > 0) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: kAmberLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kAmberBorder),
               ),
-            ],
-            const SizedBox(height: 4),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.warning_amber_rounded, size: 16, color: kAmberDark),
+                const SizedBox(width: 8),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('$totalCancel patient${totalCancel == 1 ? '' : 's'} will be cancelled',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kAmberDark)),
+                  const SizedBox(height: 2),
+                  Text(
+                    [
+                      if (queuePending > 0) '$queuePending pending in this queue',
+                      if (queueSkipped > 0) '$queueSkipped skipped in this queue',
+                      if (earlierSlotPending > 0) '$earlierSlotPending from earlier slots',
+                    ].join(' · '),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kAmberDark, height: 1.3),
+                  ),
+                ])),
+              ]),
+            ),
           ],
-        ),
+          const SizedBox(height: 4),
+        ]),
         actions: [
           Row(children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(ctx, false),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text('No',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextSecondary)),
+            Expanded(child: GestureDetector(
+              onTap: () => Navigator.pop(ctx, false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                alignment: Alignment.center,
+                child: const Text('No',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextSecondary)),
               ),
-            ),
+            )),
             const SizedBox(width: 10),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(ctx, true),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: kRedLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kRedBorder),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text('Yes, Close',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kRedDark)),
+            Expanded(child: GestureDetector(
+              onTap: () => Navigator.pop(ctx, true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: kRedLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kRedBorder),
                 ),
+                alignment: Alignment.center,
+                child: const Text('Yes, Close',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kRedDark)),
               ),
-            ),
+            )),
           ]),
         ],
       ),
@@ -1599,8 +5388,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   Future<void> _showEmergencyDialog(int? queueId) async {
-    if (ref.read(appointmentViewModelProvider.notifier)
-        .isEmergencyPaused(queueId)) {
+    if (ref.read(appointmentViewModelProvider.notifier).isEmergencyPaused(queueId)) {
       _snack('Already emergency paused');
       return;
     }
@@ -1611,76 +5399,50 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
         actionsPadding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                  color: kPurpleLight,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: kPurpleBorder)),
-              child: const Icon(Icons.warning_amber_rounded,
-                  color: kPurple, size: 26),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 52, height: 52,
+            decoration: BoxDecoration(
+              color: kPurpleLight, shape: BoxShape.circle,
+              border: Border.all(color: kPurpleBorder),
             ),
-            const SizedBox(height: 14),
-            const Text(
-              'Emergency Pause?',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Queue is Emergency Pause. Do you want to pause immediately?',
+            child: const Icon(Icons.warning_amber_rounded, color: kPurple, size: 26),
+          ),
+          const SizedBox(height: 14),
+          const Text('Emergency Pause?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+          const SizedBox(height: 8),
+          const Text('Queue is Emergency Pause. Do you want to pause immediately?',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5),
-            ),
-            const SizedBox(height: 4),
-          ],
-        ),
+              style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.5)),
+          const SizedBox(height: 4),
+        ]),
         actions: [
           Row(children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(ctx, false),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF3F4F6),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text('No',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextSecondary)),
-                ),
+            Expanded(child: GestureDetector(
+              onTap: () => Navigator.pop(ctx, false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(12)),
+                alignment: Alignment.center,
+                child: const Text('No',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextSecondary)),
               ),
-            ),
+            )),
             const SizedBox(width: 10),
-            Expanded(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(ctx, true),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: kPurpleLight,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: kPurpleBorder),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text('Yes, Pause',
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kPurpleDark)),
+            Expanded(child: GestureDetector(
+              onTap: () => Navigator.pop(ctx, true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: kPurpleLight, borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kPurpleBorder),
                 ),
+                alignment: Alignment.center,
+                child: const Text('Yes, Pause',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPurpleDark)),
               ),
-            ),
+            )),
           ]),
         ],
       ),
@@ -1688,449 +5450,85 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (confirmed == true) await _onQueuePauseEmergency(queueId);
   }
 
-  // ── Session mini stat strip (inside each card) ─────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // SESSION MINI STATS
+  // ─────────────────────────────────────────────────────────────────────────
 
-  Widget _buildSessionMiniStats({
-    required int total,
-    required int waiting,
-    required int done,
- //   required int skipped,
-  }) {
+  Widget _buildSessionMiniStats({required int total, required int waiting, required int done}) {
     return Row(children: [
-      _miniStatChip(label: 'Total',   value: total,   accent: kPrimary,   textColor: kPrimaryDark),
-      const SizedBox(width: 5),
-      _miniStatChip(label: 'Waiting', value: waiting, accent: kPrimary,   textColor: kPrimaryDark),
-      const SizedBox(width: 5),
-      _miniStatChip(label: 'Done',    value: done,    accent: kGreen,     textColor: kGreenDark),
-      // const SizedBox(width: 5),
-      // _miniStatChip(label: 'Skipped', value: skipped, accent: kAmber,     textColor: kAmberDark),
+      _miniStatChip(label: 'Total',   value: total,   bg: kPrimaryLight,  fg: Colors.black,  border: const Color(0xFF9FE1CB)),
+      const SizedBox(width: 6),
+      _miniStatChip(label: 'Waiting', value: waiting, bg: kBlueLight,     fg: Colors.black,     border: kBlueBorder),
+      const SizedBox(width: 6),
+      _miniStatChip(label: 'Done',    value: done,    bg: kGreenLight,    fg: Colors.black,    border: kGreenBorder),
     ]);
   }
 
   Widget _miniStatChip({
     required String label,
     required int value,
-    required Color accent,
-    required Color textColor,
+    required Color bg,
+    required Color fg,
+    required Color border,
   }) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 6, 8, 7),
+        padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [accent.withOpacity(0.10), accent.withOpacity(0.04)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: bg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: accent.withOpacity(0.18)),
+          border: Border.all(color: border),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: textColor.withOpacity(0.75),
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value.toString().padLeft(2, '0'),
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: textColor,
-                height: 1,
-                letterSpacing: -0.4,
-              ),
-            ),
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                  color: fg.withOpacity(0.75), letterSpacing: 0.2)),
+          const SizedBox(height: 2),
+          Text(value.toString().padLeft(2, '0'),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+                  color: fg, height: 1, letterSpacing: -0.4)),
+        ]),
       ),
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // ACTION BUTTON
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _actionBtn({
     required String label,
     IconData? icon,
     required VoidCallback onTap,
-    required bool isPrimary,
+    required Color bg,
+    required Color fg,
+    required Color border,
   }) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          gradient: isPrimary ? kPrimaryGradient : null,
-          color: isPrimary ? null : kAmberLight,
-          borderRadius: BorderRadius.circular(11),
-          border: isPrimary ? null : Border.all(color: kAmberBorder),
-        ),
-        alignment: Alignment.center,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon,
-                  size: 14,
-                  color: isPrimary ? Colors.white : kAmberDark),
-              const SizedBox(width: 4),
-            ],
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: isPrimary ? Colors.white : kAmberDark,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTokenRow({
-    required int currentNo,
-    required int nextNo,
-    required int total,
-  }) {
-    return Row(children: [
-      Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.all(Radius.circular(13)),
-          ),
-          child: Column(children: [
-            const Text('Current',
-                style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.7,
-                    color: Colors.white70)),
-            const SizedBox(height: 3),
-            Text(currentNo.toString().padLeft(2, '0'),
-                style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1)),
-          ]),
-        ),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: kPrimaryLighter,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: kPrimaryLight),
-          ),
-          child: Column(children: [
-            const Text('Up Next',
-                style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.7,
-                    color: kTextSecondary)),
-            const SizedBox(height: 3),
-            Text(nextNo > 0 ? nextNo.toString().padLeft(2, '0') : '--',
-                style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: kTextPrimary,
-                    height: 1)),
-          ]),
-        ),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: kGreenLight,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: kGreenBorder),
-          ),
-          child: Column(children: [
-            const Text('Remaining',
-                style: TextStyle(
-                    fontSize: 8,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.7,
-                    color: kGreenDark)),
-            const SizedBox(height: 3),
-            Text(total.toString().padLeft(2, '0'),
-                style: const TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: kGreenDark,
-                    height: 1)),
-          ]),
-        ),
-      ),
-    ]);
-  }
-
-  Widget _buildCurrentPatientBand(AppointmentList? patient) {
-    if (patient == null) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        decoration: BoxDecoration(
-          color: kPrimaryLighter,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: kPrimaryLight),
-        ),
-        child: const Center(
-            child: Text('No patients in queue today',
-                style: TextStyle(color: kTextMuted, fontSize: 12))),
-      );
-    }
-
-    final name     = patient.patientName ?? patient.bookingFor ?? 'Unknown';
-    final age      = _calcAge(patient.dob);
-    final initials = _initials(name);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: kPrimaryLighter,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: kPrimaryLight),
-      ),
-      child: Row(children: [
-        Stack(children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF4DD9C8), Color(0xFF2BB5A0)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(initials,
-                style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white)),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: kGreen,
-                shape: BoxShape.circle,
-                border: Border.all(color: kPrimaryLighter, width: 2),
-              ),
-            ),
-          ),
-        ]),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name,
-                    style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary),
-                    overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text(
-                  [
-                    if (patient.gender != null) patient.gender!,
-                    if (age != null) '$age yrs',
-                    'Token ${(patient.queueNumber ?? 0).toString().padLeft(2, '0')}',
-                  ].join(' · '),
-                  style: const TextStyle(fontSize: 10, color: kTextSecondary),
-                ),
-                const SizedBox(height: 5),
-                Row(children: [
-                  Container(
-                      width: 7,
-                      height: 7,
-                      decoration: const BoxDecoration(
-                          color: kPrimary, shape: BoxShape.circle)),
-                  const SizedBox(width: 4),
-                  const Text('In Consultation',
-                      style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: kPrimaryDark)),
-                ]),
-              ]),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-              color: kPrimary, borderRadius: BorderRadius.circular(8)),
-          child: const Text('Now',
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white)),
-        ),
-      ]),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // QUICK ACTIONS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildQuickActions(AppointmentList? current) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kBorder),
-      ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      child:
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Quick Actions',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-                color: kPrimary)),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(
-            child: _quickBtn(
-              label: '✓  Mark Complete',
-              bg: kGreenLight,
-              fg: kGreenDark,
-              border: kGreenBorder,
-              enabled: current != null,
-              onTap: current != null ? () => _onQueueNext(current) : null,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _quickBtn(
-              label: '⏭  Skip Patient',
-              bg: kAmberLight,
-              fg: kAmberDark,
-              border: kAmberBorder,
-              enabled: current != null,
-              onTap: current != null ? () => _onQueueSkip(current) : null,
-            ),
-          ),
-        ]),
-        const SizedBox(height: 10),
-        Row(children: [
-          _shortcutTile(
-              icon: Icons.folder_open_rounded,
-              label: 'Records',
-              bg: kGreenLight,
-              fg: kGreenDark,
-              border: kGreenBorder),
-          const SizedBox(width: 6),
-          _shortcutTile(
-              icon: Icons.medication_rounded,
-              label: 'Prescribe',
-              bg: kPurpleLight,
-              fg: kPurpleDark,
-              border: kPurpleBorder),
-          const SizedBox(width: 6),
-          _shortcutTile(
-              icon: Icons.calendar_today_rounded,
-              label: 'Schedule',
-              bg: kAmberLight,
-              fg: kAmberDark,
-              border: kAmberBorder),
-          const SizedBox(width: 6),
-          _shortcutTile(
-              icon: Icons.notifications_rounded,
-              label: 'Notify',
-              bg: kRedLight,
-              fg: kRedDark,
-              border: kRedBorder),
-        ]),
-      ]),
-    );
-  }
-
-  Widget _quickBtn({
-    required String label,
-    required Color bg,
-    required Color fg,
-    required Color border,
-    required bool enabled,
-    required VoidCallback? onTap,
-  }) {
-    return Opacity(
-      opacity: enabled ? 1.0 : 0.42,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: border),
-          ),
-          alignment: Alignment.center,
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
-        ),
-      ),
-    );
-  }
-
-  Widget _shortcutTile({
-    required IconData icon,
-    required String label,
-    required Color bg,
-    required Color fg,
-    required Color border,
-  }) {
-    return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 9),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: bg,
           borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: border),
+          border: bg == kPrimaryDark ? null : Border.all(color: border),
         ),
-        child: Column(children: [
-          Icon(icon, size: 18, color: fg),
-          const SizedBox(height: 4),
+        alignment: Alignment.center,
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: fg),
+            const SizedBox(width: 4),
+          ],
           Text(label,
-              style: TextStyle(
-                  fontSize: 9, fontWeight: FontWeight.w700, color: fg)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                  color: fg, letterSpacing: 0.2)),
         ]),
       ),
     );
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // HOME QUICK ACTIONS  (Edit Medicine, Schedule, History)
+  // WALK-IN CARD  (receptionist only)
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildWalkInCard() {
@@ -2138,24 +5536,18 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       onTap: () => setState(() => _walkInExpanded = !_walkInExpanded),
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [kPrimaryLight, Colors.white],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: kPrimaryLight, // solid teal-light, no gradient
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFB2EBE4)),
-          boxShadow: kSoftShadow,
+          border: Border.all(color: const Color(0xFF9FE1CB)),
         ),
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Row(children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 42, height: 42,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFB2EBE4)),
+              border: Border.all(color: const Color(0xFF9FE1CB)),
             ),
             alignment: Alignment.center,
             child: const Icon(Icons.person_add_rounded, size: 20, color: kPrimaryDark),
@@ -2164,137 +5556,83 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           const Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Add Walk-in Patient',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black)),
               SizedBox(height: 2),
               Text('Book appointment for walk-in patient',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimaryDark)),
             ]),
           ),
           AnimatedRotation(
             turns: _walkInExpanded ? 0.25 : 0,
             duration: const Duration(milliseconds: 200),
-            child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kTextSecondary),
+            child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kPrimaryDark),
           ),
         ]),
       ),
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // HOME QUICK ACTIONS
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildHomeQuickActions() {
     final isReceptionist = ref.watch(tokenProvider).roleId == 3;
     return Container(
       decoration: BoxDecoration(
-        gradient: kCardGlassGradient,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kHairline),
-        boxShadow: kSoftShadow,
+        border: Border.all(color: kCardBorder),
       ),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 3,
-                height: 12,
-                decoration: BoxDecoration(
-                  gradient: kPrimaryGradient,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              ),
-              const SizedBox(width: 7),
-              const Text(
-                'Quick Actions',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                  color: kTextPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          if (isReceptionist)
-            Row(children: [
-              _homeActionTile(
-                icon: Icons.calendar_today_rounded,
-                label: 'Edit\nSchedule',
-                accent: kAmber,
-                bg: kAmberLight,
-                fg: kAmberDark,
-                border: kAmberBorder,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 3, height: 14,
+              decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 7),
+          const Text('Quick Actions',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2, color: kTextPrimary)),
+        ]),
+        const SizedBox(height: 10),
+        if (isReceptionist)
+          Row(children: [
+            _homeActionTile(icon: Icons.calendar_today_rounded, label: 'Edit\nSchedule',
+                bg: kAmberLight, fg: kAmberDark, border: kAmberBorder,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()),
-                ),
-              ),
-              const SizedBox(width: 7),
-              _homeActionTile(
-                icon: Icons.people_alt_rounded,
-                label: 'Patient\nList',
-                accent: kGreen,
-                bg: kGreenLight,
-                fg: kGreenDark,
-                border: kGreenBorder,
+                    MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()))),
+            const SizedBox(width: 7),
+            _homeActionTile(icon: Icons.people_alt_rounded, label: 'Patient\nList',
+                bg: kGreenLight, fg: kGreenDark, border: kGreenBorder,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const DoctorPatientHistoryScreen()),
-                ),
-              ),
-              const SizedBox(width: 7),
-              const Expanded(child: SizedBox()),
-            ])
-          else
-            Row(children: [
-              _homeActionTile(
-                icon: Icons.medication_rounded,
-                label: 'Add\nMedicine',
-                accent: kPurple,
-                bg: kPurpleLight,
-                fg: kPurpleDark,
-                border: kPurpleBorder,
+                    MaterialPageRoute(builder: (_) => const DoctorPatientHistoryScreen()))),
+            const SizedBox(width: 7),
+            const Expanded(child: SizedBox()),
+          ])
+        else
+          Row(children: [
+            _homeActionTile(icon: Icons.medication_rounded, label: 'Add\nMedicine',
+                bg: kPurpleLight, fg: kPurpleDark, border: kPurpleBorder,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const AddMedicinePage()),
-                ),
-              ),
-              const SizedBox(width: 7),
-              _homeActionTile(
-                icon: Icons.calendar_today_rounded,
-                label: 'Edit\nSchedule',
-                accent: kAmber,
-                bg: kAmberLight,
-                fg: kAmberDark,
-                border: kAmberBorder,
+                    MaterialPageRoute(builder: (_) => const AddMedicinePage()))),
+            const SizedBox(width: 7),
+            _homeActionTile(icon: Icons.calendar_today_rounded, label: 'Edit\nSchedule',
+                bg: kAmberLight, fg: kAmberDark, border: kAmberBorder,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const DoctorAvailabilityPage()),
-                ),
-              ),
-              const SizedBox(width: 7),
-              _homeActionTile(
-                icon: Icons.history_rounded,
-                label: 'Patient\nHistory',
-                accent: kGreen,
-                bg: kGreenLight,
-                fg: kGreenDark,
-                border: kGreenBorder,
+                    MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()))),
+            const SizedBox(width: 7),
+            _homeActionTile(icon: Icons.history_rounded, label: 'Patient\nHistory',
+                bg: kGreenLight, fg: kGreenDark, border: kGreenBorder,
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(
-                      builder: (_) => const DoctorPatientHistoryScreen()),
-                ),
-              ),
-            ]),
-        ],
-      ),
+                    MaterialPageRoute(builder: (_) => const DoctorPatientHistoryScreen()))),
+          ]),
+      ]),
     );
   }
 
   Widget _homeActionTile({
     required IconData icon,
     required String label,
-    required Color accent,
     required Color bg,
     required Color fg,
     required Color border,
@@ -2304,489 +5642,30 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       child: GestureDetector(
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.fromLTRB(6, 9, 6, 9),
+          padding: const EdgeInsets.fromLTRB(6, 10, 6, 10),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [bg, Colors.white],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+            color: bg, // solid color, no gradient
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: border),
           ),
           child: Column(children: [
             Container(
-              width: 28,
-              height: 28,
+              width: 30, height: 30,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(9),
                 border: Border.all(color: border),
               ),
               alignment: Alignment.center,
-              child: Icon(icon, size: 15, color: fg),
+              child: Icon(icon, size: 16, color: fg),
             ),
             const SizedBox(height: 6),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 11,
-                height: 1.15,
-                fontWeight: FontWeight.w700,
-                color: fg,
-                letterSpacing: 0.1,
-              ),
-            ),
+            Text(label,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, height: 1.2,
+                    fontWeight: FontWeight.w700, color: fg)),
           ]),
         ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // TODAY'S SCHEDULE CARD  (single unified card with day + slots + edit)
-  // Shown when no live queue sessions exist for today.
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildTodayScheduleCard(List<TimeSlotModel> slots) {
-    final dayLabel =
-        DateFormat('EEEE, d MMMM').format(DateTime.now());
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: kCardGlassGradient,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kHairline),
-        boxShadow: kSoftShadow,
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                gradient: kPrimaryGradient,
-                borderRadius: BorderRadius.circular(9),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(Icons.calendar_today_rounded,
-                  size: 14, color: Colors.white),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dayLabel,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w500,
-                      color: kTextPrimary,
-                      letterSpacing: -0.1,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    "${slots.length} slot${slots.length == 1 ? '' : 's'} scheduled",
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: kTextSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const DoctorAvailabilityPage()),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [kPrimaryLight, kPrimaryLighter],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: kPrimary.withOpacity(0.22)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.edit_calendar_rounded,
-                        size: 11, color: kPrimaryDark),
-                    SizedBox(width: 3),
-                    Text(
-                      'Edit',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: kPrimaryDark,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ]),
-          const SizedBox(height: 10),
-          Container(
-            height: 1,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  kHairline.withOpacity(0),
-                  kHairline,
-                  kHairline.withOpacity(0),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 9),
-          ...List.generate(slots.length, (i) {
-            final slot = slots[i];
-            final isLast = i == slots.length - 1;
-            return Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 6),
-              child: _scheduleSlotRow(slot),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _scheduleSlotRow(TimeSlotModel slot) {
-    final timeLabel = '${_fmtScheduleTime(slot.startTime)} – '
-        '${_fmtScheduleTime(slot.endTime)}';
-    final modeLbl = _bookingModeLabel(slot.bookingMode);
-    final isQueueMode = slot.bookingMode == 1 || slot.bookingMode == 3;
-    final detail = isQueueMode
-        ? (slot.maxQueueLength != null ? 'Max ${slot.maxQueueLength}' : null)
-        : (slot.slotDuration != null ? '${slot.slotDuration}m' : null);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [kPrimaryLighter, Colors.white],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: kPrimaryLight.withOpacity(0.7)),
-      ),
-      child: Row(children: [
-        Container(
-          width: 3,
-          height: 18,
-          decoration: BoxDecoration(
-            gradient: kPrimaryGradient,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Text(
-            timeLabel,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: kTextPrimary,
-              letterSpacing: -0.1,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: kPrimary.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: kPrimary.withOpacity(0.15)),
-          ),
-          child: Text(
-            modeLbl,
-            style: const TextStyle(
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              color: kPrimaryDark,
-              letterSpacing: 0.2,
-            ),
-          ),
-        ),
-        if (detail != null) ...[
-          const SizedBox(width: 5),
-          Text(
-            detail,
-            style: const TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: kTextSecondary,
-            ),
-          ),
-        ],
-      ]),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // WEEKLY PERFORMANCE  (mini bar chart of last 7 days)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildWeeklyPerformance(List<AppointmentList> all) {
-    final series = _lastSevenDaysCompleted(all);
-    final maxVal =
-        series.fold<int>(0, (m, e) => e.count > m ? e.count : m);
-    final total = series.fold<int>(0, (s, e) => s + e.count);
-    final todayIdx = series.length - 1;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kBorder),
-      ),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            const Text('This Week',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.1,
-                    color: kPrimary)),
-            const Spacer(),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text('$total seen',
-                  style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: kPrimaryDark)),
-            ),
-          ]),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 84,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: List.generate(series.length, (i) {
-                final e = series[i];
-                final ratio = maxVal == 0 ? 0.0 : e.count / maxVal;
-                final isToday = i == todayIdx;
-                final barH = (ratio * 60).clamp(4.0, 60.0);
-                return Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: i == 0 || i == series.length - 1
-                            ? 2
-                            : 3),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Text(
-                          e.count == 0 ? '·' : '${e.count}',
-                          style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: isToday ? kPrimaryDark : kTextMuted),
-                        ),
-                        const SizedBox(height: 3),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(6),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            height: barH,
-                            decoration: BoxDecoration(
-                              gradient: isToday
-                                  ? const LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        Color(0xFF4DD9C8),
-                                        Color(0xFF2BB5A0),
-                                      ],
-                                    )
-                                  : null,
-                              color:
-                                  isToday ? null : kPrimaryLight,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          DateFormat('E').format(e.date)[0],
-                          style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                              color: isToday ? kPrimaryDark : kTextMuted),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // DOCTOR TIPS  (auto-rotating carousel)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildTipsCarousel() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFEAF8F5), Color(0xFFFAFEFD)],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kPrimary.withOpacity(0.15)),
-        boxShadow: kSoftShadow,
-      ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 7, vertical: 2),
-                decoration: BoxDecoration(
-                  gradient: kPrimaryGradient,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Icon(Icons.tips_and_updates_rounded,
-                        size: 10, color: Colors.white),
-                    SizedBox(width: 3),
-                    Text(
-                      'TIP',
-                      style: TextStyle(
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${_currentTip + 1} / ${_kDoctorTips.length}',
-                style: const TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: FontWeight.w700,
-                  color: kTextSecondary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 64,
-            child: PageView.builder(
-              controller: _tipsController,
-              itemCount: _kDoctorTips.length,
-              onPageChanged: (i) => setState(() => _currentTip = i),
-              itemBuilder: (_, i) {
-                final tip = _kDoctorTips[i];
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: kPrimaryLight),
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(tip.emoji,
-                          style: const TextStyle(fontSize: 18)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tip.title,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
-                              color: kPrimaryDark,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            tip.body,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              height: 1.35,
-                              color: kTextPrimary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 7),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(_kDoctorTips.length, (i) {
-              final active = i == _currentTip;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 240),
-                curve: Curves.easeOut,
-                margin: const EdgeInsets.symmetric(horizontal: 2.5),
-                width: active ? 18 : 5,
-                height: 5,
-                decoration: BoxDecoration(
-                  gradient: active ? kPrimaryGradient : null,
-                  color: active ? null : kPrimaryLight,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-              );
-            }),
-          ),
-        ],
       ),
     );
   }
@@ -2798,216 +5677,44 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   Widget _buildNoLiveSessions() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
       decoration: BoxDecoration(
-        gradient: kCardGlassGradient,
+        color: kCardBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kHairline),
-        boxShadow: kSoftShadow,
+        border: Border.all(color: kCardBorder),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [kPrimaryLight, Colors.white],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              shape: BoxShape.circle,
-              border: Border.all(color: kPrimaryLight),
-            ),
-            child: const Icon(Icons.event_busy_rounded,
-                color: kPrimary, size: 22),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 48, height: 48,
+          decoration: BoxDecoration(
+            color: kPrimaryLight, shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFF9FE1CB)),
           ),
-          const SizedBox(height: 10),
-          const Text(
-            'No Schedule for Today',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: kTextPrimary,
-              letterSpacing: -0.1,
-            ),
-          ),
-          const SizedBox(height: 3),
-          const Text(
-            'Set your weekly availability to start accepting patients.',
+          child: const Icon(Icons.event_busy_rounded, color: kPrimaryDark, size: 22),
+        ),
+        const SizedBox(height: 10),
+        const Text('No Schedule for Today',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
+        const SizedBox(height: 4),
+        const Text('Set your weekly availability to start accepting patients.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 12,
-              color: kTextSecondary,
-              fontWeight: FontWeight.w500,
-              height: 1.35,
+            style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.35)),
+        const SizedBox(height: 14),
+        GestureDetector(
+          onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage())),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: kPrimaryDark,
+              borderRadius: BorderRadius.circular(11),
             ),
-          ),
-          const SizedBox(height: 12),
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: (_) => const DoctorAvailabilityPage()),
-            ),
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 14, vertical: 9),
-              decoration: BoxDecoration(
-                gradient: kPrimaryGradient,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.calendar_today_rounded,
-                      color: Colors.white, size: 13),
-                  SizedBox(width: 6),
-                  Text(
-                    'Set Schedule',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // PATIENT CARD
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _patientCard(AppointmentList p) {
-    final name     = p.patientName ?? p.bookingFor ?? 'Unknown';
-    final initials = _initials(name);
-    final age      = _calcAge(p.dob);
-    final status   = p.status ?? 'booked';
-
-    final palettes = [
-      (kPrimaryLighter, kPrimaryLight, kPrimary),
-      (kPurpleLight,    kPurpleBorder, kPurple),
-      (kAmberLight,     kAmberBorder,  kAmber),
-      (kRedLight,       kRedBorder,    kRed),
-    ];
-    final (avBg, avBd, avFg) =
-        palettes[(p.queueNumber ?? 0) % palettes.length];
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: kCardGlassGradient,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kHairline),
-        boxShadow: kSoftShadow,
-      ),
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
-      child: Row(children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [avBg, Colors.white],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(11),
-            border: Border.all(color: avBd),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            initials,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: avFg,
-              letterSpacing: 0.4,
-            ),
-          ),
-        ),
-        const SizedBox(width: 9),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary,
-                  letterSpacing: -0.1,
-                  height: 1.15,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 1),
-              Text(
-                [
-                  if (p.gender != null) p.gender!,
-                  if (age != null) '$age yrs'
-                ].join(' · '),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: kTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(children: [
-                _statusChip(status),
-                if (p.specialization != null) ...[
-                  const SizedBox(width: 4),
-                  _tagChip(p.specialization!,
-                      bg: kPrimaryLighter, fg: kPrimaryDark),
-                ],
-              ]),
-            ],
-          ),
-        ),
-        const SizedBox(width: 7),
-        Container(
-          padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [avBg, Colors.white],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: avBd),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Text(
-                'TOKEN',
-                style: TextStyle(
-                  fontSize: 9.5,
-                  color: kTextMuted,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                (p.queueNumber ?? 0).toString().padLeft(2, '0'),
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: avFg,
-                  height: 1,
-                  letterSpacing: -0.4,
-                ),
-              ),
-            ],
+            child: Row(mainAxisSize: MainAxisSize.min, children: const [
+              Icon(Icons.calendar_today_rounded, color: Colors.white, size: 13),
+              SizedBox(width: 6),
+              Text('Set Schedule',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+            ]),
           ),
         ),
       ]),
@@ -3015,23 +5722,218 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // BADGES & CHIPS
+  // PATIENT CARDS
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Avatar color palettes — solid bg, no gradient
+  static const List<(Color, Color, Color)> _kAvatarPalettes = [
+    (Color(0xFFE1F5EE), Color(0xFF9FE1CB), Color(0xFF085041)), // teal
+    (Color(0xFFEDE9FE), Color(0xFFDDD6FE), Color(0xFF4C1D95)), // purple
+    (Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFF78350F)), // amber
+    (Color(0xFFFEE2E2), Color(0xFFFECACA), Color(0xFF7F1D1D)), // red
+  ];
+
+  Widget _buildActionPatientCard(
+    AppointmentList p,
+    QueueState qs,
+    bool hasIP,
+    int? nextBookedQNo,
+  ) {
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    final name      = p.patientName ?? 'Patient';
+    final initials  = _initials(name);
+    final age       = _calcAge(p.dob);
+    final status    = p.status?.toLowerCase().trim() ?? '';
+    final isIP      = status == 'in_progress';
+    final isSkipped = status == 'skipped';
+    final isBooked  = status == 'booked';
+    final queueActive = qs == QueueState.running || qs == QueueState.paused;
+
+    bool accessible = false;
+    if (isIP) { accessible = true; }
+    else if (isSkipped) { accessible = true; }
+    else if (queueActive && isBooked) {
+      accessible = !hasIP && p.queueNumber == nextBookedQNo;
+    }
+    final effectiveAccessible = isSkipped ? accessible : queueActive && accessible;
+    final VoidCallback? effectiveSkip = isBooked && queueActive && (isReceptionist || accessible)
+        ? () => _skipPatient(p) : null;
+
+    final (avBg, avBd, avFg) = _kAvatarPalettes[(p.queueNumber ?? 0) % _kAvatarPalettes.length];
+
+    final Color borderColor = isIP
+        ? kPrimary
+        : isSkipped ? kAmber : kCardBorder;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor, width: (isIP || isSkipped) ? 1.5 : 1.0),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: avBg, borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: avBd),
+            ),
+            alignment: Alignment.center,
+            child: Text(initials,
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: avFg)),
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                    color: kTextPrimary, height: 1.15),
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 1),
+            Text([if (p.gender != null) p.gender!, if (age != null) '$age yrs'].join(' · '),
+                style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500)),
+            if (isIP || isSkipped) ...[
+              const SizedBox(height: 3),
+              _statusChip(status),
+            ],
+          ])),
+          if (p.queueNumber != null) ...[
+            const SizedBox(width: 7),
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
+              decoration: BoxDecoration(
+                color: avBg, borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: avBd),
+              ),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.center, children: [
+                const Text('TOKEN',
+                    style: TextStyle(fontSize: 8, color: kTextMuted,
+                        fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                const SizedBox(height: 1),
+                Text((p.queueNumber ?? 0).toString().padLeft(2, '0'),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                        color: avFg, height: 1)),
+              ]),
+            ),
+          ],
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          if (effectiveSkip != null) ...[
+            Expanded(child: GestureDetector(
+              onTap: effectiveSkip,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: kRedLight, borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: kRedBorder),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Skip',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kRedDark)),
+              ),
+            )),
+            if (!isReceptionist) const SizedBox(width: 7),
+          ],
+          if (!isReceptionist)
+            Expanded(
+              flex: 2,
+              child: GestureDetector(
+                onTap: effectiveAccessible ? () => _startSession(p) : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: effectiveAccessible ? kPrimaryDark : const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    isIP ? 'Continue' : isSkipped ? 'Recall' : 'Start Session',
+                    style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700,
+                      color: effectiveAccessible ? Colors.white : kTextMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildCompletedPatientCard(AppointmentList p) {
+    final name     = p.patientName ?? 'Patient';
+    final initials = _initials(name);
+    final age      = _calcAge(p.dob);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kCardBorder),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: kGreenLight, borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kGreenBorder),
+            ),
+            alignment: Alignment.center,
+            child: Text(initials,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kGreenDark)),
+          ),
+          const SizedBox(width: 9),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                    color: kTextPrimary, height: 1.15),
+                overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 1),
+            Text([if (p.gender != null) p.gender!, if (age != null) '$age yrs'].join(' · '),
+                style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500)),
+          ])),
+        ]),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => _viewPrescription(p),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: kPurpleLight,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: kPurpleBorder),
+            ),
+            alignment: Alignment.center,
+            child: const Text('View Prescription',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPurpleDark)),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BADGES, CHIPS, HELPERS
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _statusChip(String status) {
     Color bg, fg, dot;
     switch (status.toLowerCase()) {
-      case 'skipped':
-        bg = kAmberLight; fg = kAmberDark; dot = kAmber;
-        break;
-      case 'completed':
-        bg = kPrimaryLighter; fg = kPrimaryDark; dot = kPrimary;
-        break;
-      default:
-        bg = kRedLight; fg = kRedDark; dot = kRed;
+      case 'in_progress': bg = kPrimaryLight; fg = kPrimaryDark; dot = kPrimary; break;
+      case 'skipped':     bg = kAmberLight;   fg = kAmberDark;   dot = kAmber;   break;
+      case 'completed':   bg = kGreenLight;   fg = kGreenDark;   dot = kGreen;   break;
+      default:            bg = kRedLight;     fg = kRedDark;     dot = kRed;
     }
     return _badgeDot(
-        status[0].toUpperCase() + status.substring(1), bg, fg, dot);
+      status == 'in_progress' ? 'In Progress' : status[0].toUpperCase() + status.substring(1),
+      bg, fg, dot,
+    );
   }
 
   Widget _queueStateBadge(QueueState state) {
@@ -3039,185 +5941,99 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     late Color bg, fg, dot;
     switch (state) {
       case QueueState.running:
-        label = 'Running'; bg = kPrimaryLighter; fg = kPrimaryDark; dot = kPrimary;
-        break;
+        label = 'Running'; bg = kPrimaryLight; fg = kPrimaryDark; dot = kPrimary; break;
       case QueueState.paused:
-        label = 'Paused'; bg = kAmberLight; fg = kAmberDark; dot = kAmber;
-        break;
+        label = 'Paused';  bg = kAmberLight;   fg = kAmberDark;   dot = kAmber;   break;
       case QueueState.stopped:
         label = 'Closed';
-        bg = const Color(0xFFF3F4F6);
-        fg = const Color(0xFF6B7280);
-        dot = const Color(0xFF9CA3AF);
+        bg = const Color(0xFFF1F5F9); fg = const Color(0xFF64748B); dot = const Color(0xFF94A3B8);
         break;
       case QueueState.idle:
-        label = 'Idle'; bg = kRedLight; fg = kRedDark; dot = kRed;
-        break;
+        label = 'Idle'; bg = kRedLight; fg = kRedDark; dot = kRed; break;
     }
     return _badgeDot(label, bg, fg, dot);
   }
 
-  Widget _badgeDot(String label, Color bg, Color fg, Color dot) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: dot.withOpacity(0.18)),
-        ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 5,
-            height: 5,
-            decoration: BoxDecoration(
-              color: dot,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
-              color: fg,
-            ),
-          ),
-        ]),
-      );
-
-  Widget _tagChip(String label, {required Color bg, required Color fg}) =>
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: fg.withOpacity(0.15)),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: fg,
-            letterSpacing: 0.2,
-          ),
-        ),
-      );
-
-  // ── Premium helpers ─────────────────────────────────────────────────────
+  Widget _badgeDot(String label, Color bg, Color fg, Color dot) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+    decoration: BoxDecoration(
+      color: bg, borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: dot.withOpacity(0.25)),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 5, height: 5,
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+      const SizedBox(width: 4),
+      Text(label,
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+              letterSpacing: 0.2, color: fg)),
+    ]),
+  );
 
   Widget _slotPill(String label) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [kPrimaryLight, kPrimaryLighter],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: kPrimary.withOpacity(0.18)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.schedule_rounded, size: 9, color: kPrimaryDark),
-            const SizedBox(width: 3),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: kPrimaryDark,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF1F5F9),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: kCardBorder),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(Icons.schedule_rounded, size: 9, color: kTextSecondary),
+      const SizedBox(width: 3),
+      Text(label,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+              color: kTextSecondary, letterSpacing: 0.2)),
+    ]),
+  );
 
-  Widget _gradientProgress(double value) => ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          height: 6,
-          decoration: BoxDecoration(
-            color: kPrimaryLight.withOpacity(0.6),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: FractionallySizedBox(
-            widthFactor: value.clamp(0.0, 1.0),
-            alignment: Alignment.centerLeft,
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: kPrimaryGradient,
-                borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
-        ),
-      );
+  Widget _solidProgress(double value) => ClipRRect(
+    borderRadius: BorderRadius.circular(20),
+    child: Container(
+      height: 7,
+      color: kPrimaryLight,
+      child: FractionallySizedBox(
+        widthFactor: value.clamp(0.0, 1.0),
+        alignment: Alignment.centerLeft,
+        child: Container(color: kPrimary),
+      ),
+    ),
+  );
 
   Widget _sectionHeader(String label, int count, Color accent, Color accentLight, Color accentDark) {
     return Row(children: [
-      Container(
-        width: 3,
-        height: 14,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [accent, accent.withOpacity(0.5)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: BorderRadius.circular(3),
-        ),
-      ),
+      Container(width: 3, height: 14,
+          decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(3))),
       const SizedBox(width: 7),
-      Text(
-        label,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: kTextPrimary,
-          letterSpacing: -0.1,
-        ),
-      ),
+      Text(label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+              color: kTextPrimary, letterSpacing: -0.1)),
       const SizedBox(width: 6),
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
         decoration: BoxDecoration(
-          color: accentLight,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accent.withOpacity(0.18)),
+          color: accentLight, borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withOpacity(0.25)),
         ),
-        child: Text(
-          '$count',
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: accentDark,
-          ),
-        ),
+        child: Text('$count',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: accentDark)),
       ),
     ]);
   }
 
   Widget _pulseDot() => TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0.4, end: 1.0),
-        duration: const Duration(milliseconds: 900),
-        builder: (_, v, child) => Opacity(opacity: v, child: child),
-        onEnd: () => setState(() {}),
-        child: Container(
-          width: 7,
-          height: 7,
-          decoration:
-              const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
-        ),
-      );
+    tween: Tween(begin: 0.4, end: 1.0),
+    duration: const Duration(milliseconds: 900),
+    builder: (_, v, child) => Opacity(opacity: v, child: child),
+    onEnd: () => setState(() {}),
+    child: Container(
+      width: 7, height: 7,
+      decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WALK-IN INLINE PANEL  (shown below the walk-in card on home screen)
+// WALK-IN INLINE PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _WalkInInlinePanel extends ConsumerStatefulWidget {
@@ -3241,7 +6057,6 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   bool    _booking  = false;
   String? _bookError;
 
-  // patient lookup — inline (no bottom sheet)
   Patients?           _foundPatient;
   bool                _checkingMobile    = false;
   int?                _resolvedPatientId;
@@ -3277,16 +6092,10 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   }
 
   void _clearPatientState() {
-    _foundPatient        = null;
-    _resolvedPatientId   = null;
-    _familyMemberId      = null;
-    _familyHeadPatientId = null;
-    _familyGenderId      = null;
-    _familyMembers       = [];
-    _loadingMembers      = false;
-    _addingNewMember     = false;
-    _newMemberCtr.clear();
-    _newMemberGender     = 1;
+    _foundPatient = null; _resolvedPatientId = null;
+    _familyMemberId = null; _familyHeadPatientId = null; _familyGenderId = null;
+    _familyMembers = []; _loadingMembers = false; _addingNewMember = false;
+    _newMemberCtr.clear(); _newMemberGender = 1;
   }
 
   Future<void> _loadSessions() async {
@@ -3299,13 +6108,27 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     }
     final dayName = const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][DateTime.now().weekday - 1];
     try {
-      final avails = await api.getDoctorAvailability(doctorId);
-      final sessions = avails.where((a) {
-        if (a.dayOfWeek != dayName) return false;
-        if (a.isEnabled == false) return false;
-        final mode = a.bookingMode ?? 0;
-        return mode == 1 || mode == 2 || mode == 3;
-      }).toList();
+      final schedule = await api.getDoctorSchedule(doctorId);
+      final todaySlots = (schedule.schedule ?? [])
+          .where((d) => d.day == dayName && (d.isEnabled ?? 0) == 1)
+          .expand((d) => d.slots ?? [])
+          .toList();
+      final sessions = todaySlots
+          .where((slot) {
+            if (_hasSessionEndedToday(slot.endTime)) return false;
+            final mode = slot.bookingMode ?? 0;
+            return mode == 1 || mode == 2 || mode == 3;
+          })
+          .map((slot) => DoctorAvailabilityModel(
+                dayOfWeek:   dayName,
+                isEnabled:   true,
+                slotId:      slot.slotId,
+                startTime:   slot.startTime,
+                endTime:     slot.endTime,
+                bookingMode: slot.bookingMode,
+                slotDuration: slot.slotDuration,
+              ))
+          .toList();
       if (!mounted) return;
       setState(() {
         _todaySessions = sessions;
@@ -3337,11 +6160,9 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       if (results.isNotEmpty) {
         final p = results.first;
         setState(() { _foundPatient = p; _checkingMobile = false; _loadingMembers = true; });
-        // load family members inline
         try {
           final members = p.patientId != null
-              ? await api.fetchFamilyMembers(p.patientId!)
-              : <FamilyMember>[];
+              ? await api.fetchFamilyMembers(p.patientId!) : <FamilyMember>[];
           if (mounted) setState(() { _familyMembers = members; _loadingMembers = false; });
         } catch (_) {
           if (mounted) setState(() { _loadingMembers = false; });
@@ -3353,8 +6174,6 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       if (mounted) setState(() { _checkingMobile = false; });
     }
   }
-
-  // _showPatientSheet removed — options shown inline below mobile field
 
   String _fmtTime(String? iso) {
     if (iso == null || iso.isEmpty) return '';
@@ -3387,8 +6206,6 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
 
     final today = DateTime.now();
     final dateStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
-    final mode    = _selected!.bookingMode ?? 0;
-    final isQueue = mode == 1 || mode == 3;
     final isNewFamily      = _familyHeadPatientId != null;
     final isExistingFamily = _familyMemberId != null;
     final isFamilyBooking  = isNewFamily || isExistingFamily;
@@ -3399,7 +6216,6 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       'doctor_id':        doctorId,
       'appointment_date': dateStr,
       'slot_id':          _selected!.slotId,
-      'start_time':       isQueue ? null : null,
       'user_type':        isFamilyBooking ? 2 : 1,
       if (isExistingFamily) 'patient_id': _familyMemberId,
       if (isNewFamily) 'family_id': _familyHeadPatientId,
@@ -3432,30 +6248,39 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
 
   @override
   Widget build(BuildContext context) {
-    final bookedFor = _resolvedPatientId != null
-        ? _nameCtr.text
-        : _familyMemberId != null || _familyHeadPatientId != null
-            ? _nameCtr.text
-            : null;
+    final bookedFor = _resolvedPatientId != null || _familyMemberId != null || _familyHeadPatientId != null
+        ? _nameCtr.text : null;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kHairline),
+        border: Border.all(color: kCardBorder),
       ),
       padding: const EdgeInsets.all(14),
       child: _loading
           ? const Center(child: Padding(
               padding: EdgeInsets.all(16),
-              child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
-            ))
+              child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary)))
           : _error != null
               ? _errBox(_error!)
               : _todaySessions.isEmpty
                   ? _errBox('No sessions scheduled for today')
-                  : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      // Today label
+                  : Builder(builder: (context) {
+                      final liveSessions = _todaySessions
+                          .where((s) => !_hasSessionEndedToday(s.endTime))
+                          .toList();
+                      // Auto-clear stale selection
+                      if (_selected != null &&
+                          !liveSessions.any((s) => s.slotId == _selected!.slotId)) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          if (mounted) setState(() => _selected = null);
+                        });
+                      }
+                      if (liveSessions.isEmpty) {
+                        return _errBox('No sessions available at this time');
+                      }
+                      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Row(children: [
                         const Icon(Icons.event_rounded, size: 14, color: kPrimary),
                         const SizedBox(width: 6),
@@ -3465,15 +6290,15 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                         ),
                       ]),
                       const SizedBox(height: 12),
-
-                      // Session chips
-                      if (_todaySessions.length > 1) ...[
-                        const Text('SELECT SESSION', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted, letterSpacing: 0.7)),
+                      if (liveSessions.length > 1) ...[
+                        const Text('SELECT SESSION',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                                color: kTextMuted, letterSpacing: 0.7)),
                         const SizedBox(height: 8),
                       ],
                       Wrap(
                         spacing: 8, runSpacing: 8,
-                        children: _todaySessions.map((s) {
+                        children: liveSessions.map((s) {
                           final isSel = _selected?.slotId == s.slotId;
                           return GestureDetector(
                             onTap: () => setState(() => _selected = s),
@@ -3481,9 +6306,10 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                               duration: const Duration(milliseconds: 150),
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
-                                color: isSel ? kPrimary : kPrimaryLight.withValues(alpha: 0.5),
+                                color: isSel ? kPrimaryDark : kPrimaryLight,
                                 borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: isSel ? kPrimary : const Color(0xFFB2EBE4)),
+                                border: Border.all(
+                                    color: isSel ? kPrimaryDark : const Color(0xFF9FE1CB)),
                               ),
                               child: Column(mainAxisSize: MainAxisSize.min, children: [
                                 Text('${_fmtTime(s.startTime)} – ${_fmtTime(s.endTime)}',
@@ -3491,75 +6317,69 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                                         color: isSel ? Colors.white : kTextPrimary)),
                                 const SizedBox(height: 2),
                                 Text(_modeLabel(s.bookingMode),
-                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: isSel ? Colors.white70 : kTextMuted)),
+                                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w500,
+                                        color: isSel ? Colors.white70 : kTextMuted)),
                               ]),
                             ),
                           );
                         }).toList(),
                       ),
                       const SizedBox(height: 14),
-
-                      // Name field
-                      _inlineField(controller: _nameCtr, label: 'Patient Name', icon: Icons.person_outline_rounded,
+                      _inlineField(controller: _nameCtr, label: 'Patient Name',
+                          icon: Icons.person_outline_rounded,
                           type: TextInputType.name, caps: TextCapitalization.words),
                       const SizedBox(height: 10),
-
-                      // Mobile field
-                      _inlineField(controller: _mobileCtr, label: 'Mobile Number', icon: Icons.phone_outlined,
-                          type: TextInputType.phone, maxLen: 10,
+                      _inlineField(controller: _mobileCtr, label: 'Mobile Number',
+                          icon: Icons.phone_outlined, type: TextInputType.phone, maxLen: 10,
                           formatters: [FilteringTextInputFormatter.digitsOnly]),
 
-                      // Patient lookup feedback
                       if (_checkingMobile) ...[
                         const SizedBox(height: 8),
                         const Row(children: [
-                          SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary)),
+                          SizedBox(width: 14, height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary)),
                           SizedBox(width: 8),
-                          Text('Checking...', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted)),
+                          Text('Checking...', style: TextStyle(fontSize: 12, color: kTextMuted)),
                         ]),
                       ] else if (_foundPatient != null && _resolvedPatientId == null &&
                                  _familyMemberId == null && _familyHeadPatientId == null) ...[
-                        // ── Inline patient options (no bottom sheet) ──────
                         const SizedBox(height: 8),
                         Container(
                           decoration: BoxDecoration(
-                            color: kPrimaryLight.withValues(alpha: 0.5),
+                            color: kPrimaryLight,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: kPrimary.withValues(alpha: 0.3)),
+                            border: Border.all(color: const Color(0xFF9FE1CB)),
                           ),
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            // Header
                             Padding(
                               padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
                               child: Row(children: [
-                                const Icon(Icons.person_rounded, size: 14, color: kPrimary),
+                                const Icon(Icons.person_rounded, size: 14, color: kPrimaryDark),
                                 const SizedBox(width: 6),
                                 Text('${_foundPatient!.name}  ·  ${_foundPatient!.mobileNo ?? ''}',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPrimary)),
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                        color: kPrimaryDark)),
                               ]),
                             ),
                             const Divider(height: 1, color: kBorder),
-                            // Book for primary
                             InkWell(
                               onTap: () => setState(() {
-                                _resolvedPatientId   = _foundPatient!.patientId;
-                                _nameCtr.text        = _foundPatient!.name ?? _nameCtr.text;
-                                _foundPatient        = null;
-                                _familyMemberId      = null;
-                                _familyHeadPatientId = null;
-                                _familyGenderId      = null;
+                                _resolvedPatientId = _foundPatient!.patientId;
+                                _nameCtr.text = _foundPatient!.name ?? _nameCtr.text;
+                                _foundPatient = null; _familyMemberId = null;
+                                _familyHeadPatientId = null; _familyGenderId = null;
                               }),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                 child: Row(children: [
-                                  const Icon(Icons.how_to_reg_rounded, size: 14, color: kPrimary),
+                                  const Icon(Icons.how_to_reg_rounded, size: 14, color: kPrimaryDark),
                                   const SizedBox(width: 8),
                                   Text('Book for ${_foundPatient!.name}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kPrimary)),
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                          color: kPrimaryDark)),
                                 ]),
                               ),
                             ),
-                            // Family members
                             if (_loadingMembers) ...[
                               const Divider(height: 1, color: kBorder),
                               const Padding(
@@ -3572,31 +6392,31 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                               ..._familyMembers.map((m) => Column(children: [
                                 InkWell(
                                   onTap: () => setState(() {
-                                    _familyMemberId      = m.memberId!;
-                                    _nameCtr.text        = m.memberName ?? '';
-                                    _foundPatient        = null;
-                                    _resolvedPatientId   = null;
-                                    _familyHeadPatientId = null;
-                                    _familyGenderId      = null;
+                                    _familyMemberId = m.memberId!;
+                                    _nameCtr.text = m.memberName ?? '';
+                                    _foundPatient = null; _resolvedPatientId = null;
+                                    _familyHeadPatientId = null; _familyGenderId = null;
                                   }),
                                   child: Padding(
                                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                                     child: Row(children: [
                                       CircleAvatar(radius: 12, backgroundColor: kPrimaryLight,
                                           child: Text(m.avatarLetter,
-                                              style: const TextStyle(color: kPrimary, fontSize: 11, fontWeight: FontWeight.w700))),
+                                              style: const TextStyle(color: kPrimaryDark, fontSize: 11,
+                                                  fontWeight: FontWeight.w700))),
                                       const SizedBox(width: 8),
                                       Expanded(child: Text(m.memberName ?? '',
-                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary))),
-                                      Text([m.genderName, m.relationName].where((s) => s != null && s.isNotEmpty).join(' · '),
-                                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextMuted)),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                              color: kTextPrimary))),
+                                      Text([m.genderName, m.relationName]
+                                              .where((s) => s != null && s.isNotEmpty).join(' · '),
+                                          style: const TextStyle(fontSize: 11, color: kTextMuted)),
                                     ]),
                                   ),
                                 ),
                                 const Divider(height: 1, color: kBorder),
                               ])),
                             ],
-                            // Add new family member toggle
                             InkWell(
                               onTap: () => setState(() => _addingNewMember = !_addingNewMember),
                               child: Padding(
@@ -3620,23 +6440,33 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                                   TextField(
                                     controller: _newMemberCtr,
                                     textCapitalization: TextCapitalization.words,
-                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+                                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                                        color: kTextPrimary),
                                     decoration: InputDecoration(
                                       hintText: 'Family member name',
                                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                       filled: true, fillColor: Colors.white,
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
-                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kBorder)),
-                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: kBorder)),
+                                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: kBorder)),
+                                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8),
+                                          borderSide: const BorderSide(color: kPrimary, width: 1.5)),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Row(children: [
-                                    _GenderPill(label: 'Male',   value: 1, selected: _newMemberGender == 1, onTap: () => setState(() => _newMemberGender = 1)),
+                                    _GenderPill(label: 'Male',   value: 1,
+                                        selected: _newMemberGender == 1,
+                                        onTap: () => setState(() => _newMemberGender = 1)),
                                     const SizedBox(width: 6),
-                                    _GenderPill(label: 'Female', value: 2, selected: _newMemberGender == 2, onTap: () => setState(() => _newMemberGender = 2)),
+                                    _GenderPill(label: 'Female', value: 2,
+                                        selected: _newMemberGender == 2,
+                                        onTap: () => setState(() => _newMemberGender = 2)),
                                     const SizedBox(width: 6),
-                                    _GenderPill(label: 'Other',  value: 3, selected: _newMemberGender == 3, onTap: () => setState(() => _newMemberGender = 3)),
+                                    _GenderPill(label: 'Other',  value: 3,
+                                        selected: _newMemberGender == 3,
+                                        onTap: () => setState(() => _newMemberGender = 3)),
                                   ]),
                                   const SizedBox(height: 10),
                                   SizedBox(
@@ -3656,11 +6486,13 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                                         });
                                       },
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: kPrimary, foregroundColor: Colors.white,
-                                        elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        backgroundColor: kPrimaryDark, foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                         padding: const EdgeInsets.symmetric(vertical: 10),
                                       ),
-                                      child: const Text('Use this member', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                                      child: const Text('Use this member',
+                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                                     ),
                                   ),
                                 ]),
@@ -3673,15 +6505,15 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
-                            color: kGreenLight,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: kGreen.withValues(alpha: 0.5)),
+                            color: kGreenLight, borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kGreenBorder),
                           ),
                           child: Row(children: [
-                            const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF38A169)),
+                            const Icon(Icons.check_circle_rounded, size: 16, color: kGreen),
                             const SizedBox(width: 8),
                             Text('Booking for $bookedFor',
-                                style: const TextStyle(fontSize: 12, color: Color(0xFF38A169), fontWeight: FontWeight.w500)),
+                                style: const TextStyle(fontSize: 12, color: kGreenDark,
+                                    fontWeight: FontWeight.w500)),
                           ]),
                         ),
                       ],
@@ -3690,16 +6522,13 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                         const SizedBox(height: 10),
                         _errBox(_bookError!),
                       ],
-
                       const SizedBox(height: 14),
-
                       SizedBox(
-                        width: double.infinity,
-                        height: 44,
+                        width: double.infinity, height: 44,
                         child: ElevatedButton(
                           onPressed: _booking ? null : _book,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary, foregroundColor: Colors.white,
+                            backgroundColor: kPrimaryDark, foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
@@ -3710,7 +6539,8 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         ),
                       ),
-                    ]),
+                      ]);
+                    }),
     );
   }
 
@@ -3729,17 +6559,20 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
         textCapitalization: caps,
         maxLength: maxLen,
         inputFormatters: formatters,
-        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextPrimary),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary),
           prefixIcon: Icon(icon, size: 16, color: kTextSecondary),
           counterText: '',
-          filled: true, fillColor: const Color(0xFFF7FDFC),
+          filled: true, fillColor: kPageBg,
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBorder)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kBorder)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: kPrimary, width: 1.5)),
         ),
       );
 
@@ -3748,19 +6581,23 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
       color: kRedLight, borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: kRed.withValues(alpha: 0.3)),
+      border: Border.all(color: kRedBorder),
     ),
-    child: Text(msg, style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: kRedDark)),
+    child: Text(msg, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kRedDark)),
   );
 }
 
-// Gender pill for walk-in family member sheet
+// ─────────────────────────────────────────────────────────────────────────────
+// GENDER PILL
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _GenderPill extends StatelessWidget {
   final String label;
   final int    value;
   final bool   selected;
   final VoidCallback onTap;
-  const _GenderPill({required this.label, required this.value, required this.selected, required this.onTap});
+  const _GenderPill({required this.label, required this.value,
+      required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
@@ -3768,12 +6605,13 @@ class _GenderPill extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: selected ? kPrimary : Colors.white,
+        color: selected ? kPrimaryDark : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: selected ? kPrimary : kBorder),
+        border: Border.all(color: selected ? kPrimaryDark : kBorder),
       ),
-      child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-          color: selected ? Colors.white : kTextSecondary)),
+      child: Text(label,
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+              color: selected ? Colors.white : kTextSecondary)),
     ),
   );
 }

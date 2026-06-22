@@ -95,12 +95,14 @@ app.use('/patient/index', protect, patientIndexRouter);
 // Uploaded images — JWT-gated.
 app.use('/uploads', uploadAuth, express.static(path.join(__dirname, 'uploads')));
 
-app.get('/', (req, res) => res.send('OK'));
+// Landing page static assets (CSS, JS, images).
+app.use(express.static(path.join(__dirname, 'public')));
 
-// Public — Privacy Policy (required for Play Store listing)
+// Keep old Play Store privacy/logo links working.
 app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'routes', 'privacy.html')));
 app.get('/privacy/logo', (req, res) => res.sendFile(path.join(__dirname, '..', 'frontend', 'assets', 'icon', 'qless_logo.png')));
-app.get('/delete-account', (req, res) => res.sendFile(path.join(__dirname, 'routes', 'delete-account.html')));
+
+// Delete-account API (POST) still works; GET is handled by React landing page below.
 app.post('/delete-account/request', express.json(), (req, res) => {
   const { name, phone, userType, reason } = req.body;
   if (!name || !phone || !userType) return res.status(400).json({ error: 'Missing required fields' });
@@ -108,8 +110,14 @@ app.post('/delete-account/request', express.json(), (req, res) => {
   res.json({ success: true });
 });
 
-// 404 fallthrough
-app.use((req, res) => res.status(404).json({ error: 'Not Found' }));
+// React landing page — serve index.html for all non-API routes.
+app.get('*', (req, res) => {
+  const indexFile = path.join(__dirname, 'public', 'index.html');
+  if (require('fs').existsSync(indexFile)) {
+    return res.sendFile(indexFile);
+  }
+  res.status(404).json({ error: 'Not Found' });
+});
 
 // Global error handler.
 app.use((err, req, res, next) => {

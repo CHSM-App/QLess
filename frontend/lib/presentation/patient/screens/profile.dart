@@ -17,7 +17,6 @@ import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart'
     show prescriptionViewModelProvider;
 
-// ── Colour palette (mirrors doctor_explore_screen.dart exactly) ───────────────
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
@@ -47,9 +46,6 @@ const kInfoLight = Color(0xFFDBEAFE);
 const kIndigo      = Color(0xFF7F9CF5);
 const kIndigoLight = Color(0xFFE0E7FF);
 
-// =============================================================================
-//  SCREEN
-// =============================================================================
 class PatientProfilePage extends ConsumerStatefulWidget {
   const PatientProfilePage({super.key});
 
@@ -230,8 +226,6 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     final gender      = _displayGender(details);
     final age         = _ageFromDob(details?.DOB);
     final bloodGroup  = details?.bloodGroup;
-    final dob         = _formatDob(details?.DOB);
-    final weight      = details?.weight;
     final initials    = _initials(displayName);
     final contactLine = _joinNonEmpty([email, mobile], separator: ' · ');
     // /uploads is JWT-gated — sign the avatar URL with ?token= so it loads.
@@ -333,46 +327,46 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                   ],
                 ),
 
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(height: 1, thickness: 1, color: kBorder),
-                ),
+                // const Padding(
+                //   padding: EdgeInsets.symmetric(vertical: 12),
+                //   child: Divider(height: 1, thickness: 1, color: kBorder),
+                // ),
 
-                Row(children: [
-                  Expanded(
-                    child: _infoTile(
-                      Icons.calendar_today_rounded,
-                      kPrimary,
-                      kPrimaryLight,
-                      'Date of Birth',
-                      dob ?? '—',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _infoTile(
-                      Icons.monitor_weight_outlined,
-                      kWarning,
-                      kAmberLight,
-                      'Weight',
-                      weight?.trim().isNotEmpty == true
-                          ? '${weight!.trim()} kg'
-                          : '—',
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _infoTile(
-                      Icons.location_on_outlined,
-                      const Color(0xFF38A169),
-                      kGreenLight,
-                      'Location',
-                      details?.address?.trim().isNotEmpty == true
-                          ? details!.address!
-                          : '—',
-                    ),
-                  ),
-                ]),
+                // Row(children: [
+                //   Expanded(
+                //     child: _infoTile(
+                //       Icons.calendar_today_rounded,
+                //       kPrimary,
+                //       kPrimaryLight,
+                //       'Date of Birth',
+                //       dob ?? '—',
+                //     ),
+                //   ),
+                //   const SizedBox(width: 8),
+                //   Expanded(
+                //     child: _infoTile(
+                //       Icons.monitor_weight_outlined,
+                //       kWarning,
+                //       kAmberLight,
+                //       'Weight',
+                //       weight?.trim().isNotEmpty == true
+                //           ? '${weight!.trim()} kg'
+                //           : '—',
+                //     ),
+                //   ),
+                //   const SizedBox(width: 8),
+                //   Expanded(
+                //     child: _infoTile(
+                //       Icons.location_on_outlined,
+                //       const Color(0xFF38A169),
+                //       kGreenLight,
+                //       'Location',
+                //       details?.address?.trim().isNotEmpty == true
+                //           ? details!.address!
+                //           : '—',
+                //     ),
+                //   ),
+                // ]),
               ],
             ),
           ),

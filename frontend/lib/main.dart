@@ -273,7 +273,6 @@ Future<void> _setupNotifications() async {
   if (initialMessage != null) {
     _handleNotificationTap(initialMessage.data);
   }
-
   // Step 2c — app was in background, user tapped the notification
   FirebaseMessaging.onMessageOpenedApp.listen((message) {
     _handleNotificationTap(message.data);

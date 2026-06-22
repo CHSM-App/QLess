@@ -46,6 +46,13 @@ bool _isToday(DateTime d) {
 bool _bookable(int? mode, bool isToday) =>
     switch (mode) { 1 => isToday, 2 => true, 3 => true, _ => false };
 
+bool _sessionEndedToday(DoctorAvailabilityModel s) {
+  if (s.endTime == null) return false;
+  final end = _parseTime(s.endTime);
+  final now = DateTime.now();
+  return now.hour * 60 + now.minute >= end.hour * 60 + end.minute;
+}
+
 String _fmtDateApi(DateTime dt) =>
     '${dt.year}-${dt.month.toString().padLeft(2,'0')}-${dt.day.toString().padLeft(2,'0')}';
 
@@ -527,8 +534,10 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
 
   void _pickDate(DateTime date) {
     final day      = _kDayNames[(date.weekday - 1).clamp(0, 6)];
+    final isToday  = _isToday(date);
     final sessions = (_grouped[day] ?? [])
-        .where((s) => _bookable(s.bookingMode, _isToday(date)))
+        .where((s) => _bookable(s.bookingMode, isToday))
+        .where((s) => !(isToday && _sessionEndedToday(s)))
         .toList();
     final avail    = sessions.length == 1 ? sessions.first : null;
 
@@ -662,6 +671,7 @@ class _WalkInPatientPageState extends ConsumerState<WalkInPatientPage> {
     final sessions = day == null ? <DoctorAvailabilityModel>[] :
         (_grouped[day] ?? [])
             .where((s) => _bookable(s.bookingMode, _dayIsToday))
+            .where((s) => !(_dayIsToday && _sessionEndedToday(s)))
             .toList();
 
     return SingleChildScrollView(

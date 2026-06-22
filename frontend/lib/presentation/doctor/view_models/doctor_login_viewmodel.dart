@@ -78,6 +78,18 @@ class DoctorLoginState {
   }
 }
 
+String _extractErrorMessage(Object e) {
+  if (e is DioException) {
+    if (e.response?.data is Map) {
+      final data = e.response!.data as Map;
+      final msg = data['error']?.toString() ?? data['message']?.toString();
+      if (msg != null && msg.isNotEmpty) return msg;
+    }
+    if (e.message != null && e.message!.isNotEmpty) return e.message!;
+  }
+  return e.toString();
+}
+
 class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   final DoctorLoginUsecase usecase;
   final OfflineQueueStore offlineStore;
@@ -229,7 +241,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           }
         }
       }
-      state = state.copyWith(isLoading: false, error: e.toString());
+      state = state.copyWith(isLoading: false, error: _extractErrorMessage(e));
     }
   }
 

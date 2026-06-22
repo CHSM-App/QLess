@@ -53,6 +53,7 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
 
   StreamSubscription<List<ConnectivityResult>>? _sub;
   Timer? _bannerTimer;
+  Timer? _pollTimer;
 
   Future<void> _init() async {
     // Determine initial status immediately
@@ -61,8 +62,33 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
       status: hasInternet ? ConnectivityStatus.online : ConnectivityStatus.offline,
     );
 
-    // Listen to connectivity changes
+    // Listen to connectivity changes (adapter on/off)
     _sub = Connectivity().onConnectivityChanged.listen(_onConnectivityChanged);
+
+    // Schedule next poll only after the previous one finishes — prevents
+    // concurrent DNS lookups when the network is very slow.
+    _schedulePoll();
+  }
+
+  void _schedulePoll() {
+    _pollTimer = Timer(const Duration(seconds: 10), () async {
+      if (!mounted) return;
+      try {
+        final hasInternet = await _checkInternet();
+        if (!mounted) return;
+        if (!hasInternet && state.isOnline) {
+          _bannerTimer?.cancel();
+          state = state.copyWith(
+            status: ConnectivityStatus.offline,
+            showBackOnlineBanner: false,
+          );
+        } else if (hasInternet && state.isOffline) {
+          await _onCameOnline();
+        }
+      } finally {
+        if (mounted) _schedulePoll();
+      }
+    });
   }
 
   Future<void> _onConnectivityChanged(List<ConnectivityResult> results) async {
@@ -87,7 +113,10 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
       return;
     }
 
-    // Came back online — show banner for 2 seconds
+    await _onCameOnline();
+  }
+
+  Future<void> _onCameOnline() async {
     final wasOffline = state.isOffline || state.status == ConnectivityStatus.unknown;
     if (wasOffline) {
       state = state.copyWith(
@@ -122,6 +151,7 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
   void dispose() {
     _sub?.cancel();
     _bannerTimer?.cancel();
+    _pollTimer?.cancel();
     super.dispose();
   }
 }
