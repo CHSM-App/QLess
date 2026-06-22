@@ -427,6 +427,8 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
   String _gender = 'Female';
   File?  _photo;
   bool   _saving = false;
+  bool   _mobileChecking = false;
+  bool?  _mobileExists;          // null=unchecked, true=exists, false=free
 
   final _picker = ImagePicker();
 
@@ -454,6 +456,40 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
     super.dispose();
   }
 
+
+  // ── Mobile exist check ───────────────────────────────────────────────────
+  String? _mobileExistMsg;
+
+  Future<void> _checkMobile(String val) async {
+    if (_isEdit || val.length != 10) {
+      if (_mobileExists != null || _mobileExistMsg != null) {
+        setState(() { _mobileExists = null; _mobileExistMsg = null; });
+      }
+      return;
+    }
+    setState(() { _mobileChecking = true; _mobileExists = null; _mobileExistMsg = null; });
+    try {
+      final results = await Future.wait([
+        ref.read(receptionistLoginViewModelProvider.notifier).mobileExistReceptionist(val),
+        ref.read(doctorLoginViewModelProvider.notifier).mobileExistDoctor(val),
+      ]);
+      if (!mounted) return;
+      final recepExists  = results[0].isNotEmpty;
+      final doctorExists = results[1].isNotEmpty;
+      setState(() {
+        _mobileChecking = false;
+        _mobileExists   = recepExists || doctorExists;
+        _mobileExistMsg = doctorExists
+            ? 'Mobile number registered as Doctor'
+            : recepExists
+                ? 'Mobile number already registered'
+                : null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _mobileChecking = false; _mobileExists = null; _mobileExistMsg = null; });
+    }
+  }
 
   // ── Photo picker ─────────────────────────────────────────────────────────
   void _pickPhoto() {
@@ -598,6 +634,13 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_isEdit && _mobileExists == true) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_mobileExistMsg ?? 'This mobile number is already registered.'),
+        backgroundColor: _kError,
+      ));
+      return;
+    }
 
     final clinicId = await _resolveClinicId();
     debugPrint('[ReceptionistDebug] save receptionist clinicId=$clinicId');
@@ -607,6 +650,34 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
         const SnackBar(content: Text('Clinic not found. Please try again.')),
       );
       return;
+    }
+
+    // Mobile exist check — only on add, not edit
+    if (!_isEdit) {
+      try {
+        final exists = await ref
+            .read(receptionistLoginViewModelProvider.notifier)
+            .mobileExistReceptionist(_mobileCtrl.text.trim());
+        if (!mounted) return;
+        if (exists.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('This mobile number is already registered.'),
+              backgroundColor: Color(0xFFFC8181),
+            ),
+          );
+          return;
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not verify mobile number. Please try again.'),
+            backgroundColor: const Color(0xFFFC8181),
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _saving = true);
@@ -743,8 +814,38 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
                     _field(ctrl: _mobileCtrl, label: 'Mobile Number', hint: '10-digit number',
                         icon: Icons.phone_outlined, inputType: TextInputType.phone,
                         formatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-                        readOnly: _isEdit,
+                        onChanged: _checkMobile,
                         validator: (v) => (v == null || v.trim().length != 10) ? 'Valid 10-digit number required' : null),
+                    if (!_isEdit) ...[
+                      if (_mobileChecking)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6, left: 4),
+                          child: Row(children: [
+                            SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1.5, color: _kTextMuted)),
+                            SizedBox(width: 6),
+                            Text('Checking…', style: TextStyle(fontSize: 11, color: _kTextMuted)),
+                          ]),
+                        ),
+                      if (!_mobileChecking && _mobileExists == true)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6, left: 4),
+                          child: Row(children: [
+                            const Icon(Icons.cancel_rounded, size: 13, color: _kError),
+                            const SizedBox(width: 5),
+                            Text(_mobileExistMsg ?? 'Mobile number already registered',
+                                style: const TextStyle(fontSize: 11, color: _kError, fontWeight: FontWeight.w600)),
+                          ]),
+                        ),
+                      if (!_mobileChecking && _mobileExists == false)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 6, left: 4),
+                          child: Row(children: [
+                            Icon(Icons.check_circle_rounded, size: 13, color: _kSuccess),
+                            SizedBox(width: 5),
+                            Text('Mobile number available', style: TextStyle(fontSize: 11, color: _kSuccess, fontWeight: FontWeight.w600)),
+                          ]),
+                        ),
+                    ],
                     const SizedBox(height: 12),
                     _field(ctrl: _emailCtrl, label: 'Email Address (optional)', hint: 'staff@clinic.com',
                         icon: Icons.email_outlined, inputType: TextInputType.emailAddress,

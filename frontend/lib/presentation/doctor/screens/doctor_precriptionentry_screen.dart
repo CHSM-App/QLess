@@ -684,7 +684,6 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   String? _validate() {
     if (_sympCtrl.text.trim().isEmpty) return 'Please enter symptoms';
-    if (_diagCtrl.text.trim().isEmpty) return 'Please enter diagnosis';
     for (int i = 0; i < _meds.length; i++) {
       if (_meds[i].selectedName == null || _meds[i].medicineId == null)
         return 'Please select medicine name for Medicine ${i + 1}';
@@ -1075,7 +1074,7 @@ Widget build(BuildContext context) {
             children: [
               _patientCard(), _gap(12),
               _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
-              _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'),
+              _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'),
               // _gap(10),
               // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
             ],
@@ -1125,7 +1124,7 @@ Widget build(BuildContext context) {
               children: [
                 _patientCard(), _gap(12),
                 _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
-                _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(10),
+                _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
                 // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
                 _followUpCard(),
               ],
@@ -1153,7 +1152,7 @@ Widget build(BuildContext context) {
         children: [
           _patientCard(), _gap(12),
           _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
-          _textSection('Diagnosis *', _diagCtrl, 'Enter diagnosis…'), _gap(12),
+          _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(12),
           // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
           _medicinesHeader(), _gap(10),
           ..._buildMedCards(medicines),
@@ -1507,8 +1506,6 @@ void _onTypeChange(MedicineType t) {
       const SizedBox(width: 9),
   Text('Medicine ${widget.index}',  
           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary)),
-      const SizedBox(width: 7),
-      _TypePill(value: e.type, onChanged: _onTypeChange),
       const Spacer(),
       GestureDetector(
         onTap: widget.onDelete,
@@ -1633,24 +1630,29 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     ]),
   ]);
 
+  void _onMedicineSelected(Medicine m) {
+    final newType = MedicineType.values.firstWhere(
+      (t) => t.typeId == (m.medTypeId ?? 1),
+      orElse: () => MedicineType.tablet,
+    );
+    if (newType != e.type) {
+      _onTypeChange(newType);
+    }
+    setState(() {
+      e.selectedName = m.medicineName ?? '';
+      e.medicineId   = m.medicineId;
+      e.searchText   = '';
+    });
+  }
+
   Widget _nameSearch() {
-    final all = widget.medicines.where((m) => (m.medTypeId ?? 0) == e.type.typeId).toList();
+    final all = widget.medicines;
     final filtered = e.searchText.isEmpty
-        ? all
+        ? <Medicine>[]
         : all.where((m) => (m.medicineName ?? '').toLowerCase().contains(e.searchText.toLowerCase())).toList();
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _lbl('Medicine Name  ·  ${e.type.label}'), _gap(5),
-      if (all.isEmpty)
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(color: kAmberLight, borderRadius: BorderRadius.circular(8), border: Border.all(color: kAmberDark.withOpacity(0.3))),
-          child: const Row(children: [
-            Icon(Icons.info_outline_rounded, size: 13, color: kAmberDark),
-            SizedBox(width: 6),
-            Expanded(child: Text('No medicines found for this type.', style: TextStyle(fontSize: 11, color: kAmberDark))),
-          ]),
-        ),
+      _lbl('Medicine Name'), _gap(5),
       if (e.selectedName != null)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -1664,6 +1666,12 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
             const SizedBox(width: 8),
             Expanded(child: Text(e.selectedName!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
                 overflow: TextOverflow.ellipsis)),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: e.type.color.withOpacity(0.12), borderRadius: BorderRadius.circular(5)),
+              child: Text(e.type.label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: e.type.colorDark)),
+            ),
+            const SizedBox(width: 6),
             GestureDetector(
               onTap: () => setState(() { e.selectedName = null; e.medicineId = null; e.searchText = ''; }),
               child: Container(
@@ -1678,9 +1686,9 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
         TextField(
           onChanged: (v) => setState(() => e.searchText = v),
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
-          decoration: _ideco('Search ${e.type.label} name…').copyWith(
-            prefixIcon: Padding(padding: const EdgeInsets.symmetric(horizontal: 11),
-                child: Icon(Icons.search_rounded, color: e.type.color, size: 16)),
+          decoration: _ideco('Search medicine name…').copyWith(
+            prefixIcon: const Padding(padding: EdgeInsets.symmetric(horizontal: 11),
+                child: Icon(Icons.search_rounded, color: kPrimary, size: 16)),
             prefixIconConstraints: const BoxConstraints(minWidth: 40),
           ),
         ),
@@ -1688,7 +1696,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
           _gap(4),
           if (filtered.isNotEmpty)
             Container(
-              constraints: const BoxConstraints(maxHeight: 180),
+              constraints: const BoxConstraints(maxHeight: 200),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: kBorder),
@@ -1698,32 +1706,39 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
                 shrinkWrap: true, padding: EdgeInsets.zero,
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
-                itemBuilder: (_, i) => InkWell(
-                  onTap: () => setState(() {
-                    e.selectedName = filtered[i].medicineName ?? '';
-                    e.medicineId   = filtered[i].medicineId;
-                    e.searchText   = '';
-                  }),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    child: Row(children: [
-                      Icon(e.type.icon, color: e.type.color, size: 13),
-                      const SizedBox(width: 9),
-                      Expanded(child: Text(filtered[i].medicineName ?? '',
-                          style: const TextStyle(fontSize: 12, color: kTextPrimary),
-                          overflow: TextOverflow.ellipsis)),
-                      Icon(Icons.add_circle_outline_rounded, color: e.type.color, size: 15),
-                    ]),
-                  ),
-                ),
+                itemBuilder: (_, i) {
+                  final med = filtered[i];
+                  final medType = MedicineType.values.firstWhere(
+                    (t) => t.typeId == (med.medTypeId ?? 1),
+                    orElse: () => MedicineType.tablet,
+                  );
+                  return InkWell(
+                    onTap: () => _onMedicineSelected(med),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(children: [
+                        Icon(medType.icon, color: medType.color, size: 13),
+                        const SizedBox(width: 9),
+                        Expanded(child: Text(med.medicineName ?? '',
+                            style: const TextStyle(fontSize: 12, color: kTextPrimary),
+                            overflow: TextOverflow.ellipsis)),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: medType.colorLight, borderRadius: BorderRadius.circular(5)),
+                          child: Text(medType.label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: medType.colorDark)),
+                        ),
+                      ]),
+                    ),
+                  );
+                },
               ),
             )
           else
             Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
               const Icon(Icons.info_outline_rounded, size: 12, color: kTextMuted),
               const SizedBox(width: 5),
-              Expanded(child: Text('No ${e.type.label} found for "${e.searchText}"',
+              Expanded(child: Text('No medicine found for "${e.searchText}"',
                   style: const TextStyle(fontSize: 11, color: kTextMuted))),
             ])),
         ],
@@ -1775,38 +1790,3 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
   );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  _TypePill
-// ════════════════════════════════════════════════════════════════════
-class _TypePill extends StatelessWidget {
-  final MedicineType value;
-  final ValueChanged<MedicineType> onChanged;
-  const _TypePill({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-    decoration: BoxDecoration(
-      color: value.colorLight,
-      borderRadius: BorderRadius.circular(7),
-      border: Border.all(color: value.color.withOpacity(0.35)),
-    ),
-    child: DropdownButtonHideUnderline(
-      child: DropdownButton<MedicineType>(
-        value: value, isDense: true,
-        icon: Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: value.colorDark),
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: value.colorDark),
-        dropdownColor: Colors.white,
-        items: MedicineType.values.map((t) => DropdownMenuItem(
-          value: t,
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(t.icon, size: 13, color: t.color),
-            const SizedBox(width: 5),
-            Text(t.label, style: TextStyle(color: t.colorDark, fontSize: 12, fontWeight: FontWeight.w600)),
-          ]),
-        )).toList(),
-        onChanged: (v) { if (v != null) onChanged(v); },
-      ),
-    ),
-  );
-}
