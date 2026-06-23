@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/database/offline_queue_store.dart';
@@ -24,6 +25,7 @@ class DoctorLoginState {
   final AsyncValue<List<DoctorDetails>> phoneCheckResult;
   final AsyncValue<List<Medicine>>? medicines;
   final AsyncValue<List<Medicine>>? medicineTypes;
+  final AsyncValue<List<DoctorDetails>>? clinicsList;
 
   const DoctorLoginState({
     this.isLoading = false,
@@ -40,6 +42,7 @@ class DoctorLoginState {
     this.phoneCheckResult = const AsyncValue.data([]),
     this.medicineTypes,
     this.medicines,
+    this.clinicsList,
   });
 
   DoctorLoginState copyWith({
@@ -58,6 +61,7 @@ class DoctorLoginState {
     AsyncValue<List<DoctorDetails>>? phoneCheckResult,
     AsyncValue<List<Medicine>>? medicines,
     AsyncValue<List<Medicine>>? medicineTypes,
+    AsyncValue<List<DoctorDetails>>? clinicsList,
   }) {
     return DoctorLoginState(
       isLoading: isLoading ?? this.isLoading,
@@ -74,6 +78,7 @@ class DoctorLoginState {
       phoneCheckResult: phoneCheckResult ?? this.phoneCheckResult,
       medicineTypes: medicineTypes ?? this.medicineTypes,
       medicines: medicines ?? this.medicines,
+      clinicsList: clinicsList ?? this.clinicsList,
     );
   }
 }
@@ -259,27 +264,83 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
     try {
       final result = await usecase.checkPhoneDoctor(mobile);
-      final d = result.first;
-      state = state.copyWith(
-        doctorId: d.doctorId,
-        name: d.name,
-        mobile: d.mobile,
-        email: d.email,
-        roleId: d.roleId?.toString(),
-        token: d.Token,
-        clinicId: d.clinicId,
-        clinic_name: d.clinicName,
-        leadTimeMinutes: d.leadTime,
-        phoneCheckResult: AsyncValue.data(result),
-      );
-      if (d.name != null) await TokenStorage.saveValue('name', d.name!);
-      if (d.clinicName != null)
-        await TokenStorage.saveValue('clinic_name', d.clinicName!);
-      if (d.clinicId != null &&
-          d.clinicId!.trim().isNotEmpty &&
-          d.clinicId!.trim().toLowerCase() != 'null' &&
-          d.clinicId!.trim() != '0') {
-        await TokenStorage.saveValue('clinic_id', d.clinicId!.trim());
+      final existingClinicId = state.clinic_id;
+      if (existingClinicId != null) {
+        // Clinic already selected via picker.
+        // Update personal fields from API, preserve clinic fields from selectClinic.
+        final d = result.first;
+        final currentList = state.phoneCheckResult.maybeWhen(
+          data: (l) => l,
+          orElse: () => <DoctorDetails>[],
+        );
+        final currentFirst = currentList.isNotEmpty ? currentList.first : null;
+        final updatedFirst = DoctorDetails(
+          // Personal fields from checkPhoneDoctor (has specialization, qualification etc.)
+          doctorId:       d.doctorId,
+          name:           d.name,
+          email:          d.email,
+          mobile:         d.mobile,
+          qualification:  d.qualification,
+          licenseNo:      d.licenseNo,
+          experience:     d.experience,
+          specialization: d.specialization,
+          image:          d.image,
+          roleId:         d.roleId,
+          Token:          d.Token,
+          genderId:       d.genderId,
+          isverified:     d.isverified,
+          leadTime:       d.leadTime,
+          qStartSection:  d.qStartSection,
+          // Clinic fields preserved from selectClinic merge
+          clinicId:        currentFirst?.clinicId      ?? existingClinicId,
+          clinicName:      currentFirst?.clinicName    ?? state.clinic_name,
+          clinicAddress:   currentFirst?.clinicAddress,
+          latitude:        currentFirst?.latitude,
+          longitude:       currentFirst?.longitude,
+          consultationFee: currentFirst?.consultationFee,
+          websiteName:     currentFirst?.websiteName,
+          clinicEmail:     currentFirst?.clinicEmail,
+          clinicContact:   currentFirst?.clinicContact,
+          imageUrl:        currentFirst?.imageUrl,
+        );
+        final updatedList = currentList.isNotEmpty
+            ? [updatedFirst, ...currentList.skip(1)]
+            : [updatedFirst];
+        state = state.copyWith(
+          doctorId:       d.doctorId,
+          name:           d.name,
+          mobile:         d.mobile,
+          email:          d.email,
+          roleId:         d.roleId?.toString(),
+          token:          d.Token,
+          leadTimeMinutes: d.leadTime,
+          phoneCheckResult: AsyncValue.data(updatedList),
+        );
+        if (d.name != null) await TokenStorage.saveValue('name', d.name!);
+      } else {
+        final d = result.first;
+        state = state.copyWith(
+          doctorId: d.doctorId,
+          name: d.name,
+          mobile: d.mobile,
+          email: d.email,
+          roleId: d.roleId?.toString(),
+          token: d.Token,
+          clinicId: d.clinicId,
+          clinic_name: d.clinicName,
+          leadTimeMinutes: d.leadTime,
+          phoneCheckResult: AsyncValue.data(result),
+        );
+        if (d.name != null) await TokenStorage.saveValue('name', d.name!);
+        if (d.clinicName != null) {
+          await TokenStorage.saveValue('clinic_name', d.clinicName!);
+        }
+        if (d.clinicId != null &&
+            d.clinicId!.trim().isNotEmpty &&
+            d.clinicId!.trim().toLowerCase() != 'null' &&
+            d.clinicId!.trim() != '0') {
+          await TokenStorage.saveValue('clinic_id', d.clinicId!.trim());
+        }
       }
     } catch (e, st) {
       state = state.copyWith(
@@ -489,9 +550,12 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
   /// or doctor_id via the dedicated backend route (doctor_login_vw).
   Future<void> loadDoctorProfileForReceptionist({String? clinicId, int? doctorId}) async {
     try {
+      debugPrint('[RecepDebug] loadDoctorProfile clinicId=$clinicId doctorId=$doctorId');
       final doctors = await usecase.getDoctorProfileByClinic(clinicId: clinicId, doctorId: doctorId);
+      debugPrint('[RecepDebug] doctors returned: ${doctors.length}');
       if (doctors.isEmpty) return;
       final d = doctors.first;
+      debugPrint('[RecepDebug] d.clinicId=${d.clinicId} d.clinicName=${d.clinicName}');
       state = state.copyWith(
         doctorId: d.doctorId,
         name: d.name,
@@ -505,9 +569,126 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         phoneCheckResult: AsyncValue.data(doctors),
       );
       if (d.name != null) await TokenStorage.saveValue('doctor_name', d.name!);
+      if (d.clinicId != null) await TokenStorage.saveValue('clinic_id', d.clinicId!);
       if (d.clinicName != null) await TokenStorage.saveValue('clinic_name', d.clinicName!);
       if (d.mobile != null) await TokenStorage.saveValue('recep_doctor_mobile', d.mobile!);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[RecepDebug] loadDoctorProfile ERROR: $e');
+    }
+  }
+
+  Future<void> selectClinic(DoctorDetails clinic) async {
+    // First, update clinic_id/name immediately so UI is responsive.
+    state = state.copyWith(
+      clinicId: clinic.clinicId,
+      clinic_name: clinic.clinicName,
+      leadTimeMinutes: clinic.leadTime,
+    );
+    if (clinic.clinicId != null) {
+      await TokenStorage.saveValue('clinic_id', clinic.clinicId!);
+    }
+    if (clinic.clinicName != null) {
+      await TokenStorage.saveValue('clinic_name', clinic.clinicName!);
+    }
+
+    // Build phoneCheckResult: personal fields from existing state (set by
+    // checkPhoneDoctor / loadDoctorProfileForReceptionist), clinic fields from
+    // picker selection (GetDoctorClinics returns full clinic row).
+    final currentList = state.phoneCheckResult.maybeWhen(
+      data: (l) => l,
+      orElse: () => <DoctorDetails>[],
+    );
+    final personal = currentList.isNotEmpty ? currentList.first : null;
+    final merged = DoctorDetails(
+      doctorId:        personal?.doctorId      ?? state.doctorId,
+      name:            personal?.name          ?? state.name,
+      email:           personal?.email         ?? state.email,
+      mobile:          personal?.mobile        ?? state.mobile,
+      qualification:   personal?.qualification,
+      licenseNo:       personal?.licenseNo,
+      experience:      personal?.experience,
+      specialization:  personal?.specialization,
+      image:           personal?.image,
+      roleId:          personal?.roleId,
+      Token:           personal?.Token,
+      genderId:        personal?.genderId,
+      isverified:      personal?.isverified,
+      leadTime:        clinic.leadTime ?? personal?.leadTime,
+      qStartSection:   personal?.qStartSection,
+      // Clinic fields from picker (GetDoctorClinics has full clinic row)
+      clinicId:        clinic.clinicId,
+      clinicName:      clinic.clinicName,
+      clinicAddress:   clinic.clinicAddress,
+      latitude:        clinic.latitude,
+      longitude:       clinic.longitude,
+      consultationFee: clinic.consultationFee,
+      websiteName:     clinic.websiteName,
+      clinicEmail:     clinic.clinicEmail,
+      clinicContact:   clinic.clinicContact,
+      imageUrl:        clinic.imageUrl,
+    );
+    final allClinics = state.clinicsList?.maybeWhen(
+          data: (l) => l,
+          orElse: () => <DoctorDetails>[],
+        ) ??
+        <DoctorDetails>[];
+    final reordered = [
+      merged,
+      ...allClinics.where((c) => c.clinicId != clinic.clinicId),
+    ];
+    state = state.copyWith(
+      leadTimeMinutes: merged.leadTime ?? state.leadTimeMinutes,
+      phoneCheckResult: AsyncValue.data(reordered),
+    );
+  }
+
+  Future<void> getDoctorClinics(int doctorId) async {
+    state = state.copyWith(clinicsList: const AsyncValue.loading());
+    try {
+      final result = await usecase.getClinicsForDoctor(doctorId);
+      state = state.copyWith(clinicsList: AsyncValue.data(result));
+    } catch (e, st) {
+      state = state.copyWith(clinicsList: AsyncValue.error(e, st));
+    }
+  }
+
+  Future<bool> addClinic(DoctorDetails clinic, {List<File>? clinicImages}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await usecase.addClinic(clinic, clinicImages: clinicImages);
+      state = state.copyWith(isLoading: false);
+      if (clinic.doctorId != null) await getDoctorClinics(clinic.doctorId!);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractErrorMessage(e));
+      return false;
+    }
+  }
+
+  Future<bool> updateClinic(DoctorDetails clinic, {List<File>? clinicImages}) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await usecase.updateClinic(clinic, clinicImages: clinicImages);
+      state = state.copyWith(isLoading: false);
+      if (clinic.doctorId != null) await getDoctorClinics(clinic.doctorId!);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractErrorMessage(e));
+      return false;
+    }
+  }
+
+  Future<bool> deleteClinic(String clinicId, int doctorId) async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      await usecase.deleteClinic(clinicId, doctorId);
+      state = state.copyWith(isLoading: false);
+      await getDoctorClinics(doctorId);
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _extractErrorMessage(e));
+      return false;
+    }
   }
 
   /// Called at receptionist login: fetches the linked doctor's data using

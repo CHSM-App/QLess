@@ -143,6 +143,61 @@ class DoctorLoginImpl implements DoctorLoginRepository {
 
   
   @override
+  Future<List<DoctorDetails>> getClinicsForDoctor(int doctorId) {
+    return apiService.getClinicsForDoctor(doctorId);
+  }
+
+  @override
+  Future<dynamic> addClinic(DoctorDetails clinic, {List<File>? clinicImages}) async {
+    List<MultipartFile>? multipartImages;
+    if (clinicImages != null && clinicImages.isNotEmpty) {
+      multipartImages = await Future.wait(
+        clinicImages.map((f) => MultipartFile.fromFile(f.path, filename: p.basename(f.path))),
+      );
+    }
+    return apiService.addClinicMultipart(
+      clinic.doctorId ?? 0,
+      clinic.clinicName ?? '',
+      clinic.clinicAddress ?? '',
+      clinic.latitude?.toString() ?? '0',
+      clinic.longitude?.toString() ?? '0',
+      clinic.consultationFee?.toString() ?? '0',
+      clinic.websiteName ?? '',
+      clinic.clinicEmail ?? '',
+      clinic.clinicContact ?? '',
+      multipartImages,
+    );
+  }
+
+  @override
+  Future<dynamic> updateClinic(DoctorDetails clinic, {List<File>? clinicImages}) async {
+    List<MultipartFile>? multipartImages;
+    if (clinicImages != null && clinicImages.isNotEmpty) {
+      multipartImages = await Future.wait(
+        clinicImages.map((f) => MultipartFile.fromFile(f.path, filename: p.basename(f.path))),
+      );
+    }
+    return apiService.updateClinicMultipart(
+      clinic.clinicId ?? '',
+      clinic.doctorId ?? 0,
+      clinic.clinicName ?? '',
+      clinic.clinicAddress ?? '',
+      clinic.latitude?.toString() ?? '0',
+      clinic.longitude?.toString() ?? '0',
+      clinic.consultationFee?.toString() ?? '0',
+      clinic.websiteName ?? '',
+      clinic.clinicEmail ?? '',
+      clinic.clinicContact ?? '',
+      multipartImages,
+    );
+  }
+
+  @override
+  Future<dynamic> deleteClinic(String clinicId, int doctorId) {
+    return apiService.deleteClinic(clinicId, doctorId);
+  }
+
+  @override
   Future<OtpResponse> sendOtp(OtpResponse payload) {
     return apiService.sendOtp(payload);
   }

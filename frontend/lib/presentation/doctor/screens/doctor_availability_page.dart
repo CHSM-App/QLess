@@ -65,7 +65,8 @@ class DaySchedule {
 //  PAGE
 // ════════════════════════════════════════════════════════════════════
 class DoctorAvailabilityPage extends ConsumerStatefulWidget {
-  const DoctorAvailabilityPage({super.key});
+  final String? clinicId;
+  const DoctorAvailabilityPage({super.key, this.clinicId});
 
   @override
   ConsumerState<DoctorAvailabilityPage> createState() =>
@@ -96,7 +97,7 @@ class _DoctorAvailabilityPageState
     final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
     await ref
         .read(doctorSettingsViewModelProvider.notifier)
-        .getDoctorSchedule(doctorId);
+        .getDoctorSchedule(doctorId, clinicId: widget.clinicId);
   }
 
   // ---------------------------------------------------------------------------
@@ -277,7 +278,7 @@ class _DoctorAvailabilityPageState
     final notifier = ref.read(doctorSettingsViewModelProvider.notifier);
     final model = _buildModel();
 
-    final ok = await notifier.saveDoctorSchedule(model);
+    final ok = await notifier.saveDoctorSchedule(model, clinicId: widget.clinicId);
     if (!mounted) return;
 
     if (ok) {
@@ -348,6 +349,7 @@ class _DoctorAvailabilityPageState
           model,
           force: true,
           action: choice!,
+          clinicId: widget.clinicId,
         );
         if (!mounted) return;
         if (ok2) {

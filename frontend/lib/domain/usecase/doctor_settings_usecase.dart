@@ -14,16 +14,18 @@ class DoctorSettingsUsecase {
     DoctorScheduleModel doctorSchedule, {
     bool force = false,
     String action = 'cancel',
+    String? clinicId,
   }) {
     return doctorSettingsRepo.saveDoctorSchedule(
       doctorSchedule,
       force: force,
       action: action,
+      clinicId: clinicId,
     );
   }
 
-  Future<DoctorScheduleModel> getDoctorSchedule(int doctorId) {
-    return doctorSettingsRepo.getDoctorSchedule(doctorId);
+  Future<DoctorScheduleModel> getDoctorSchedule(int doctorId, {String? clinicId}) {
+    return doctorSettingsRepo.getDoctorSchedule(doctorId, clinicId: clinicId);
   }
 
   Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId) {

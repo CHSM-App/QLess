@@ -381,9 +381,13 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<DoctorScheduleModel> getDoctorSchedule(int doctorId) async {
+  Future<DoctorScheduleModel> getDoctorSchedule(
+    int doctorId, {
+    String? clinicId,
+  }) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'clinic_id': clinicId};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<DoctorScheduleModel>(
@@ -442,9 +446,13 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId) async {
+  Future<List<AppointmentList>> fetchPatientAppointments(
+    int doctorId, {
+    String? clinicId,
+  }) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'clinic_id': clinicId};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<List<AppointmentList>>(
@@ -473,9 +481,13 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<TodayQueueModel>> getTodayQueue(int doctorId) async {
+  Future<List<TodayQueueModel>> getTodayQueue(
+    int doctorId, {
+    String? clinicId,
+  }) async {
     final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{r'clinic_id': clinicId};
+    queryParameters.removeWhere((k, v) => v == null);
     final _headers = <String, dynamic>{};
     const Map<String, dynamic>? _data = null;
     final _options = _setStreamType<List<TodayQueueModel>>(
@@ -558,6 +570,158 @@ class _ApiService implements ApiService {
       errorLogger?.logError(e, s, _options, response: _result);
       rethrow;
     }
+    return _value;
+  }
+
+  @override
+  Future<List<DoctorDetails>> getClinicsForDoctor(int doctorId) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<DoctorDetails>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'login/getClinicsForDoctor/${doctorId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<DoctorDetails> _value;
+    try {
+      _value = _result.data!
+          .map((dynamic i) => DoctorDetails.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<dynamic> addClinicMultipart(
+    int doctorId,
+    String clinicName,
+    String clinicAddress,
+    String latitude,
+    String longitude,
+    String consultationFee,
+    String websiteName,
+    String clinicEmail,
+    String clinicContact,
+    List<MultipartFile>? clinicImages,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    final _data = FormData();
+    _data.fields.add(MapEntry('doctor_id', doctorId.toString()));
+    _data.fields.add(MapEntry('clinic_name', clinicName));
+    _data.fields.add(MapEntry('clinic_address', clinicAddress));
+    _data.fields.add(MapEntry('latitude', latitude));
+    _data.fields.add(MapEntry('longitude', longitude));
+    _data.fields.add(MapEntry('consultation_fee', consultationFee));
+    _data.fields.add(MapEntry('website_name', websiteName));
+    _data.fields.add(MapEntry('clinic_email', clinicEmail));
+    _data.fields.add(MapEntry('clinic_contact', clinicContact));
+    if (clinicImages != null) {
+      _data.files.addAll(clinicImages.map((i) => MapEntry('clinic_images', i)));
+    }
+    final _options = _setStreamType<dynamic>(
+      Options(
+            method: 'POST',
+            headers: _headers,
+            extra: _extra,
+            contentType: 'multipart/form-data',
+          )
+          .compose(
+            _dio.options,
+            'login/addClinic',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<dynamic> updateClinicMultipart(
+    String clinicId,
+    int doctorId,
+    String clinicName,
+    String clinicAddress,
+    String latitude,
+    String longitude,
+    String consultationFee,
+    String websiteName,
+    String clinicEmail,
+    String clinicContact,
+    List<MultipartFile>? clinicImages,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    queryParameters.removeWhere((k, v) => v == null);
+    final _headers = <String, dynamic>{};
+    final _data = FormData();
+    _data.fields.add(MapEntry('clinic_id', clinicId));
+    _data.fields.add(MapEntry('doctor_id', doctorId.toString()));
+    _data.fields.add(MapEntry('clinic_name', clinicName));
+    _data.fields.add(MapEntry('clinic_address', clinicAddress));
+    _data.fields.add(MapEntry('latitude', latitude));
+    _data.fields.add(MapEntry('longitude', longitude));
+    _data.fields.add(MapEntry('consultation_fee', consultationFee));
+    _data.fields.add(MapEntry('website_name', websiteName));
+    _data.fields.add(MapEntry('clinic_email', clinicEmail));
+    _data.fields.add(MapEntry('clinic_contact', clinicContact));
+    if (clinicImages != null) {
+      _data.files.addAll(clinicImages.map((i) => MapEntry('clinic_images', i)));
+    }
+    final _options = _setStreamType<dynamic>(
+      Options(
+            method: 'PUT',
+            headers: _headers,
+            extra: _extra,
+            contentType: 'multipart/form-data',
+          )
+          .compose(
+            _dio.options,
+            'login/updateClinic',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<dynamic> deleteClinic(String clinicId, int doctorId) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'DELETE', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'login/deleteClinic/${clinicId}/${doctorId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
     return _value;
   }
 

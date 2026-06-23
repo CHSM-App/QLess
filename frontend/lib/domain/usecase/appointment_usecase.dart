@@ -43,8 +43,8 @@ class AppointmentUsecase {
     return appointmentRepository.getBookedSlots(doctorId);
   }
 
-  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId) {
-    return appointmentRepository.fetchPatientAppointments(doctorId);
+  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId, {String? clinicId}) {
+    return appointmentRepository.fetchPatientAppointments(doctorId, clinicId: clinicId);
   }
 
   Future<List<AppointmentList>> getPatientAppointments(int familyId) {
@@ -109,8 +109,8 @@ class AppointmentUsecase {
     return appointmentRepository.queuePreviewEstimate(appointmentRequest);
   }
   
-  Future<List<TodayQueueModel>> getTodayQueue(int doctorId) {
-    return appointmentRepository.getTodayQueue(doctorId);
+  Future<List<TodayQueueModel>> getTodayQueue(int doctorId, {String? clinicId}) {
+    return appointmentRepository.getTodayQueue(doctorId, clinicId: clinicId);
   }
 
   Future<AppointmentResponseModel> queuePauseEmergency(int queueId) {

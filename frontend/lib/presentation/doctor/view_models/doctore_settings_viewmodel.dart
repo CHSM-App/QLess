@@ -59,6 +59,7 @@ class DoctorSettingsState {
     bool? isLoading,
     String? errorMessage,
     DoctorScheduleModel? doctorSchedule,
+    bool clearSchedule = false,
     List<ScheduleConflict>? pendingConflicts,
     bool clearConflicts = false,
     String? todayBlockedMessage,
@@ -67,7 +68,7 @@ class DoctorSettingsState {
     bool? isLeaveBusy,
   }) {
     return DoctorSettingsState(
-      doctorSchedule: doctorSchedule ?? this.doctorSchedule,
+      doctorSchedule: clearSchedule ? null : (doctorSchedule ?? this.doctorSchedule),
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage ?? this.errorMessage,
       pendingConflicts: clearConflicts
@@ -94,6 +95,7 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
     DoctorScheduleModel doctorSchedule, {
     bool force = false,
     String action = 'cancel',
+    String? clinicId,
   }) async {
     state = state.copyWith(
       isLoading: true,
@@ -106,6 +108,7 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
         doctorSchedule,
         force: force,
         action: action,
+        clinicId: clinicId,
       );
       debugPrint('Doctor schedule saved successfully: ${result?['message']}');
       return true;
@@ -150,10 +153,10 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
     state = state.copyWith(clearConflicts: true);
   }
 
-  Future<void> getDoctorSchedule(int doctorId) async {
-    state = state.copyWith(isLoading: true, errorMessage: '');
+  Future<void> getDoctorSchedule(int doctorId, {String? clinicId}) async {
+    state = state.copyWith(isLoading: true, errorMessage: '', clearSchedule: true);
     try {
-      final schedule = await doctorSettingsUsecase.getDoctorSchedule(doctorId);
+      final schedule = await doctorSettingsUsecase.getDoctorSchedule(doctorId, clinicId: clinicId);
       state = state.copyWith(doctorSchedule: schedule);
     } catch (e) {
       debugPrint('Error fetching doctor schedule: $e');

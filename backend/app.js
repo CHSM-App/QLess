@@ -102,12 +102,35 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'routes', 'privacy.html')));
 app.get('/privacy/logo', (req, res) => res.sendFile(path.join(__dirname, '..', 'frontend', 'assets', 'icon', 'qless_logo.png')));
 
-// Delete-account API (POST) still works; GET is handled by React landing page below.
-app.post('/delete-account/request', express.json(), (req, res) => {
-  const { name, phone, userType, reason } = req.body;
-  if (!name || !phone || !userType) return res.status(400).json({ error: 'Missing required fields' });
-  log.info(`[ACCOUNT DELETION REQUEST] name=${name} phone=${phone} type=${userType} reason=${reason || 'not provided'}`);
-  res.json({ success: true });
+// Delete-account request — saves to DB for audit trail.
+app.post('/delete-account/request', express.json(), async (req, res) => {
+  try {
+    const { phone, role_id, reason } = req.body;
+    if (!phone || !role_id) return res.status(400).json({ success: false, message: 'phone and role_id required' });
+
+    const normalized = phone.toString().trim().replace(/\D/g, '').replace(/^91/, '').slice(-10);
+    if (!/^[6-9]\d{9}$/.test(normalized)) {
+      return res.status(400).json({ success: false, message: 'Invalid phone number' });
+    }
+    const parsedRoleId = parseInt(role_id);
+    if (![1, 2, 3].includes(parsedRoleId)) {
+      return res.status(400).json({ success: false, message: 'Invalid role_id' });
+    }
+
+    const db = require('./routes/db');
+    await db.request()
+      .input('phone',   normalized)
+      .input('role_id', parsedRoleId)
+      .input('reason',  reason || null)
+      .query(`INSERT INTO AccountDeletionRequests (phone, role_id, reason)
+              VALUES (@phone, @role_id, @reason)`);
+
+    log.info(`[DELETE REQUEST] phone=${normalized} role_id=${parsedRoleId}`);
+    res.json({ success: true, message: 'Deletion request submitted. Account will be deleted within 30 days.' });
+  } catch (err) {
+    log.error('[DELETE REQUEST ERROR] ' + err.message);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 // React landing page — serve index.html for all non-API routes.

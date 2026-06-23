@@ -4289,6 +4289,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   int get _doctorId => ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+  String? get _clinicId => ref.read(doctorLoginViewModelProvider).clinic_id;
 
   String get _doctorName {
     if (ref.read(tokenProvider).roleId == 3) {
@@ -4301,10 +4302,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (_doctorId == 0) return;
     if (_hasFetched && !force) return;
     _hasFetched = true;
-    ref.read(appointmentViewModelProvider.notifier).joinClinic(_doctorId);
+    ref.read(appointmentViewModelProvider.notifier).joinClinic(_doctorId, clinicId: _clinicId);
     await Future.wait([
-      ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId),
-      ref.read(doctorSettingsViewModelProvider.notifier).getDoctorSchedule(_doctorId),
+      ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId, clinicId: _clinicId),
+      ref.read(doctorSettingsViewModelProvider.notifier).getDoctorSchedule(_doctorId, clinicId: _clinicId),
     ]);
   }
 

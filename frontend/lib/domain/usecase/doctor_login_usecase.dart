@@ -73,4 +73,20 @@ class DoctorLoginUsecase {
   Future<List<DoctorDetails>> getDoctorProfileByClinic({String? clinicId, int? doctorId}) {
     return doctorLoginRepository.getDoctorProfileByClinic(clinicId: clinicId, doctorId: doctorId);
   }
+
+  Future<List<DoctorDetails>> getClinicsForDoctor(int doctorId) {
+    return doctorLoginRepository.getClinicsForDoctor(doctorId);
+  }
+
+  Future<dynamic> addClinic(DoctorDetails clinic, {List<File>? clinicImages}) {
+    return doctorLoginRepository.addClinic(clinic, clinicImages: clinicImages);
+  }
+
+  Future<dynamic> updateClinic(DoctorDetails clinic, {List<File>? clinicImages}) {
+    return doctorLoginRepository.updateClinic(clinic, clinicImages: clinicImages);
+  }
+
+  Future<dynamic> deleteClinic(String clinicId, int doctorId) {
+    return doctorLoginRepository.deleteClinic(clinicId, doctorId);
+  }
 }

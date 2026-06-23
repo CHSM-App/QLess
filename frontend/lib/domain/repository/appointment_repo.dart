@@ -26,7 +26,7 @@ abstract class AppointmentRepository {
 
   Future<List<MonthSlotData>> getBookedSlots(int doctorId);
 
-  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId);
+  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId, {String? clinicId});
 
   Future<List<AppointmentList>> getPatientAppointments(int familyId);
   
@@ -67,7 +67,7 @@ abstract class AppointmentRepository {
     AppointmentRequestModel appointmentRequest,
   );
 
-  Future<List<TodayQueueModel>> getTodayQueue(int doctorId);
+  Future<List<TodayQueueModel>> getTodayQueue(int doctorId, {String? clinicId});
 
   Future<AppointmentResponseModel> queuePauseEmergency(int queueId);
 

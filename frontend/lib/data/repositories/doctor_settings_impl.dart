@@ -13,9 +13,11 @@ class DoctorSettingsImpl implements DoctorSettingsRepo {
     DoctorScheduleModel doctorSchedule, {
     bool force = false,
     String action = 'cancel',
+    String? clinicId,
   }) {
     final body = <String, dynamic>{
       ...doctorSchedule.toJson(),
+      if (clinicId != null) 'clinic_id': clinicId,
       if (force) 'force': true,
       if (force) 'action': action,
     };
@@ -23,8 +25,8 @@ class DoctorSettingsImpl implements DoctorSettingsRepo {
   }
 
   @override
-  Future<DoctorScheduleModel> getDoctorSchedule(int doctorId) {
-    return apiService.getDoctorSchedule(doctorId);
+  Future<DoctorScheduleModel> getDoctorSchedule(int doctorId, {String? clinicId}) {
+    return apiService.getDoctorSchedule(doctorId, clinicId: clinicId);
   }
 
   @override

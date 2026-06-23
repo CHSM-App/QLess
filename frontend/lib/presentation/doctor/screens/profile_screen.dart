@@ -10,6 +10,7 @@ import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart'
 import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
 import 'package:qless/presentation/doctor/screens/doctor_help_center_screen.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
+import 'package:qless/presentation/doctor/screens/my_clinics_page.dart';
 import 'package:qless/presentation/doctor/screens/receptionist_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
@@ -897,6 +898,13 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         _Item(Icons.medical_information_outlined, 'Professional Details',
             'Specialization, license',
             onTap: () => _showProfessionalDetailsSheet(s, d)),
+      if (!isReceptionist)
+        _Item(Icons.local_hospital_outlined, 'My Clinics',
+            'View & add your clinics',
+            onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MyClinicsPage()),
+                )),
       if (!isReceptionist)
         _Item(Icons.people_outline_rounded, 'Receptionists',
             'Manage clinic staff access',

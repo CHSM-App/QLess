@@ -9,9 +9,10 @@ abstract class DoctorSettingsRepo {
     DoctorScheduleModel doctorSchedule, {
     bool force,
     String action,
+    String? clinicId,
   });
 
-  Future<DoctorScheduleModel> getDoctorSchedule(int doctorId);
+  Future<DoctorScheduleModel> getDoctorSchedule(int doctorId, {String? clinicId});
 
   Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId);
 

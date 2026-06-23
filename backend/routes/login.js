@@ -253,6 +253,14 @@ router.get('/getDoctorProfileByClinic', lookupLimiter, async (req, res) => {
 	try {
 		const { clinic_id, doctor_id } = req.query;
 
+		if (doctor_id && parseInt(doctor_id) > 0 && clinic_id) {
+			const r = await db.request()
+				.input('doctor_id', parseInt(doctor_id))
+				.input('clinic_id', clinic_id)
+				.query('SELECT * FROM dbo.doctor_login_vw WHERE doctor_id = @doctor_id AND clinic_id = @clinic_id AND doc_active_status = 0');
+			return res.json(r.recordset);
+		}
+
 		if (doctor_id && parseInt(doctor_id) > 0) {
 			const r = await db.request()
 				.input('doctor_id', parseInt(doctor_id))
@@ -808,6 +816,160 @@ router.get('/delete-account', (req, res) => {
 });
 
 
+
+// ════════════════════════════════════════════════════════════════════
+//  DOCTOR CLINICS
+// ════════════════════════════════════════════════════════════════════
+
+router.get('/getClinicsForDoctor/:doctor_id', async (req, res) => {
+	try {
+		const { doctor_id } = req.params;
+		if (!doctor_id) return res.status(400).json({ error: 'doctor_id required' });
+		const result = await db.request()
+			.input('operation', 'GetDoctorClinics')
+			.input('doctor_id', parseInt(doctor_id))
+			.execute('sp_doctor_login');
+		return res.json(result.recordset);
+	} catch (err) {
+		log.error('getClinicsForDoctor error: ' + err.message);
+		return res.status(500).json({ error: err.message });
+	}
+});
+
+router.post('/addClinic', uploadHandler(upload.fields([{ name: 'clinic_images', maxCount: 5 }])), async (req, res) => {
+	try {
+		if (!(await verifyImageFiles(req, res))) return;
+
+		const {
+			doctor_id, clinic_name, clinic_address,
+			latitude, longitude, consultation_fee,
+			website_name, clinic_email, clinic_contact,
+		} = req.body;
+
+		if (!doctor_id) return res.status(400).json({ success: false, error: 'doctor_id required' });
+
+		const result = await db.request()
+			.input('operation', 'AddClinic')
+			.input('doctor_id', parseInt(doctor_id))
+			.input('clinic_name', clinic_name || null)
+			.input('clinic_address', clinic_address || null)
+			.input('latitude', latitude ? parseFloat(latitude) : null)
+			.input('longitude', longitude ? parseFloat(longitude) : null)
+			.input('consultation_fee', consultation_fee ? parseFloat(consultation_fee) : null)
+			.input('website_name', website_name || null)
+			.input('clinic_email', clinic_email || null)
+			.input('clinic_contact', clinic_contact || null)
+			.execute('sp_doctor_login');
+
+		const row = result.recordset?.[0];
+		if (!row?.success) {
+			return res.status(400).json({ success: false, error: row?.ErrorMessage || 'Failed to add clinic' });
+		}
+
+		const returnedClinicId = row.clinic_id;
+		const clinicImageUrls = [];
+
+		if (req.files?.clinic_images?.length) {
+			const dir = require('path').join(__dirname, '..', 'uploads', 'clinic_images', returnedClinicId);
+			await require('fs-extra').ensureDir(dir);
+
+			let sortOrder = 0;
+			for (const file of req.files.clinic_images) {
+				const dest = require('path').join(dir, file.filename);
+				await require('fs-extra').move(file.path, dest, { overwrite: true });
+				const url = `${PUBLIC_BASE_URL}/uploads/clinic_images/${returnedClinicId}/${file.filename}`;
+				clinicImageUrls.push(url);
+				await db.request()
+					.input('operation', 'uploadClinicGallery')
+					.input('clinic_id', returnedClinicId)
+					.input('image_url', url)
+					.input('sort_order', sortOrder)
+					.execute('sp_doctor_login');
+				sortOrder++;
+			}
+		}
+
+		return res.json({ success: true, clinic_id: returnedClinicId, clinic_images: clinicImageUrls });
+	} catch (err) {
+		log.error('addClinic error: ' + err.message);
+		await cleanupFiles(req).catch(() => {});
+		return res.status(500).json({ success: false, error: err.message });
+	}
+});
+
+router.put('/updateClinic', uploadHandler(upload.fields([{ name: 'clinic_images', maxCount: 5 }])), async (req, res) => {
+	try {
+		if (!(await verifyImageFiles(req, res))) return;
+
+		const {
+			clinic_id, doctor_id, clinic_name, clinic_address,
+			latitude, longitude, consultation_fee,
+			website_name, clinic_email, clinic_contact,
+		} = req.body;
+
+		if (!clinic_id || !doctor_id) return res.status(400).json({ success: false, error: 'clinic_id and doctor_id required' });
+
+		await db.request()
+			.input('operation', 'UpdateClinic')
+			.input('clinic_id', clinic_id)
+			.input('doctor_id', parseInt(doctor_id))
+			.input('clinic_name', clinic_name || null)
+			.input('clinic_address', clinic_address || null)
+			.input('latitude', latitude ? parseFloat(latitude) : null)
+			.input('longitude', longitude ? parseFloat(longitude) : null)
+			.input('consultation_fee', consultation_fee ? parseFloat(consultation_fee) : null)
+			.input('website_name', website_name || null)
+			.input('clinic_email', clinic_email || null)
+			.input('clinic_contact', clinic_contact || null)
+			.execute('sp_doctor_login');
+
+		if (req.files?.clinic_images?.length) {
+			const dir = require('path').join(__dirname, '..', 'uploads', 'clinic_images', clinic_id);
+			await require('fs-extra').ensureDir(dir);
+			let sortOrder = 0;
+			for (const file of req.files.clinic_images) {
+				const dest = require('path').join(dir, file.filename);
+				await require('fs-extra').move(file.path, dest, { overwrite: true });
+				const url = `${PUBLIC_BASE_URL}/uploads/clinic_images/${clinic_id}/${file.filename}`;
+				await db.request()
+					.input('operation', 'uploadClinicGallery')
+					.input('clinic_id', clinic_id)
+					.input('image_url', url)
+					.input('sort_order', sortOrder)
+					.execute('sp_doctor_login');
+				sortOrder++;
+			}
+		}
+
+		return res.json({ success: true, clinic_id });
+	} catch (err) {
+		log.error('updateClinic error: ' + err.message);
+		await cleanupFiles(req).catch(() => {});
+		return res.status(500).json({ success: false, error: err.message });
+	}
+});
+
+router.delete('/deleteClinic/:clinic_id/:doctor_id', async (req, res) => {
+	try {
+		const { clinic_id, doctor_id } = req.params;
+		if (!clinic_id || !doctor_id) return res.status(400).json({ success: false, error: 'clinic_id and doctor_id required' });
+
+		const result = await db.request()
+			.input('operation', 'DeleteClinic')
+			.input('clinic_id', clinic_id)
+			.input('doctor_id', parseInt(doctor_id))
+			.execute('sp_doctor_login');
+
+		const row = result.recordset?.[0];
+		if (!row?.success) {
+			return res.status(400).json({ success: false, error: row?.message || 'Cannot delete clinic' });
+		}
+		return res.json({ success: true });
+	} catch (err) {
+		log.error('deleteClinic error: ' + err.message);
+		return res.status(500).json({ success: false, error: err.message });
+	}
+});
 
 // ════════════════════════════════════════════════════════════════════
 

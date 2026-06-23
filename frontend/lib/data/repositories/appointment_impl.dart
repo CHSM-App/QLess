@@ -51,8 +51,8 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
-  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId) {
-    return apiService.fetchPatientAppointments(doctorId);
+  Future<List<AppointmentList>> fetchPatientAppointments(int doctorId, {String? clinicId}) {
+    return apiService.fetchPatientAppointments(doctorId, clinicId: clinicId);
   }
 
   @override
@@ -132,8 +132,8 @@ class AppointmentImpl implements AppointmentRepository {
 
 
   @override
-  Future<List<TodayQueueModel>> getTodayQueue(int doctorId) {
-    return apiService.getTodayQueue(doctorId);
+  Future<List<TodayQueueModel>> getTodayQueue(int doctorId, {String? clinicId}) {
+    return apiService.getTodayQueue(doctorId, clinicId: clinicId);
   }
 
   @override

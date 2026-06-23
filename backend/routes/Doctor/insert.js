@@ -303,8 +303,9 @@ router.post('/addQueueStartTime/', async (req, res) => {
 
 
 router.post('/saveDoctorSchedule', async (req, res) => {
-  const { doctor_id, schedule, force } = req.body;
+  const { doctor_id, clinic_id, schedule, force } = req.body;
   const action = req.body.action === 'reschedule' ? 'reschedule' : 'cancel';
+  const addClinic = (r) => { if (clinic_id) r.input('clinic_id', clinic_id); return r; };
 
   if (!doctor_id || !Array.isArray(schedule)) {
     return res.status(400).json({
@@ -352,9 +353,9 @@ router.post('/saveDoctorSchedule', async (req, res) => {
     const conflicts = [];     // FUTURE appts (cancel/reschedule gate)
     const todayBlocked = [];  // TODAY's live bookings on a slot being removed/retimed
     // Current schedule (slot_id -> timing) to detect timing changes.
-    const cur = await db.request()
+    const cur = await addClinic(db.request()
       .input('operation', 'GET')
-      .input('doctor_id', doctor_id)
+      .input('doctor_id', doctor_id))
       .execute('sp_doctor_schedule');
     const curTiming = {};
     for (const r of (cur.recordset || [])) {
@@ -374,10 +375,10 @@ router.post('/saveDoctorSchedule', async (req, res) => {
     };
 
     for (const day of schedule) {
-      const existing = await db.request()
+      const existing = await addClinic(db.request()
         .input('operation', 'GET_DAY_SLOT_IDS')
         .input('doctor_id', doctor_id)
-        .input('day_of_week', day.day)
+        .input('day_of_week', day.day))
         .execute('sp_doctor_schedule');
 
       const existingIds = (existing.recordset || []).map(r => r.slot_id);
@@ -450,11 +451,11 @@ router.post('/saveDoctorSchedule', async (req, res) => {
 
     for (const day of schedule) {
       // UPSERT DAY
-      const dayResult = await db.request()
+      const dayResult = await addClinic(db.request()
         .input('operation', 'UPSERT_DAY')
         .input('doctor_id', doctor_id)
         .input('day_of_week', day.day)
-        .input('is_enabled', day.is_enabled)
+        .input('is_enabled', day.is_enabled))
         .execute('sp_doctor_schedule');
 
       const availability_id = dayResult.recordset?.[0]?.availability_id;
@@ -463,10 +464,10 @@ router.post('/saveDoctorSchedule', async (req, res) => {
       }
 
       // Re-read existing slot ids for diff
-      const existing = await db.request()
+      const existing = await addClinic(db.request()
         .input('operation', 'GET_DAY_SLOT_IDS')
         .input('doctor_id', doctor_id)
-        .input('day_of_week', day.day)
+        .input('day_of_week', day.day))
         .execute('sp_doctor_schedule');
       const existingIds = (existing.recordset || []).map(r => r.slot_id);
 

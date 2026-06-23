@@ -80,13 +80,15 @@ router.get('/getAllMedicines/:doctor_id', async (req, res) => {
 
 router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
   const { doctor_id } = req.params;
+  const { clinic_id } = req.query;
 
   try {
 
-    const result = await db.request()
+    const req2 = db.request()
       .input('operation', 'GET')
-      .input('doctor_id', doctor_id)
-      .execute('sp_doctor_schedule');
+      .input('doctor_id', doctor_id);
+    if (clinic_id) req2.input('clinic_id', clinic_id);
+    const result = await req2.execute('sp_doctor_schedule');
 
     const rows = result.recordset;
 
@@ -138,12 +140,14 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
 
 router.get('/patientAppointmentList/:doctor_id', async (req, res) => {
   const { doctor_id } = req.params;
+  const { clinic_id } = req.query;
 
   try {
     const request = db.request();
 
     request.input('operation', 'patientAppointmentList');
     request.input('doctor_id', doctor_id);
+    if (clinic_id) request.input('clinic_id', clinic_id);
 
     const result = await request.execute('sp_appointment');
 
@@ -183,6 +187,7 @@ router.get('/appointmentWisePrescription/:appointment_id', async (req, res) => {
 // GET TODAY QUEUE
 router.get('/appointment/getTodayQueue/:doctor_id', async (req, res) => {
   const { doctor_id } = req.params;
+  const { clinic_id } = req.query;
 
   if (!doctor_id) {
     return res.status(400).json({
@@ -197,10 +202,11 @@ router.get('/appointment/getTodayQueue/:doctor_id', async (req, res) => {
     // even if the nightly cron / startup catch-up was missed. No-op on normal days.
     try { await closeStaleSessions(); } catch (e) { /* never block the read */ }
 
-    const result = await db.request()
+    const req2 = db.request()
       .input('operation', 'GET_TODAY_QUEUE')
-      .input('doctor_id', doctor_id)
-      .execute('sp_appointment');
+      .input('doctor_id', doctor_id);
+    if (clinic_id) req2.input('clinic_id', clinic_id);
+    const result = await req2.execute('sp_appointment');
 
     const rows = result.recordsets?.[0] || [];
     const statusRow = result.recordsets?.[1]?.[0] || {};

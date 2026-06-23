@@ -74,16 +74,18 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
 
   StreamSubscription<Map<String, dynamic>>? _socketSub;
   int? _currentDoctorId;
+  String? _currentClinicId;
 
   AppointmentListViewmodel(this.usecase, this.offlineStore, this.socketService)
       : super(const AppointmentListState());
 
-  void joinClinic(int doctorId) {
+  void joinClinic(int doctorId, {String? clinicId}) {
     _currentDoctorId = doctorId;
+    _currentClinicId = clinicId;
     socketService.doctorJoinClinic(doctorId);
     _socketSub?.cancel();
     _socketSub = socketService.updates.listen((_) {
-      fetchPatientAppointments(doctorId, silent: true);
+      fetchPatientAppointments(doctorId, silent: true, clinicId: _currentClinicId);
     });
   }
 
@@ -107,7 +109,9 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   /// Offline-first fetch: tries the network, falls back to SQLite cache.
   /// [silent] skips the loading spinner — used for background socket refreshes.
   Future<void> fetchPatientAppointments(int doctorId,
-      {bool isOnline = true, bool silent = false}) async {
+      {bool isOnline = true, bool silent = false, String? clinicId}) async {
+    if (clinicId != null) _currentClinicId = clinicId;
+    final clinicIdToUse = _currentClinicId;
     if (!silent) {
       state = state.copyWith(
         patientAppointmentsList: const AsyncValue.loading(),
@@ -116,7 +120,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     }
     try {
       if (isOnline) {
-        final result = await usecase.fetchPatientAppointments(doctorId);
+        final result = await usecase.fetchPatientAppointments(doctorId, clinicId: clinicIdToUse);
         // Cache the fresh data locally
         await offlineStore.cacheAppointments(result);
 
@@ -125,7 +129,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
 
         List<TodayQueueModel> todayQueues = [];
         try {
-          todayQueues = await usecase.getTodayQueue(doctorId);
+          todayQueues = await usecase.getTodayQueue(doctorId, clinicId: clinicIdToUse);
           await offlineStore.cacheQueues(todayQueues);
         } catch (_) {}
 
@@ -493,7 +497,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   }
 
   Future<List<TodayQueueModel>> getTodayQueue(int doctorId,
-      {bool isOnline = true}) async {
+      {bool isOnline = true, String? clinicId}) async {
     state = state.copyWith(
       todayQueueResult: const AsyncValue.loading(),
       error: null,
@@ -501,7 +505,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     try {
       List<TodayQueueModel> result;
       if (isOnline) {
-        result = await usecase.getTodayQueue(doctorId);
+        result = await usecase.getTodayQueue(doctorId, clinicId: clinicId);
         await offlineStore.cacheQueues(result);
       } else {
         result = await offlineStore.getCachedQueues(doctorId);

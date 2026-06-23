@@ -10,6 +10,7 @@ import 'package:qless/domain/models/receptionist_model.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
@@ -231,19 +232,54 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     final roleId = ref.read(tokenProvider).roleId ?? 0;
 
     if (roleId == 1) {
-      // Doctor: load their own profile
+      // Doctor: load their own profile then all their clinics
       await ref
           .read(doctorLoginViewModelProvider.notifier)
           .checkPhoneDoctor(widget.mobileNumber);
+      if (!mounted) return;
+      final doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
+      if (doctorId != null) {
+        await ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .getDoctorClinics(doctorId);
+      }
     } else if (roleId == 3) {
-      // Receptionist: use doctor_mobile from mobileExistReceptionist to load
-      // the doctor's full profile directly via checkPhoneDoctor.
+      // Receptionist table has no clinic_id — load doctor profile first,
+      // then override clinic from picker selection (same as doctor login flow).
+      DoctorDetails? selectedClinic;
+      if (receptionistDoctorId != null) {
+        await ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .getDoctorClinics(receptionistDoctorId);
+        if (!mounted) return;
+        final allClinics = ref
+                .read(doctorLoginViewModelProvider)
+                .clinicsList
+                ?.maybeWhen(data: (l) => l, orElse: () => <DoctorDetails>[]) ??
+            <DoctorDetails>[];
+        if (allClinics.length > 1) {
+          setState(() => _isLoading = false);
+          final selected = await _showClinicPickerDialog(allClinics);
+          if (!mounted) return;
+          if (selected == null) return;
+          selectedClinic = selected;
+          setState(() => _isLoading = true);
+        } else if (allClinics.length == 1) {
+          selectedClinic = allClinics.first;
+        }
+      }
+      // Load doctor base profile using doctor_id only (no clinic filter needed).
       await ref
           .read(doctorLoginViewModelProvider.notifier)
           .loadDoctorProfileForReceptionist(
-            clinicId: receptionistClinicId,
             doctorId: receptionistDoctorId,
           );
+      // Override clinic data with the selected clinic (sets clinic_id in state).
+      if (selectedClinic != null) {
+        await ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .selectClinic(selectedClinic);
+      }
       // Save full receptionist profile (name, mobile, email, address, gender).
       if (receptionistProfile != null) {
         await ref
@@ -259,6 +295,21 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     if (!mounted) return;
 
     if (roleId == 1 || roleId == 3) {
+      if (roleId == 1) {
+        final clinics = ref.read(doctorLoginViewModelProvider).clinicsList?.maybeWhen(
+              data: (list) => list,
+              orElse: () => <DoctorDetails>[],
+            ) ??
+            <DoctorDetails>[];
+        if (clinics.length > 1) {
+          setState(() => _isLoading = false);
+          final selected = await _showClinicPickerDialog(clinics);
+          if (!mounted) return;
+          if (selected == null) return;
+          await ref.read(doctorLoginViewModelProvider.notifier).selectClinic(selected);
+          if (!mounted) return;
+        }
+      }
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const DoctorBottomNav()),
@@ -326,6 +377,53 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     _shakeController.forward(from: 0);
     for (final c in _controllers) c.clear();
     _focusNodes[0].requestFocus();
+  }
+
+  Future<DoctorDetails?> _showClinicPickerDialog(List<DoctorDetails> clinics) {
+    return showDialog<DoctorDetails>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.local_hospital_outlined, color: kPrimaryDarker, size: 20),
+                ),
+                const SizedBox(width: 12),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Select Clinic',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
+                    Text('Choose which clinic to open',
+                        style: TextStyle(fontSize: 11, color: kTextSecondary)),
+                  ],
+                ),
+              ]),
+              const SizedBox(height: 16),
+              const Divider(height: 1, color: kBorderStrong),
+              const SizedBox(height: 12),
+              ...clinics.map((c) => _ClinicTile(
+                clinic: c,
+                onTap: () => Navigator.of(ctx).pop(c),
+              )),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _resendOtp() {
@@ -1434,6 +1532,67 @@ class _OtpBoxState extends State<_OtpBox> {
             contentPadding: EdgeInsets.zero,
           ),
           onChanged: widget.onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CLINIC TILE (used inside clinic picker dialog)
+// ═════════════════════════════════════════════════════════════════════════════
+class _ClinicTile extends StatelessWidget {
+  final DoctorDetails clinic;
+  final VoidCallback onTap;
+
+  const _ClinicTile({required this.clinic, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: kBgSoft,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: kBorderStrong),
+          ),
+          child: Row(children: [
+            Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.business_outlined, color: kPrimaryDarker, size: 18),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    clinic.clinicName ?? 'Clinic',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                  ),
+                  if (clinic.clinicAddress != null && clinic.clinicAddress!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      clinic.clinicAddress!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: kTextSecondary),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kTextSecondary),
+          ]),
         ),
       ),
     );

@@ -76,8 +76,9 @@ abstract class ApiService {
 
   @GET("doctor/users/getDoctorSchedule/{doctor_id}")
   Future<DoctorScheduleModel> getDoctorSchedule(
-    @Path("doctor_id") int doctorId,
-  );
+    @Path("doctor_id") int doctorId, {
+    @Query("clinic_id") String? clinicId,
+  });
 
   @GET("doctor/users/appointmentWisePrescription/{appointment_id}")
   Future<List<PrescriptionModel>> appointmentWisePrescription(
@@ -86,13 +87,15 @@ abstract class ApiService {
 
   @GET("doctor/users/patientAppointmentList/{doctor_id}")
   Future<List<AppointmentList>> fetchPatientAppointments(
-    @Path("doctor_id") int doctorId,
-  );
+    @Path("doctor_id") int doctorId, {
+    @Query("clinic_id") String? clinicId,
+  });
 
-   @GET("doctor/users/appointment/getTodayQueue/{doctor_id}")
+  @GET("doctor/users/appointment/getTodayQueue/{doctor_id}")
   Future<List<TodayQueueModel>> getTodayQueue(
-    @Path("doctor_id") int doctorId,
-  );
+    @Path("doctor_id") int doctorId, {
+    @Query("clinic_id") String? clinicId,
+  });
 
   @GET("doctor/users/clinicGallery/{clinic_id}")
   Future<List<DoctorDetails>> fetchClinicGallery(
@@ -102,6 +105,48 @@ abstract class ApiService {
   @GET("doctor/users/getDoctorsByClinic/{clinic_id}")
   Future<List<DoctorDetails>> getDoctorsByClinic(
     @Path("clinic_id") String clinicId,
+  );
+
+  @GET("login/getClinicsForDoctor/{doctor_id}")
+  Future<List<DoctorDetails>> getClinicsForDoctor(
+    @Path("doctor_id") int doctorId,
+  );
+
+  @MultiPart()
+  @POST("login/addClinic")
+  Future<dynamic> addClinicMultipart(
+    @Part(name: "doctor_id") int doctorId,
+    @Part(name: "clinic_name") String clinicName,
+    @Part(name: "clinic_address") String clinicAddress,
+    @Part(name: "latitude") String latitude,
+    @Part(name: "longitude") String longitude,
+    @Part(name: "consultation_fee") String consultationFee,
+    @Part(name: "website_name") String websiteName,
+    @Part(name: "clinic_email") String clinicEmail,
+    @Part(name: "clinic_contact") String clinicContact,
+    @Part(name: "clinic_images") List<MultipartFile>? clinicImages,
+  );
+
+  @MultiPart()
+  @PUT("login/updateClinic")
+  Future<dynamic> updateClinicMultipart(
+    @Part(name: "clinic_id") String clinicId,
+    @Part(name: "doctor_id") int doctorId,
+    @Part(name: "clinic_name") String clinicName,
+    @Part(name: "clinic_address") String clinicAddress,
+    @Part(name: "latitude") String latitude,
+    @Part(name: "longitude") String longitude,
+    @Part(name: "consultation_fee") String consultationFee,
+    @Part(name: "website_name") String websiteName,
+    @Part(name: "clinic_email") String clinicEmail,
+    @Part(name: "clinic_contact") String clinicContact,
+    @Part(name: "clinic_images") List<MultipartFile>? clinicImages,
+  );
+
+  @DELETE("login/deleteClinic/{clinic_id}/{doctor_id}")
+  Future<dynamic> deleteClinic(
+    @Path("clinic_id") String clinicId,
+    @Path("doctor_id") int doctorId,
   );
 
   @DELETE("doctor/index/delete/clinicGallery")

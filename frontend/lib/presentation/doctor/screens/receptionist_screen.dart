@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -569,69 +568,6 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
       );
 
   // ── Save ─────────────────────────────────────────────────────────────────
-  Future<String?> _resolveClinicId() async {
-    final doctorState = ref.read(doctorLoginViewModelProvider);
-    final doctorClinicId = doctorState.clinic_id;
-    final receptionistClinicId =
-        ref.read(receptionistLoginViewModelProvider).clinicId;
-    final phoneCheckClinicId = doctorState.phoneCheckResult.maybeWhen(
-      data: (list) => list.isNotEmpty ? list.first.clinicId : null,
-      orElse: () => null,
-    );
-    final storedClinicId = await TokenStorage.getValue('clinic_id');
-
-    final clinicId = _parseClinicId(widget.clinicId?.toString()) ??
-        _parseClinicId(doctorClinicId) ??
-        _parseClinicId(receptionistClinicId) ??
-        _parseClinicId(phoneCheckClinicId) ??
-        _parseClinicId(storedClinicId);
-    debugPrint(
-      '[ReceptionistDebug] resolveClinicId initial '
-      'widget=${widget.clinicId} '
-      'doctorState=$doctorClinicId '
-      'receptionistState=$receptionistClinicId '
-      'phoneCheck=$phoneCheckClinicId '
-      'storage=$storedClinicId '
-      'resolved=$clinicId',
-    );
-    if (clinicId != null) return clinicId;
-
-    final mobile = (doctorState.mobile ?? await TokenStorage.getValue('mobile'))
-        ?.trim();
-    debugPrint(
-      '[ReceptionistDebug] clinicId missing, refresh doctor by mobile '
-      'hasMobile=${mobile != null && mobile.isNotEmpty}',
-    );
-    if (mobile == null || mobile.isEmpty) return null;
-
-    try {
-      await ref
-          .read(doctorLoginViewModelProvider.notifier)
-          .checkPhoneDoctor(mobile);
-    } catch (e) {
-      debugPrint('[ReceptionistDebug] checkPhoneDoctor failed: $e');
-      return null;
-    }
-    final refreshedState = ref.read(doctorLoginViewModelProvider);
-    final refreshedClinicId = refreshedState.phoneCheckResult.maybeWhen(
-      data: (list) => list.isNotEmpty ? list.first.clinicId : null,
-      orElse: () => null,
-    );
-
-    final refreshedStorageClinicId = await TokenStorage.getValue('clinic_id');
-    final refreshedResolved = _parseClinicId(refreshedState.clinic_id) ??
-        _parseClinicId(refreshedClinicId) ??
-        _parseClinicId(refreshedStorageClinicId);
-    debugPrint(
-      '[ReceptionistDebug] resolveClinicId after refresh '
-      'doctorState=${refreshedState.clinic_id} '
-      'phoneCheck=$refreshedClinicId '
-      'storage=$refreshedStorageClinicId '
-      'resolved=$refreshedResolved',
-    );
-    return refreshedResolved;
-  }
-
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (!_isEdit && _mobileExists == true) {
@@ -639,16 +575,6 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
         content: Text(_mobileExistMsg ?? 'This mobile number is already registered.'),
         backgroundColor: _kError,
       ));
-      return;
-    }
-
-    final clinicId = await _resolveClinicId();
-    debugPrint('[ReceptionistDebug] save receptionist clinicId=$clinicId');
-    if (!mounted) return;
-    if (clinicId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Clinic not found. Please try again.')),
-      );
       return;
     }
 
@@ -691,7 +617,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
       email:    _emailCtrl.text.trim(),
       address:  _addressCtrl.text.trim(),
       genderId: _genderMap[_gender] ?? 2,
-      clinicId: clinicId,
+      clinicId: null,
       activeStatus: widget.existing?.activeStatus ?? 1,
       doctorId: doctorId,
     );

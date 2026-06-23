@@ -30,6 +30,10 @@ abstract class DoctorLoginRepository {
   Future<List<DoctorDetails>> fetchDoctorsByClinic(String clinicId);
   Future<List<DoctorDetails>> getDoctorProfileByClinic({String? clinicId, int? doctorId});
 
+  Future<List<DoctorDetails>> getClinicsForDoctor(int doctorId);
+  Future<dynamic> addClinic(DoctorDetails clinic, {List<File>? clinicImages});
+  Future<dynamic> updateClinic(DoctorDetails clinic, {List<File>? clinicImages});
+  Future<dynamic> deleteClinic(String clinicId, int doctorId);
 
   //send otp
     Future<OtpResponse> sendOtp(OtpResponse payload);
