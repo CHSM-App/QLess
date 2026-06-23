@@ -295,7 +295,7 @@ class _PortraitLayout extends StatelessWidget {
                       const SizedBox(height: 12),
 
                       // Secure footer
-                      const _SecureFooter(),
+                      // const _SecureFooter(),
                     ],
                   ),
                 ),
@@ -470,7 +470,7 @@ class _LandscapeLayout extends StatelessWidget {
                         const SizedBox(height: 26),
                         const _LegalText(),
                         const SizedBox(height: 12),
-                        const _SecureFooter(),
+                        // const _SecureFooter(),
                       ],
                     ),
                   ),
@@ -679,26 +679,26 @@ class _LegalText extends StatelessWidget {
       );
 }
 
-class _SecureFooter extends StatelessWidget {
-  const _SecureFooter();
+// class _SecureFooter extends StatelessWidget {
+//   const _SecureFooter();
 
-  @override
-  Widget build(BuildContext context) => const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
-          SizedBox(width: 6),
-          Text(
-            'Protected by end-to-end encryption',
-            style: TextStyle(
-              fontSize: 12,
-              color: kTextMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      );
-}
+//   @override
+//   Widget build(BuildContext context) => const Row(
+//         mainAxisAlignment: MainAxisAlignment.center,
+//         children: [
+//           Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
+//           SizedBox(width: 6),
+//           Text(
+//             'Protected by end-to-end encryption',
+//             style: TextStyle(
+//               fontSize: 12,
+//               color: kTextMuted,
+//               fontWeight: FontWeight.w500,
+//             ),
+//           ),
+//         ],
+//       );
+// }
 
 class _FeaturePill extends StatelessWidget {
   final IconData icon;

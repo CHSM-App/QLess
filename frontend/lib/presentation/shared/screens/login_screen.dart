@@ -40,9 +40,10 @@ const kInfo      = Color(0xFF3B82F6);
 const kInfoLight = Color(0xFFDBEAFE);
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key, this.role = 'doctor'});
+  const LoginScreen({super.key, this.role = 'doctor', this.initialMobile});
 
   final String role;
+  final String? initialMobile;
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -63,6 +64,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   @override
   void initState() {
     super.initState();
+    if (widget.initialMobile != null) {
+      _mobileCtrl.text = widget.initialMobile!;
+    }
     _focusNode.addListener(() {
       setState(() => _isFocused = _focusNode.hasFocus);
     });
@@ -606,7 +610,7 @@ class _LandscapeLayout extends StatelessWidget {
                         const SizedBox(height: 22),
                         _RegisterCard(onTap: onRegister, isDoctor: isDoctor),
                         const SizedBox(height: 18),
-                        const _SecureFooter(),
+                        // const _SecureFooter(),
                       ],
                     ),
                   ),
@@ -740,25 +744,25 @@ class _PortraitLayout extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                const Spacer(),
-                                // Help icon
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.18),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.25),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.help_outline_rounded,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
+                                // const Spacer(),
+                                // // Help icon
+                                // Container(
+                                //   width: 36,
+                                //   height: 36,
+                                //   decoration: BoxDecoration(
+                                //     color: Colors.white.withOpacity(0.18),
+                                //     shape: BoxShape.circle,
+                                //     border: Border.all(
+                                //       color: Colors.white.withOpacity(0.25),
+                                //       width: 1,
+                                //     ),
+                                //   ),
+                                //   child: const Icon(
+                                //     Icons.help_outline_rounded,
+                                //     color: Colors.white,
+                                //     size: 18,
+                                //   ),
+                                // ),
                               ],
                             ),
                             SizedBox(height: gapTopRowToLogo),
@@ -949,7 +953,7 @@ class _PortraitLayout extends StatelessWidget {
                         const SizedBox(height: 20),
                         _RegisterCard(onTap: onRegister, isDoctor: isDoctor),
                         const SizedBox(height: 24),
-                        const _SecureFooter(),
+                        // const _SecureFooter(),
                       ],
                     ),
                   ),
@@ -1284,26 +1288,26 @@ class _RegisterCard extends StatelessWidget {
   }
 }
 
-class _SecureFooter extends StatelessWidget {
-  const _SecureFooter();
+// class _SecureFooter extends StatelessWidget {
+//   const _SecureFooter();
 
-  @override
-  Widget build(BuildContext context) => const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
-          SizedBox(width: 6),
-          Text(
-            'Protected by end-to-end encryption',
-            style: TextStyle(
-              fontSize: 12,
-              color: kTextMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      );
-}
+//   @override
+//   Widget build(BuildContext context) => const Row(
+//         mainAxisAlignment: MainAxisAlignment.center,
+//         children: [
+//           Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
+//           SizedBox(width: 6),
+//           Text(
+//             'Protected by end-to-end encryption',
+//             style: TextStyle(
+//               fontSize: 12,
+//               color: kTextMuted,
+//               fontWeight: FontWeight.w500,
+//             ),
+//           ),
+//         ],
+//       );
+// }
 
 class _FeaturePill extends StatelessWidget {
   final IconData icon;
