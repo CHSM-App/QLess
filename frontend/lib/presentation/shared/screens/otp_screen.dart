@@ -14,6 +14,7 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
+import 'package:qless/presentation/shared/screens/login_screen.dart';
 
 // ── Colour Palette (matches login + patient registration) ──────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -627,17 +628,42 @@ class _PortraitLayout extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 height: 1.5,
               ),
-              children: [
-                const TextSpan(text: "We've sent a verification code to\n"),
-                TextSpan(
-                  text: '+91 $maskedNumber',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: kTextPrimary,
-                  ),
-                ),
+              children: const [
+                TextSpan(text: "We've sent a verification code to"),
               ],
             ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                '+91 $maskedNumber',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: kTextPrimary,
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LoginScreen(
+                                    role: isDoctor ? 'doctor' : 'patient',
+                                    initialMobile: mobileNumber,
+                                  ),
+                                ),
+                              ),
+                child: const Icon(
+                  Icons.edit_outlined,
+                  size: 16,
+                  color: kPrimaryDarker,
+                ),
+              ),
+            ],
           ),
           SizedBox(height: isVerySmall ? 18 : 26),
 
@@ -663,14 +689,22 @@ class _PortraitLayout extends StatelessWidget {
           const SizedBox(height: 16),
 
           // ── Change number link ───────────────────────────────
-          _ChangeNumberLink(
-            mobileNumber: mobileNumber,
-            onTap: () => Navigator.of(context).maybePop(),
-          ),
-          SizedBox(height: isVerySmall ? 14 : 22),
+          // _ChangeNumberLink(
+          //   mobileNumber: mobileNumber,
+          //   onTap: () => Navigator.pushReplacement(
+          //                       context,
+          //                       MaterialPageRoute(
+          //                         builder: (_) => LoginScreen(
+          //                           role: isDoctor ? 'doctor' : 'patient',
+          //                           initialMobile: mobileNumber,
+          //                         ),
+          //                       ),
+          //                     ),
+          // ),
+          // SizedBox(height: isVerySmall ? 14 : 22),
 
           // ── Secure footer ────────────────────────────────────
-          const _SecureFooter(),
+          // const _SecureFooter(),
         ],
       ),
     );
@@ -744,31 +778,62 @@ class _LandscapeLayout extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     RichText(
-                      text: TextSpan(
-                        style: const TextStyle(
+                      text: const TextSpan(
+                        style: TextStyle(
                           fontSize: 13.5,
                           color: kTextSecondary,
                           fontWeight: FontWeight.w500,
                           height: 1.55,
                         ),
                         children: [
-                          const TextSpan(
-                              text: "We've sent a verification code to\n"),
-                          TextSpan(
-                            text: '+91 $maskedNumber',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              color: kTextPrimary,
-                            ),
-                          ),
+                          TextSpan(text: "We've sent a verification code to"),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    _ChangeNumberLink(
-                      mobileNumber: mobileNumber,
-                      onTap: () => Navigator.of(context).maybePop(),
+                    const SizedBox(height: 4),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          '+91 $maskedNumber',
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w800,
+                            color: kTextPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => LoginScreen(
+                                    role: isDoctor ? 'doctor' : 'patient',
+                                    initialMobile: mobileNumber,
+                                  ),
+                                ),
+                              ),
+                          child: const Icon(
+                            Icons.edit_outlined,
+                            size: 16,
+                            color: kPrimaryDarker,
+                          ),
+                        ),
+                      ],
                     ),
+                    // const SizedBox(height: 18),
+                    // _ChangeNumberLink(
+                    //   mobileNumber: mobileNumber,
+                    //   onTap: () => Navigator.pushReplacement(
+                    //             context,
+                    //             MaterialPageRoute(
+                    //               builder: (_) => LoginScreen(
+                    //                 role: isDoctor ? 'doctor' : 'patient',
+                    //                 initialMobile: mobileNumber,
+                    //               ),
+                    //             ),
+                    //           ),
+                    // ),
                   ],
                 ),
               ),
@@ -799,7 +864,7 @@ class _LandscapeLayout extends StatelessWidget {
                       onVerify: onVerify,
                     ),
                     const SizedBox(height: 18),
-                    const _SecureFooter(),
+                    // const _SecureFooter(),
                   ],
                 ),
               ),
@@ -916,31 +981,31 @@ class _OtpCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: kPrimaryLight,
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: const Icon(Icons.lock_outline_rounded,
-                    color: kPrimaryDarker, size: 17),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Verification Code',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: kTextPrimary,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
+          // Row(
+          //   children: [
+          //     Container(
+          //       width: 32,
+          //       height: 32,
+          //       decoration: BoxDecoration(
+          //         color: kPrimaryLight,
+          //         borderRadius: BorderRadius.circular(9),
+          //       ),
+          //       child: const Icon(Icons.lock_outline_rounded,
+          //           color: kPrimaryDarker, size: 17),
+          //     ),
+          //     const SizedBox(width: 10),
+          //     const Text(
+          //       'Verification Code',
+          //       style: TextStyle(
+          //         fontSize: 13,
+          //         fontWeight: FontWeight.w700,
+          //         color: kTextPrimary,
+          //         letterSpacing: -0.2,
+          //       ),
+          //     ),
+          //   ],
+          // ),
+          // const SizedBox(height: 16),
 
           // OTP boxes
           _OtpBoxRow(
@@ -1250,77 +1315,77 @@ class _ResendRow extends StatelessWidget {
 // ═════════════════════════════════════════════════════════════════════════════
 // CHANGE NUMBER LINK
 // ═════════════════════════════════════════════════════════════════════════════
-class _ChangeNumberLink extends StatelessWidget {
-  final String mobileNumber;
-  final VoidCallback onTap;
+// class _ChangeNumberLink extends StatelessWidget {
+//   final String mobileNumber;
+//   final VoidCallback onTap;
 
-  const _ChangeNumberLink({
-    required this.mobileNumber,
-    required this.onTap,
-  });
+//   const _ChangeNumberLink({
+//     required this.mobileNumber,
+//     required this.onTap,
+//   });
 
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.edit_outlined, size: 14, color: kTextSecondary),
-              SizedBox(width: 5),
-              Text(
-                'Wrong number? ',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: kTextSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              Text(
-                'Change',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: kPrimaryDarker,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     return Material(
+//       color: Colors.transparent,
+//       child: InkWell(
+//         onTap: onTap,
+//         borderRadius: BorderRadius.circular(12),
+//         child: Padding(
+//           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+//           child: Row(
+//             mainAxisSize: MainAxisSize.min,
+//             mainAxisAlignment: MainAxisAlignment.center,
+//             children: const [
+//               Icon(Icons.edit_outlined, size: 14, color: kTextSecondary),
+//               SizedBox(width: 5),
+//               Text(
+//                 'Wrong number? ',
+//                 style: TextStyle(
+//                   fontSize: 13,
+//                   color: kTextSecondary,
+//                   fontWeight: FontWeight.w500,
+//                 ),
+//               ),
+//               Text(
+//                 'Change',
+//                 style: TextStyle(
+//                   fontSize: 13,
+//                   fontWeight: FontWeight.w700,
+//                   color: kPrimaryDarker,
+//                 ),
+//               ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SECURE FOOTER
 // ═════════════════════════════════════════════════════════════════════════════
-class _SecureFooter extends StatelessWidget {
-  const _SecureFooter();
+// class _SecureFooter extends StatelessWidget {
+//   const _SecureFooter();
 
-  @override
-  Widget build(BuildContext context) => const Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
-          SizedBox(width: 6),
-          Text(
-            'Protected by end-to-end encryption',
-            style: TextStyle(
-              fontSize: 12,
-              color: kTextMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      );
-}
+//   @override
+//   Widget build(BuildContext context) => const Row(
+//         mainAxisAlignment: MainAxisAlignment.center,
+//         children: [
+//           Icon(Icons.shield_outlined, size: 13, color: kTextMuted),
+//           SizedBox(width: 6),
+//           Text(
+//             'Protected by end-to-end encryption',
+//             style: TextStyle(
+//               fontSize: 12,
+//               color: kTextMuted,
+//               fontWeight: FontWeight.w500,
+//             ),
+//           ),
+//         ],
+//       );
+// }
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SINGLE OTP BOX
