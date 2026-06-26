@@ -912,17 +912,18 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final initials   = _initials(doctorName);
     final loginState = ref.watch(doctorLoginViewModelProvider);
     final clinicName = loginState.clinic_name ?? '';
+    // clinicsList is fetched via getDoctorClinics at login + restart → ground truth.
+    // phoneCheckResult fallback covers the brief window before clinicsList loads.
+    final fromClinics = loginState.clinicsList?.maybeWhen(
+          data: (list) => list,
+          orElse: () => <DoctorDetails>[],
+        ) ??
+        <DoctorDetails>[];
     final fromCheck = loginState.phoneCheckResult.maybeWhen(
       data: (list) => list,
       orElse: () => <DoctorDetails>[],
     );
-    final allClinics = fromCheck.isNotEmpty
-        ? fromCheck
-        : (loginState.clinicsList?.maybeWhen(
-              data: (list) => list,
-              orElse: () => <DoctorDetails>[],
-            ) ??
-            <DoctorDetails>[]);
+    final allClinics = fromClinics.isNotEmpty ? fromClinics : fromCheck;
     final multiClinic = allClinics.length > 1;
     final isReceptionist = ref.read(tokenProvider).roleId == 3;
 

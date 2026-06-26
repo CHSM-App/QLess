@@ -33,9 +33,8 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     Widget target;
     if (tokenState.isLoggedIn && (tokenState.roleId == 1 || tokenState.roleId == 3)) {
       await ref.read(doctorLoginViewModelProvider.notifier).loadFromStorage();
-      // Receptionist restart: if doctor mobile isn't in storage yet (first login
-      // had the clinic_id bug), fall back to stored recep_clinic_id.
       if (tokenState.roleId == 3) {
+        // Receptionist restart: if doctor mobile isn't in storage yet fall back.
         final doctorMobile = ref.read(doctorLoginViewModelProvider).mobile;
         if (doctorMobile == null || doctorMobile.trim().isEmpty) {
           final clinicId = await TokenStorage.getValue('recep_clinic_id');
@@ -48,25 +47,26 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                 doctorId: doctorId,
               );
         }
-        // Populate clinicsList so the clinic dropdown works on restart.
-        // doctorId is loaded from storage by loadFromStorage(); fall back to
-        // recep_doctor_id if it wasn't saved yet (older installs).
-        final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
-        final fallbackId = int.tryParse(
-                await TokenStorage.getValue('recep_doctor_id') ?? '') ?? 0;
-        final effectiveDoctorId = doctorId > 0 ? doctorId : fallbackId;
-        if (effectiveDoctorId > 0) {
-          try {
-            await ref
-                .read(doctorLoginViewModelProvider.notifier)
-                .getDoctorClinics(effectiveDoctorId);
-          } catch (_) {}
-        }
-        // Ensure receptionist's own name is in state (not doctor's name)
+        // Ensure receptionist's own name is in state (not doctor's name).
         final recepName = await TokenStorage.getValue('recep_name');
         if (recepName != null) {
           ref.read(receptionistLoginViewModelProvider.notifier).setName(recepName);
         }
+      }
+      // Populate clinicsList for the header dropdown (both doctor and receptionist).
+      // doctorId is set in state by loadFromStorage (reads 'doctor_id' key).
+      // Receptionist fallback: recep_doctor_id saved by setProfileFromCheck.
+      final stateDocId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+      final fallbackId = tokenState.roleId == 3
+          ? (int.tryParse(await TokenStorage.getValue('recep_doctor_id') ?? '') ?? 0)
+          : 0;
+      final effectiveDoctorId = stateDocId > 0 ? stateDocId : fallbackId;
+      if (effectiveDoctorId > 0) {
+        try {
+          await ref
+              .read(doctorLoginViewModelProvider.notifier)
+              .getDoctorClinics(effectiveDoctorId);
+        } catch (_) {}
       }
       target = const DoctorBottomNav();
     } else if (tokenState.isLoggedIn && tokenState.roleId == 2) {
