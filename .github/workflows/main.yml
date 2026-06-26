@@ -1,112 +1,185 @@
-on:
-  workflow_dispatch:        
-  push:
-    tags:
-      - 'v*'              
+name: CI
 
-name: "Build & Release"
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  BACKEND_DIR: backend
+  BACKEND_BRANCH: backend
+  FLUTTER_VERSION: '3.32.0'
 
 jobs:
-  test:
-    name: Run Tests
+  # ── Job 1: Flutter tests ────────────────────────────────────────────────────
+  test-flutter:
+    name: Flutter tests
     runs-on: ubuntu-latest
-
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Cache pub dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
+          restore-keys: ${{ runner.os }}-pub-
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
-          architecture: x64
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
           cache: true
 
-      - run: flutter pub get
+      - name: Get Flutter dependencies
         working-directory: frontend
+        run: flutter pub get
 
-      - name: Run tests
+      - name: Run Flutter tests with coverage
+        working-directory: frontend
         run: flutter test --coverage
-        working-directory: frontend
 
-      - name: Upload coverage report
+      - name: Upload Flutter coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: coverage/lcov.info
+          name: flutter-coverage
+          path: frontend/coverage/
+          retention-days: 14
 
+  # ── Job 2: Build landing page, copy into backend/public/, sync backend branch
   sync-backend:
-    name: Sync Backend to Branch
+    name: Build landing page + sync backend branch
     runs-on: ubuntu-latest
-
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          fetch-depth: 0
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+
+      - name: Install landing page dependencies
+        working-directory: landing
+        run: npm ci
+
+      - name: Build landing page (outputs to backend/public/)
+        working-directory: landing
+        run: npm run build
+        env:
+          VITE_API_URL: ''
+
+      - name: Install backend production dependencies
+        working-directory: backend
+        run: npm ci --omit=dev
+
+      - name: Remove backend/public/ exclusion so it gets deployed
+        run: sed -i '/^backend\/public\//d' .gitignore
 
       - name: Push backend folder to backend branch
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${{ secrets.TOKEN }}@github.com/${{ github.repository }}.git
-          cp -r backend /tmp/backend-content
-          git checkout --orphan backend-tmp
-          git rm -rf . --quiet
-          cp -r /tmp/backend-content/. .
-          git add -A
-          git commit -m "sync: update backend from ${{ github.ref_name }}"
-          git push origin backend-tmp:backend --force
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: ${{ env.BACKEND_BRANCH }}
+          publish_dir: ./${{ env.BACKEND_DIR }}
+          force_orphan: true
+          commit_message: "sync: backend + landing page from ${{ github.ref_name }} @ ${{ github.sha }}"
 
-  build:
-    name: Build & Release
+  # ── Job 3: Build Flutter APK + AAB on tag push (v*) ────────────────────────
+  build-apk:
+    name: Build Flutter APK + AAB
     runs-on: ubuntu-latest
-    needs: test                
-    permissions:
-      contents: write           
-
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
       - name: Cache pub dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
+          restore-keys: ${{ runner.os }}-pub-
 
       - name: Cache Gradle
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
+          restore-keys: ${{ runner.os }}-gradle-
 
-      - uses: subosito/flutter-action@v2
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
-          architecture: x64
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
           cache: true
 
-      - run: flutter pub get
+      - name: Get Flutter dependencies
         working-directory: frontend
+        run: flutter pub get
 
-      - run: flutter build apk --release --split-per-abi
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > frontend/android/app/upload-keystore.jks
+
+      - name: Create key.properties
+        run: |
+          cat > frontend/android/key.properties << EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/upload-keystore.jks
+          EOF
+
+      - name: Build APK (release)
         working-directory: frontend
+        run: flutter build apk --release
 
-      - name: Push to Releases
-        uses: ncipollo/release-action@v1
+      - name: Build AAB (release)
+        working-directory: frontend
+        run: flutter build appbundle --release
+
+      - name: Rename APK and AAB with tag version
+        run: |
+          mv frontend/build/app/outputs/flutter-apk/app-release.apk \
+            frontend/build/app/outputs/flutter-apk/qless-${{ github.ref_name }}.apk
+          mv frontend/build/app/outputs/bundle/release/app-release.aab \
+            frontend/build/app/outputs/bundle/release/qless-${{ github.ref_name }}.aab
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
         with:
-          artifacts: "frontend/build/app/outputs/apk/release/*"
-          tag: ${{ github.ref_name }}
-          allowUpdates: true
-          token: ${{ secrets.TOKEN }}
+          name: qless-apk-${{ github.ref_name }}
+          path: frontend/build/app/outputs/flutter-apk/qless-*.apk
+          retention-days: 30
+
+      - name: Upload AAB as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qless-aab-${{ github.ref_name }}
+          path: frontend/build/app/outputs/bundle/release/qless-*.aab
+          retention-days: 30
+
+      - name: Create GitHub Release with APK and AAB
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            frontend/build/app/outputs/flutter-apk/qless-*.apk
+            frontend/build/app/outputs/bundle/release/qless-*.aab
+          generate_release_notes: true

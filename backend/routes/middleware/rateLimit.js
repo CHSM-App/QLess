@@ -43,8 +43,18 @@ const lookupLimiter = rateLimit({
   max: 30,
 });
 
+// ── Account deletion endpoints. OTP-gated, low-volume. Stricter than auth to
+// slow down scraping of who has accounts (request endpoint) while still being
+// generous enough that a real user can retry once or twice.
+const deletionLimiter = rateLimit({
+  ...commonOptions,
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,
+});
+
 module.exports = {
   globalLimiter,
   authLimiter,
   lookupLimiter,
+  deletionLimiter,
 };
