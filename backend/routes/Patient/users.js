@@ -32,13 +32,14 @@ router.get('/fetchFamilyMembers/:family_id', async (req, res) => {
   }
 });
 
-router.get('/getDoctorAvailability/:doctor_id', async (req, res) => {
-  const { doctor_id } = req.params;
+router.get('/getDoctorAvailability/:doctor_id/:clinic_id', async (req, res) => {
+  const { doctor_id, clinic_id } = req.params;
 
   try {
 
     const result = await db.request()
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
 	  .input('operation', 'doctor_availability')
       .execute('sp_patients');
 

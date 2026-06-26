@@ -70,7 +70,7 @@ router.post('/insertFamilyMember', async (req, res) => {
 
 
 router.post('/appointment/book', async (req, res) => {
-  const { doctor_id, patient_id, appointment_date, start_time, user_type, slot_id,symptoms} = req.body;
+  const { doctor_id, patient_id, appointment_date, start_time, user_type, slot_id, symptoms, clinic_id } = req.body;
 
   try {
     // Hard-guard: reject booking if the doctor is on leave that date
@@ -96,7 +96,8 @@ router.post('/appointment/book', async (req, res) => {
       .input('appointment_date', appointment_date)
       .input('start_time', start_time)
 	  .input('slot_id', slot_id)
-		  .input('symptoms', symptoms)
+	  .input('symptoms', symptoms)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     const booked = result.recordset[0].success === 1;
@@ -302,7 +303,8 @@ router.post('/cancelAppointment/:appointment_id', async (req, res) => {
 router.post('/queueEstimate', async (req, res) => {
   const {
     appointment_id,
-    doctor_id
+    doctor_id,
+    clinic_id
   } = req.body;
 
   try {
@@ -310,6 +312,7 @@ router.post('/queueEstimate', async (req, res) => {
       .input('operation', 'QUEUE_ESTIMATE_SMART')
       .input('appointment_id', appointment_id)
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     res.status(200).json(result.recordset[0]);
@@ -326,7 +329,8 @@ router.post('/queueEstimate', async (req, res) => {
 router.post('/queuePreviewEstimate', async (req, res) => {
   const {
     doctor_id,
-	  slot_id
+	  slot_id,
+    clinic_id
   } = req.body;
 
   try {
@@ -334,6 +338,7 @@ router.post('/queuePreviewEstimate', async (req, res) => {
       .input('operation', 'QUEUE_PREVIEW_ESTIMATE')
       .input('doctor_id', doctor_id)
 	  .input('slot_id', slot_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     res.status(200).json(result.recordset[0]);

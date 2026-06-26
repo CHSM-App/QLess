@@ -51,13 +51,13 @@ class DoctorsViewmodel extends StateNotifier<DoctorsState> {
     }
   }
 
-  Future<void> getDoctorAvailability(int doctorId) async {
+  Future<void> getDoctorAvailability(int doctorId, String clinicId) async {
     if (state.isLoading) return;
     // Clear the previous doctor's schedule so a new profile doesn't briefly
     // render stale availability while this fetch is in flight.
     state = state.copyWith(isLoading: true, doctorAvailabilities: const []);
     try {
-      final availability = await doctorsUseCase.getDoctorAvailability(doctorId);
+      final availability = await doctorsUseCase.getDoctorAvailability(doctorId, clinicId);
       state = state.copyWith(
         doctorAvailabilities: availability,
         isLoading: false,

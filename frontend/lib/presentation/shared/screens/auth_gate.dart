@@ -48,6 +48,20 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                 doctorId: doctorId,
               );
         }
+        // Populate clinicsList so the clinic dropdown works on restart.
+        // doctorId is loaded from storage by loadFromStorage(); fall back to
+        // recep_doctor_id if it wasn't saved yet (older installs).
+        final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+        final fallbackId = int.tryParse(
+                await TokenStorage.getValue('recep_doctor_id') ?? '') ?? 0;
+        final effectiveDoctorId = doctorId > 0 ? doctorId : fallbackId;
+        if (effectiveDoctorId > 0) {
+          try {
+            await ref
+                .read(doctorLoginViewModelProvider.notifier)
+                .getDoctorClinics(effectiveDoctorId);
+          } catch (_) {}
+        }
         // Ensure receptionist's own name is in state (not doctor's name)
         final recepName = await TokenStorage.getValue('recep_name');
         if (recepName != null) {

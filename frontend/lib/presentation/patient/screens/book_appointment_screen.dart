@@ -258,7 +258,7 @@ class _BookAppointmentScreenState
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (did != null) {
-        ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did);
+        ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did, widget.doctor.clinicId ?? '');
         ref.read(doctorsViewModelProvider.notifier).getDoctorLeaveDates(did);
         ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did);
         ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
@@ -366,7 +366,7 @@ void dispose() {
     setState(() { _isEstimateLoading = true; _estimatedWaitTime = null; });
 
     await ref.read(appointmentViewModelProvider.notifier)
-        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did,slotId: _selectedSlotId));
+        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did, slotId: _selectedSlotId, clinicId: widget.doctor.clinicId));
     if (!mounted) return;
 
     final qd = ref.read(appointmentViewModelProvider).queuePreviewEstimateResponse;
@@ -774,7 +774,8 @@ void dispose() {
           startTime:       start,
           userType:        isForMember ? 2 : 1,
           slotId:          _selectedSlotId,
-            symptoms:        _symptomsController.text.trim().isEmpty
+          clinicId:        widget.doctor.clinicId,
+          symptoms:        _symptomsController.text.trim().isEmpty
                        ? null : _symptomsController.text.trim(),
         ),
       );

@@ -17,8 +17,8 @@ class DoctorsImpl implements DoctorsRepository {
   }
 
   @override
-  Future<List<DoctorAvailabilityModel>> getDoctorAvailability(int doctorId) {
-    return apiService.getDoctorAvailability(doctorId);
+  Future<List<DoctorAvailabilityModel>> getDoctorAvailability(int doctorId, String clinicId) {
+    return apiService.getDoctorAvailability(doctorId, clinicId);
   }
 
   @override

@@ -138,7 +138,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     final did = widget.doctor.doctorId ?? 0;
     if (did <= 0 || (_didFetchAvail && !force)) return;
     _didFetchAvail = true;
-    ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did);
+    ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did, widget.doctor.clinicId ?? '');
   }
 
   void _tryFetchPatientCount({bool force = false}) {

@@ -272,15 +272,15 @@ router.get('/getDoctorsByClinic/:clinic_id', async (req, res) => {
 
 
 
-router.get('/fetchReceptionistList/:clinic_id', async (req, res) => {
-  const { clinic_id } = req.params;
-  console.log('[ReceptionistDebug] fetchReceptionistList clinic_id:', clinic_id);
+router.get('/fetchReceptionistList/:doctor_id', async (req, res) => {
+  const { doctor_id } = req.params;
+  console.log('[ReceptionistDebug] fetchReceptionistList doctor_id:', doctor_id);
 
   try {
     const request = db.request();
 
     request.input('operation', 'FetchReceptionistList');
-    request.input('clinic_id', clinic_id);
+    request.input('doctor_id', doctor_id);
 
     const result = await request.execute('sp_receptionist');
     console.log(

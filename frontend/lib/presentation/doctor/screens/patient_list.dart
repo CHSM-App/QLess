@@ -378,6 +378,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       }
     }
     if (!mounted) return;
+    final clinicId = ref.read(doctorLoginViewModelProvider).clinic_id;
     await Navigator.push(context, MaterialPageRoute(
       builder: (_) => PrescriptionScreen(
         patientId: pid, doctorId: did,
@@ -389,6 +390,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         queueNumber: p.queueNumber,
         patientStatus: p.status ?? 'booked',
         symptoms: p.symptoms,
+        clinicId: clinicId,
       ),
     ));
     if (!mounted) return;

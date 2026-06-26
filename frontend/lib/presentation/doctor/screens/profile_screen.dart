@@ -1164,12 +1164,15 @@ Widget _buildAvailabilityCard() => Container(
       ],
     ),
     TextButton.icon(
-      onPressed: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const DoctorAvailabilityPage(),
-        ),
-      ),
+      onPressed: () {
+        final clinicId = ref.read(doctorLoginViewModelProvider).clinic_id;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DoctorAvailabilityPage(clinicId: clinicId),
+          ),
+        );
+      },
       icon: const Icon(Icons.edit_calendar_outlined, size: 13),
       label: const Text(
         'Edit Schedule',

@@ -13,8 +13,8 @@ class ReceptionistUsecase {
     return receptionistRepository.addReceptionist(receptionist, image: image);
   }
 
-  Future<List<ReceptionistApiModel>> fetchReceptionistList(String clinicId) {
-    return receptionistRepository.fetchReceptionistList(clinicId);
+  Future<List<ReceptionistApiModel>> fetchReceptionistList(int doctorId) {
+    return receptionistRepository.fetchReceptionistList(doctorId);
   }
 
   Future<List<ReceptionistApiModel>> checkPhoneReceptionist(String mobileNo) {

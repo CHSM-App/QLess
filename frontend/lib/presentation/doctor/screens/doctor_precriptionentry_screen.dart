@@ -591,6 +591,7 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
   final int?    queueNumber;
   final String  patientStatus;
   final String? symptoms;
+  final String? clinicId;
 
   const PrescriptionScreen({
     super.key,
@@ -604,6 +605,7 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
     this.queueNumber,
     this.patientStatus = 'booked',
     this.symptoms,
+    this.clinicId,
   });
 
   @override
@@ -722,6 +724,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     followUpDate:  _followUpStr(),
     advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
     medicines:     _meds.map((e) => e.toApiModel()).toList(),
+    clinicId:      widget.clinicId,
   );
 
   Future<AppointmentResponseModel?> _completeQueueAction() async {
@@ -737,6 +740,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
               doctorId:      widget.doctorId,
               appointmentId: widget.appointmentId,
               patientId:     widget.patientId,
+              clinicId:      widget.clinicId,
             ));
       } else {
         result = await ref.read(appointmentViewModelProvider.notifier)
@@ -746,6 +750,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
               appointmentId:   widget.appointmentId,
               patientId:       widget.patientId,
               appointmentDate: _todayApi(),
+              clinicId:        widget.clinicId,
             ));
       }
       if (result.success == true) return result;
@@ -801,6 +806,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       queueNumber:   next.queueNumber,
       patientStatus: next.status ?? 'booked',
       symptoms:      next.symptoms,
+      clinicId:      widget.clinicId,
     )));
   }
 
@@ -924,6 +930,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         queueNumber:   next.queueNumber,
         patientStatus: next.status ?? 'booked',
         symptoms:      next.symptoms,
+        clinicId:      widget.clinicId,
       )));
     } catch (e) { _showSnack('Skip failed: $e', isError: true); }
   }

@@ -302,9 +302,10 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   @GET("patient/users/getDoctors/{patient_id}")
   Future<List<DoctorDetails>> fetchDoctors(@Path("patient_id") int patientId);
 
-  @GET("patient/users/getDoctorAvailability/{doctor_id}")
+  @GET("patient/users/getDoctorAvailability/{doctor_id}/{clinic_id}")
   Future<List<DoctorAvailabilityModel>> getDoctorAvailability(
     @Path("doctor_id") int doctorId,
+    @Path("clinic_id") String clinicId,
   );
 
   @GET("patient/users/getPatientAppointments/{family_id}")
@@ -467,9 +468,9 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Path("clinic_id") String clinicId,
   );
 
-  @GET("doctor/users/fetchReceptionistList/{clinic_id}")
+  @GET("doctor/users/fetchReceptionistList/{doctor_id}")
   Future<List<ReceptionistApiModel>> fetchReceptionistList(
-    @Path("clinic_id") String clinicId,
+    @Path("doctor_id") int doctorId,
   );
 
   @MultiPart()

@@ -125,12 +125,13 @@ async function hasNotificationBeenSent(patient_id, type, ref_id) {
 //     est_minutes_to_turn   INT     -- (position - 1) * avg_consultation_minutes
 //
 // Fire-and-forget — failures here must not break the calling endpoint.
-async function sendProximityNotifications(doctor_id) {
+async function sendProximityNotifications(doctor_id, clinic_id = null) {
   if (!doctor_id) return;
   try {
     const r = await db.request()
       .input('operation', 'QUEUE_PROXIMITY_LIST')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     const rows = r.recordset || [];
@@ -831,6 +832,7 @@ router.post('/insertPrescription', async (req, res) => {
     follow_up_date,
     advice,
     medicines = [],
+    clinic_id,
   } = req.body;
 
   if (!patient_id) {
@@ -872,6 +874,7 @@ router.post('/insertPrescription', async (req, res) => {
       request.input('created_at', new Date());
       request.input('user_type', user_type);
       request.input('appointment_id', appointment_id);
+      request.input('clinic_id', clinic_id || null);
 
       request.input('medicine_id', med?.medicine_id ?? null);
       request.input('medicine_type_id', med?.medicine_type_id ?? null);
@@ -1024,7 +1027,7 @@ router.post('/insertPrescription', async (req, res) => {
 });
 
 router.post('/appointment/queueNext', async (req, res) => {
-  const { doctor_id, appointment_id } = req.body;
+  const { doctor_id, appointment_id, clinic_id } = req.body;
 
   if (!doctor_id) {
     return res.status(400).json({ success: false, message: 'doctor_id is required' });
@@ -1038,6 +1041,7 @@ router.post('/appointment/queueNext', async (req, res) => {
       .input('operation', 'NEXT_SESSION')
       .input('doctor_id', doctor_id)
       .input('appointment_id', appointment_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     const row = result.recordset?.[0] ?? {};
@@ -1071,7 +1075,7 @@ router.post('/appointment/queueNext', async (req, res) => {
       }
     }
 
-    sendProximityNotifications(doctor_id);
+    sendProximityNotifications(doctor_id, clinic_id);
     const nextServing = await fetchCurrentServing(appointment_id);
     emitQueueUpdate(req, 'next', doctor_id, { current_serving: nextServing });
 
@@ -1579,7 +1583,7 @@ router.post('/appointment/startSession', async (req, res) => {
 
 //END SESSION 
 router.post('/appointment/endSession', async (req, res) => {
-  const { doctor_id, appointment_id } = req.body;
+  const { doctor_id, appointment_id, clinic_id } = req.body;
 
   if (!doctor_id || !appointment_id) {
     return res.status(400).json({
@@ -1593,6 +1597,7 @@ router.post('/appointment/endSession', async (req, res) => {
       .input('operation', 'END_SESSION')
       .input('doctor_id', doctor_id)
       .input('appointment_id', appointment_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     const allRows = (result.recordsets || [result.recordset || []]).flat();
@@ -1611,7 +1616,7 @@ router.post('/appointment/endSession', async (req, res) => {
     // "Be Ready (3rd in queue)" push, which only duplicated the proximity
     // 'near' stage for the same patient. Every ended consultation shifts each
     // waiting patient one slot closer, so re-scan proximity here.
-    sendProximityNotifications(doctor_id);
+    sendProximityNotifications(doctor_id, clinic_id);
     emitQueueUpdate(req, 'session_ended', doctor_id);
 
     return res.json({
@@ -2017,7 +2022,7 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
 // Finds or creates a patient by mobile, then books the appointment.
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/walkInBook', async (req, res) => {
-  const { name, mobile_no, doctor_id, appointment_date, start_time, slot_id, user_type, symptoms, gender_id, family_id, patient_id: existingPatientId } = req.body;
+  const { name, mobile_no, doctor_id, clinic_id, appointment_date, start_time, slot_id, user_type, symptoms, gender_id, family_id, patient_id: existingPatientId } = req.body;
 
   if (!name || !mobile_no || !doctor_id || !appointment_date) {
     return res.status(400).json({ success: false, message: 'name, mobile_no, doctor_id, appointment_date required' });
@@ -2084,6 +2089,7 @@ router.post('/walkInBook', async (req, res) => {
       .input('start_time', start_time || null)
       .input('slot_id', slot_id || null)
       .input('symptoms', symptoms || '')
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     const booked = bookRes.recordset[0].success === 1;

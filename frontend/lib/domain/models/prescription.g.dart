@@ -114,6 +114,7 @@ PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
           .toList(),
       userType: (json['user_type'] as num?)?.toInt(),
       appointmentId: (json['appointment_id'] as num?)?.toInt(),
+      clinicId: json['clinic_id'] as String?,
     );
 
 Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
@@ -162,5 +163,6 @@ Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
       'created_at': instance.createdAt,
       'user_type': instance.userType,
       'appointment_id': instance.appointmentId,
+      'clinic_id': instance.clinicId,
       'medicines': instance.medicines?.map((e) => e.toJson()).toList(),
     };

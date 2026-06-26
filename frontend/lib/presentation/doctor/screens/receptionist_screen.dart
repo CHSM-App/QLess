@@ -85,16 +85,16 @@ class _ReceptionistPageState extends ConsumerState<ReceptionistPage> {
   }
 
   Future<void> _loadList() async {
-    String? clinicId = _clinicId;
-    if (clinicId == null) {
+    int? doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
+    if (doctorId == null) {
       // State may not yet be loaded — fall back to TokenStorage directly.
-      final stored = await TokenStorage.getValue('clinic_id');
-      clinicId = _parseClinicId(stored);
+      final stored = await TokenStorage.getValue('doctor_id');
+      doctorId = int.tryParse(stored ?? '');
     }
-    if (clinicId == null) return;
+    if (doctorId == null) return;
     await ref
         .read(receptionistLoginViewModelProvider.notifier)
-        .fetchReceptionistList(clinicId);
+        .fetchReceptionistList(doctorId);
   }
 
   void _goAdd() async {
