@@ -219,6 +219,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
             .input('operation', 'QUEUE_ESTIMATE_SMART')
             .input('appointment_id', item.appointment_id)
             .input('doctor_id', item.doctor_id)
+            .input('clinic_id', item.clinic_id)
             .execute('sp_appointment');
 
           if (queueResult.recordset.length > 0) {

@@ -910,7 +910,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<dynamic> getDoctorLeaves(int doctorId) async {
+  Future<dynamic> getDoctorLeaves(int doctorId, String clinicId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -919,7 +919,7 @@ class _ApiService implements ApiService {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'doctor/insert/doctorLeaves/${doctorId}',
+            'doctor/insert/doctorLeaves/${doctorId}/${clinicId}',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -2330,9 +2330,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<ReceptionistApiModel>> fetchReceptionistList(
-    int doctorId,
-  ) async {
+  Future<List<ReceptionistApiModel>> fetchReceptionistList(int doctorId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};

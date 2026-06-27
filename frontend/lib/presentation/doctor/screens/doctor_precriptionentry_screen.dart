@@ -732,9 +732,6 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       final isSkipped = widget.patientStatus.toLowerCase().trim() == 'skipped';
       final AppointmentResponseModel result;
       if (isSkipped) {
-        // Doctor has now attended a previously-skipped patient — close that
-        // session. queueRecall re-queues a skipped patient as active and
-        // fails here because the patient is already in_progress.
         result = await ref.read(appointmentViewModelProvider.notifier)
             .endSession(AppointmentRequestModel(
               doctorId:      widget.doctorId,
@@ -754,17 +751,29 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
             ));
       }
       if (result.success == true) return result;
-      _showSnack(result.message ?? 'Queue action failed', isError: true);
+      // Show user-friendly message — never expose raw SQL errors
+      final raw = result.message ?? '';
+      final friendly = (raw.contains('PRIMARY KEY') || raw.contains('duplicate key') || raw.contains('Violation'))
+          ? 'Prescription saved. Queue could not advance — please refresh the home screen.'
+          : raw.isNotEmpty ? raw : 'Queue action failed';
+      _showSnack(friendly, isError: true);
       return null;
     } catch (e) {
-      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      _showSnack('Prescription saved. Queue could not advance — please refresh.', isError: true);
       return null;
     }
   }
 
   Future<void> _handleNextPatient() async {
     final result = await _completeQueueAction();
-    if (!mounted || result == null) return;
+    if (!mounted) return;
+    if (result == null) {
+      // queueNext failed but prescription was already saved — navigate back
+      // so the user isn't stuck on the prescription screen.
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) Navigator.pop(context);
+      return;
+    }
 
     // API explicitly says no more queue patients — go back to patient list
     final msg = result.message?.trim() ?? '';
@@ -872,12 +881,15 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     if (!mounted) return;
     final state = ref.read(prescriptionViewModelProvider);
     if (state.error != null) { _showSnack(state.error!, isError: true); return; }
-    try {
-      await ref.read(appointmentViewModelProvider.notifier).endSession(
-        AppointmentRequestModel(doctorId: widget.doctorId,
-            appointmentId: widget.appointmentId, patientId: widget.patientId));
-    } catch (_) {}
-    if (!mounted) return;
+    // Fire-and-forget — don't let endSession block or unmount the widget before pop
+    ref.read(appointmentViewModelProvider.notifier).endSession(
+      AppointmentRequestModel(
+        doctorId:      widget.doctorId,
+        appointmentId: widget.appointmentId,
+        patientId:     widget.patientId,
+        clinicId:      widget.clinicId,
+      ),
+    ).catchError((_) => AppointmentResponseModel(success: false));
     _showSnack('Prescription saved', isError: false);
     await Future.delayed(const Duration(milliseconds: 300));
     if (mounted) Navigator.pop(context);

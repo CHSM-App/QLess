@@ -139,12 +139,13 @@ QueueState _sessionQueueState(int? status) {
 }
 
 // ── Date filter ───────────────────────────────────────────────────────────────
-enum _DateFilter { all, today, thisWeek, thisMonth, last3Months, last6Months, thisYear, custom }
+enum _DateFilter { all, today, tomorrow, thisWeek, thisMonth, last3Months, last6Months, thisYear, custom }
 
 extension _DateFilterX on _DateFilter {
   String get label => switch (this) {
     _DateFilter.all         => 'All Time',
     _DateFilter.today       => 'Today',
+    _DateFilter.tomorrow    => 'Tomorrow',
     _DateFilter.thisWeek    => 'This Week',
     _DateFilter.thisMonth   => 'This Month',
     _DateFilter.last3Months => 'Last 3 Months',
@@ -155,6 +156,7 @@ extension _DateFilterX on _DateFilter {
   IconData get icon => switch (this) {
     _DateFilter.all         => Icons.all_inclusive_rounded,
     _DateFilter.today       => Icons.today_rounded,
+    _DateFilter.tomorrow    => Icons.event_rounded,
     _DateFilter.thisWeek    => Icons.view_week_rounded,
     _DateFilter.thisMonth   => Icons.calendar_month_rounded,
     _DateFilter.last3Months => Icons.date_range_rounded,
@@ -168,9 +170,11 @@ bool _passesDateFilter(AppointmentList a, _DateFilter df, DateTime? customFrom, 
   final p = DateTime.tryParse(a.appointmentDate ?? '');
   if (p == null) return df == _DateFilter.all;
   final now = DateTime.now();
+  final tomorrow = DateTime(now.year, now.month, now.day + 1);
   return switch (df) {
     _DateFilter.all         => true,
     _DateFilter.today       => p.year == now.year && p.month == now.month && p.day == now.day,
+    _DateFilter.tomorrow    => p.year == tomorrow.year && p.month == tomorrow.month && p.day == tomorrow.day,
     _DateFilter.thisWeek    => p.isAfter(
         DateTime(now.year, now.month, now.day)
             .subtract(Duration(days: now.weekday - 1))
@@ -208,7 +212,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   AppointmentList? _selected;
   _Tab _activeTab = _Tab.today;
 
-  _DateFilter _upcomingFilter  = _DateFilter.all;
+  _DateFilter _upcomingFilter  = _DateFilter.tomorrow;
   DateTime?   _upcomingFrom;
   DateTime?   _upcomingTo;
   bool        _upcomingSortNewest = true;
@@ -239,7 +243,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     _tabCtrl.addListener(() {
       if (!_tabCtrl.indexIsChanging) return;
       setState(() {
-        _activeTab = _tabCtrl.index == 0 ? _Tab.today : _Tab.completed;
+        _activeTab = _tabCtrl.index == 0 ? _Tab.upcoming : _Tab.completed;
         _selected  = null;
       });
     });
@@ -885,7 +889,6 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(bottom: BorderSide(color: kBorder)),
       ),
       child: SafeArea(
         bottom: false,
@@ -983,13 +986,14 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
                   dividerColor: Colors.transparent,
                   splashFactory: NoSplash.splashFactory,
                   overlayColor: WidgetStateProperty.all(Colors.transparent),
-                  tabs: [
-                    Tab(text: 'Current Queue'),
+                  tabs: const [
+                    // Tab(text: 'Current Queue'),
+                    Tab(text: 'Upcoming'),
                     Tab(text: 'Completed'),
                   ],
                 ),
               ),
-              const Divider(height: 1, color: kBorder),
+            //  const Divider(height: 1, color: kBorder),
             ],
           ),
         ),
@@ -1026,25 +1030,32 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     return TabBarView(
       controller: _tabCtrl,
       children: [
-        _SessionGroupedBody(
-          allSessions: allSessions,
-          allAppointments: allAppointments,
-          todayPatients: today,
-          qs: qs,
-          onStart: _startSession,
-          onSkip: _skipPatient,
-          onPrescription: _viewPrescription,
-          onCancel: _cancelConfirm,
+        // _SessionGroupedBody(          // Current Queue tab — commented out
+        //   allSessions: allSessions,
+        //   allAppointments: allAppointments,
+        //   todayPatients: today,
+        //   qs: qs,
+        //   onStart: _startSession,
+        //   onSkip: _skipPatient,
+        //   onPrescription: _viewPrescription,
+        //   onCancel: _cancelConfirm,
+        //   extraBottom: _kBottomClear,
+        //   onQueueStart: _onQueueStart,
+        //   onQueuePause: _onQueuePause,
+        //   onQueueStop: _onQueueStop,
+        //   onQueueEmergency: _onQueueEmergency,
+        //   emergencyQueueIds: ref.watch(appointmentViewModelProvider).emergencyQueueIds,
+        //   onRefresh: () async {
+        //     ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId);
+        //     await Future.delayed(const Duration(milliseconds: 600));
+        //   },
+        // ),
+        _PatientListBody(
+          patients: upcoming, tab: _Tab.upcoming, qs: qs,
+          onStart: _startSession, onSkip: _skipPatient,
+          onPrescription: _viewPrescription, onCancel: _cancelConfirm,
+          onView: _viewPatientInfo,
           extraBottom: _kBottomClear,
-          onQueueStart: _onQueueStart,
-          onQueuePause: _onQueuePause,
-          onQueueStop: _onQueueStop,
-          onQueueEmergency: _onQueueEmergency,
-          emergencyQueueIds: ref.watch(appointmentViewModelProvider).emergencyQueueIds,
-          onRefresh: () async {
-            ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId);
-            await Future.delayed(const Duration(milliseconds: 600));
-          },
         ),
         _PatientListBody(
           patients: completed, tab: _Tab.completed, qs: qs,
@@ -1079,7 +1090,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         onTabChange: (t) => setState(() {
           _activeTab = t;
           _selected  = null;
-          _tabCtrl.animateTo(t == _Tab.today ? 0 : 1);
+          _tabCtrl.animateTo(t == _Tab.upcoming ? 0 : 1);
         }),
       ),
       Expanded(
@@ -1979,43 +1990,137 @@ class _PatientListBody extends ConsumerWidget {
         : <AppointmentList>[];
     final firstBooked = booked.firstOrNull;
 
+    final onRefresh = () async {
+      ref.read(appointmentViewModelProvider.notifier)
+          .fetchPatientAppointments(ref.read(doctorLoginViewModelProvider).doctorId ?? 0);
+      await Future.delayed(const Duration(milliseconds: 600));
+    };
+
+    // ── Upcoming tab: date-grouped view ──────────────────────────────
+    if (tab == _Tab.upcoming) {
+      final groups = <String, List<AppointmentList>>{};
+      for (final p in patients) {
+        groups.putIfAbsent(p.appointmentDate ?? '', () => []).add(p);
+      }
+      final sortedDates = groups.keys.toList()
+        ..sort((a, b) => (DateTime.tryParse(a) ?? DateTime(0))
+            .compareTo(DateTime.tryParse(b) ?? DateTime(0)));
+
+      // Flat items: (String,int) = date header+count, AppointmentList = card
+      final items = <Object>[];
+      for (final date in sortedDates) {
+        final list = groups[date]!;
+        items.add((date, list.length));
+        items.addAll(list);
+      }
+
+      return RefreshIndicator(
+        color: kPrimary,
+        onRefresh: onRefresh,
+        child: ListView.builder(
+          padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + extraBottom),
+          itemCount: items.length + 1,
+          itemBuilder: (ctx, i) {
+            if (i == 0) {
+              return _SectionHeader(
+                title: 'Upcoming',
+                badge: '${patients.length} scheduled',
+              );
+            }
+            final item = items[i - 1];
+            if (item is (String, int)) {
+              return _DateGroupHeader(dateStr: item.$1, count: item.$2);
+            }
+            final p = item as AppointmentList;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: _PatientCard(
+                key: ValueKey(p.appointmentId),
+                patient: p, tab: tab,
+                accessible: true,
+                selected: selected?.appointmentId == p.appointmentId,
+                onTap: onSelect != null ? () => onSelect!(p) : null,
+                onStart: () => onStart(p),
+                onSkip: null,
+                onPrescription: () => onPrescription(p),
+                onCancel: () => onCancel(p),
+                onView: onView != null ? () => onView!(p) : null,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // ── Completed: date-grouped view ─────────────────────────────────
+    if (tab == _Tab.completed) {
+      final groups = <String, List<AppointmentList>>{};
+      for (final p in patients) {
+        groups.putIfAbsent(p.appointmentDate ?? '', () => []).add(p);
+      }
+      final sortedDates = groups.keys.toList()
+        ..sort((a, b) => (DateTime.tryParse(b) ?? DateTime(0))
+            .compareTo(DateTime.tryParse(a) ?? DateTime(0))); // newest first
+
+      final items = <Object>[];
+      for (final date in sortedDates) {
+        final list = groups[date]!;
+        items.add((date, list.length));
+        items.addAll(list);
+      }
+
+      return RefreshIndicator(
+        color: kPrimary,
+        onRefresh: onRefresh,
+        child: ListView.builder(
+          padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + extraBottom),
+          itemCount: items.length,
+          itemBuilder: (ctx, i) {
+            final item = items[i];
+            if (item is (String, int)) {
+              return _DateGroupHeader(dateStr: item.$1, count: item.$2);
+            }
+            final p = item as AppointmentList;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 7),
+              child: _PatientCard(
+                key: ValueKey(p.appointmentId),
+                patient: p, tab: tab,
+                accessible: false,
+                selected: selected?.appointmentId == p.appointmentId,
+                onTap: onSelect != null ? () => onSelect!(p) : null,
+                onStart: () => onStart(p),
+                onSkip: null,
+                onPrescription: () => onPrescription(p),
+                onCancel: () => onCancel(p),
+                onView: onView != null ? () => onView!(p) : null,
+              ),
+            );
+          },
+        ),
+      );
+    }
+
+    // ── Today: flat list ──────────────────────────────────────────────
     return RefreshIndicator(
       color: kPrimary,
-      onRefresh: () async {
-        ref.read(appointmentViewModelProvider.notifier)
-            .fetchPatientAppointments(ref.read(doctorLoginViewModelProvider).doctorId ?? 0);
-        await Future.delayed(const Duration(milliseconds: 600));
-      },
+      onRefresh: onRefresh,
       child: ListView.builder(
         padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + extraBottom),
         itemCount: patients.length + 1,
         itemBuilder: (ctx, i) {
           if (i == 0) {
-            final badge = switch (tab) {
-              _Tab.today     => '${patients.length} left',
-              _Tab.upcoming  => '${patients.length} scheduled',
-              _Tab.completed => '${patients.length} done',
-            };
-            final title = switch (tab) {
-              _Tab.today     => 'Waiting',
-              _Tab.upcoming  => 'Upcoming',
-              _Tab.completed => 'Completed',
-            };
-            return _SectionHeader(title: title, badge: badge);
+            return _SectionHeader(title: 'Waiting', badge: '${patients.length} left');
           }
-
           final p      = patients[i - 1];
           final status = p.status?.toLowerCase() ?? '';
           bool accessible = true;
-          if (tab == _Tab.today) {
-            if (status == 'in_progress') { accessible = true; }
-            else if (status == 'skipped') { accessible = true; }
-            else if (!isQueueActive) { accessible = false; }
-            else if (status == 'booked') {
-              accessible = !hasIP && p.queueNumber == firstBooked?.queueNumber;
-            }
+          if (status == 'in_progress') { accessible = true; }
+          else if (status == 'skipped') { accessible = true; }
+          else if (!isQueueActive) { accessible = false; }
+          else if (status == 'booked') {
+            accessible = !hasIP && p.queueNumber == firstBooked?.queueNumber;
           }
-
           return Padding(
             padding: const EdgeInsets.only(bottom: 7),
             child: _PatientCard(
@@ -2025,7 +2130,7 @@ class _PatientListBody extends ConsumerWidget {
               selected: selected?.appointmentId == p.appointmentId,
               onTap: onSelect != null ? () => onSelect!(p) : null,
               onStart: () => onStart(p),
-              onSkip: accessible && tab == _Tab.today && status == 'booked' ? () => onSkip(p) : null,
+              onSkip: accessible && status == 'booked' ? () => onSkip(p) : null,
               onPrescription: () => onPrescription(p),
               onCancel: () => onCancel(p),
               onView: onView != null ? () => onView!(p) : null,
@@ -2448,9 +2553,60 @@ class _DetailPanel extends StatelessWidget {
 // SHARED SMALL WIDGETS
 // ═════════════════════════════════════════════════════════════════════════════
 
+class _DateGroupHeader extends StatelessWidget {
+  final String dateStr;
+  final int count;
+  const _DateGroupHeader({required this.dateStr, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final d   = DateTime.tryParse(dateStr);
+    final now = DateTime.now();
+    final isToday    = d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+    final isTomorrow = d != null && DateTime(d.year, d.month, d.day) ==
+        DateTime(now.year, now.month, now.day + 1);
+
+    final label = d == null
+        ? dateStr
+        : isToday
+            ? 'Today, ${DateFormat('d MMMM yyyy').format(d)}'
+            : isTomorrow
+                ? 'Tomorrow, ${DateFormat('d MMMM yyyy').format(d)}'
+                : DateFormat('EEEE, d MMMM yyyy').format(d);
+
+    final barColor = isToday ? kPrimary : isTomorrow ? kAmber : kTextMuted;
+    final textColor = isToday ? kPrimary : isTomorrow ? kAmberDark : kTextPrimary;
+    final badgeBg  = isToday ? kPrimaryLight : isTomorrow ? kAmberLight : const Color(0xFFF1F5F9);
+    final badgeFg  = isToday ? kPrimaryDark  : isTomorrow ? kAmberDark  : kTextSecondary;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 12, 2, 8),
+      child: Row(children: [
+        Container(
+          width: 3, height: 14,
+          decoration: BoxDecoration(color: barColor, borderRadius: BorderRadius.circular(4)),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(label,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: textColor)),
+        ),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(20)),
+          child: Text('$count',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: badgeFg)),
+        ),
+      ]),
+    );
+  }
+}
+
 class _SectionHeader extends StatelessWidget {
-  final String title, badge;
-  const _SectionHeader({required this.title, required this.badge});
+  final String title;
+  final String? badge;
+  const _SectionHeader({required this.title, this.badge});
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -2461,12 +2617,13 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 7),
         Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
       ]),
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-        decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF9FE1CB))),
-        child: Text(badge, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kPrimaryDark)),
-      ),
+      if (badge != null)
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFF9FE1CB))),
+          child: Text(badge!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+        ),
     ]),
   );
 }

@@ -30,8 +30,8 @@ class DoctorSettingsImpl implements DoctorSettingsRepo {
   }
 
   @override
-  Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId) async {
-    final res = await apiService.getDoctorLeaves(doctorId);
+  Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId, {String? clinicId}) async {
+    final res = await apiService.getDoctorLeaves(doctorId, clinicId ?? '');
     final list = (res as List?) ?? const [];
     return list
         .whereType<Map>()
@@ -46,6 +46,7 @@ class DoctorSettingsImpl implements DoctorSettingsRepo {
     required String toDate,
     String? reason,
     bool force = false,
+    String? clinicId,
   }) {
     final body = <String, dynamic>{
       'doctor_id': doctorId,
@@ -53,6 +54,7 @@ class DoctorSettingsImpl implements DoctorSettingsRepo {
       'to_date': toDate,
       if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
       if (force) 'force': true,
+      if (clinicId != null) 'clinic_id': clinicId,
     };
     return apiService.addDoctorLeave(body);
   }
@@ -61,10 +63,12 @@ class DoctorSettingsImpl implements DoctorSettingsRepo {
   Future<dynamic> cancelDoctorLeave({
     required int doctorId,
     required int leaveId,
+    String? clinicId,
   }) {
     return apiService.cancelDoctorLeave({
       'doctor_id': doctorId,
       'leave_id': leaveId,
+      if (clinicId != null) 'clinic_id': clinicId,
     });
   }
 }

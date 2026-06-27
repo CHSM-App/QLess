@@ -202,9 +202,10 @@ abstract class ApiService {
     @Body() Map<String, dynamic> body,
   );
 
-  @GET("doctor/insert/doctorLeaves/{doctor_id}")
+  @GET("doctor/insert/doctorLeaves/{doctor_id}/{clinic_id}")
   Future<dynamic> getDoctorLeaves(
     @Path("doctor_id") int doctorId,
+    @Path("clinic_id") String clinicId,
   );
 
   @POST("doctor/insert/cancelDoctorLeave")

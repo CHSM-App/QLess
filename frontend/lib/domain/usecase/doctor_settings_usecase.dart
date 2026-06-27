@@ -28,8 +28,8 @@ class DoctorSettingsUsecase {
     return doctorSettingsRepo.getDoctorSchedule(doctorId, clinicId: clinicId);
   }
 
-  Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId) {
-    return doctorSettingsRepo.getDoctorLeaves(doctorId);
+  Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId, {String? clinicId}) {
+    return doctorSettingsRepo.getDoctorLeaves(doctorId, clinicId: clinicId);
   }
 
   Future<dynamic> addDoctorLeave({
@@ -38,6 +38,7 @@ class DoctorSettingsUsecase {
     required String toDate,
     String? reason,
     bool force = false,
+    String? clinicId,
   }) {
     return doctorSettingsRepo.addDoctorLeave(
       doctorId: doctorId,
@@ -45,16 +46,19 @@ class DoctorSettingsUsecase {
       toDate: toDate,
       reason: reason,
       force: force,
+      clinicId: clinicId,
     );
   }
 
   Future<dynamic> cancelDoctorLeave({
     required int doctorId,
     required int leaveId,
+    String? clinicId,
   }) {
     return doctorSettingsRepo.cancelDoctorLeave(
       doctorId: doctorId,
       leaveId: leaveId,
+      clinicId: clinicId,
     );
   }
 }

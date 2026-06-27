@@ -332,7 +332,7 @@ class _DoctorAvailabilityPageState
       if (openLeave == true) {
         final doctorId =
             ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
-        showDoctorLeaveSheet(context, doctorId);
+        showDoctorLeaveSheet(context, doctorId, clinicId: widget.clinicId);
       }
       return;
     }
@@ -620,7 +620,7 @@ class _DoctorAvailabilityPageState
                               .read(doctorLoginViewModelProvider)
                               .doctorId ??
                           0;
-                      showDoctorLeaveSheet(context, doctorId);
+                      showDoctorLeaveSheet(context, doctorId, clinicId: widget.clinicId);
                     },
               style: TextButton.styleFrom(
                 foregroundColor: kPrimary,

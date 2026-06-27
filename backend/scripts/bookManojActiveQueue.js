@@ -12,6 +12,7 @@
 const db = require('../routes/db');
 
 const DOCTOR_ID = 1;
+const CLINIC_ID = 'CL001';
 const N = parseInt(process.argv[2], 10) || 20;
 const SLOT_START = process.argv[3] || null; // optional HH:MM filter, e.g. "11:30"
 const SYMPTOMS = ['Fever','Cold','Headache','Cough','BP check','Acidity','Joint pain','Skin rash','Stomach upset','Allergy'];
@@ -94,6 +95,7 @@ async function main() {
       .input('appointment_date', date).input('start_time', null)
       .input('slot_id', slot.slot_id)
       .input('symptoms', SYMPTOMS[i % SYMPTOMS.length])
+      .input('clinic_id', CLINIC_ID)
       .execute('sp_appointment');
     const row = r.recordset?.[0];
     if (row?.success !== 1) { console.warn(`  [skip] ${s.name}: ${row?.message}`); continue; }

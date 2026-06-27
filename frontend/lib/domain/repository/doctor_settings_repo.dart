@@ -14,7 +14,7 @@ abstract class DoctorSettingsRepo {
 
   Future<DoctorScheduleModel> getDoctorSchedule(int doctorId, {String? clinicId});
 
-  Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId);
+  Future<List<DoctorLeaveModel>> getDoctorLeaves(int doctorId, {String? clinicId});
 
   /// Returns the raw response on success. Throws [DioException] with
   /// statusCode 409 when appointments exist and `force` is false.
@@ -24,10 +24,12 @@ abstract class DoctorSettingsRepo {
     required String toDate,
     String? reason,
     bool force,
+    String? clinicId,
   });
 
   Future<dynamic> cancelDoctorLeave({
     required int doctorId,
     required int leaveId,
+    String? clinicId,
   });
 }

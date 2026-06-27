@@ -153,6 +153,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   bool _hasFetched = false;
   bool _walkInExpanded = false;
   final Map<int, bool> _patientsExpanded = {};
+  final Map<int, bool> _sessionExpanded = {};
   late final ProviderSubscription<int?> _doctorIdSub;
   ProviderSubscription<String?>? _clinicIdSub;
 
@@ -702,21 +703,28 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         loading: () => _buildLoadingBody(greeting, doctorName),
         error: (e, _) => _buildErrorBody(e, greeting, doctorName),
         data: (list) {
-          final todayQueue     = _todayQueue(list);
+          final currentClinicId = _clinicId;
+          final filteredList = currentClinicId == null
+              ? list
+              : list.where((a) => a.clinicId == currentClinicId).toList();
+          final todayQueue     = _todayQueue(filteredList);
           final current        = todayQueue.isNotEmpty ? todayQueue.first : null;
-          final completed      = _completedToday(list);
-          final skipped        = _skippedToday(list);
+          final completed      = _completedToday(filteredList);
+          final skipped        = _skippedToday(filteredList);
           final allSessions    = vmState.todayQueueResult?.value ?? [];
-          final visibleSessions = allSessions.where(_shouldShowSession).toList();
-          final todayActivePts = _todayActivePatients(list);
+          final activeQueueIds = filteredList.map((a) => a.queueId).whereType<int>().toSet();
+          final visibleSessions = allSessions
+              .where((s) => _shouldShowSession(s) &&
+                  (currentClinicId == null || activeQueueIds.contains(s.queueId)))
+              .toList();
+          final todayActivePts = _todayActivePatients(filteredList);
 
           return _buildRefreshableScrollView(
             slivers: [
               SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
 
-              // ── WALK-IN CARD (receptionist only) ───────────────────
-              if (ref.watch(tokenProvider).roleId == 3)
-                SliverToBoxAdapter(
+              // ── WALK-IN CARD ───────────────────────────────────────
+              SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                     child: Column(
@@ -757,20 +765,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                       (_, i) {
                         final session   = visibleSessions[i];
                         final sessionQs = _sessionQueueState(session.queueStatus);
-                        final currentPt = _findCurrentPatient(list, session.currentServing);
-                        final nextQNo   = session.currentQueueNo != null &&
-                                session.currentQueueNo! < (session.totalQueue ?? 0)
-                            ? session.currentQueueNo! + 1
-                            : null;
                         final slotLbl = (session.startTime != null)
                             ? '${_fmtTime(session.startTime)} – ${_fmtTime(session.endTime)}'
                             : null;
-                        final sessionSkipped = skipped.where((a) => a.queueId == session.queueId).length;
-                        final sessionTotal   = session.totalQueue ?? 0;
-                        final sessionDone    = session.completedCount ?? 0;
-                        final sessionServing = (session.currentServing ?? 0) > 0 ? 1 : 0;
-                        final sessionWaiting = (sessionTotal - sessionDone - sessionServing - sessionSkipped)
-                            .clamp(0, sessionTotal);
                         final sessionPts = todayActivePts
                             .where((p) => p.queueId == session.queueId)
                             .toList();
@@ -786,17 +783,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 14),
-                          child: _buildQueueCard(
-                            current:        currentPt,
-                            nextQueueNo:    nextQNo,
-                            total:          sessionTotal,
-                            done:           sessionDone,
-                            sessionWaiting: sessionWaiting,
-                            sessionSkipped: sessionSkipped,
-                            queueState:     sessionQs,
+                          child: _buildSessionAccordion(
+                            sessionIndex:   i,
                             queueId:        session.queueId,
                             slotLabel:      slotLbl,
-                            isOnlySession:  i == 0,
+                            queueState:     sessionQs,
                             sessionPts:     sessionPts,
                             sessionHasIP:   sessionHasIP,
                             sessionNextQNo: sessionNextQNo,
@@ -809,38 +800,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                 ),
 
               // ── QUICK ACTIONS ───────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                  child: _buildHomeQuickActions(),
-                ),
-              ),
-
-              // ── RECENTLY SEEN ───────────────────────────────────────
-              if (completed.isNotEmpty) ...[
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 14, 12, 8),
-                    child: _sectionHeader('Recently Seen', completed.length,
-                        kGreen, kGreenLight, kGreenDark),
-                  ),
-                ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (_, i) {
-                        final p = completed.take(5).toList()[i];
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: _buildCompletedPatientCard(p),
-                        );
-                      },
-                      childCount: completed.length > 5 ? 5 : completed.length,
-                    ),
-                  ),
-                ),
-              ],
+              // SliverToBoxAdapter(
+              //   child: Padding(
+              //     padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              //     child: _buildHomeQuickActions(),
+              //   ),
+              // ),
 
               const SliverToBoxAdapter(child: SizedBox(height: 80)),
             ],
@@ -1118,198 +1083,293 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // QUEUE CARD
+  // SESSION ACCORDION  (matches patient_list.dart style)
   // ─────────────────────────────────────────────────────────────────────────
 
-  Widget _buildQueueCard({
-    required AppointmentList? current,
-    required int? nextQueueNo,
-    required int total,
-    required int done,
-    required int sessionWaiting,
-    required int sessionSkipped,
+  Widget _buildSessionAccordion({
+    required int sessionIndex,
+    required int? queueId,
+    required String? slotLabel,
     required QueueState queueState,
-    int? queueId,
-    String? slotLabel,
-    bool isOnlySession = false,
-    List<AppointmentList> sessionPts = const [],
-    bool sessionHasIP = false,
-    int? sessionNextQNo,
+    required List<AppointmentList> sessionPts,
+    required bool sessionHasIP,
+    required int? sessionNextQNo,
   }) {
-    final isIdle    = queueState == QueueState.idle;
-    final isRunning = queueState == QueueState.running;
-    final isStopped = queueState == QueueState.stopped;
-    final isPaused  = queueState == QueueState.paused;
-    final isEmergency = ref
-        .read(appointmentViewModelProvider.notifier)
-        .isEmergencyPaused(queueId);
+    if (queueState == QueueState.stopped) return const SizedBox.shrink();
 
-    final Color borderColor = isRunning
-        ? kPrimary
-        : isPaused
-            ? kAmber
-            : kCardBorder;
-    final double borderWidth = (isRunning || isPaused) ? 2.0 : 1.5;
+    final isExpanded  = _sessionExpanded[sessionIndex] ?? true;
+    final isEmergency = ref.read(appointmentViewModelProvider.notifier).isEmergencyPaused(queueId);
 
-    // ── Compact card for idle sessions ──────────────────────────────────
-    if (isIdle && !isOnlySession) {
-      return Container(
-        decoration: BoxDecoration(
-          color: kCardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: borderColor, width: borderWidth),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            _pulseDot(),
-            const SizedBox(width: 5),
-            _queueStateBadge(queueState),
-            const Spacer(),
-            if (slotLabel != null) _slotPill(slotLabel),
-          ]),
-          const SizedBox(height: 10),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text('Daily progress',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
-            Text('$done / $total seen',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kPrimaryDark)),
-          ]),
-          const SizedBox(height: 5),
-          _solidProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
-        ]),
-      );
-    }
+    final (Color borderColor, double borderWidth) = switch (queueState) {
+      QueueState.running => (kPrimary, 2.0),
+      QueueState.paused  => (kAmber, 1.5),
+      _                  => (kCardBorder, 1.0),
+    };
 
-    // ── Full card ────────────────────────────────────────────────────────
     return Container(
       decoration: BoxDecoration(
         color: kCardBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: borderColor, width: borderWidth),
       ),
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          _pulseDot(),
-          const SizedBox(width: 5),
-          _queueStateBadge(queueState),
-          const Spacer(),
-          if (slotLabel != null) _slotPill(slotLabel),
-        ]),
-        const SizedBox(height: 10),
-        _buildSessionMiniStats(total: total, waiting: sessionWaiting, done: done),
-        const SizedBox(height: 10),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          const Text('Daily progress',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
-          Text('$done / $total seen',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kPrimaryDark)),
-        ]),
-        const SizedBox(height: 5),
-        _solidProgress(total == 0 ? 0 : (done / total).clamp(0.0, 1.0)),
-        const SizedBox(height: 10),
-
-        // ── Action buttons ─────────────────────────────────────────────
-        Row(children: [
-          Expanded(
-            child: _actionBtn(
-              label: isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start',
-              icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              onTap: isRunning
-                  ? () => _onQueuePause(queueId)
-                  : isPaused
-                      ? () => _onQueueResume(queueId)
-                      : () => _onQueueStart(queueId),
-              bg: isRunning ? kAmberLight : kPrimaryDark,
-              fg: isRunning ? kAmberDark : Colors.white,
-              border: isRunning ? kAmberBorder : kPrimaryDark,
-            ),
+        // ── Accordion header ──────────────────────────────────────────
+        InkWell(
+          onTap: () => setState(() => _sessionExpanded[sessionIndex] = !isExpanded),
+          borderRadius: BorderRadius.vertical(
+            top: const Radius.circular(14),
+            bottom: isExpanded ? Radius.zero : const Radius.circular(14),
           ),
-          if (!isEmergency) ...[
-            const SizedBox(width: 6),
-            Expanded(
-              child: Opacity(
-                opacity: (isStopped || isIdle) ? 0.4 : 1.0,
-                child: GestureDetector(
-                  onTap: (isStopped || isIdle) ? null : () => _showCloseDialog(queueId),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: kRedLight,
-                      borderRadius: BorderRadius.circular(11),
-                      border: Border.all(color: kRedBorder),
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
-                      Icon(Icons.close_rounded, size: 13, color: kRedDark),
-                      SizedBox(width: 4),
-                      Text('Close',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kRedDark)),
-                    ]),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+            child: Row(children: [
+              Container(
+                width: 26, height: 26,
+                decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(8)),
+                alignment: Alignment.center,
+                child: Text('S${sessionIndex + 1}',
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kPrimaryDark)),
+              ),
+              const SizedBox(width: 10),
+              if (slotLabel != null)
+                Expanded(child: Row(children: [
+                  const Icon(Icons.access_time_rounded, size: 13, color: kTextSecondary),
+                  const SizedBox(width: 4),
+                  Expanded(child: Text(slotLabel,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                      overflow: TextOverflow.ellipsis)),
+                ]))
+              else
+                const Expanded(child: Text('Session',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary))),
+              const SizedBox(width: 8),
+              _queueStateBadge(queueState),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () => Navigator.push(context, MaterialPageRoute(
+                  builder: (_) => _HomeSessionFullscreenPage(
+                    sessionIndex:   sessionIndex,
+                    slotLabel:      slotLabel,
+                    queueState:     queueState,
+                    sessionPts:     sessionPts,
+                    sessionHasIP:   sessionHasIP,
+                    sessionNextQNo: sessionNextQNo,
+                    isEmergency:    isEmergency,
+                    onQueueStart:   () => _onQueueStart(queueId),
+                    onQueuePause:   () => _onQueuePause(queueId),
+                    onQueueStop:    () => _showCloseDialog(queueId),
+                    onQueueEmergency: () => _showEmergencyDialog(queueId),
+                    onStartSession: _startSession,
+                    onSkip:         _skipPatient,
+                    onCancel:       _cancelConfirm,
+                    onPrescription: _viewPrescription,
                   ),
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () => _showEmergencyDialog(queueId),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 11),
-              decoration: BoxDecoration(
-                color: kPurpleLight,
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: kPurpleBorder),
-              ),
-              child: const Icon(Icons.warning_amber_rounded, color: kPurpleDark, size: 16),
-            ),
-          ),
-        ]),
-
-        // ── Patient list ───────────────────────────────────────────────
-        if (sessionPts.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          const Divider(height: 1, color: kHairline),
-          const SizedBox(height: 6),
-          GestureDetector(
-            onTap: () => setState(() {
-              final key = queueId ?? 0;
-              _patientsExpanded[key] = !(_patientsExpanded[key] ?? true);
-            }),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(children: [
-                const Text('Patients',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                )),
+                child: Container(
+                  width: 28, height: 28,
                   decoration: BoxDecoration(
                     color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(color: const Color(0xFF9FE1CB)),
                   ),
-                  child: Text('${sessionPts.length}',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+                  child: const Icon(Icons.open_in_full_rounded, size: 14, color: kPrimaryDark),
                 ),
-                const Spacer(),
-                AnimatedRotation(
-                  turns: (_patientsExpanded[queueId ?? 0] ?? true) ? 0.5 : 0.0,
-                  duration: const Duration(milliseconds: 220),
-                  child: const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: kTextSecondary),
-                ),
-              ]),
-            ),
+              ),
+              const SizedBox(width: 6),
+              AnimatedRotation(
+                turns: isExpanded ? 0.5 : 0.0,
+                duration: const Duration(milliseconds: 220),
+                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: kTextSecondary),
+              ),
+            ]),
           ),
-          if (_patientsExpanded[queueId ?? 0] ?? true)
-            ...sessionPts.map((p) => Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: _buildActionPatientCard(p, queueState, sessionHasIP, sessionNextQNo),
-            )),
-        ],
+        ),
+
+        // ── Accordion body — live queue bar + patient list ────────────
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Divider(height: 1, color: kHairline),
+              const SizedBox(height: 10),
+              _buildLiveQueueBar(
+                queueId: queueId,
+                queueState: queueState,
+                isEmergency: isEmergency,
+                sessionPts: sessionPts,
+              ),
+              if (sessionPts.isEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  alignment: Alignment.center,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle,
+                          border: Border.all(color: const Color(0xFF9FE1CB))),
+                      child: const Icon(Icons.inbox_rounded, color: kPrimaryDark, size: 18),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text('No patients waiting',
+                        style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
+                  ]),
+                )
+              else ...[
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6, top: 2),
+                  child: Row(children: [
+                    Container(width: 3, height: 14,
+                        decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(3))),
+                    const SizedBox(width: 7),
+                    const Text('Waiting',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(20)),
+                      child: Text('${sessionPts.length}',
+                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+                    ),
+                  ]),
+                ),
+                ...sessionPts.map((p) => Padding(
+                  padding: const EdgeInsets.only(top: 7),
+                  child: _buildPatientCard(p, queueState, sessionHasIP, sessionNextQNo),
+                )),
+              ],
+            ]),
+          ),
+          crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 220),
+        ),
       ]),
     );
   }
+
+  Widget _buildLiveQueueBar({
+    required int? queueId,
+    required QueueState queueState,
+    required bool isEmergency,
+    required List<AppointmentList> sessionPts,
+  }) {
+    if (queueState == QueueState.stopped) return const SizedBox.shrink();
+    final isRunning = queueState == QueueState.running;
+    final isPaused  = queueState == QueueState.paused;
+
+    final ip = sessionPts.where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress').firstOrNull;
+    final booked = sessionPts.where((p) => (p.status?.toLowerCase() ?? '') == 'booked').toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+    final current = ip ?? booked.firstOrNull;
+    final next    = ip != null ? booked.firstOrNull : (booked.length > 1 ? booked[1] : null);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kPrimaryLighter,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kPrimaryLight),
+        ),
+        padding: const EdgeInsets.all(11),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            _pulseDot(),
+            const SizedBox(width: 6),
+            const Text('LIVE QUEUE',
+                style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 1.1, color: kPrimary)),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(20)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.people_alt_outlined, size: 10, color: kPrimaryDark),
+                const SizedBox(width: 3),
+                Text('${sessionPts.length}',
+                    style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+              ]),
+            ),
+            const Spacer(),
+            _liveIconBtn(
+              icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: isRunning ? kAmberDark : kPrimaryDark,
+              bg:    isRunning ? kAmberLight  : kPrimaryLight,
+              border: isRunning ? kAmberBorder : const Color(0xFF9FE1CB),
+              tooltip: isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start',
+              onTap: isRunning ? () => _onQueuePause(queueId) : () => _onQueueStart(queueId),
+            ),
+            if (!isEmergency) ...[
+              const SizedBox(width: 5),
+              _liveIconBtn(
+                icon: Icons.close_rounded,
+                color: kRedDark, bg: kRedLight, border: kRedBorder,
+                tooltip: 'Close queue',
+                onTap: () => _showCloseDialog(queueId),
+              ),
+            ],
+            const SizedBox(width: 5),
+            _liveIconBtn(
+              icon: Icons.warning_amber_rounded,
+              color: kPurpleDark, bg: kPurpleLight, border: kPurpleBorder,
+              tooltip: 'Emergency pause',
+              onTap: () => _showEmergencyDialog(queueId),
+            ),
+          ]),
+          // const SizedBox(height: 10),
+          // Row(children: [
+          //   _tokBox(label: 'CURRENT',   value: current != null ? (current.queueNumber ?? 0).toString().padLeft(2,'0') : '--', isActive: true),
+          //   const SizedBox(width: 5),
+          //   _tokBox(label: 'UP NEXT',   value: next != null ? (next.queueNumber ?? 0).toString().padLeft(2,'0') : '--'),
+          //   const SizedBox(width: 5),
+          //   _tokBox(label: 'REMAINING', value: sessionPts.length.toString().padLeft(2,'0'), isGreen: true),
+          // ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _liveIconBtn({
+    required IconData icon,
+    required Color color,
+    required Color bg,
+    required Color border,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) =>
+      Tooltip(
+        message: tooltip,
+        preferBelow: false,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 28, height: 28,
+            decoration: BoxDecoration(
+              color: bg, borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: border)),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 15, color: color),
+          ),
+        ),
+      );
+
+  Widget _tokBox({required String label, required String value, bool isActive = false, bool isGreen = false}) =>
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          decoration: BoxDecoration(
+            color: isActive ? kPrimaryDark : isGreen ? kGreenLight : kPrimaryLighter,
+            borderRadius: BorderRadius.circular(10),
+            border: isActive ? null : Border.all(color: isGreen ? kGreenBorder : kPrimaryLight),
+          ),
+          child: Column(children: [
+            Text(label, style: TextStyle(fontSize: 7.5, fontWeight: FontWeight.w700, letterSpacing: .7,
+                color: isActive ? Colors.white.withOpacity(0.75) : isGreen ? kGreenDark : kTextSecondary)),
+            const SizedBox(height: 2),
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1,
+                color: isActive ? Colors.white : isGreen ? kGreenDark : kTextPrimary)),
+          ]),
+        ),
+      );
 
   // ─────────────────────────────────────────────────────────────────────────
   // DIALOGS
@@ -1497,83 +1557,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // SESSION MINI STATS
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildSessionMiniStats({required int total, required int waiting, required int done}) {
-    return Row(children: [
-      _miniStatChip(label: 'Total',   value: total,   bg: kPrimaryLight,  fg: Colors.black,  border: const Color(0xFF9FE1CB)),
-      const SizedBox(width: 6),
-      _miniStatChip(label: 'Waiting', value: waiting, bg: kBlueLight,     fg: Colors.black,     border: kBlueBorder),
-      const SizedBox(width: 6),
-      _miniStatChip(label: 'Done',    value: done,    bg: kGreenLight,    fg: Colors.black,    border: kGreenBorder),
-    ]);
-  }
-
-  Widget _miniStatChip({
-    required String label,
-    required int value,
-    required Color bg,
-    required Color fg,
-    required Color border,
-  }) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(9, 7, 9, 8),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: border),
-        ),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(label,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                  color: fg.withOpacity(0.75), letterSpacing: 0.2)),
-          const SizedBox(height: 2),
-          Text(value.toString().padLeft(2, '0'),
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
-                  color: fg, height: 1, letterSpacing: -0.4)),
-        ]),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // ACTION BUTTON
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _actionBtn({
-    required String label,
-    IconData? icon,
-    required VoidCallback onTap,
-    required Color bg,
-    required Color fg,
-    required Color border,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(11),
-          border: bg == kPrimaryDark ? null : Border.all(color: border),
-        ),
-        alignment: Alignment.center,
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 4),
-          ],
-          Text(label,
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                  color: fg, letterSpacing: 0.2)),
-        ]),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────
   // WALK-IN CARD  (receptionist only)
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -1646,7 +1629,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             _homeActionTile(icon: Icons.calendar_today_rounded, label: 'Edit\nSchedule',
                 bg: kAmberLight, fg: kAmberDark, border: kAmberBorder,
                 onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()))),
+                    MaterialPageRoute(builder: (_) => DoctorAvailabilityPage(clinicId: _clinicId)))),
             const SizedBox(width: 7),
             _homeActionTile(icon: Icons.people_alt_rounded, label: 'Patient\nList',
                 bg: kGreenLight, fg: kGreenDark, border: kGreenBorder,
@@ -1665,7 +1648,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             _homeActionTile(icon: Icons.calendar_today_rounded, label: 'Edit\nSchedule',
                 bg: kAmberLight, fg: kAmberDark, border: kAmberBorder,
                 onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage()))),
+                    MaterialPageRoute(builder: (_) => DoctorAvailabilityPage(clinicId: _clinicId)))),
             const SizedBox(width: 7),
             _homeActionTile(icon: Icons.history_rounded, label: 'Patient\nHistory',
                 bg: kGreenLight, fg: kGreenDark, border: kGreenBorder,
@@ -1748,7 +1731,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         const SizedBox(height: 14),
         GestureDetector(
           onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const DoctorAvailabilityPage())),
+              MaterialPageRoute(builder: (_) => DoctorAvailabilityPage(clinicId: _clinicId))),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
@@ -1771,15 +1754,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // PATIENT CARDS
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Avatar color palettes — solid bg, no gradient
   static const List<(Color, Color, Color)> _kAvatarPalettes = [
-    (Color(0xFFE1F5EE), Color(0xFF9FE1CB), Color(0xFF085041)), // teal
-    (Color(0xFFEDE9FE), Color(0xFFDDD6FE), Color(0xFF4C1D95)), // purple
-    (Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFF78350F)), // amber
-    (Color(0xFFFEE2E2), Color(0xFFFECACA), Color(0xFF7F1D1D)), // red
+    (Color(0xFFE1F5EE), Color(0xFF9FE1CB), Color(0xFF085041)),
+    (Color(0xFFEDE9FE), Color(0xFFDDD6FE), Color(0xFF4C1D95)),
+    (Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFF78350F)),
+    (Color(0xFFFEE2E2), Color(0xFFFECACA), Color(0xFF7F1D1D)),
   ];
 
-  Widget _buildActionPatientCard(
+  Widget _buildPatientCard(
     AppointmentList p,
     QueueState qs,
     bool hasIP,
@@ -1802,14 +1784,16 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       accessible = !hasIP && p.queueNumber == nextBookedQNo;
     }
     final effectiveAccessible = isSkipped ? accessible : queueActive && accessible;
-    final VoidCallback? effectiveSkip = isBooked && queueActive && (isReceptionist || accessible)
-        ? () => _skipPatient(p) : null;
+    // final VoidCallback? effectiveSkip = isBooked && queueActive && (isReceptionist || accessible)
+    //     ? () => _skipPatient(p) : null;
+    // final VoidCallback? effectiveSkip = queueActive && accessible && isBooked
+    // ? () => _skipPatient(p) : null;
+    final VoidCallback? effectiveSkip = isReceptionist
+    ? (queueActive && isBooked ? () => _skipPatient(p) : null)
+    : (queueActive && accessible && isBooked ? () => _skipPatient(p) : null);
 
     final (avBg, avBd, avFg) = _kAvatarPalettes[(p.queueNumber ?? 0) % _kAvatarPalettes.length];
-
-    final Color borderColor = isIP
-        ? kPrimary
-        : isSkipped ? kAmber : kCardBorder;
+    final Color borderColor = isIP ? kPrimary : isSkipped ? kAmber : kCardBorder;
 
     return Container(
       decoration: BoxDecoration(
@@ -1882,11 +1866,16 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             )),
             if (!isReceptionist) const SizedBox(width: 7),
           ],
-          if (!isReceptionist)
-            Expanded(
-              flex: 2,
-              child: GestureDetector(
-                onTap: effectiveAccessible ? () => _startSession(p) : null,
+          // if (!isReceptionist)
+          //   Expanded(
+          //     flex: 2,
+          //     child: GestureDetector(
+          //       onTap: effectiveAccessible ? () => _startSession(p) : null,
+          if (!isReceptionist && effectiveAccessible)
+  Expanded(
+    flex: 2,
+    child: GestureDetector(
+      onTap: () => _startSession(p),
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
@@ -1906,6 +1895,20 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             ),
         ]),
       ]),
+    );
+  }
+
+  Widget _statusChip(String status) {
+    Color bg, fg, dot;
+    switch (status.toLowerCase()) {
+      case 'in_progress': bg = kPrimaryLight; fg = kPrimaryDark; dot = kPrimary; break;
+      case 'skipped':     bg = kAmberLight;   fg = kAmberDark;   dot = kAmber;   break;
+      case 'completed':   bg = kGreenLight;   fg = kGreenDark;   dot = kGreen;   break;
+      default:            bg = kRedLight;     fg = kRedDark;     dot = kRed;
+    }
+    return _badgeDot(
+      status == 'in_progress' ? 'In Progress' : status[0].toUpperCase() + status.substring(1),
+      bg, fg, dot,
     );
   }
 
@@ -1967,20 +1970,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // ─────────────────────────────────────────────────────────────────────────
   // BADGES, CHIPS, HELPERS
   // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _statusChip(String status) {
-    Color bg, fg, dot;
-    switch (status.toLowerCase()) {
-      case 'in_progress': bg = kPrimaryLight; fg = kPrimaryDark; dot = kPrimary; break;
-      case 'skipped':     bg = kAmberLight;   fg = kAmberDark;   dot = kAmber;   break;
-      case 'completed':   bg = kGreenLight;   fg = kGreenDark;   dot = kGreen;   break;
-      default:            bg = kRedLight;     fg = kRedDark;     dot = kRed;
-    }
-    return _badgeDot(
-      status == 'in_progress' ? 'In Progress' : status[0].toUpperCase() + status.substring(1),
-      bg, fg, dot,
-    );
-  }
 
   Widget _queueStateBadge(QueueState state) {
     late String label;
@@ -2094,6 +2083,8 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   final _nameCtr   = TextEditingController();
   final _mobileCtr = TextEditingController();
 
+  Timer? _mobileDebounce;
+
   bool    _loading = true;
   String? _error;
 
@@ -2124,6 +2115,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
 
   @override
   void dispose() {
+    _mobileDebounce?.cancel();
     _mobileCtr.removeListener(_onMobileChanged);
     _nameCtr.dispose();
     _mobileCtr.dispose();
@@ -2146,9 +2138,12 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
 
   Future<void> _loadSessions() async {
     setState(() { _loading = true; _error = null; });
-    final recepState = ref.read(receptionistLoginViewModelProvider);
-    final doctorId  = recepState.doctorId;
-    final clinicId  = ref.read(doctorLoginViewModelProvider).clinic_id;
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    final doctorId = isReceptionist
+        ? ref.read(receptionistLoginViewModelProvider).doctorId
+        : ref.read(doctorLoginViewModelProvider).doctorId;
+    final clinicId = ref.read(doctorLoginViewModelProvider).clinic_id
+        ?? (isReceptionist ? ref.read(receptionistLoginViewModelProvider).clinicId : null);
     final api = _api;
     if (doctorId == null || api == null) {
       setState(() { _loading = false; _error = 'Doctor not linked'; });
@@ -2189,12 +2184,13 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   }
 
   void _onMobileChanged() {
+    _mobileDebounce?.cancel();
     final digits = _mobileCtr.text.trim().replaceAll(RegExp(r'\D'), '');
     if (digits.length == 10) {
-      _lookupMobile(digits);
-    } else if (_foundPatient != null || _resolvedPatientId != null ||
-               _familyMemberId != null || _familyHeadPatientId != null) {
-      setState(() => _clearPatientState());
+      _mobileDebounce = Timer(const Duration(milliseconds: 800), () => _lookupMobile(digits));
+    } else if (_checkingMobile || _foundPatient != null || _resolvedPatientId != null ||
+               _familyMemberId != null || _familyHeadPatientId != null || _bookError != null) {
+      setState(() { _checkingMobile = false; _bookError = null; _clearPatientState(); });
     }
   }
 
@@ -2205,6 +2201,9 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     try {
       final results = await api.checkPhonePatient(mobile);
       if (!mounted) return;
+      // Discard if user already changed/cleared the field
+      final currentDigits = _mobileCtr.text.trim().replaceAll(RegExp(r'\D'), '');
+      if (currentDigits != mobile) return;
       if (results.isNotEmpty) {
         final p = results.first;
         setState(() { _foundPatient = p; _checkingMobile = false; _loadingMembers = true; });
@@ -2247,9 +2246,12 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     if (mobile.length < 10) { setState(() { _bookError = 'Enter valid 10-digit mobile'; }); return; }
     if (_selected == null) { setState(() { _bookError = 'Please select a session'; }); return; }
 
-    final recepState = ref.read(receptionistLoginViewModelProvider);
-    final doctorId   = recepState.doctorId;
-    final clinicId   = ref.read(doctorLoginViewModelProvider).clinic_id;
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    final doctorId = isReceptionist
+        ? ref.read(receptionistLoginViewModelProvider).doctorId
+        : ref.read(doctorLoginViewModelProvider).doctorId;
+    final clinicId = ref.read(doctorLoginViewModelProvider).clinic_id
+        ?? (isReceptionist ? ref.read(receptionistLoginViewModelProvider).clinicId : null);
     if (doctorId == null) return;
 
     setState(() { _booking = true; _bookError = null; });
@@ -2274,19 +2276,16 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       if (!isFamilyBooking && _resolvedPatientId != null) 'patient_id': _resolvedPatientId,
     }..removeWhere((_, v) => v == null);
 
+    bool _didBook = false;
+    String? _successMsg;
     try {
       final isOnline = ref.read(connectivityNotifierProvider).isOnline;
       final resp = await ref.read(receptionistLoginViewModelProvider.notifier)
           .walkInBook(body, isOnline: isOnline);
       if (!mounted) return;
       if (resp.success == true) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(resp.message ?? 'Walk-in patient booked'),
-          backgroundColor: kPrimary,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ));
-        widget.onBooked();
+        _didBook = true;
+        _successMsg = resp.message ?? 'Walk-in patient booked';
       } else {
         setState(() { _bookError = resp.message ?? 'Booking failed'; });
       }
@@ -2294,6 +2293,17 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       if (mounted) setState(() { _bookError = e.toString().replaceFirst('Exception: ', ''); });
     } finally {
       if (mounted) setState(() { _booking = false; });
+    }
+    // Call onBooked() AFTER finally so the setState above completes before
+    // the parent collapses this widget (prevents deactivated-ancestor crash).
+    if (_didBook && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(_successMsg!),
+        backgroundColor: kPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ));
+      widget.onBooked();
     }
   }
 
@@ -2665,4 +2675,740 @@ class _GenderPill extends StatelessWidget {
               color: selected ? Colors.white : kTextSecondary)),
     ),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HOME SESSION FULLSCREEN PAGE
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _HomeSessionFullscreenPage extends ConsumerStatefulWidget {
+  final int sessionIndex;
+  final String? slotLabel;
+  final QueueState queueState;
+  final List<AppointmentList> sessionPts;
+  final bool sessionHasIP;
+  final bool isEmergency;
+  final int? sessionNextQNo;
+  final VoidCallback onQueueStart;
+  final VoidCallback onQueuePause;
+  final VoidCallback onQueueStop;
+  final VoidCallback onQueueEmergency;
+  final Function(AppointmentList) onStartSession;
+  final Function(AppointmentList) onSkip;
+  final Function(AppointmentList) onCancel;
+  final Function(AppointmentList) onPrescription;
+
+  const _HomeSessionFullscreenPage({
+    required this.sessionIndex,
+    this.slotLabel,
+    required this.queueState,
+    required this.sessionPts,
+    required this.sessionHasIP,
+    required this.isEmergency,
+    this.sessionNextQNo,
+    required this.onQueueStart,
+    required this.onQueuePause,
+    required this.onQueueStop,
+    required this.onQueueEmergency,
+    required this.onStartSession,
+    required this.onSkip,
+    required this.onCancel,
+    required this.onPrescription,
+  });
+
+  @override
+  ConsumerState<_HomeSessionFullscreenPage> createState() =>
+      _HomeSessionFullscreenPageState();
+}
+
+class _HomeSessionFullscreenPageState
+    extends ConsumerState<_HomeSessionFullscreenPage> {
+  static const List<(Color, Color, Color)> _kAvatarPalettes = [
+    (Color(0xFFE1F5EE), Color(0xFF9FE1CB), Color(0xFF085041)),
+    (Color(0xFFEDE9FE), Color(0xFFDDD6FE), Color(0xFF4C1D95)),
+    (Color(0xFFFEF3C7), Color(0xFFFDE68A), Color(0xFF78350F)),
+    (Color(0xFFFEE2E2), Color(0xFFFECACA), Color(0xFF7F1D1D)),
+  ];
+
+  String _initials(String name) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return parts[0].substring(0, parts[0].length.clamp(0, 2)).toUpperCase();
+    }
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  int? _calcAge(String? dob) {
+    if (dob == null) return null;
+    final bd = DateTime.tryParse(dob);
+    if (bd == null) return null;
+    final now = DateTime.now();
+    int age = now.year - bd.year;
+    if (now.month < bd.month || (now.month == bd.month && now.day < bd.day)) {
+      age--;
+    }
+    return age;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final title = widget.slotLabel ?? 'Session ${widget.sessionIndex + 1}';
+    final pts = widget.sessionPts;
+    final waiting = pts
+        .where((p) => ['booked', 'in_progress', 'skipped']
+            .contains(p.status?.toLowerCase()))
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+    final completed = pts
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'completed')
+        .toList();
+
+    return Scaffold(
+      backgroundColor: kPageBg,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Compact header ─────────────────────────────────────────
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+              child: Row(children: [
+                IconButton(
+                  icon: const Icon(Icons.close_fullscreen_rounded, size: 18),
+                  onPressed: () => Navigator.pop(context),
+                  color: kTextSecondary,
+                  padding: const EdgeInsets.all(8),
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                    child: Text(title,
+                        style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: kTextPrimary),
+                        overflow: TextOverflow.ellipsis)),
+                const SizedBox(width: 8),
+                _queueStateBadge(widget.queueState),
+                const SizedBox(width: 12),
+              ]),
+            ),
+            const Divider(height: 1, color: kBorder),
+            // ── Scrollable body ────────────────────────────────────────
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(14),
+                children: [
+                  _buildLiveQueueBar(),
+                  if (waiting.isEmpty && completed.isEmpty)
+                    _buildEmptyState()
+                  else ...[
+                    if (waiting.isNotEmpty) ...[
+                      _sectionLabel('Waiting', waiting.length, kPrimary,
+                          kPrimaryLight, kPrimaryDark),
+                      const SizedBox(height: 8),
+                      ...waiting.map((p) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _buildPatientCard(p),
+                          )),
+                    ],
+                    if (completed.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      _sectionLabel('Completed', completed.length, kGreen,
+                          kGreenLight, kGreenDark),
+                      const SizedBox(height: 8),
+                      ...completed.map((p) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _buildCompletedCard(p),
+                          )),
+                    ],
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLiveQueueBar() {
+    if (widget.queueState == QueueState.stopped) return const SizedBox.shrink();
+    final isRunning = widget.queueState == QueueState.running;
+    final isPaused = widget.queueState == QueueState.paused;
+    final pts = widget.sessionPts;
+    final ip = pts
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress')
+        .firstOrNull;
+    final booked = pts
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+    final current = ip ?? booked.firstOrNull;
+    final next = ip != null
+        ? booked.firstOrNull
+        : (booked.length > 1 ? booked[1] : null);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: kPrimaryLighter,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kPrimaryLight),
+        ),
+        padding: const EdgeInsets.all(11),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            _pulseDot(),
+            const SizedBox(width: 6),
+            const Text('LIVE QUEUE',
+                style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.1,
+                    color: kPrimary)),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                  color: kPrimaryLight,
+                  borderRadius: BorderRadius.circular(20)),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.people_alt_outlined,
+                    size: 10, color: kPrimaryDark),
+                const SizedBox(width: 3),
+                Text('${pts.length}',
+                    style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDark)),
+              ]),
+            ),
+            const Spacer(),
+            _liveIconBtn(
+              icon: isRunning
+                  ? Icons.pause_rounded
+                  : Icons.play_arrow_rounded,
+              color: isRunning ? kAmberDark : kPrimaryDark,
+              bg: isRunning ? kAmberLight : kPrimaryLight,
+              border: isRunning ? kAmberBorder : const Color(0xFF9FE1CB),
+              tooltip: isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start',
+              onTap: isRunning ? widget.onQueuePause : widget.onQueueStart,
+            ),
+            if (!widget.isEmergency) ...[
+              const SizedBox(width: 5),
+              _liveIconBtn(
+                icon: Icons.close_rounded,
+                color: kRedDark,
+                bg: kRedLight,
+                border: kRedBorder,
+                tooltip: 'Close queue',
+                onTap: widget.onQueueStop,
+              ),
+            ],
+            const SizedBox(width: 5),
+            _liveIconBtn(
+              icon: Icons.warning_amber_rounded,
+              color: kPurpleDark,
+              bg: kPurpleLight,
+              border: kPurpleBorder,
+              tooltip: 'Emergency pause',
+              onTap: widget.onQueueEmergency,
+            ),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            _tokBox(
+                label: 'CURRENT',
+                value: current != null
+                    ? (current.queueNumber ?? 0).toString().padLeft(2, '0')
+                    : '--',
+                isActive: true),
+            const SizedBox(width: 5),
+            _tokBox(
+                label: 'UP NEXT',
+                value: next != null
+                    ? (next.queueNumber ?? 0).toString().padLeft(2, '0')
+                    : '--'),
+            const SizedBox(width: 5),
+            _tokBox(
+                label: 'REMAINING',
+                value: pts.length.toString().padLeft(2, '0'),
+                isGreen: true),
+          ]),
+        ]),
+      ),
+    );
+  }
+
+  Widget _buildPatientCard(AppointmentList p) {
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    final qs = widget.queueState;
+    final hasIP = widget.sessionHasIP;
+    final nextBookedQNo = widget.sessionNextQNo;
+    final name = p.patientName ?? 'Patient';
+    final initials = _initials(name);
+    final age = _calcAge(p.dob);
+    final status = p.status?.toLowerCase().trim() ?? '';
+    final isIP = status == 'in_progress';
+    final isSkipped = status == 'skipped';
+    final isBooked = status == 'booked';
+    final queueActive = qs == QueueState.running || qs == QueueState.paused;
+
+    bool accessible = false;
+    if (isIP) {
+      accessible = true;
+    } else if (isSkipped) {
+      accessible = true;
+    } else if (queueActive && isBooked) {
+      accessible = !hasIP && p.queueNumber == nextBookedQNo;
+    }
+    final effectiveAccessible = isSkipped ? accessible : queueActive && accessible;
+    final VoidCallback? effectiveSkip =
+        isBooked && queueActive && (isReceptionist || accessible)
+            ? () => widget.onSkip(p)
+            : null;
+
+    final (avBg, avBd, avFg) =
+        _kAvatarPalettes[(p.queueNumber ?? 0) % _kAvatarPalettes.length];
+    final Color borderColor =
+        isIP ? kPrimary : isSkipped ? kAmber : kCardBorder;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+            color: borderColor, width: (isIP || isSkipped) ? 1.5 : 1.0),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+                color: avBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: avBd)),
+            alignment: Alignment.center,
+            child: Text(initials,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: avFg)),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(name,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary,
+                        height: 1.15),
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 1),
+                Text(
+                    [
+                      if (p.gender != null) p.gender!,
+                      if (age != null) '$age yrs'
+                    ].join(' · '),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: kTextSecondary,
+                        fontWeight: FontWeight.w500)),
+                if (isIP || isSkipped) ...[
+                  const SizedBox(height: 3),
+                  _statusChip(status),
+                ],
+              ])),
+          if (p.queueNumber != null) ...[
+            const SizedBox(width: 7),
+            Container(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 5),
+              decoration: BoxDecoration(
+                  color: avBg,
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: avBd)),
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const Text('TOKEN',
+                        style: TextStyle(
+                            fontSize: 8,
+                            color: kTextMuted,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5)),
+                    const SizedBox(height: 1),
+                    Text(
+                        (p.queueNumber ?? 0).toString().padLeft(2, '0'),
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: avFg,
+                            height: 1)),
+                  ]),
+            ),
+          ],
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          if (effectiveSkip != null) ...[
+            Expanded(
+                child: GestureDetector(
+              onTap: effectiveSkip,
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                    color: kRedLight,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: kRedBorder)),
+                alignment: Alignment.center,
+                child: const Text('Skip',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: kRedDark)),
+              ),
+            )),
+            if (!isReceptionist) const SizedBox(width: 7),
+          ],
+          if (!isReceptionist)
+            Expanded(
+              flex: 2,
+              child: GestureDetector(
+                onTap: effectiveAccessible
+                    ? () => widget.onStartSession(p)
+                    : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: effectiveAccessible
+                        ? kPrimaryDark
+                        : const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    isIP
+                        ? 'Continue'
+                        : isSkipped
+                            ? 'Recall'
+                            : 'Start Session',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: effectiveAccessible ? Colors.white : kTextMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildCompletedCard(AppointmentList p) {
+    final name = p.patientName ?? 'Patient';
+    final initials = _initials(name);
+    final age = _calcAge(p.dob);
+    return Container(
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: kCardBorder),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+                color: kGreenLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kGreenBorder)),
+            alignment: Alignment.center,
+            child: Text(initials,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: kGreenDark)),
+          ),
+          const SizedBox(width: 9),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text(name,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary,
+                        height: 1.15),
+                    overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 1),
+                Text(
+                    [
+                      if (p.gender != null) p.gender!,
+                      if (age != null) '$age yrs'
+                    ].join(' · '),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: kTextSecondary,
+                        fontWeight: FontWeight.w500)),
+              ])),
+        ]),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () => widget.onPrescription(p),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+                color: kPurpleLight,
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: kPurpleBorder)),
+            alignment: Alignment.center,
+            child: const Text('View Prescription',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: kPurpleDark)),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildEmptyState() => Container(
+        padding: const EdgeInsets.symmetric(vertical: 36),
+        alignment: Alignment.center,
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+                color: kPrimaryLight,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF9FE1CB))),
+            child:
+                const Icon(Icons.inbox_rounded, color: kPrimaryDark, size: 22),
+          ),
+          const SizedBox(height: 10),
+          const Text('No patients today',
+              style: TextStyle(
+                  color: kTextMuted,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500)),
+        ]),
+      );
+
+  Widget _sectionLabel(String label, int count, Color accent, Color accentLight,
+          Color accentDark) =>
+      Padding(
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Row(children: [
+          Container(
+              width: 3,
+              height: 14,
+              decoration: BoxDecoration(
+                  color: accent, borderRadius: BorderRadius.circular(3))),
+          const SizedBox(width: 7),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: kTextPrimary)),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+                color: accentLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: accent.withOpacity(0.25))),
+            child: Text('$count',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: accentDark)),
+          ),
+        ]),
+      );
+
+  Widget _queueStateBadge(QueueState state) {
+    late String label;
+    late Color bg, fg, dot;
+    switch (state) {
+      case QueueState.running:
+        label = 'Running';
+        bg = kPrimaryLight;
+        fg = kPrimaryDark;
+        dot = kPrimary;
+        break;
+      case QueueState.paused:
+        label = 'Paused';
+        bg = kAmberLight;
+        fg = kAmberDark;
+        dot = kAmber;
+        break;
+      case QueueState.stopped:
+        label = 'Closed';
+        bg = const Color(0xFFF1F5F9);
+        fg = const Color(0xFF64748B);
+        dot = const Color(0xFF94A3B8);
+        break;
+      case QueueState.idle:
+        label = 'Idle';
+        bg = kRedLight;
+        fg = kRedDark;
+        dot = kRed;
+        break;
+    }
+    return _badgeDot(label, bg, fg, dot);
+  }
+
+  Widget _statusChip(String status) {
+    Color bg, fg, dot;
+    switch (status.toLowerCase()) {
+      case 'in_progress':
+        bg = kPrimaryLight;
+        fg = kPrimaryDark;
+        dot = kPrimary;
+        break;
+      case 'skipped':
+        bg = kAmberLight;
+        fg = kAmberDark;
+        dot = kAmber;
+        break;
+      case 'completed':
+        bg = kGreenLight;
+        fg = kGreenDark;
+        dot = kGreen;
+        break;
+      default:
+        bg = kRedLight;
+        fg = kRedDark;
+        dot = kRed;
+    }
+    return _badgeDot(
+      status == 'in_progress'
+          ? 'In Progress'
+          : status[0].toUpperCase() + status.substring(1),
+      bg,
+      fg,
+      dot,
+    );
+  }
+
+  Widget _badgeDot(String label, Color bg, Color fg, Color dot) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: dot.withOpacity(0.25))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 5,
+              height: 5,
+              decoration: BoxDecoration(color: dot, shape: BoxShape.circle)),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                  color: fg)),
+        ]),
+      );
+
+  Widget _liveIconBtn({
+    required IconData icon,
+    required Color color,
+    required Color bg,
+    required Color border,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) =>
+      Tooltip(
+        message: tooltip,
+        preferBelow: false,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: border)),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 15, color: color),
+          ),
+        ),
+      );
+
+  Widget _tokBox(
+          {required String label,
+          required String value,
+          bool isActive = false,
+          bool isGreen = false}) =>
+      Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+          decoration: BoxDecoration(
+            color: isActive
+                ? kPrimaryDark
+                : isGreen
+                    ? kGreenLight
+                    : kPrimaryLighter,
+            borderRadius: BorderRadius.circular(10),
+            border: isActive
+                ? null
+                : Border.all(
+                    color: isGreen ? kGreenBorder : kPrimaryLight),
+          ),
+          child: Column(children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 7.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: .7,
+                    color: isActive
+                        ? Colors.white.withOpacity(0.75)
+                        : isGreen
+                            ? kGreenDark
+                            : kTextSecondary)),
+            const SizedBox(height: 2),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                    color: isActive
+                        ? Colors.white
+                        : isGreen
+                            ? kGreenDark
+                            : kTextPrimary)),
+          ]),
+        ),
+      );
+
+  Widget _pulseDot() => TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0.4, end: 1.0),
+        duration: const Duration(milliseconds: 900),
+        builder: (_, v, child) => Opacity(opacity: v, child: child),
+        onEnd: () => setState(() {}),
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
+        ),
+      );
 }

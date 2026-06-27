@@ -30,8 +30,8 @@ class AppointmentState {
   final Set<int> offlineDoctors; // doctor IDs whose network is currently down
   // Live queue status per doctorId: 'queue_started' | 'queue_paused' | 'queue_paused_emergency' | 'queue_stopped'
   final Map<int, String> doctorQueueEvents;
-  // Real current_serving per doctorId from socket events (overrides SP value for skipped patients).
-  final Map<int, int> doctorCurrentServing;
+  // Real current_serving per "doctorId_clinicId" from socket events (overrides SP value).
+  final Map<String, int> doctorCurrentServing;
 
   const AppointmentState({
     this.isLoading = false,
@@ -71,7 +71,7 @@ class AppointmentState {
     bool clearDoctorPatientCount = false,
     Set<int>? offlineDoctors,
     Map<int, String>? doctorQueueEvents,
-    Map<int, int>? doctorCurrentServing,
+    Map<String, int>? doctorCurrentServing,
   }) {
     return AppointmentState(
       isLoading: isLoading ?? this.isLoading,
@@ -135,13 +135,16 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
       final raw   = data['doctor_id'];
       final dId   = raw is int ? raw : int.tryParse(raw.toString());
       if (dId != null) {
-        // Capture real current_serving from socket (avoids SP bug where skipped
-        // patients receive their own token echoed back as current_serving).
+        // Capture real current_serving from socket, keyed by "doctorId_clinicId"
+        // so a CL001 event never pollutes CL002 patient's NOW circle.
         final rawCs = data['current_serving'];
         final cs = rawCs is int ? rawCs : int.tryParse(rawCs?.toString() ?? '');
-        if (cs != null && cs > 0) {
-          final csMap = Map<int, int>.from(state.doctorCurrentServing);
-          csMap[dId] = cs;
+        final rawCl = data['clinic_id'];
+        final clinicId = rawCl?.toString();
+        if (cs != null && cs > 0 && clinicId != null && clinicId.isNotEmpty) {
+          final key = '${dId}_$clinicId';
+          final csMap = Map<String, int>.from(state.doctorCurrentServing);
+          csMap[key] = cs;
           state = state.copyWith(doctorCurrentServing: csMap);
         }
         if (event != null && bannerEvents.contains(event)) {

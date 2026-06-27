@@ -580,7 +580,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     isNext: e.key == 0,
                     doctorOffline: offline.contains(e.value.doctorId),
                     queueEvent: vmState.doctorQueueEvents[e.value.doctorId],
-                    currentServingOverride: vmState.doctorCurrentServing[e.value.doctorId],
+                    currentServingOverride: vmState.doctorCurrentServing['${e.value.doctorId}_${e.value.clinicId}'],
                   ),
                 ),
               ),
@@ -2310,6 +2310,22 @@ String _fmtClockTime(String? raw) {
                                 style: const TextStyle(
                                     fontSize: 11,
                                     color: kTextSecondary)),
+                          ],
+                          if ((appt.clinicName ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.location_on_outlined,
+                                  size: 10, color: kTextMuted),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(appt.clinicName ?? '',
+                                    style: const TextStyle(
+                                        fontSize: 10,
+                                        color: kTextMuted,
+                                        fontWeight: FontWeight.w500),
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                            ]),
                           ],
                           if ((appt.patientName ?? '').isNotEmpty) ...[
                             const SizedBox(height: 2),

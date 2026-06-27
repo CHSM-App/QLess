@@ -618,7 +618,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
 //  appointment in the range and FCM-notifies the affected patients.
 // ──────────────────────────────────────────────────────────────────────────
 router.post('/addDoctorLeave', async (req, res) => {
-  const { doctor_id, from_date, to_date, reason, force } = req.body;
+  const { doctor_id, from_date, to_date, reason, force, clinic_id } = req.body;
 
   if (!doctor_id || !from_date || !to_date) {
     return res.status(400).json({
@@ -641,6 +641,7 @@ router.post('/addDoctorLeave', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('from_date', from_date)
       .input('to_date', to_date)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_doctor_leave');
 
     const affected = countRes.recordset?.[0]?.cnt ?? 0;
@@ -660,6 +661,7 @@ router.post('/addDoctorLeave', async (req, res) => {
       .input('from_date', from_date)
       .input('to_date', to_date)
       .input('reason', reason ?? null)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_doctor_leave');
 
     const row = addRes.recordset?.[0] ?? {};
@@ -769,12 +771,13 @@ router.post('/addDoctorLeave', async (req, res) => {
   }
 });
 
-router.get('/doctorLeaves/:doctor_id', async (req, res) => {
-  const { doctor_id } = req.params;
+router.get('/doctorLeaves/:doctor_id/:clinic_id?', async (req, res) => {
+  const { doctor_id, clinic_id } = req.params;
   try {
     const result = await db.request()
       .input('operation', 'LIST_LEAVE')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_doctor_leave');
 
     res.status(200).json(result.recordset || []);
@@ -788,7 +791,7 @@ router.get('/doctorLeaves/:doctor_id', async (req, res) => {
 });
 
 router.post('/cancelDoctorLeave', async (req, res) => {
-  const { doctor_id, leave_id } = req.body;
+  const { doctor_id, leave_id, clinic_id } = req.body;
 
   if (!doctor_id || !leave_id) {
     return res.status(400).json({
@@ -802,6 +805,7 @@ router.post('/cancelDoctorLeave', async (req, res) => {
       .input('operation', 'CANCEL_LEAVE')
       .input('doctor_id', doctor_id)
       .input('leave_id', leave_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_doctor_leave');
 
     return res.status(200).json({
@@ -1077,7 +1081,7 @@ router.post('/appointment/queueNext', async (req, res) => {
 
     sendProximityNotifications(doctor_id, clinic_id);
     const nextServing = await fetchCurrentServing(appointment_id);
-    emitQueueUpdate(req, 'next', doctor_id, { current_serving: nextServing });
+    emitQueueUpdate(req, 'next', doctor_id, { current_serving: nextServing, clinic_id });
 
     return res.json({
       success: true,
