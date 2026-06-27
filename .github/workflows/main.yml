@@ -13,7 +13,7 @@ permissions:
 env:
   BACKEND_DIR: backend
   BACKEND_BRANCH: backend
-  FLUTTER_VERSION: '3.32.0'
+  FLUTTER_VERSION: '3.35.2'
 
 jobs:
   # ── Job 1: Flutter tests ────────────────────────────────────────────────────
