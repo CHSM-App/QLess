@@ -90,13 +90,13 @@ const _navItems = [
   ),
 ];
 
-const _navAccent = Color(0xFF6366F1);
-const _navInactive = Color(0xFF1E293B);
-const _navActivePill = Color(0x1A6366F1);
-const _navPillBg = Color(0x12FFFFFF);
-const _navPillBorder = Color(0x26000000);
-const _compactNavHeight = 48.0;
-const _regularNavHeight = 56.0;
+const _navAccent   = Color(0xFF6366F1);
+const _navInactive = Color(0xFF94A3B8);
+const _neuNavBg    = Color(0xFFEEF2F7);
+const _neuLight    = Color(0xFFFFFFFF);
+const _neuDark     = Color(0xFFCDD5DE);
+const _compactNavHeight = 50.0;
+const _regularNavHeight = 60.0;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN SHELL WIDGET
@@ -243,7 +243,7 @@ final showAppBar = false;
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: _neuNavBg,
         extendBody: true,
         appBar: null,
         body: Stack(
@@ -284,17 +284,11 @@ final showAppBar = false;
   Widget _buildSideRail() {
     return Container(
       width: 76,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(
-          right: BorderSide(color: Color(0xFFE2E8F0)),
-        ),
+      decoration: const BoxDecoration(
+        color: _neuNavBg,
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(4, 0),
-          ),
+          BoxShadow(color: _neuLight, offset: Offset(-4, 0), blurRadius: 10),
+          BoxShadow(color: _neuDark,  offset: Offset(4, 0),  blurRadius: 10),
         ],
       ),
       child: SafeArea(
@@ -320,10 +314,14 @@ final showAppBar = false;
                         padding:
                             const EdgeInsets.symmetric(vertical: 10),
                         decoration: BoxDecoration(
-                          color: selected
-                              ? _navActivePill
-                              : Colors.transparent,
+                          color: _neuNavBg,
                           borderRadius: BorderRadius.circular(14),
+                          boxShadow: selected
+                              ? const [
+                                  BoxShadow(color: _neuLight, offset: Offset(-3, -3), blurRadius: 7),
+                                  BoxShadow(color: _neuDark,  offset: Offset(3, 3),   blurRadius: 7),
+                                ]
+                              : null,
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
@@ -378,170 +376,141 @@ final showAppBar = false;
   Widget _buildPillNav() {
     final isCompact = MediaQuery.of(context).size.width < 360;
     final navHeight = isCompact ? _compactNavHeight : _regularNavHeight;
-    final pillHeight = navHeight - 10;
+    final indicatorHeight = navHeight - 14;
 
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
         child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
+          height: navHeight,
+          decoration: const BoxDecoration(
+            color: _neuNavBg,
+            borderRadius: BorderRadius.all(Radius.circular(32)),
+            boxShadow: [
+              BoxShadow(color: _neuLight, offset: Offset(-6, -6), blurRadius: 14, spreadRadius: 1),
+              BoxShadow(color: _neuDark,  offset: Offset(6, 6),   blurRadius: 14, spreadRadius: 1),
+            ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: Container(
-                height: navHeight,
-                decoration: BoxDecoration(
-                  color: _navPillBg,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: _navPillBorder,
-                    width: 0.3,
-                  ),
-                ),
-                child: LayoutBuilder(
-                  builder: (_, constraints) {
-                    final totalWidth  = constraints.maxWidth;
-                    final itemCount   = _navItems.length;
-                    final itemWidth   = totalWidth / itemCount;
-                    final pillWidth   = itemWidth - 10;
-                    final curCenter   = (_currentIndex + 0.5) * itemWidth;
-                    final minCenter   = itemWidth / 2;
-                    final maxCenter   = totalWidth - itemWidth / 2;
-                    final dragCenter  =
-                        (_dragX ?? curCenter).clamp(minCenter, maxCenter);
-                    final pillLeft    =
-                        (dragCenter - pillWidth / 2)
-                            .clamp(0.0, totalWidth - pillWidth);
+          child: LayoutBuilder(
+            builder: (_, constraints) {
+              final totalWidth = constraints.maxWidth;
+              final itemCount  = _navItems.length;
+              final itemWidth  = totalWidth / itemCount;
+              final pillWidth  = itemWidth - 12;
+              final curCenter  = (_currentIndex + 0.5) * itemWidth;
+              final minCenter  = itemWidth / 2;
+              final maxCenter  = totalWidth - itemWidth / 2;
+              final dragCenter = (_dragX ?? curCenter).clamp(minCenter, maxCenter);
+              final pillLeft   = (dragCenter - pillWidth / 2)
+                  .clamp(0.0, totalWidth - pillWidth);
 
-                    return GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onHorizontalDragStart: (d) => setState(() {
-                        _isDragging      = true;
-                        _dragX           = d.localPosition.dx;
-                        _dragHoverIndex  = _currentIndex;
-                      }),
-                      onHorizontalDragUpdate: (d) => setState(() {
-                        _dragX = d.localPosition.dx
-                            .clamp(minCenter, maxCenter);
-                        final hover =
-                            ((_dragX ?? curCenter) / itemWidth)
-                                .floor()
-                                .clamp(0, itemCount - 1);
-                        if (hover != _dragHoverIndex) {
-                          _dragHoverIndex = hover;
-                          HapticFeedback.selectionClick();
-                        }
-                      }),
-                      onHorizontalDragEnd: (_) {
-                        final target =
-                            (_dragX ?? curCenter)
-                                .clamp(minCenter, maxCenter);
-                        final newIdx =
-                            (target / itemWidth)
-                                .floor()
-                                .clamp(0, itemCount - 1);
-                        setState(() {
-                          _isDragging     = false;
-                          _dragX          = null;
-                          _dragHoverIndex = null;
-                        });
-                        _onTabTap(newIdx);
-                      },
-                      onHorizontalDragCancel: () => setState(() {
-                        _isDragging     = false;
-                        _dragX          = null;
-                        _dragHoverIndex = null;
-                      }),
-                      child: Stack(
-                        children: [
-                          // Sliding active-tab indicator
-                          AnimatedPositioned(
-                            duration: _isDragging
-                                ? Duration.zero
-                                : const Duration(milliseconds: 220),
-                            curve: Curves.easeInOut,
-                            left:   pillLeft,
-                            top:    5,
-                            width:  pillWidth,
-                            height: pillHeight,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: _navActivePill,
-                                borderRadius: BorderRadius.circular(22),
+              return GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragStart: (d) => setState(() {
+                  _isDragging     = true;
+                  _dragX          = d.localPosition.dx;
+                  _dragHoverIndex = _currentIndex;
+                }),
+                onHorizontalDragUpdate: (d) => setState(() {
+                  _dragX = d.localPosition.dx.clamp(minCenter, maxCenter);
+                  final hover = ((_dragX ?? curCenter) / itemWidth)
+                      .floor()
+                      .clamp(0, itemCount - 1);
+                  if (hover != _dragHoverIndex) {
+                    _dragHoverIndex = hover;
+                    HapticFeedback.selectionClick();
+                  }
+                }),
+                onHorizontalDragEnd: (_) {
+                  final target = (_dragX ?? curCenter).clamp(minCenter, maxCenter);
+                  final newIdx = (target / itemWidth).floor().clamp(0, itemCount - 1);
+                  setState(() {
+                    _isDragging     = false;
+                    _dragX          = null;
+                    _dragHoverIndex = null;
+                  });
+                  _onTabTap(newIdx);
+                },
+                onHorizontalDragCancel: () => setState(() {
+                  _isDragging     = false;
+                  _dragX          = null;
+                  _dragHoverIndex = null;
+                }),
+                child: Stack(
+                  children: [
+                    // ── Neomorphic active indicator (raised pill) ───────────
+                    AnimatedPositioned(
+                      duration: _isDragging
+                          ? Duration.zero
+                          : const Duration(milliseconds: 240),
+                      curve: Curves.easeInOut,
+                      left:   pillLeft,
+                      top:    7,
+                      width:  pillWidth,
+                      height: indicatorHeight,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: _neuNavBg,
+                          borderRadius: BorderRadius.all(Radius.circular(22)),
+                          boxShadow: [
+                            BoxShadow(color: _neuLight, offset: Offset(-4, -4), blurRadius: 8, spreadRadius: 0),
+                            BoxShadow(color: _neuDark,  offset: Offset(4, 4),   blurRadius: 8, spreadRadius: 0),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // ── Nav items ───────────────────────────────────────────
+                    Row(
+                      children: List.generate(_navItems.length, (i) {
+                        final selected = _currentIndex == i;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => _onTabTap(i),
+                            behavior: HitTestBehavior.opaque,
+                            child: AnimatedBuilder(
+                              animation: _iconScales[i],
+                              builder: (_, __) => Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Transform.scale(
+                                    scale: _iconScales[i].value,
+                                    child: Icon(
+                                      selected
+                                          ? _navItems[i].activeIcon
+                                          : _navItems[i].icon,
+                                      size: isCompact ? 18 : 21,
+                                      color: selected ? _navAccent : _navInactive,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  AnimatedDefaultTextStyle(
+                                    duration: const Duration(milliseconds: 200),
+                                    style: TextStyle(
+                                      fontSize: isCompact ? 8 : 9.5,
+                                      fontWeight: selected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: selected ? _navAccent : _navInactive,
+                                      letterSpacing: 0.1,
+                                    ),
+                                    child: Text(
+                                      _navItems[i].label,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
-
-                          // Nav items
-                          Row(
-                            children: List.generate(_navItems.length, (i) {
-                              final selected = _currentIndex == i;
-                              return Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _onTabTap(i),
-                                  behavior: HitTestBehavior.opaque,
-                                  child: AnimatedBuilder(
-                                    animation: _iconScales[i],
-                                    builder: (_, __) => Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 3,
-                                        vertical: 4,
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Transform.scale(
-                                            scale: _iconScales[i].value,
-                                            child: Icon(
-                                              selected
-                                                  ? _navItems[i].activeIcon
-                                                  : _navItems[i].icon,
-                                              size: isCompact ? 18 : 20,
-                                              color: selected
-                                                  ? _navAccent
-                                                  : _navInactive,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          AnimatedDefaultTextStyle(
-                                            duration: const Duration(
-                                              milliseconds: 200,
-                                            ),
-                                            style: TextStyle(
-                                              fontSize: isCompact ? 8 : 9,
-                                              fontWeight: selected
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w500,
-                                              color: selected
-                                                  ? _navAccent
-                                                  : _navInactive,
-                                              letterSpacing: 0.1,
-                                            ),
-                                            child: Text(
-                                              _navItems[i].label,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                        );
+                      }),
+                    ),
+                  ],
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

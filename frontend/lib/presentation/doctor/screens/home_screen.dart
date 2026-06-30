@@ -1110,29 +1110,32 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         .toList()
       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
 
-    final (Color borderColor, double borderWidth) = switch (queueState) {
-      QueueState.running => (kPrimary, 2.0),
-      QueueState.paused  => (kAmber, 1.5),
-      _                  => (kCardBorder, 1.0),
-    };
-
     return Container(
-      decoration: BoxDecoration(
-        color: kCardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor, width: borderWidth),
+      decoration: const BoxDecoration(
+        color: kPageBg,
+        borderRadius: BorderRadius.all(Radius.circular(22)),
+        boxShadow: [
+          BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-7, -7), blurRadius: 16, spreadRadius: 1),
+          BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(7, 7),  blurRadius: 16, spreadRadius: 1),
+        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Session header ────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
           child: Row(children: [
             Container(
-              width: 26, height: 26,
-              decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(8)),
-              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+              decoration: const BoxDecoration(
+                color: kPageBg,
+                borderRadius: BorderRadius.all(Radius.circular(9)),
+                boxShadow: [
+                  BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-2, -2), blurRadius: 5),
+                  BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(2, 2),  blurRadius: 5),
+                ],
+              ),
               child: Text('S${sessionIndex + 1}',
-                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kPrimaryDark)),
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: kPrimaryDark)),
             ),
             const SizedBox(width: 10),
             if (slotLabel != null)
@@ -1149,51 +1152,53 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             const SizedBox(width: 8),
             _queueStateBadge(queueState),
             const SizedBox(width: 8),
-            _liveIconBtn(
+            _neuIconBtn(
               icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
               color: isRunning ? kAmberDark : kPrimaryDark,
-              bg:    isRunning ? kAmberLight  : kPrimaryLight,
-              border: isRunning ? kAmberBorder : const Color(0xFF9FE1CB),
               tooltip: isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start',
               onTap: isRunning ? () => _onQueuePause(queueId) : () => _onQueueStart(queueId),
             ),
             if (!isEmergency) ...[
-              const SizedBox(width: 5),
-              _liveIconBtn(
+              const SizedBox(width: 6),
+              _neuIconBtn(
                 icon: Icons.stop_rounded,
-                color: kRedDark, bg: kRedLight, border: kRedBorder,
+                color: kRedDark,
                 tooltip: 'Close queue',
                 onTap: () => _showCloseDialog(queueId),
               ),
             ],
-            const SizedBox(width: 5),
-            _liveIconBtn(
+            const SizedBox(width: 6),
+            _neuIconBtn(
               icon: Icons.warning_amber_rounded,
-              color: kPurpleDark, bg: kPurpleLight, border: kPurpleBorder,
+              color: kPurpleDark,
               tooltip: 'Emergency pause',
               onTap: () => _showEmergencyDialog(queueId),
             ),
           ]),
         ),
 
-        const Divider(height: 1, color: kHairline),
-
-        // ── NOW SERVING card ──────────────────────────────────────────
+        // ── NOW SERVING ───────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
           child: currentPt != null
               ? _buildNowServingCard(currentPt, queueState, sessionPts.length, sessionHasIP, sessionNextQNo)
               : Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Center(
                     child: Column(mainAxisSize: MainAxisSize.min, children: [
                       Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle,
-                            border: Border.all(color: const Color(0xFF9FE1CB))),
-                        child: const Icon(Icons.inbox_rounded, color: kPrimaryDark, size: 18),
+                        width: 46, height: 46,
+                        decoration: const BoxDecoration(
+                          color: kPageBg,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 7),
+                            BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3),  blurRadius: 7),
+                          ],
+                        ),
+                        child: const Icon(Icons.inbox_rounded, color: kTextMuted, size: 20),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                       const Text('No patients waiting',
                           style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
                     ]),
@@ -1204,29 +1209,57 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         // ── Up next ───────────────────────────────────────────────────
         if (upNextPts.isNotEmpty) ...[
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
             child: Row(children: [
               const Text('Up next',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                      color: kTextSecondary, letterSpacing: 0.2)),
               const Spacer(),
               Text('${upNextPts.length} waiting',
-                  style: const TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w500)),
+                  style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500)),
             ]),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
             child: Column(children: upNextPts
                 .map((p) => Padding(
-                      padding: const EdgeInsets.only(bottom: 7),
+                      padding: const EdgeInsets.only(bottom: 10),
                       child: _buildUpNextCard(p, queueState),
                     ))
                 .toList()),
           ),
         ] else
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
       ]),
     );
   }
+
+  Widget _neuIconBtn({
+    required IconData icon,
+    required Color color,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) =>
+      Tooltip(
+        message: tooltip,
+        preferBelow: false,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 32, height: 32,
+            decoration: const BoxDecoration(
+              color: kPageBg,
+              borderRadius: BorderRadius.all(Radius.circular(9)),
+              boxShadow: [
+                BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 6),
+                BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3),  blurRadius: 6),
+              ],
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, size: 16, color: color),
+          ),
+        ),
+      );
 
   Widget _buildNowServingCard(
     AppointmentList p,
@@ -1251,70 +1284,79 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final effectiveAccessible = queueActive && accessible;
 
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: kPrimaryDark,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+        boxShadow: [
+          BoxShadow(color: Color(0xFF0A4A35), offset: Offset(4, 4), blurRadius: 10),
+          BoxShadow(color: Color(0xFF2EC48A), offset: Offset(-3, -3), blurRadius: 8),
+        ],
       ),
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      padding: const EdgeInsets.all(14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           const Text('NOW SERVING',
               style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
-                  letterSpacing: 1.0, color: Colors.white70)),
+                  letterSpacing: 1.1, color: Colors.white60)),
           const Spacer(),
           Text(
             'Token ${(p.queueNumber ?? 0).toString().padLeft(2, '0')} · 1 of $totalWaiting',
-            style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500),
+            style: const TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w500),
           ),
         ]),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(children: [
           Container(
-            width: 46, height: 46,
+            width: 50, height: 50,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
+              color: const Color(0x14FFFFFF),
+              borderRadius: const BorderRadius.all(Radius.circular(13)),
+              boxShadow: const [
+                BoxShadow(color: Color(0x2E000000), offset: Offset(3, 3), blurRadius: 7),
+                BoxShadow(color: Color(0x0FFFFFFF), offset: Offset(-2, -2), blurRadius: 5),
+              ],
             ),
             alignment: Alignment.center,
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               const Text('TKN',
-                  style: TextStyle(fontSize: 8, color: Colors.white60,
-                      fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                  style: TextStyle(fontSize: 8, color: Colors.white54,
+                      fontWeight: FontWeight.w700, letterSpacing: 0.6)),
               Text(
                 (p.queueNumber ?? 0).toString().padLeft(2, '0'),
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
                     color: Colors.white, height: 1.0),
               ),
             ]),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(name,
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                    color: Colors.white, height: 1.15),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                    color: Colors.white, height: 1.2),
                 overflow: TextOverflow.ellipsis),
             if (p.gender != null) ...[
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(p.gender!,
-                  style: const TextStyle(fontSize: 12, color: Colors.white70,
+                  style: const TextStyle(fontSize: 12, color: Colors.white60,
                       fontWeight: FontWeight.w500)),
             ],
           ])),
         ]),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         Row(children: [
           if (queueActive) ...[
             Expanded(child: GestureDetector(
               onTap: () => _skipPatient(p),
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 9),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: Colors.white38),
+                  borderRadius: const BorderRadius.all(Radius.circular(10)),
+                  border: Border.all(color: Colors.white24),
+                  color: const Color(0x0FFFFFFF),
                 ),
                 alignment: Alignment.center,
                 child: const Text('Skip',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white70)),
               ),
             )),
             if (!isReceptionist) const SizedBox(width: 10),
@@ -1325,19 +1367,23 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               child: GestureDetector(
                 onTap: effectiveAccessible ? () => _startSession(p) : null,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                    color: effectiveAccessible
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(9),
+                    color: effectiveAccessible ? Colors.white : const Color(0x26FFFFFF),
+                    borderRadius: const BorderRadius.all(Radius.circular(10)),
+                    boxShadow: effectiveAccessible
+                        ? const [
+                            BoxShadow(color: Color(0x23000000), offset: Offset(3, 3), blurRadius: 7),
+                            BoxShadow(color: Color(0x80FFFFFF), offset: Offset(-2, -2), blurRadius: 5),
+                          ]
+                        : null,
                   ),
                   alignment: Alignment.center,
                   child: Text(
                     isIP ? 'Continue' : 'Start session',
                     style: TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w700,
-                      color: effectiveAccessible ? kPrimaryDark : Colors.white54,
+                      color: effectiveAccessible ? kPrimaryDark : Colors.white38,
                     ),
                   ),
                 ),
@@ -1355,43 +1401,47 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final queueActive = queueState == QueueState.running || queueState == QueueState.paused;
 
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kCardBorder),
+      decoration: const BoxDecoration(
+        color: kPageBg,
+        borderRadius: BorderRadius.all(Radius.circular(13)),
+        boxShadow: [
+          BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-4, -4), blurRadius: 8, spreadRadius: 1),
+          BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(4, 4),  blurRadius: 8, spreadRadius: 1),
+        ],
       ),
-      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Row(children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
-          decoration: BoxDecoration(
-            color: kPrimaryLight,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFF9FE1CB)),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: const BoxDecoration(
+            color: kPageBg,
+            borderRadius: BorderRadius.all(Radius.circular(9)),
+            boxShadow: [
+              BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3), blurRadius: 5),
+              BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 5),
+            ],
           ),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const Text('TKN',
                 style: TextStyle(fontSize: 7, color: kTextMuted,
-                    fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+                    fontWeight: FontWeight.w700, letterSpacing: 0.4)),
             Text(
               (p.queueNumber ?? 0).toString().padLeft(2, '0'),
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
                   color: kPrimaryDark, height: 1.0),
             ),
           ]),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(name,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
               overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           if (isSkipped)
             Row(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                width: 6, height: 6,
-                decoration: const BoxDecoration(color: kAmber, shape: BoxShape.circle),
-              ),
+              Container(width: 6, height: 6,
+                  decoration: const BoxDecoration(color: kAmber, shape: BoxShape.circle)),
               const SizedBox(width: 4),
               const Text('Skipped earlier',
                   style: TextStyle(fontSize: 11, color: kAmberDark, fontWeight: FontWeight.w500)),
@@ -1400,16 +1450,19 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             Text(p.gender!,
                 style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500)),
         ])),
-        const SizedBox(width: 8),
+        const SizedBox(width: 10),
         if (isSkipped && queueActive)
           GestureDetector(
             onTap: () => _startSession(p),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                color: kPrimaryLight,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFF9FE1CB)),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: const BoxDecoration(
+                color: kPageBg,
+                borderRadius: BorderRadius.all(Radius.circular(9)),
+                boxShadow: [
+                  BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 6),
+                  BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3),  blurRadius: 6),
+                ],
               ),
               child: const Text('Recall',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPrimaryDark)),
