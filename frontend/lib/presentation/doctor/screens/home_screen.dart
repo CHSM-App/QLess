@@ -223,6 +223,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   Future<void> _refreshData() => _loadData(force: true);
 
+  // Silent queue-status update — no loading spinner
+  void _refreshQueueStatus() {
+    if (_doctorId == 0) return;
+    ref.read(appointmentViewModelProvider.notifier).joinClinic(_doctorId, clinicId: _clinicId);
+  }
+
   // ── Queue filters ─────────────────────────────────────────────────────────
 
   List<AppointmentList> _todayQueue(List<AppointmentList> all) {
@@ -358,7 +364,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .read(appointmentViewModelProvider.notifier)
           .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue started');
-      await _refreshData();
+      _refreshQueueStatus();
     } catch (_) {
       _snack('Failed to start queue');
     }
@@ -383,7 +389,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .read(appointmentViewModelProvider.notifier)
           .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue paused');
-      await _refreshData();
+      _refreshQueueStatus();
     } catch (_) {
       _snack('Failed to pause queue');
     }
@@ -395,7 +401,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .read(appointmentViewModelProvider.notifier)
           .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
       _snack(res.message ?? 'Queue closed');
-      await _refreshData();
+      _refreshQueueStatus();
     } catch (_) {
       _snack('Failed to close queue');
     }
@@ -437,7 +443,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .read(appointmentViewModelProvider.notifier)
           .queuePauseEmergency(queueId);
       _snack(res.message ?? 'Queue paused (emergency)');
-      await _refreshData();
+      _refreshQueueStatus();
     } catch (_) {
       _snack('Failed to pause queue');
     }
@@ -682,11 +688,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Good Morning 👋'
-        : hour < 17 ? 'Good Afternoon 👋' : 'Good Evening 👋';
-
     final vmState           = ref.watch(appointmentViewModelProvider);
     final appointmentsAsync = vmState.patientAppointmentsList;
 
@@ -700,8 +701,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     return Scaffold(
       backgroundColor: kPageBg, // ← grey-50
       body: appointmentsAsync.when(
-        loading: () => _buildLoadingBody(greeting, doctorName),
-        error: (e, _) => _buildErrorBody(e, greeting, doctorName),
+        loading: () => _buildLoadingBody(doctorName),
+        error: (e, _) => _buildErrorBody(e, doctorName),
         data: (list) {
           final currentClinicId = _clinicId;
           final filteredList = currentClinicId == null
@@ -721,7 +722,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
           return _buildRefreshableScrollView(
             slivers: [
-              SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
+              SliverToBoxAdapter(child: _buildHeader(doctorName)),
 
               // ── WALK-IN CARD ───────────────────────────────────────
               SliverToBoxAdapter(
@@ -830,20 +831,20 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     );
   }
 
-  Widget _buildLoadingBody(String greeting, String doctorName) =>
+  Widget _buildLoadingBody(String doctorName) =>
       _buildRefreshableScrollView(
         slivers: [
-          SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
+          SliverToBoxAdapter(child: _buildHeader(doctorName)),
           const SliverFillRemaining(
             child: Center(child: CircularProgressIndicator(color: kPrimary)),
           ),
         ],
       );
 
-  Widget _buildErrorBody(Object e, String greeting, String doctorName) =>
+  Widget _buildErrorBody(Object e, String doctorName) =>
       _buildRefreshableScrollView(
         slivers: [
-          SliverToBoxAdapter(child: _buildHeader(greeting, doctorName)),
+          SliverToBoxAdapter(child: _buildHeader(doctorName)),
           SliverFillRemaining(
             child: Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -873,7 +874,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // HEADER  (dark teal — same solid color, no gradient)
   // ─────────────────────────────────────────────────────────────────────────
 
-  Widget _buildHeader(String greeting, String doctorName) {
+  Widget _buildHeader(String doctorName) {
     final initials   = _initials(doctorName);
     final loginState = ref.watch(doctorLoginViewModelProvider);
     final clinicName = loginState.clinic_name ?? '';
@@ -924,12 +925,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(greeting,
-                        style: const TextStyle(
-                          fontSize: 11, fontWeight: FontWeight.w500,
-                          color: kTextSecondary, height: 1.1,
-                        )),
-                    const SizedBox(height: 2),
                     Text(
                       isReceptionist ? doctorName : 'Dr. $doctorName',
                       maxLines: 1,
@@ -1083,7 +1078,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // SESSION ACCORDION  (matches patient_list.dart style)
+  // SESSION CARD
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildSessionAccordion({
@@ -1097,8 +1092,23 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }) {
     if (queueState == QueueState.stopped) return const SizedBox.shrink();
 
-    final isExpanded  = _sessionExpanded[sessionIndex] ?? true;
+    final isRunning   = queueState == QueueState.running;
+    final isPaused    = queueState == QueueState.paused;
     final isEmergency = ref.read(appointmentViewModelProvider.notifier).isEmergencyPaused(queueId);
+
+    // Current patient: in_progress first, then first booked by queue number
+    final ipPt = sessionPts.where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress').firstOrNull;
+    final bookedSorted = sessionPts
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
+    final currentPt = ipPt ?? bookedSorted.firstOrNull;
+
+    // Up next = all except current, sorted by queue number
+    final upNextPts = sessionPts
+        .where((p) => p.appointmentId != currentPt?.appointmentId)
+        .toList()
+      ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
 
     final (Color borderColor, double borderWidth) = switch (queueState) {
       QueueState.running => (kPrimary, 2.0),
@@ -1113,140 +1123,306 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         border: Border.all(color: borderColor, width: borderWidth),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // ── Accordion header ──────────────────────────────────────────
-        InkWell(
-          onTap: () => setState(() => _sessionExpanded[sessionIndex] = !isExpanded),
-          borderRadius: BorderRadius.vertical(
-            top: const Radius.circular(14),
-            bottom: isExpanded ? Radius.zero : const Radius.circular(14),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
-            child: Row(children: [
-              Container(
-                width: 26, height: 26,
-                decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(8)),
-                alignment: Alignment.center,
-                child: Text('S${sessionIndex + 1}',
-                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kPrimaryDark)),
+        // ── Session header ────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          child: Row(children: [
+            Container(
+              width: 26, height: 26,
+              decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(8)),
+              alignment: Alignment.center,
+              child: Text('S${sessionIndex + 1}',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: kPrimaryDark)),
+            ),
+            const SizedBox(width: 10),
+            if (slotLabel != null)
+              Expanded(child: Row(children: [
+                const Icon(Icons.access_time_rounded, size: 13, color: kTextSecondary),
+                const SizedBox(width: 4),
+                Expanded(child: Text(slotLabel,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
+                    overflow: TextOverflow.ellipsis)),
+              ]))
+            else
+              const Expanded(child: Text('Session',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary))),
+            const SizedBox(width: 8),
+            _queueStateBadge(queueState),
+            const SizedBox(width: 8),
+            _liveIconBtn(
+              icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+              color: isRunning ? kAmberDark : kPrimaryDark,
+              bg:    isRunning ? kAmberLight  : kPrimaryLight,
+              border: isRunning ? kAmberBorder : const Color(0xFF9FE1CB),
+              tooltip: isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start',
+              onTap: isRunning ? () => _onQueuePause(queueId) : () => _onQueueStart(queueId),
+            ),
+            if (!isEmergency) ...[
+              const SizedBox(width: 5),
+              _liveIconBtn(
+                icon: Icons.stop_rounded,
+                color: kRedDark, bg: kRedLight, border: kRedBorder,
+                tooltip: 'Close queue',
+                onTap: () => _showCloseDialog(queueId),
               ),
-              const SizedBox(width: 10),
-              if (slotLabel != null)
-                Expanded(child: Row(children: [
-                  const Icon(Icons.access_time_rounded, size: 13, color: kTextSecondary),
-                  const SizedBox(width: 4),
-                  Expanded(child: Text(slotLabel,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary),
-                      overflow: TextOverflow.ellipsis)),
-                ]))
-              else
-                const Expanded(child: Text('Session',
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary))),
-              const SizedBox(width: 8),
-              _queueStateBadge(queueState),
-              const SizedBox(width: 6),
-              GestureDetector(
-                onTap: () => Navigator.push(context, MaterialPageRoute(
-                  builder: (_) => _HomeSessionFullscreenPage(
-                    sessionIndex:   sessionIndex,
-                    slotLabel:      slotLabel,
-                    queueState:     queueState,
-                    sessionPts:     sessionPts,
-                    sessionHasIP:   sessionHasIP,
-                    sessionNextQNo: sessionNextQNo,
-                    isEmergency:    isEmergency,
-                    onQueueStart:   () => _onQueueStart(queueId),
-                    onQueuePause:   () => _onQueuePause(queueId),
-                    onQueueStop:    () => _showCloseDialog(queueId),
-                    onQueueEmergency: () => _showEmergencyDialog(queueId),
-                    onStartSession: _startSession,
-                    onSkip:         _skipPatient,
-                    onCancel:       _cancelConfirm,
-                    onPrescription: _viewPrescription,
-                  ),
-                )),
-                child: Container(
-                  width: 28, height: 28,
-                  decoration: BoxDecoration(
-                    color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(7),
-                    border: Border.all(color: const Color(0xFF9FE1CB)),
-                  ),
-                  child: const Icon(Icons.open_in_full_rounded, size: 14, color: kPrimaryDark),
-                ),
-              ),
-              const SizedBox(width: 6),
-              AnimatedRotation(
-                turns: isExpanded ? 0.5 : 0.0,
-                duration: const Duration(milliseconds: 220),
-                child: const Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: kTextSecondary),
-              ),
-            ]),
-          ),
+            ],
+            const SizedBox(width: 5),
+            _liveIconBtn(
+              icon: Icons.warning_amber_rounded,
+              color: kPurpleDark, bg: kPurpleLight, border: kPurpleBorder,
+              tooltip: 'Emergency pause',
+              onTap: () => _showEmergencyDialog(queueId),
+            ),
+          ]),
         ),
 
-        // ── Accordion body — live queue bar + patient list ────────────
-        AnimatedCrossFade(
-          firstChild: const SizedBox(width: double.infinity),
-          secondChild: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Divider(height: 1, color: kHairline),
-              const SizedBox(height: 10),
-              _buildLiveQueueBar(
-                queueId: queueId,
-                queueState: queueState,
-                isEmergency: isEmergency,
-                sessionPts: sessionPts,
-              ),
-              if (sessionPts.isEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  alignment: Alignment.center,
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    Container(
-                      width: 40, height: 40,
-                      decoration: BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFF9FE1CB))),
-                      child: const Icon(Icons.inbox_rounded, color: kPrimaryDark, size: 18),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text('No patients waiting',
-                        style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
-                  ]),
-                )
-              else ...[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6, top: 2),
-                  child: Row(children: [
-                    Container(width: 3, height: 14,
-                        decoration: BoxDecoration(color: kPrimary, borderRadius: BorderRadius.circular(3))),
-                    const SizedBox(width: 7),
-                    const Text('Waiting',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(color: kPrimaryLight, borderRadius: BorderRadius.circular(20)),
-                      child: Text('${sessionPts.length}',
-                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: kPrimaryDark)),
-                    ),
-                  ]),
+        const Divider(height: 1, color: kHairline),
+
+        // ── NOW SERVING card ──────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+          child: currentPt != null
+              ? _buildNowServingCard(currentPt, queueState, sessionPts.length, sessionHasIP, sessionNextQNo)
+              : Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                      Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle,
+                            border: Border.all(color: const Color(0xFF9FE1CB))),
+                        child: const Icon(Icons.inbox_rounded, color: kPrimaryDark, size: 18),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('No patients waiting',
+                          style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
+                    ]),
+                  ),
                 ),
-                ...sessionPts.map((p) => Padding(
-                  padding: const EdgeInsets.only(top: 7),
-                  child: _buildPatientCard(p, queueState, sessionHasIP, sessionNextQNo),
-                )),
-              ],
+        ),
+
+        // ── Up next ───────────────────────────────────────────────────
+        if (upNextPts.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: Row(children: [
+              const Text('Up next',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+              const Spacer(),
+              Text('${upNextPts.length} waiting',
+                  style: const TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w500)),
             ]),
           ),
-          crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 220),
-        ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+            child: Column(children: upNextPts
+                .map((p) => Padding(
+                      padding: const EdgeInsets.only(bottom: 7),
+                      child: _buildUpNextCard(p, queueState),
+                    ))
+                .toList()),
+          ),
+        ] else
+          const SizedBox(height: 12),
       ]),
     );
   }
 
+  Widget _buildNowServingCard(
+    AppointmentList p,
+    QueueState queueState,
+    int totalWaiting,
+    bool hasIP,
+    int? nextBookedQNo,
+  ) {
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    final name     = p.patientName ?? 'Patient';
+    final status   = p.status?.toLowerCase().trim() ?? '';
+    final isIP     = status == 'in_progress';
+    final isBooked = status == 'booked';
+    final queueActive = queueState == QueueState.running || queueState == QueueState.paused;
+
+    bool accessible = false;
+    if (isIP) {
+      accessible = true;
+    } else if (queueActive && isBooked) {
+      accessible = !hasIP && p.queueNumber == nextBookedQNo;
+    }
+    final effectiveAccessible = queueActive && accessible;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: kPrimaryDark,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Text('NOW SERVING',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0, color: Colors.white70)),
+          const Spacer(),
+          Text(
+            'Token ${(p.queueNumber ?? 0).toString().padLeft(2, '0')} · 1 of $totalWaiting',
+            style: const TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Container(
+            width: 46, height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('TKN',
+                  style: TextStyle(fontSize: 8, color: Colors.white60,
+                      fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+              Text(
+                (p.queueNumber ?? 0).toString().padLeft(2, '0'),
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800,
+                    color: Colors.white, height: 1.0),
+              ),
+            ]),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(name,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
+                    color: Colors.white, height: 1.15),
+                overflow: TextOverflow.ellipsis),
+            if (p.gender != null) ...[
+              const SizedBox(height: 2),
+              Text(p.gender!,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70,
+                      fontWeight: FontWeight.w500)),
+            ],
+          ])),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          if (queueActive) ...[
+            Expanded(child: GestureDetector(
+              onTap: () => _skipPatient(p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 9),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: Colors.white38),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Skip',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            )),
+            if (!isReceptionist) const SizedBox(width: 10),
+          ],
+          if (!isReceptionist)
+            Expanded(
+              flex: 2,
+              child: GestureDetector(
+                onTap: effectiveAccessible ? () => _startSession(p) : null,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  decoration: BoxDecoration(
+                    color: effectiveAccessible
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    isIP ? 'Continue' : 'Start session',
+                    style: TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w700,
+                      color: effectiveAccessible ? kPrimaryDark : Colors.white54,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      ]),
+    );
+  }
+
+  Widget _buildUpNextCard(AppointmentList p, QueueState queueState) {
+    final name      = p.patientName ?? 'Patient';
+    final status    = p.status?.toLowerCase().trim() ?? '';
+    final isSkipped = status == 'skipped';
+    final queueActive = queueState == QueueState.running || queueState == QueueState.paused;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kCardBorder),
+      ),
+      padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+          decoration: BoxDecoration(
+            color: kPrimaryLight,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFF9FE1CB)),
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('TKN',
+                style: TextStyle(fontSize: 7, color: kTextMuted,
+                    fontWeight: FontWeight.w600, letterSpacing: 0.3)),
+            Text(
+              (p.queueNumber ?? 0).toString().padLeft(2, '0'),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                  color: kPrimaryDark, height: 1.0),
+            ),
+          ]),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(name,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          if (isSkipped)
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 6, height: 6,
+                decoration: const BoxDecoration(color: kAmber, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 4),
+              const Text('Skipped earlier',
+                  style: TextStyle(fontSize: 11, color: kAmberDark, fontWeight: FontWeight.w500)),
+            ])
+          else if (p.gender != null)
+            Text(p.gender!,
+                style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500)),
+        ])),
+        const SizedBox(width: 8),
+        if (isSkipped && queueActive)
+          GestureDetector(
+            onTap: () => _startSession(p),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF9FE1CB)),
+              ),
+              child: const Text('Recall',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+            ),
+          )
+        else
+          const Text('Waiting',
+              style: TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w500)),
+      ]),
+    );
+  }
+
+  // (kept for _HomeSessionFullscreenPage reuse via shared helpers)
   Widget _buildLiveQueueBar({
     required int? queueId,
     required QueueState queueState,
@@ -1572,7 +1748,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Row(children: [
           Container(
-            width: 42, height: 42,
+            width: 42, height: 30,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
@@ -1586,9 +1762,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Add Walk-in Patient',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black)),
-              SizedBox(height: 2),
-              Text('Book appointment for walk-in patient',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimaryDark)),
+              // SizedBox(height: 2),
+              // Text('Book appointment for walk-in patient',
+              //     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimaryDark)),
             ]),
           ),
           AnimatedRotation(

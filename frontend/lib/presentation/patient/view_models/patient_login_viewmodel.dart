@@ -134,10 +134,12 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
         } catch (_) {}
         state = state.copyWith(
           patientPhoneCheck: AsyncValue.data(result),
+          patientId: p.patientId ?? state.patientId,
           name:     p.name     ?? state.name,
           mobileNo: p.mobileNo ?? state.mobileNo,
           email:    p.email    ?? state.email,
         );
+        if (p.patientId != null) await TokenStorage.saveValue('patient_id', p.patientId!.toString());
         if (p.name     != null) await TokenStorage.saveValue('name',      p.name!);
         if (p.mobileNo != null) await TokenStorage.saveValue('mobile_no', p.mobileNo!);
         if (p.email    != null) await TokenStorage.saveValue('email',     p.email!);
