@@ -7,6 +7,7 @@ import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
+import 'package:qless/presentation/doctor/screens/doctor_leave_sheet.dart';
 import 'package:qless/presentation/doctor/screens/doctor_edit_screen.dart';
 import 'package:qless/presentation/doctor/screens/doctor_help_center_screen.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
@@ -17,6 +18,7 @@ import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart' hide appointmentViewModelProvider;
+import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart' show appointmentUsecaseProvider;
 import 'package:url_launcher/url_launcher.dart';
 
 // ── Colour Palette (matches QueueHomePage + DoctorMedicinePage exactly) ───────
@@ -92,6 +94,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   bool _availableForConsult  = true;
   bool _didFetchProfile      = false;
   bool _didFetchCounts       = false;
+  String? _lastClinicId;
+  Set<int> _clinicApptIds    = {};
 
   int  _savedLeadHours   = 0;
   int  _savedLeadMinutes = 0;
@@ -124,7 +128,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         final doctorId = roleId == 3
             ? ref.read(receptionistLoginViewModelProvider).doctorId
             : next.doctorId;
-        if (doctorId != null && doctorId > 0) _fetchCounts(doctorId);
+        final clinicId = next.clinic_id;
+        final clinicChanged = clinicId != _lastClinicId && _didFetchCounts;
+        if (doctorId != null && doctorId > 0) {
+          _fetchCounts(doctorId, force: clinicChanged, clinicId: clinicId);
+        }
       },
     );
     Future.microtask(() {
@@ -141,7 +149,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       final doctorId = roleId == 3
           ? ref.read(receptionistLoginViewModelProvider).doctorId
           : s.doctorId;
-      if (doctorId != null && doctorId > 0) _fetchCounts(doctorId);
+      if (doctorId != null && doctorId > 0) {
+        _fetchCounts(doctorId, clinicId: s.clinic_id);
+      }
     });
   }
 
@@ -201,19 +211,35 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           .read(doctorLoginViewModelProvider.notifier)
           .checkPhoneDoctor(mobile);
     }
-    final doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
-    if (doctorId != null && doctorId > 0) _fetchCounts(doctorId, force: true);
+    final s = ref.read(doctorLoginViewModelProvider);
+    final doctorId = s.doctorId;
+    if (doctorId != null && doctorId > 0) _fetchCounts(doctorId, force: true, clinicId: s.clinic_id);
     await Future.delayed(const Duration(milliseconds: 600));
   }
 
   // ── Counts fetch ──────────────────────────────────────────────────────────
 
-  void _fetchCounts(int doctorId, {bool force = false}) {
+  void _fetchCounts(int doctorId, {bool force = false, String? clinicId}) {
     if (_didFetchCounts && !force) return;
     _didFetchCounts = true;
-    ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(doctorId);
+    if (clinicId != _lastClinicId) setState(() => _clinicApptIds = {});
+    _lastClinicId = clinicId;
+    ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(doctorId, clinicId: clinicId);
     ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(doctorId);
-    ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(doctorId);
+    ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(doctorId, clinicId ?? '');
+    if (clinicId != null && clinicId.isNotEmpty) {
+      _fetchClinicApptIds(doctorId, clinicId);
+    }
+  }
+
+  Future<void> _fetchClinicApptIds(int doctorId, String clinicId) async {
+    try {
+      final appts = await ref.read(appointmentUsecaseProvider)
+          .fetchPatientAppointments(doctorId, clinicId: clinicId);
+      final ids = appts.map((a) => a.appointmentId).whereType<int>().toSet();
+      if (!mounted) return;
+      setState(() => _clinicApptIds = ids);
+    } catch (_) {}
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -323,8 +349,11 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   }
 
   void _showReviewsSheet() {
-    final reviewState = ref.read(reviewViewModelProvider);
-    final reviews     = reviewState.reviews ?? [];
+    final allReviews = ref.read(reviewViewModelProvider).reviews ?? [];
+    final reviews = _clinicApptIds.isEmpty
+        ? allReviews
+        : allReviews.where((r) => r.appointmentId != null && _clinicApptIds.contains(r.appointmentId)).toList();
+
     double? avg;
     if (reviews.isNotEmpty) {
       final vals = reviews
@@ -396,9 +425,12 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final todayAppointments = _todayAppointmentsCount(appointments);
     final waitingToday = _waitingTodayCount(appointments);
 
-    // Rating avg + review count — both from fetchDoctorReviews
-    final reviews     = reviewState.reviews;
-    final reviewCount = reviews?.length;   // total reviews received
+    // Rating avg + review count — clinic-filtered via local appointment IDs
+    final allReviews = reviewState.reviews;
+    final reviews = (allReviews == null || _clinicApptIds.isEmpty)
+        ? allReviews
+        : allReviews.where((r) => r.appointmentId != null && _clinicApptIds.contains(r.appointmentId)).toList();
+    final reviewCount = reviews?.length;
 
     double? avgRating;
     if (reviews != null && reviews.isNotEmpty) {
@@ -1190,6 +1222,48 @@ Widget _buildAvailabilityCard() => Container(
     ),
   ],
 ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: kDivider),
+          const SizedBox(height: 12),
+
+          // Leave
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: kAmberLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.beach_access_rounded, size: 15, color: kWarning),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Leave',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kTextPrimary),
+                  ),
+                ],
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+                  showDoctorLeaveSheet(context, doctorId);
+                },
+                icon: const Icon(Icons.add_rounded, size: 13),
+                label: const Text('Manage', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                style: TextButton.styleFrom(
+                  foregroundColor: kPrimary,
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

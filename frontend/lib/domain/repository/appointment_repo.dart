@@ -24,7 +24,7 @@ abstract class AppointmentRepository {
     AppointmentRequestModel appointmentRequest,
   );
 
-  Future<List<MonthSlotData>> getBookedSlots(int doctorId);
+  Future<List<MonthSlotData>> getBookedSlots(int doctorId, String clinicId);
 
   Future<List<AppointmentList>> fetchPatientAppointments(int doctorId, {String? clinicId});
 

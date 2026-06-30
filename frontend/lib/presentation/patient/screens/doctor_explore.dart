@@ -145,15 +145,10 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
 
     // Fetch favorites for the loaded doctors so the Favorites section can populate
     if (patientId > 0) {
-      final doctorIds = ref
-          .read(doctorsViewModelProvider)
-          .doctors
-          .map((d) => d.doctorId)
-          .whereType<int>()
-          .toList();
+      final doctors = ref.read(doctorsViewModelProvider).doctors;
       ref
           .read(favoriteViewModelProvider.notifier)
-          .fetchFavoritesForDoctors(patientId, doctorIds);
+          .fetchFavoritesForDoctors(patientId, doctors);
     }
 
     // If no location has been set yet, fall back to device GPS
@@ -185,9 +180,10 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   }
 
   List<DoctorDetails> _favoriteDoctors(
-      List<DoctorDetails> all, Map<int, bool> favMap) =>
+      List<DoctorDetails> all, Map<String, bool> favMap) =>
       all
-          .where((d) => d.doctorId != null && favMap[d.doctorId] == true)
+          .where((d) => d.doctorId != null &&
+              favMap['${d.doctorId}_${d.clinicId ?? ''}'] == true)
           .toList();
 
   void _goToSearch(BuildContext context, {String? specialty}) {

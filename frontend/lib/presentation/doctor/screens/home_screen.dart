@@ -2303,7 +2303,9 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ));
-      widget.onBooked();
+      _nameCtr.clear();
+      _mobileCtr.clear();
+      setState(() { _clearPatientState(); _selected = _todaySessions.length == 1 ? _todaySessions.first : null; });
     }
   }
 

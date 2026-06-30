@@ -176,21 +176,21 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     super.dispose();
   }
 
-  Future<void> getAppointmentAvailability(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
-    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
-    try {
-      final result = await usecase.getAppointmentAvailability(appointmentRequest);
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-        availabilityResponse: result,
-      );
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: _extractError(e));
-    }
-  }
+  // Future<void> getAppointmentAvailability(
+  //   AppointmentRequestModel appointmentRequest,
+  // ) async {
+  //   state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
+  //   try {
+  //     final result = await usecase.getAppointmentAvailability(appointmentRequest);
+  //     state = state.copyWith(
+  //       isLoading: false,
+  //       isSuccess: true,
+  //       availabilityResponse: result,
+  //     );
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: _extractError(e));
+  //   }
+  // }
 
 
   Future<void> getPatientAppointments(int familyId, {bool silent = false}) async {
@@ -301,21 +301,21 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     }
   }
 
-  Future<void> getBookedSlots(int doctorId) async {
+  Future<void> getBookedSlots(int doctorId, String clinicId) async {
     try {
-      final result = await usecase.getBookedSlots(doctorId);
+      final result = await usecase.getBookedSlots(doctorId, clinicId);
       state = state.copyWith(bookedSlots: result);
     } catch (_) {
       // Non-critical — slots just won't be grayed out
     }
   }
 
-  Future<void> fetchDoctorPatientCount(int doctorId) async {
+  Future<void> fetchDoctorPatientCount(int doctorId, {String? clinicId}) async {
     // Reset so a new doctor's profile shows '--' instead of the previous
     // doctor's count until this fetch resolves.
     state = state.copyWith(clearDoctorPatientCount: true);
     try {
-      final result = await usecase.fetchPatientAppointments(doctorId);
+      final result = await usecase.fetchPatientAppointments(doctorId, clinicId: clinicId);
       final count = result
           .where((a) => a.status?.toLowerCase() == 'completed')
           .length;

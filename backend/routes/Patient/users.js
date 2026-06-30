@@ -56,16 +56,19 @@ router.get('/getDoctorAvailability/:doctor_id/:clinic_id', async (req, res) => {
 
 // Active future leave ranges for a doctor — patient app greys these
 // out in the appointment-date calendar.
-router.get('/getDoctorLeaveDates/:doctor_id', async (req, res) => {
-  const { doctor_id } = req.params;
+router.get('/getDoctorLeaveDates/:doctor_id/:clinic_id', async (req, res) => {
+  const { doctor_id,clinic_id } = req.params;
 
   try {
     const result = await db.request()
       .input('operation', 'GET_LEAVE_DATES')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id)
       .execute('sp_doctor_leave');
 
     res.status(200).json(result.recordset || []);
+
+    
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -139,13 +142,14 @@ router.get('/patientPrescriptionDetails/:prescription_id', async (req, res) => {
   }
 });
 
-router.get('/appointment/getBookedSlots/:doctor_id', async (req, res) => {
-  const { doctor_id } = req.params;
+router.get('/appointment/getBookedSlots/:doctor_id/:clinic_id', async (req, res) => {
+  const { doctor_id, clinic_id } = req.params;
 
   try {
     const result = await db.request()
       .input('operation', 'GET_MONTH_SLOTS')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 	  
     res.status(200).json(result.recordset);
@@ -260,14 +264,29 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
 
 
 
-router.get('/favoriteDoctor/:patient_id/:doctor_id', async (req, res) => {
+// SP Case 2: all favorites for a patient (doctor_id omitted → SP returns all rows)
+router.get('/favoriteDoctors/:patient_id', async (req, res) => {
   try {
-    const { patient_id, doctor_id } = req.params;
+    const result = await db.request()
+      .input('operation', 'Fetch')
+      .input('patient_id', req.params.patient_id)
+      .execute('sp_favorite_doctors');
+    res.status(200).json(result.recordset || []);
+  } catch (error) {
+    log.error('Error in get all favorites: ' + error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/favoriteDoctor/:patient_id/:doctor_id/:clinic_id', async (req, res) => {
+  try {
+    const { patient_id, doctor_id, clinic_id } = req.params;
 
     const result = await db.request()
       .input('operation', 'Fetch')
       .input('patient_id', patient_id)
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id)
       .execute('sp_favorite_doctors');
 
     res.status(200).json({
@@ -366,14 +385,15 @@ router.post('/markAllNotificationsRead/:patient_id', async (req, res) => {
   }
 });
 
-// GET all reviews for doctor
-router.get('/review/doctor/:doctor_id', async (req, res) => {
+// GET all reviews for doctor (optional clinic_id param)
+router.get('/review/doctor/:doctor_id/:clinic_id', async (req, res) => {
   try {
-    const { doctor_id } = req.params;
+    const { doctor_id, clinic_id } = req.params;
 
     const result = await db.request()
       .input('operation', 'Fetch')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id )
       .execute('sp_review');
 
     res.status(200).json(result.recordset || []);

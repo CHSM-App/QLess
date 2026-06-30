@@ -46,8 +46,8 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
-  Future<List<MonthSlotData>> getBookedSlots(int doctorId) {
-    return apiService.getBookedSlots(doctorId);
+  Future<List<MonthSlotData>> getBookedSlots(int doctorId,String clinicId) {
+    return apiService.getBookedSlots(doctorId, clinicId);
   }
 
   @override

@@ -105,6 +105,78 @@ async function hasNotificationBeenSent(patient_id, type, ref_id) {
   }
 }
 
+// Position-based notifications — Practo style. Every time the queue moves,
+// the top-3 waiting patients get a position milestone push (once per milestone
+// per appointment, idempotency via hasNotificationBeenSent):
+//   Position 1 → "You're Next!"
+//   Position 2 → "Get Ready! — 2nd in line"
+//   Position 3 → "3rd in Queue"
+// appointment_id → queue_id subquery used to scope to exact clinic's queue;
+// avoids assuming dq.clinic_id column exists.
+async function sendPositionNotifications(doctor_id, appointment_id) {
+  if (!doctor_id || !appointment_id) return;
+  try {
+    const r = await db.request()
+      .input('ref_apt_id', sql.Int, parseInt(appointment_id))
+      .query(`
+        SELECT TOP 3
+          a.appointment_id,
+          ROW_NUMBER() OVER (ORDER BY a.queue_number) AS position,
+          CASE WHEN a.user_type = 1 THEN p.token  ELSE ph.token       END AS token,
+          CASE WHEN a.user_type = 1 THEN p.patient_id ELSE ph.patient_id END AS patient_id,
+          d.name AS doctor_name
+        FROM appointments a
+        JOIN doctor_queue   dq ON dq.queue_id   = a.queue_id
+        JOIN doctors        d  ON d.doctor_id   = dq.doctor_id
+        LEFT JOIN patients  p  ON a.user_type = 1 AND p.patient_id  = a.patient_id
+        LEFT JOIN family_members fm ON a.user_type = 2 AND fm.member_id = a.patient_id
+        LEFT JOIN patients  ph ON a.user_type = 2 AND ph.patient_id = fm.family_id
+        WHERE a.queue_id = (SELECT TOP 1 queue_id FROM appointments WHERE appointment_id = @ref_apt_id)
+          AND a.status = 'waiting'
+        ORDER BY a.queue_number ASC
+      `);
+
+    const rows = r.recordset || [];
+    if (rows.length === 0) return;
+
+    for (const row of rows) {
+      const pos      = Number(row.position);
+      const doctor   = row.doctor_name || 'your doctor';
+      const patient_id = row.patient_id;
+      const aptId    = row.appointment_id;
+      const token    = row.token;
+      if (!patient_id || !aptId) continue;
+
+      let stage, title, body;
+      if (pos === 1) {
+        stage = 'queue_next';  title = "You're Next!";
+        body  = `Dr. ${doctor} is ready for you. Please come in.`;
+      } else if (pos === 2) {
+        stage = 'queue_ready'; title = 'Get Ready!';
+        body  = `You're 2nd in line for Dr. ${doctor}. Please be at the clinic.`;
+      } else if (pos === 3) {
+        stage = 'queue_soon';  title = '3rd in Queue';
+        body  = `You're 3rd in line for Dr. ${doctor}. Get ready.`;
+      } else { continue; }
+
+      const refId = `${aptId}:${stage}`;
+      if (await hasNotificationBeenSent(patient_id, 'queue', refId)) continue;
+
+      await insertNotification(patient_id, title, body, 'queue', refId);
+
+      if (token && String(token).trim()) {
+        await admin.messaging().send({
+          token,
+          notification: { title, body },
+          data: { type: 'queue', stage, doctor_id: String(doctor_id), appointment_id: String(aptId) },
+        }).catch(err => log.error(`FCM err (pos${pos}): ` + (err.code || err.message)));
+      }
+    }
+  } catch (err) {
+    log.error('sendPositionNotifications failed: ' + err.message);
+  }
+}
+
 // Proximity notifications — fired on every queue movement (queueStart,
 // endSession, queueSkip, cancelByDoctor). For each waiting patient, the SP
 // returns estimated minutes-to-turn based on (position-1) * avg consultation
@@ -1080,6 +1152,7 @@ router.post('/appointment/queueNext', async (req, res) => {
     }
 
     sendProximityNotifications(doctor_id, clinic_id);
+    sendPositionNotifications(doctor_id, appointment_id);
     const nextServing = await fetchCurrentServing(appointment_id);
     emitQueueUpdate(req, 'next', doctor_id, { current_serving: nextServing, clinic_id });
 
@@ -1486,6 +1559,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
     }
 
     sendProximityNotifications(doctor_id);
+    sendPositionNotifications(doctor_id, appointment_id);
     const skipServing = await fetchCurrentServing(appointment_id);
     emitQueueUpdate(req, 'skip', doctor_id, { current_serving: skipServing });
 
@@ -1621,6 +1695,7 @@ router.post('/appointment/endSession', async (req, res) => {
     // 'near' stage for the same patient. Every ended consultation shifts each
     // waiting patient one slot closer, so re-scan proximity here.
     sendProximityNotifications(doctor_id, clinic_id);
+    sendPositionNotifications(doctor_id, appointment_id);
     emitQueueUpdate(req, 'session_ended', doctor_id);
 
     return res.json({

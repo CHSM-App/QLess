@@ -910,7 +910,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<dynamic> getDoctorLeaves(int doctorId, String clinicId) async {
+  Future<dynamic> getDoctorLeaves(int doctorId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -919,7 +919,7 @@ class _ApiService implements ApiService {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'doctor/insert/doctorLeaves/${doctorId}/${clinicId}',
+            'doctor/insert/doctorLeaves/${doctorId}',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -953,7 +953,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<dynamic> getDoctorLeaveDates(int doctorId) async {
+  Future<dynamic> getDoctorLeaveDates(int doctorId, String clinicId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -962,7 +962,7 @@ class _ApiService implements ApiService {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'patient/users/getDoctorLeaveDates/${doctorId}',
+            'patient/users/getDoctorLeaveDates/${doctorId}/${clinicId}',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -1530,7 +1530,7 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<dynamic> getFavoriteDoctor(int patientId, int doctorId) async {
+  Future<dynamic> getFavoriteDoctors(int patientId) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -1539,7 +1539,32 @@ class _ApiService implements ApiService {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'patient/users/favoriteDoctor/${patientId}/${doctorId}',
+            'patient/users/favoriteDoctors/${patientId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch(_options);
+    final _value = _result.data;
+    return _value;
+  }
+
+  @override
+  Future<dynamic> getFavoriteDoctor(
+    int patientId,
+    int doctorId,
+    String clinicId,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<dynamic>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'patient/users/favoriteDoctor/${patientId}/${doctorId}/${clinicId}',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -1647,7 +1672,42 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<List<MonthSlotData>> getBookedSlots(int doctorId) async {
+  Future<List<ReviewModel>> getDoctorReviews(
+    int doctorId,
+    String clinicId,
+  ) async {
+    final _extra = <String, dynamic>{};
+    final queryParameters = <String, dynamic>{};
+    final _headers = <String, dynamic>{};
+    const Map<String, dynamic>? _data = null;
+    final _options = _setStreamType<List<ReviewModel>>(
+      Options(method: 'GET', headers: _headers, extra: _extra)
+          .compose(
+            _dio.options,
+            'patient/users/review/doctor/${doctorId}/${clinicId}',
+            queryParameters: queryParameters,
+            data: _data,
+          )
+          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
+    );
+    final _result = await _dio.fetch<List<dynamic>>(_options);
+    late List<ReviewModel> _value;
+    try {
+      _value = _result.data!
+          .map((dynamic i) => ReviewModel.fromJson(i as Map<String, dynamic>))
+          .toList();
+    } on Object catch (e, s) {
+      errorLogger?.logError(e, s, _options, response: _result);
+      rethrow;
+    }
+    return _value;
+  }
+
+  @override
+  Future<List<MonthSlotData>> getBookedSlots(
+    int doctorId,
+    String clinicId,
+  ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -1656,7 +1716,7 @@ class _ApiService implements ApiService {
       Options(method: 'GET', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'patient/users/appointment/getBookedSlots/${doctorId}',
+            'patient/users/appointment/getBookedSlots/${doctorId}/${clinicId}',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -1686,35 +1746,6 @@ class _ApiService implements ApiService {
           .compose(
             _dio.options,
             'patient/users/review/appointment/${appointmentId}',
-            queryParameters: queryParameters,
-            data: _data,
-          )
-          .copyWith(baseUrl: _combineBaseUrls(_dio.options.baseUrl, baseUrl)),
-    );
-    final _result = await _dio.fetch<List<dynamic>>(_options);
-    late List<ReviewModel> _value;
-    try {
-      _value = _result.data!
-          .map((dynamic i) => ReviewModel.fromJson(i as Map<String, dynamic>))
-          .toList();
-    } on Object catch (e, s) {
-      errorLogger?.logError(e, s, _options, response: _result);
-      rethrow;
-    }
-    return _value;
-  }
-
-  @override
-  Future<List<ReviewModel>> getDoctorReviews(int doctorId) async {
-    final _extra = <String, dynamic>{};
-    final queryParameters = <String, dynamic>{};
-    final _headers = <String, dynamic>{};
-    const Map<String, dynamic>? _data = null;
-    final _options = _setStreamType<List<ReviewModel>>(
-      Options(method: 'GET', headers: _headers, extra: _extra)
-          .compose(
-            _dio.options,
-            'patient/users/review/doctor/${doctorId}',
             queryParameters: queryParameters,
             data: _data,
           )
@@ -2120,7 +2151,11 @@ class _ApiService implements ApiService {
   }
 
   @override
-  Future<dynamic> deleteFavoriteDoctor(int patientId, int doctorId) async {
+  Future<dynamic> deleteFavoriteDoctor(
+    int patientId,
+    int doctorId,
+    String clinicId,
+  ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
     final _headers = <String, dynamic>{};
@@ -2129,7 +2164,7 @@ class _ApiService implements ApiService {
       Options(method: 'DELETE', headers: _headers, extra: _extra)
           .compose(
             _dio.options,
-            'patient/index/favoriteDoctor/${patientId}/${doctorId}',
+            'patient/index/favoriteDoctor/${patientId}/${doctorId}/${clinicId}',
             queryParameters: queryParameters,
             data: _data,
           )

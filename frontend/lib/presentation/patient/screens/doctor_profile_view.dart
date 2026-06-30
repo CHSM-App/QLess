@@ -7,6 +7,7 @@ import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/review_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart'
     hide appointmentViewModelProvider;
+import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
@@ -94,7 +95,9 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   bool _didFetchAvail        = false;
   bool _didFetchPatientCount = false;
   bool _didFetchGallery      = false;
-  List<String> _galleryImages = [];
+  bool _didFetchClinicAppts  = false;
+  List<String> _galleryImages  = [];
+  Set<int>     _clinicApptIds  = {};
   int? _favFetchedDid;
   int? _favFetchedPid;
   int  _reviewPage = 1;
@@ -104,14 +107,16 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   void initState() {
     super.initState();
     final did    = widget.doctor.doctorId;
+    final cid    = widget.doctor.clinicId ?? '';
     final cached = did == null
         ? null
-        : ref.read(favoriteViewModelProvider).doctorFavorites[did];
+        : ref.read(favoriteViewModelProvider).doctorFavorites['${did}_$cid'];
     _isFav = cached ?? widget.initialFavorite;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tryFetchFav();
       _tryFetchReviews();
       _tryFetchAvail();
+      _tryFetchClinicAppts();
       _tryFetchPatientCount();
       _tryFetchGallery();
     });
@@ -124,14 +129,14 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     if (_favFetchedDid == did && _favFetchedPid == pid) return;
     _favFetchedDid = did;
     _favFetchedPid = pid;
-    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did);
+    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did, widget.doctor.clinicId ?? '');
   }
 
   void _tryFetchReviews({bool force = false}) {
     final did = widget.doctor.doctorId ?? 0;
     if (did <= 0 || (_didFetchReviews && !force)) return;
     _didFetchReviews = true;
-    ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did);
+    ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did, widget.doctor.clinicId ?? '');
   }
 
   void _tryFetchAvail({bool force = false}) {
@@ -141,11 +146,27 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did, widget.doctor.clinicId ?? '');
   }
 
+  Future<void> _tryFetchClinicAppts({bool force = false}) async {
+    final did      = widget.doctor.doctorId ?? 0;
+    final clinicId = widget.doctor.clinicId;
+    if (did <= 0 || clinicId == null || clinicId.isEmpty || (_didFetchClinicAppts && !force)) return;
+    _didFetchClinicAppts = true;
+    try {
+      final appts = await ref
+          .read(appointmentUsecaseProvider)
+          .fetchPatientAppointments(did, clinicId: clinicId);
+      final ids = appts.map((a) => a.appointmentId).whereType<int>().toSet();
+      if (mounted) setState(() => _clinicApptIds = ids);
+    } catch (_) {}
+  }
+
   void _tryFetchPatientCount({bool force = false}) {
-    final did = widget.doctor.doctorId ?? 0;
+    final did      = widget.doctor.doctorId ?? 0;
+    final clinicId = widget.doctor.clinicId;
     if (did <= 0 || (_didFetchPatientCount && !force)) return;
     _didFetchPatientCount = true;
-    ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
+    ref.read(appointmentViewModelProvider.notifier)
+        .fetchDoctorPatientCount(did, clinicId: clinicId);
   }
 
   Future<void> _tryFetchGallery({bool force = false}) async {
@@ -164,6 +185,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     HapticFeedback.lightImpact();
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     final did = widget.doctor.doctorId ?? 0;
+    final cid =widget.doctor.clinicId ?? '';
     if (pid <= 0 || did <= 0) {
       setState(() => _isFav = prev);
       _snack('Please login to use favourites', isError: true);
@@ -171,8 +193,8 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
     }
     final n  = ref.read(favoriteViewModelProvider.notifier);
     final ok = v
-        ? await n.addFavoriteDoctor(pid, did)
-        : await n.deleteFavoriteDoctor(pid, did);
+        ? await n.addFavoriteDoctor(pid, did, clinicId: widget.doctor.clinicId)
+        : await n.deleteFavoriteDoctor(pid, did,cid);
     if (!ok) {
       setState(() => _isFav = prev);
       _snack(ref.read(favoriteViewModelProvider).error ?? 'Failed', isError: true);
@@ -211,13 +233,17 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
     ref.listen<FavoriteState>(favoriteViewModelProvider, (prev, next) {
       if (did == null) return;
-      final nf = next.doctorFavorites[did];
-      if (nf != null && nf != prev?.doctorFavorites[did] && mounted) {
+      final favKey = '${did}_${d.clinicId ?? ''}';
+      final nf = next.doctorFavorites[favKey];
+      if (nf != null && nf != prev?.doctorFavorites[favKey] && mounted) {
         setState(() => _isFav = nf);
       }
     });
 
-    final reviews           = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
+    final allReviews        = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
+    final reviews           = (_clinicApptIds.isNotEmpty)
+        ? allReviews.where((r) => r.appointmentId != null && _clinicApptIds.contains(r.appointmentId)).toList()
+        : allReviews;
     final availabilities    = ref.watch(doctorsViewModelProvider).doctorAvailabilities;
     final patientCount      = ref.watch(appointmentViewModelProvider).doctorPatientCount;
     final avgRating         = _avgRating(reviews);

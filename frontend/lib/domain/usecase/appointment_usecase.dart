@@ -39,8 +39,8 @@ class AppointmentUsecase {
     return appointmentRepository.updateQueueStatus(appointmentRequest);
   }
 
-  Future<List<MonthSlotData>> getBookedSlots(int doctorId) {
-    return appointmentRepository.getBookedSlots(doctorId);
+  Future<List<MonthSlotData>> getBookedSlots(int doctorId, String clinicId) {
+    return appointmentRepository.getBookedSlots(doctorId, clinicId);
   }
 
   Future<List<AppointmentList>> fetchPatientAppointments(int doctorId, {String? clinicId}) {

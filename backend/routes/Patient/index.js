@@ -45,14 +45,14 @@ router.delete("/deleteFamilyMember/:member_id", async (req, res) => {
 
 
 // DELETE Favorite Doctor
-router.delete("/favoriteDoctor/:patient_id/:doctor_id", async (req, res) => {
+router.delete("/favoriteDoctor/:patient_id/:doctor_id/:clinic_id", async (req, res) => {
   try {
-    const { patient_id, doctor_id } = req.params;
+    const { patient_id, doctor_id, clinic_id } = req.params;
 
-    if (!patient_id || !doctor_id) {
+    if (!patient_id || !doctor_id|| !clinic_id) {
       return res.status(400).json({
         success: false,
-        message: "patient_id and doctor_id are required"
+        message: "patient_id, doctor_id, and clinic_id are required"
       });
     }
 
@@ -60,6 +60,7 @@ router.delete("/favoriteDoctor/:patient_id/:doctor_id", async (req, res) => {
     request.input("operation", "Delete");
     request.input("patient_id", sql.Int, parseInt(patient_id));
     request.input("doctor_id", sql.Int, parseInt(doctor_id));
+   request.input("clinic_id", sql.NVarChar(50), clinic_id);
 
     const result = await request.execute("sp_favorite_doctors");
 

@@ -22,8 +22,8 @@ class DoctorsImpl implements DoctorsRepository {
   }
 
   @override
-  Future<List<LeaveRange>> getDoctorLeaveDates(int doctorId) async {
-    final res = await apiService.getDoctorLeaveDates(doctorId);
+  Future<List<LeaveRange>> getDoctorLeaveDates(int doctorId, String clinicId) async {
+    final res = await apiService.getDoctorLeaveDates(doctorId, clinicId);
     final list = (res as List?) ?? const [];
     return list
         .whereType<Map>()

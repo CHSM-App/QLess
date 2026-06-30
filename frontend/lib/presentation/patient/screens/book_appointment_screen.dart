@@ -237,9 +237,10 @@ class _BookAppointmentScreenState
   void initState() {
     super.initState();
     final did    = widget.doctor.doctorId;
-    final cached = did == null
+    final favKey = did == null ? null : '${did}_${widget.doctor.clinicId ?? ''}';
+    final cached = favKey == null
         ? null
-        : ref.read(favoriteViewModelProvider).doctorFavorites[did];
+        : ref.read(favoriteViewModelProvider).doctorFavorites[favKey];
     _isFavorite       = cached ?? widget.initialFavorite;
     _selectedMemberId = widget.bookingForMemberId;
 
@@ -259,12 +260,12 @@ class _BookAppointmentScreenState
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (did != null) {
         ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did, widget.doctor.clinicId ?? '');
-        ref.read(doctorsViewModelProvider.notifier).getDoctorLeaveDates(did);
-        ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did);
+        ref.read(doctorsViewModelProvider.notifier).getDoctorLeaveDates(did, widget.doctor.clinicId ?? '');
+        ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did, widget.doctor.clinicId ?? '');
         ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
         // Fetch this doctor's reviews so the rating/review-count shows on first
         // open instead of only after visiting the profile page and back.
-        ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did);
+        ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did, widget.doctor.clinicId ?? '');
       }
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {
@@ -445,10 +446,11 @@ void dispose() {
     final members   = famState.allfamilyMembers.maybeWhen(
         data: (m) => m, orElse: () => <FamilyMember>[]);
 
-    final did    = widget.doctor.doctorId;
-    final cached = did == null
+    final did      = widget.doctor.doctorId;
+    final watchKey = did == null ? null : '${did}_${widget.doctor.clinicId ?? ''}';
+    final cached   = watchKey == null
         ? null
-        : ref.watch(favoriteViewModelProvider).doctorFavorites[did];
+        : ref.watch(favoriteViewModelProvider).doctorFavorites[watchKey];
     if (cached != null && cached != _isFavorite) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _isFavorite = cached);
@@ -502,8 +504,9 @@ void dispose() {
     ref.listen<FavoriteState>(favoriteViewModelProvider, (prev, next) {
       final did = widget.doctor.doctorId;
       if (did == null) return;
-      final nextFav = next.doctorFavorites[did];
-      if (nextFav != null && nextFav != prev?.doctorFavorites[did] && mounted) {
+      final listenKey = '${did}_${widget.doctor.clinicId ?? ''}';
+      final nextFav = next.doctorFavorites[listenKey];
+      if (nextFav != null && nextFav != prev?.doctorFavorites[listenKey] && mounted) {
         setState(() => _isFavorite = nextFav);
       }
       if (next.error != null && next.error != prev?.error && mounted) {
@@ -709,7 +712,7 @@ void dispose() {
     if (_favFetchedDoctorId == did && _favFetchedPatientId == pid) return;
     _favFetchedDoctorId  = did;
     _favFetchedPatientId = pid;
-    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did);
+    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did, widget.doctor.clinicId ?? '');
   }
 
   Future<void> _handleFavoriteToggle(bool v) async {
@@ -717,6 +720,7 @@ void dispose() {
     setState(() => _isFavorite = v);
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     final did = widget.doctor.doctorId ?? 0;
+    final cid=widget.doctor.clinicId ?? '';
     if (pid <= 0 || did <= 0) {
       setState(() => _isFavorite = prev);
       _snack('Please login to use favourites', isError: true);
@@ -724,8 +728,8 @@ void dispose() {
     }
     final notifier = ref.read(favoriteViewModelProvider.notifier);
     final ok = v
-        ? await notifier.addFavoriteDoctor(pid, did)
-        : await notifier.deleteFavoriteDoctor(pid, did);
+        ? await notifier.addFavoriteDoctor(pid, did, clinicId: widget.doctor.clinicId)
+        : await notifier.deleteFavoriteDoctor(pid, did,cid);
     if (!ok) {
       setState(() => _isFavorite = prev);
       _snack(ref.read(favoriteViewModelProvider).error ??

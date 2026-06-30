@@ -184,7 +184,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   int?      _filterMinExp;
   double?   _filterMaxDistKm;
   Position? _userPosition;
-  final Map<int, double> _ratings = {};
+  final Map<String, double> _ratings = {};
 
   int get _activeFilters =>
       (_specialty != null ? 1 : 0) +
@@ -202,16 +202,11 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       if (!mounted) return;
       if (pid > 0) {
         ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
-        final doctorIds = ref
-            .read(doctorsViewModelProvider)
-            .doctors
-            .map((d) => d.doctorId)
-            .whereType<int>()
-            .toList();
+        final doctors = ref.read(doctorsViewModelProvider).doctors;
         ref
             .read(favoriteViewModelProvider.notifier)
-            .fetchFavoritesForDoctors(pid, doctorIds);
-        _loadRatings(doctorIds);
+            .fetchFavoritesForDoctors(pid, doctors);
+        _loadRatings(doctors);
       }
       if (widget.initialSpecialty != null) {
         setState(() => _specialty = widget.initialSpecialty);
@@ -234,19 +229,45 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadRatings(List<int> doctorIds) async {
-    final toFetch = doctorIds.where((id) => !_ratings.containsKey(id)).toList();
+  Future<void> _loadRatings(List<DoctorDetails> doctors) async {
+    final toFetch = doctors
+        .where((d) {
+          if (d.doctorId == null) return false;
+          final key = '${d.doctorId}_${d.clinicId ?? ''}';
+          return !_ratings.containsKey(key);
+        })
+        .toList();
     if (toFetch.isEmpty) return;
-    final usecase = ref.read(reviewUsecaseProvider);
+    final reviewUsecase = ref.read(reviewUsecaseProvider);
+    final apptUsecase   = ref.read(appointmentUsecaseProvider);
     final results = await Future.wait(
-      toFetch.map((id) async {
+      toFetch.map((d) async {
+        final id       = d.doctorId!;
+        final clinicId = d.clinicId;
+        final key      = '${id}_${clinicId ?? ''}';
         try {
-          final reviews = await usecase.getDoctorReviews(id);
-          if (reviews.isEmpty) return MapEntry(id, 0.0);
+          final allReviews = await reviewUsecase.getDoctorReviews(id, clinicId ?? '');
+          if (allReviews.isEmpty) return MapEntry(key, 0.0);
+          var reviews = allReviews;
+          if (clinicId != null && clinicId.isNotEmpty) {
+            try {
+              final appts   = await apptUsecase.fetchPatientAppointments(id, clinicId: clinicId);
+              final apptIds = appts.map((a) => a.appointmentId).whereType<int>().toSet();
+              if (apptIds.isNotEmpty) {
+                final filtered = allReviews
+                    .where((r) => r.appointmentId != null && apptIds.contains(r.appointmentId))
+                    .toList();
+                if (filtered.isNotEmpty) reviews = filtered;
+              }
+            } catch (_) {
+              // appointment fetch failed — keep all reviews as fallback
+            }
+          }
+          if (reviews.isEmpty) return MapEntry(key, 0.0);
           final avg = reviews.fold<double>(0, (a, r) => a + (r.rating?.toDouble() ?? 0)) / reviews.length;
-          return MapEntry(id, avg);
+          return MapEntry(key, avg);
         } catch (_) {
-          return MapEntry(id, 0.0);
+          return MapEntry(key, 0.0);
         }
       }),
     );
@@ -263,9 +284,9 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   }
 
   List<DoctorDetails> _filtered(
-      List<DoctorDetails> all, Map<int, bool> favMap) =>
+      List<DoctorDetails> all, Map<String, bool> favMap) =>
       all.where((d) {
-        if (_favOnly) return favMap[d.doctorId] == true;
+        if (_favOnly) return favMap['${d.doctorId}_${d.clinicId ?? ''}'] == true;
         final q = _searchCtrl.text.toLowerCase();
         final matchQ = q.isEmpty ||
             (d.name?.toLowerCase().contains(q) ?? false) ||
@@ -274,7 +295,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
         final matchS = _specialty == null ||
             (d.specialization?.toLowerCase() == _specialty?.toLowerCase());
         final matchR = _filterRating == null ||
-            (_ratings[d.doctorId] ?? 0) >= _filterRating!;
+            (_ratings['${d.doctorId}_${d.clinicId ?? ''}'] ?? 0) >= _filterRating!;
         final matchE = _filterMinExp == null ||
             (d.experience ?? 0) >= _filterMinExp!;
         bool matchD = true;
@@ -302,16 +323,11 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     await ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid);
     if (!mounted || pid <= 0) return;
-    final doctorIds = ref
-        .read(doctorsViewModelProvider)
-        .doctors
-        .map((d) => d.doctorId)
-        .whereType<int>()
-        .toList();
+    final doctors = ref.read(doctorsViewModelProvider).doctors;
     ref
         .read(favoriteViewModelProvider.notifier)
-        .fetchFavoritesForDoctors(pid, doctorIds);
-    _loadRatings(doctorIds);
+        .fetchFavoritesForDoctors(pid, doctors);
+    _loadRatings(doctors);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -319,6 +335,17 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   // ════════════════════════════════════════════════════════════════════
  @override
 Widget build(BuildContext context) {
+  // patientId loads asynchronously from storage — initState may run with id 0.
+  // Re-run fetch the moment a real id arrives so favorites populate correctly.
+  ref.listen(
+    patientLoginViewModelProvider.select((s) => s.patientId),
+    (prev, next) {
+      if ((prev == null || prev == 0) && next != null && next != 0) {
+        _refresh();
+      }
+    },
+  );
+
   final doctorsState = ref.watch(doctorsViewModelProvider);
   final patState     = ref.watch(patientLoginViewModelProvider);
   final famState     = ref.watch(familyViewModelProvider);
@@ -693,7 +720,7 @@ Widget build(BuildContext context) {
         itemBuilder: (_, i) => _DoctorCard(
           doctor: docs[i],
           selectedMemberId: _selectedMemberId,
-          cardRating: _ratings[docs[i].doctorId],
+          cardRating: _ratings['${docs[i].doctorId}_${docs[i].clinicId ?? ''}'],
           // Tapping the card → Book Appointment
           onTap: (d) => Navigator.push(
             context,

@@ -60,12 +60,12 @@ class ReviewViewmodel extends StateNotifier<ReviewState> {
     }
   }
 
-  Future<void> fetchDoctorReviews(int doctorId) async {
+  Future<void> fetchDoctorReviews(int doctorId, String clinicId) async {
     // Clear the previous doctor's reviews immediately so a different doctor's
     // profile never shows stale reviews while the new fetch is in flight.
     state = state.copyWith(isLoading: true, clearError: true, reviews: const []);
     try {
-      final reviews = await usecase.getDoctorReviews(doctorId);
+      final reviews = await usecase.getDoctorReviews(doctorId, clinicId);
       state = state.copyWith(isLoading: false, reviews: reviews);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractMessage(e));

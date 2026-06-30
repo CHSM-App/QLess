@@ -18,8 +18,8 @@ class DoctorsUseCase {
     return doctorsRepository.getDoctorAvailability(doctorId, clinicId);
   }
 
-  Future<List<LeaveRange>> getDoctorLeaveDates(int doctorId) {
-    return doctorsRepository.getDoctorLeaveDates(doctorId);
+  Future<List<LeaveRange>> getDoctorLeaveDates(int doctorId, String clinicId) {
+    return doctorsRepository.getDoctorLeaveDates(doctorId, clinicId);
   }
 }
 

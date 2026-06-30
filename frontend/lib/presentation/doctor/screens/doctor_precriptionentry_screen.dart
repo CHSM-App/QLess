@@ -621,6 +621,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final List<MedicineEntry> _meds = [];
   int _lastDoctorId = 0;
   late final ProviderSubscription<int?> _doctorIdSub;
+  bool _isSubmitting = false;
 
   // @override
   // void initState() {
@@ -865,34 +866,46 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   Future<void> _completePrescription() async {
+    if (_isSubmitting) return;
     final error = _validate();
     if (error != null) { _showSnack(error, isError: true); return; }
-    await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
-    if (!mounted) return;
-    final state = ref.read(prescriptionViewModelProvider);
-    if (state.error != null) { _showSnack(state.error!, isError: true); return; }
-    await _handleNextPatient();
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
+      if (!mounted) return;
+      final state = ref.read(prescriptionViewModelProvider);
+      if (state.error != null) { _showSnack(state.error!, isError: true); return; }
+      await _handleNextPatient();
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _completeAndBack() async {
+    if (_isSubmitting) return;
     final error = _validate();
     if (error != null) { _showSnack(error, isError: true); return; }
-    await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
-    if (!mounted) return;
-    final state = ref.read(prescriptionViewModelProvider);
-    if (state.error != null) { _showSnack(state.error!, isError: true); return; }
-    // Fire-and-forget — don't let endSession block or unmount the widget before pop
-    ref.read(appointmentViewModelProvider.notifier).endSession(
-      AppointmentRequestModel(
-        doctorId:      widget.doctorId,
-        appointmentId: widget.appointmentId,
-        patientId:     widget.patientId,
-        clinicId:      widget.clinicId,
-      ),
-    ).catchError((_) => AppointmentResponseModel(success: false));
-    _showSnack('Prescription saved', isError: false);
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (mounted) Navigator.pop(context);
+    setState(() => _isSubmitting = true);
+    try {
+      await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
+      if (!mounted) return;
+      final state = ref.read(prescriptionViewModelProvider);
+      if (state.error != null) { _showSnack(state.error!, isError: true); return; }
+      // Fire-and-forget — don't let endSession block or unmount the widget before pop
+      ref.read(appointmentViewModelProvider.notifier).endSession(
+        AppointmentRequestModel(
+          doctorId:      widget.doctorId,
+          appointmentId: widget.appointmentId,
+          patientId:     widget.patientId,
+          clinicId:      widget.clinicId,
+        ),
+      ).catchError((_) => AppointmentResponseModel(success: false));
+      _showSnack('Prescription saved', isError: false);
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) Navigator.pop(context);
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _onSkip() async {
@@ -1311,7 +1324,7 @@ List<Widget> _buildMedCards(List<Medicine> medicines) =>
 
   // ── Bottom Action Bar ────────────────────────────────────────────
   Widget _bottomBar() {
-    final isLoading = ref.watch(prescriptionViewModelProvider).isLoading;
+    final isLoading = ref.watch(prescriptionViewModelProvider).isLoading || _isSubmitting;
     return Positioned(
       bottom: 0, left: 0, right: 0,
       child: Container(

@@ -168,10 +168,10 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
 
   // ── Leave / Sutti ────────────────────────────────────────────────────────
 
-  Future<void> getDoctorLeaves(int doctorId, {String? clinicId}) async {
+  Future<void> getDoctorLeaves(int doctorId) async {
     state = state.copyWith(isLeaveBusy: true);
     try {
-      final leaves = await doctorSettingsUsecase.getDoctorLeaves(doctorId, clinicId: clinicId);
+      final leaves = await doctorSettingsUsecase.getDoctorLeaves(doctorId);
       state = state.copyWith(leaves: leaves);
     } catch (e) {
       debugPrint('Error fetching doctor leaves: $e');
@@ -189,7 +189,6 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
     required String toDate,
     String? reason,
     bool force = false,
-    String? clinicId,
   }) async {
     state = state.copyWith(isLeaveBusy: true, errorMessage: '');
     try {
@@ -199,9 +198,8 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
         toDate: toDate,
         reason: reason,
         force: force,
-        clinicId: clinicId,
       );
-      await getDoctorLeaves(doctorId, clinicId: clinicId);
+      await getDoctorLeaves(doctorId);
       return (AddLeaveResult.success, 0);
     } on DioException catch (e) {
       if (e.response?.statusCode == 409) {
@@ -228,16 +226,14 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
   Future<bool> cancelDoctorLeave({
     required int doctorId,
     required int leaveId,
-    String? clinicId,
   }) async {
     state = state.copyWith(isLeaveBusy: true, errorMessage: '');
     try {
       await doctorSettingsUsecase.cancelDoctorLeave(
         doctorId: doctorId,
         leaveId: leaveId,
-        clinicId: clinicId,
       );
-      await getDoctorLeaves(doctorId, clinicId: clinicId);
+      await getDoctorLeaves(doctorId);
       return true;
     } catch (e) {
       debugPrint('Error cancelling leave: $e');

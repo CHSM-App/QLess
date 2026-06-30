@@ -165,7 +165,7 @@ router.post('/appointment/queueStatus', async (req, res) => {
 
 
 router.post('/favoriteDoctor/add', async (req, res) => {
-  const { patient_id, doctor_id } = req.body;
+  const { patient_id, doctor_id, clinic_id } = req.body;
 
   if (!patient_id || !doctor_id) {
     return res.status(400).json({ success: false, message: 'patient_id and doctor_id are required' });
@@ -176,6 +176,7 @@ router.post('/favoriteDoctor/add', async (req, res) => {
       .input('operation', 'Insert')
       .input('patient_id', patient_id)
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_favorite_doctors');
 
     res.status(200).json({
@@ -195,12 +196,12 @@ router.post('/favoriteDoctor/add', async (req, res) => {
 
 // ADD review
 router.post('/review/add', async (req, res) => {
-  const { appointment_id, doctor_id, patient_id, rating, comment,reviewed_by_user_id } = req.body;
+  const { appointment_id, doctor_id, patient_id, rating, comment, reviewed_by_user_id, clinic_id } = req.body;
 
-  if (!appointment_id || !doctor_id || !patient_id || !rating||!reviewed_by_user_id) {
+  if (!appointment_id || !doctor_id || !patient_id || !rating || !reviewed_by_user_id) {
     return res.status(400).json({
       success: false,
-      message: 'appointment_id, doctor_id, patient_id, rating,reviewed_by_user_id required'
+      message: 'appointment_id, doctor_id, patient_id, rating, reviewed_by_user_id required'
     });
   }
 
@@ -212,7 +213,8 @@ router.post('/review/add', async (req, res) => {
       .input('patient_id', patient_id)
       .input('rating', rating)
       .input('comment', comment || '')
-	 .input('reviewed_by_user_id', reviewed_by_user_id)
+      .input('reviewed_by_user_id', reviewed_by_user_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_review');
 
     res.status(200).json({

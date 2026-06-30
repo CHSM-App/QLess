@@ -16,7 +16,7 @@ const _kBorder = Color(0xFFEDF2F7);
 const _kError = Color(0xFFE53E3E);
 
 /// Opens the doctor leave / sutti manager as a modal bottom sheet.
-Future<void> showDoctorLeaveSheet(BuildContext context, int doctorId, {String? clinicId}) {
+Future<void> showDoctorLeaveSheet(BuildContext context, int doctorId) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -24,14 +24,13 @@ Future<void> showDoctorLeaveSheet(BuildContext context, int doctorId, {String? c
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
-    builder: (_) => _DoctorLeaveSheet(doctorId: doctorId, clinicId: clinicId),
+    builder: (_) => _DoctorLeaveSheet(doctorId: doctorId),
   );
 }
 
 class _DoctorLeaveSheet extends ConsumerStatefulWidget {
   final int doctorId;
-  final String? clinicId;
-  const _DoctorLeaveSheet({required this.doctorId, this.clinicId});
+  const _DoctorLeaveSheet({required this.doctorId});
 
   @override
   ConsumerState<_DoctorLeaveSheet> createState() => _DoctorLeaveSheetState();
@@ -44,7 +43,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref
           .read(doctorSettingsViewModelProvider.notifier)
-          .getDoctorLeaves(widget.doctorId, clinicId: widget.clinicId);
+          .getDoctorLeaves(widget.doctorId);
     });
   }
 
@@ -177,7 +176,6 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
       toDate: to,
       reason: reason,
       force: force,
-      clinicId: widget.clinicId,
     );
     if (!mounted) return;
 
@@ -274,7 +272,7 @@ class _DoctorLeaveSheetState extends ConsumerState<_DoctorLeaveSheet> {
 
     final done = await ref
         .read(doctorSettingsViewModelProvider.notifier)
-        .cancelDoctorLeave(doctorId: widget.doctorId, leaveId: leaveId, clinicId: widget.clinicId);
+        .cancelDoctorLeave(doctorId: widget.doctorId, leaveId: leaveId);
     if (!mounted) return;
     _snack(done ? 'Leave removed' : 'Failed to remove leave',
         isError: !done);

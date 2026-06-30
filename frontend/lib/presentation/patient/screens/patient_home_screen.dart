@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
@@ -220,6 +221,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   List<Map<String, dynamic>> _cachedSpecialties = [];
   bool _popupShown = false;
+  final Map<int, double> _clinicRatings = {};
 
   @override
   void initState() {
@@ -270,6 +272,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
       ]);
       if (!mounted) return;
+      _loadTopRatings(ref.read(doctorsViewModelProvider).doctors);
       final appts = ref.read(appointmentViewModelProvider).patientAppointmentsList?.value ?? [];
       final now = DateTime.now();
       final liveDocIds = appts.where((a) {
@@ -285,6 +288,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     } finally {
       _isFetching = false;
     }
+  }
+
+  Future<void> _loadTopRatings(List<DoctorDetails> doctors) async {
+    final rated = doctors
+        .where((d) => d.doctorId != null && (d.rating ?? 0) >= 3.5 && (d.reviewCount ?? 0) >= 3)
+        .toList()
+      ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    final toFetch = rated
+        .take(3)
+        .where((d) => !_clinicRatings.containsKey(d.doctorId))
+        .toList();
+    if (toFetch.isEmpty) return;
+    final reviewUsecase = ref.read(reviewUsecaseProvider);
+    final apptUsecase   = ref.read(appointmentUsecaseProvider);
+    final results = await Future.wait(
+      toFetch.map((d) async {
+        final id       = d.doctorId!;
+        final clinicId = d.clinicId;
+        try {
+          final allReviews = await reviewUsecase.getDoctorReviews(id, clinicId ?? '');
+          if (allReviews.isEmpty) return MapEntry(id, d.rating ?? 0.0);
+          var reviews = allReviews;
+          if (clinicId != null && clinicId.isNotEmpty) {
+            try {
+              final appts   = await apptUsecase.fetchPatientAppointments(id, clinicId: clinicId);
+              final apptIds = appts.map((a) => a.appointmentId).whereType<int>().toSet();
+              if (apptIds.isNotEmpty) {
+                final filtered = allReviews
+                    .where((r) => r.appointmentId != null && apptIds.contains(r.appointmentId))
+                    .toList();
+                if (filtered.isNotEmpty) reviews = filtered;
+              }
+            } catch (_) {
+              // appointment fetch failed — keep all reviews
+            }
+          }
+          final avg = reviews.fold<double>(0, (a, r) => a + (r.rating?.toDouble() ?? 0)) / reviews.length;
+          return MapEntry(id, avg);
+        } catch (_) {
+          return MapEntry(id, d.rating ?? 0.0);
+        }
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      for (final e in results) { _clinicRatings[e.key] = e.value; }
+    });
   }
 
   /// Runs once per cold start. A previously saved location — whether picked
@@ -697,7 +747,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               padding: const EdgeInsets.only(bottom: 8),
               child: _TopDoctorCard(
                 doctor: doctor,
-                cardRating: doctor.rating,
+                cardRating: _clinicRatings[doctor.doctorId] ?? doctor.rating,
                 onTap: () => _goToBook(doctor),
               ),
             ),

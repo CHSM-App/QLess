@@ -332,7 +332,7 @@ class _DoctorAvailabilityPageState
       if (openLeave == true) {
         final doctorId =
             ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
-        showDoctorLeaveSheet(context, doctorId, clinicId: widget.clinicId);
+        showDoctorLeaveSheet(context, doctorId);
       }
       return;
     }
@@ -609,34 +609,7 @@ class _DoctorAvailabilityPageState
           Text('Set your weekly schedule',
               style: const TextStyle(fontSize: 11, color: kTextMuted)),
         ]),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
-              onPressed: isLoading
-                  ? null
-                  : () {
-                      final doctorId = ref
-                              .read(doctorLoginViewModelProvider)
-                              .doctorId ??
-                          0;
-                      showDoctorLeaveSheet(context, doctorId, clinicId: widget.clinicId);
-                    },
-              style: TextButton.styleFrom(
-                foregroundColor: kPrimary,
-                backgroundColor: kPrimaryLight,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              icon: const Icon(Icons.beach_access_rounded, size: 16),
-              label: const Text('Leave',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ],
+        actions: const [],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(isLoading ? 3.0 : 1.0),
           child: isLoading

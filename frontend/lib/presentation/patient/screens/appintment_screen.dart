@@ -730,6 +730,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         appointmentId: a.appointmentId!, doctorId: a.doctorId!,
         patientId: a.patientId!, rating: input.rating, comment: input.comment,
         reviewedByUserId: ref.read(patientLoginViewModelProvider).patientId!,
+        clinicId: a.clinicId,
       ),
     );
   }

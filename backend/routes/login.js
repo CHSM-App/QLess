@@ -75,7 +75,8 @@ router.post('/Createlogin', authLimiter, async (req, res) => {
 			.execute('ManageRefreshToken');
 
 
-		const roleId = result.recordset?.[0]?.role_id;
+		const spRoleId = result.recordset?.[0]?.role_id;
+		const roleId = spRoleId ?? (role === 'receptionist' ? 3 : role === 'patient' ? 2 : role === 'doctor' ? 1 : null);
 
 		const accessToken = createAccessToken({
 			mobile
