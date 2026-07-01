@@ -583,7 +583,11 @@ void dispose() {
       isSlotSessionEnded = nowMin >= endMin;
     }
 
-    final canConfirm = selAvail != null &&
+    final isSelectedDateOnLeave = _selectedDate != null &&
+        leaveRanges.any((r) => r.contains(_selectedDate!));
+
+    final canConfirm = !isSelectedDateOnLeave &&
+        selAvail != null &&
         _bookable(mode, dayIsToday) &&
         (isQueue || (_selectedTime != null && !isSlotSessionEnded)) &&
         (!isQueue || !dayIsToday || isQueueOpen);
@@ -1378,6 +1382,9 @@ class _Body extends StatelessWidget {
             .where((s) => _bookable(s.bookingMode, dayIsToday))
             .toList();
 
+    final isSelectedOnLeave = selectedDate != null &&
+        leaveRanges.any((r) => r.contains(selectedDate!));
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 100),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1392,6 +1399,34 @@ class _Body extends StatelessWidget {
           const SizedBox(height: 12),
           _DateBadge(date: selectedDate!),
         ],
+        if (isSelectedOnLeave) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: kRedLight.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kError.withOpacity(0.35)),
+            ),
+            child: const Row(children: [
+              Icon(Icons.event_busy_rounded, size: 20, color: kError),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Doctor is on leave',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: kError)),
+                  SizedBox(height: 3),
+                  Text('Appointment cannot be booked on this date',
+                      style: TextStyle(fontSize: 12, color: kError)),
+                ]),
+              ),
+            ]),
+          ),
+        ] else ...[
         if (sessions.length > 1) ...[
           const SizedBox(height: 18),
           _sectionLabel('Select Session'),
@@ -1449,6 +1484,7 @@ class _Body extends StatelessWidget {
             _SymptomsField(controller: symptomsController),
           ],
         ],
+        ], // else (not on leave)
       ]),
     );
   }
@@ -1512,10 +1548,11 @@ class _CalendarStripState extends State<_CalendarStrip> {
       widget.leaveRanges.any((r) => r.contains(dt));
 
   bool _avail(DateTime dt) {
-    if (_onLeave(dt)) return false; // doctor on leave — not bookable
     const n = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     final s = widget.grouped[n[(dt.weekday - 1).clamp(0, 6)]];
-    return s?.any((a) => _bookable(a.bookingMode, _isToday(dt))) == true;
+    // Leave dates are selectable but show a message (not blocked here)
+    return s?.any((a) => _bookable(a.bookingMode, _isToday(dt))) == true ||
+        (_onLeave(dt) && s?.isNotEmpty == true);
   }
 
   Color? _dot(DateTime dt) {
@@ -1566,10 +1603,11 @@ class _CalendarStripState extends State<_CalendarStrip> {
                         color: kTextMuted)),
               );
             }
-            final dt    = item.dt!;
-            final avail = _avail(dt);
-            final dot   = _dot(dt);
-            final isSel = widget.selectedDate?.year == dt.year &&
+            final dt      = item.dt!;
+            final avail   = _avail(dt);
+            final onLeave = _onLeave(dt);
+            final dot     = onLeave ? kError : _dot(dt);
+            final isSel   = widget.selectedDate?.year == dt.year &&
                 widget.selectedDate?.month == dt.month &&
                 widget.selectedDate?.day == dt.day;
 
@@ -1582,15 +1620,24 @@ class _CalendarStripState extends State<_CalendarStrip> {
                   width: _cw,
                   decoration: BoxDecoration(
                     color: isSel
-                        ? kPrimary
-                        : (avail ? Colors.white : Colors.transparent),
+                        ? (onLeave ? kError : kPrimary)
+                        : (avail
+                            ? (onLeave
+                                ? kRedLight.withOpacity(0.5)
+                                : Colors.white)
+                            : Colors.transparent),
                     borderRadius: BorderRadius.circular(12),
                     border: isSel
                         ? null
-                        : (avail ? Border.all(color: kBorder) : null),
+                        : (avail
+                            ? Border.all(
+                                color: onLeave
+                                    ? kError.withOpacity(0.35)
+                                    : kBorder)
+                            : null),
                     boxShadow: isSel
                         ? [BoxShadow(
-                            color: kPrimary.withOpacity(0.3),
+                            color: (onLeave ? kError : kPrimary).withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 3))]
                         : null,
@@ -1605,9 +1652,11 @@ class _CalendarStripState extends State<_CalendarStrip> {
                               color: isSel
                                   ? Colors.white.withOpacity(0.8)
                                   : (avail
-                                      ? (dt.weekday >= 6
-                                          ? kPrimary
-                                          : kTextMuted)
+                                      ? (onLeave
+                                          ? kError.withOpacity(0.7)
+                                          : (dt.weekday >= 6
+                                              ? kPrimary
+                                              : kTextMuted))
                                       : kTextMuted.withOpacity(0.3)))),
                       const SizedBox(height: 4),
                       Text('${dt.day}',
@@ -1617,7 +1666,7 @@ class _CalendarStripState extends State<_CalendarStrip> {
                               color: isSel
                                   ? Colors.white
                                   : (avail
-                                      ? kTextPrimary
+                                      ? (onLeave ? kError : kTextPrimary)
                                       : kTextMuted.withOpacity(0.3)))),
                       const SizedBox(height: 4),
                       Container(

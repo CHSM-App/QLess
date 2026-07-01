@@ -210,6 +210,23 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     return ref.read(doctorLoginViewModelProvider).name ?? 'Doctor';
   }
 
+  bool get _isDoctorOnLeaveToday {
+    final leaves = ref.read(doctorSettingsViewModelProvider).leaves;
+    if (leaves.isEmpty) return false;
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    return leaves.any((l) {
+      try {
+        final from = DateTime.parse(l.fromDate);
+        final to = DateTime.parse(l.toDate);
+        return !todayOnly.isBefore(DateTime(from.year, from.month, from.day)) &&
+            !todayOnly.isAfter(DateTime(to.year, to.month, to.day));
+      } catch (_) {
+        return false;
+      }
+    });
+  }
+
   Future<void> _loadData({bool force = false}) async {
     if (_doctorId == 0) return;
     if (_hasFetched && !force) return;
@@ -218,6 +235,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     await Future.wait([
       ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId, clinicId: _clinicId),
       ref.read(doctorSettingsViewModelProvider.notifier).getDoctorSchedule(_doctorId, clinicId: _clinicId),
+      ref.read(doctorSettingsViewModelProvider.notifier).getDoctorLeaves(_doctorId),
     ]);
   }
 
@@ -735,7 +753,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                         AnimatedSize(
                           duration: const Duration(milliseconds: 250),
                           curve: Curves.easeInOut,
-                          child: _walkInExpanded
+                          child: _walkInExpanded && !_isDoctorOnLeaveToday
                               ? Padding(
                                   padding: const EdgeInsets.only(top: 10),
                                   child: _WalkInInlinePanel(
@@ -1790,13 +1808,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildWalkInCard() {
+    final onLeave = _isDoctorOnLeaveToday;
     return GestureDetector(
-      onTap: () => setState(() => _walkInExpanded = !_walkInExpanded),
+      onTap: onLeave ? null : () => setState(() => _walkInExpanded = !_walkInExpanded),
       child: Container(
         decoration: BoxDecoration(
-          color: kPrimaryLight, // solid teal-light, no gradient
+          color: onLeave ? const Color(0xFFF1F5F9) : kPrimaryLight,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF9FE1CB)),
+          border: Border.all(color: onLeave ? const Color(0xFFCBD5E1) : const Color(0xFF9FE1CB)),
         ),
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
         child: Row(children: [
@@ -1805,26 +1824,30 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF9FE1CB)),
+              border: Border.all(color: onLeave ? const Color(0xFFCBD5E1) : const Color(0xFF9FE1CB)),
             ),
             alignment: Alignment.center,
-            child: const Icon(Icons.person_add_rounded, size: 20, color: kPrimaryDark),
+            child: Icon(Icons.person_add_rounded, size: 20, color: onLeave ? kTextMuted : kPrimaryDark),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Add Walk-in Patient',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.black)),
-              // SizedBox(height: 2),
-              // Text('Book appointment for walk-in patient',
-              //     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimaryDark)),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                      color: onLeave ? kTextMuted : Colors.black)),
+              if (onLeave) ...[
+                const SizedBox(height: 3),
+                const Text('Doctor is on leave today',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFFEF4444))),
+              ],
             ]),
           ),
-          AnimatedRotation(
-            turns: _walkInExpanded ? 0.25 : 0,
-            duration: const Duration(milliseconds: 200),
-            child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kPrimaryDark),
-          ),
+          if (!onLeave)
+            AnimatedRotation(
+              turns: _walkInExpanded ? 0.25 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kPrimaryDark),
+            ),
         ]),
       ),
     );

@@ -196,12 +196,14 @@ class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
   final Function(int) onTabChange;
+  final VoidCallback? onSeeAllAppointments;
 
   const HomeScreen({
     super.key,
     required this.onToggleTheme,
     required this.themeMode,
     required this.onTabChange,
+    this.onSeeAllAppointments,
   });
 
   @override
@@ -616,7 +618,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             _SectionTitle('Upcoming Appointments',
                 action:   hasMore ? 'See All' : null,
-                onAction: () => widget.onTabChange(2)),
+                onAction: () => widget.onSeeAllAppointments != null
+                    ? widget.onSeeAllAppointments!()
+                    : widget.onTabChange(2)),
             const SizedBox(height: 10),
             if (shown.isEmpty)
               _EmptyNote('No upcoming appointments')

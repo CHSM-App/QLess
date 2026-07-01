@@ -81,14 +81,35 @@ router.get('/getDoctorLeaveDates/:doctor_id/:clinic_id', async (req, res) => {
 router.get('/getDoctors/:patient_id', async (req, res) => {
   const { patient_id } = req.params;
   try {
-
     const result = await db.request()
       .input('operation', 'getDoctors')
       .input('patient_id', patient_id)
       .execute('sp_patients');
 
-    res.status(200).json(result.recordset);
+    const doctors = result.recordset;
+    const today = new Date().toISOString().split('T')[0];
 
+    // Parallel leave-check for each doctor (IS_BLOCKED covers today's date)
+    const leaveResults = await Promise.all(
+      doctors.map(async (d) => {
+        if (!d.doctor_id) return { doctor_id: d.doctor_id, blocked: 0 };
+        try {
+          const r = await db.request()
+            .input('operation', 'IS_BLOCKED')
+            .input('doctor_id', d.doctor_id)
+            .input('from_date', today)
+            .execute('sp_doctor_leave');
+          return { doctor_id: d.doctor_id, blocked: r.recordset?.[0]?.blocked ?? 0 };
+        } catch { return { doctor_id: d.doctor_id, blocked: 0 }; }
+      })
+    );
+
+    const leaveMap = {};
+    leaveResults.forEach(l => { leaveMap[l.doctor_id] = l.blocked; });
+
+    res.status(200).json(
+      doctors.map(d => ({ ...d, is_on_leave: leaveMap[d.doctor_id] ?? 0 }))
+    );
   } catch (error) {
     res.status(500).json({
       success: false,

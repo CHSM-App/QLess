@@ -177,6 +177,7 @@ static const _regularNavHeight = 56.0;
         onToggleTheme: widget.onToggleTheme,
         themeMode: widget.themeMode,
         onTabChange: _setTab,
+        onSeeAllAppointments: () => openAppointmentsDeepLink(filter: 'upcoming'),
       ),
       
       const DoctorExploreScreen(),

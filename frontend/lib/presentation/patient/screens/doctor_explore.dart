@@ -758,7 +758,8 @@ class _NearbyDoctorCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final accent    = _accentFor(doctor.specialization);
     final bg        = _bgFor(doctor.specialization);
-    final isOpen    = doctor.isQueueAvailable == 1;
+    final isOnLeave = doctor.isOnLeave == 1;
+    final isOpen    = !isOnLeave && doctor.isQueueAvailable == 1;
     final distLabel = distanceKm != null
         ? '${distanceKm!.toStringAsFixed(1)} km'
         : null;
@@ -793,27 +794,34 @@ class _NearbyDoctorCard extends StatelessWidget {
                     color: accent, size: 17),
               ),
               const Spacer(),
-              if (doctor.isQueueAvailable != null)
+              if (isOnLeave || doctor.isQueueAvailable != null)
                 Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: isOpen ? _kGreenLight : _kRedLight,
+                    color: isOnLeave
+                        ? _kAmberLight
+                        : (isOpen ? _kGreenLight : _kRedLight),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
                     Container(
                       width: 5, height: 5,
                       decoration: BoxDecoration(
-                          color: isOpen ? _kSuccess : _kError,
+                          color: isOnLeave
+                              ? _kWarning
+                              : (isOpen ? _kSuccess : _kError),
                           shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 4),
-                    Text(isOpen ? 'Open' : 'Closed',
+                    Text(
+                        isOnLeave ? 'On Leave' : (isOpen ? 'Open' : 'Closed'),
                         style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            color: isOpen ? _kSuccess : _kError)),
+                            color: isOnLeave
+                                ? _kWarning
+                                : (isOpen ? _kSuccess : _kError))),
                   ]),
                 ),
             ]),

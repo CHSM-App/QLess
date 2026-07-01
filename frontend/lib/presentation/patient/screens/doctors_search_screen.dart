@@ -62,7 +62,7 @@ String _cap(String s) =>
 
 
 // ── Queue State ───────────────────────────────────────────────────────────────
-enum _QueueState { noQueue, unavailable, ended, opensSoon, full, open, hasQueue }
+enum _QueueState { noQueue, unavailable, onLeave, ended, opensSoon, full, open, hasQueue }
 
 int _timeMins(String? t) {
   if (t == null || t.isEmpty) return -1;
@@ -75,6 +75,7 @@ int _timeMins(String? t) {
 }
 
 _QueueState _queueStateFor(DoctorDetails d) {
+  if (d.isOnLeave == 1)           return _QueueState.onLeave;
   if (d.isQueueAvailable == null) return _QueueState.noQueue;
   if (d.isQueueAvailable == 0)    return _QueueState.unavailable;
 
@@ -115,6 +116,11 @@ class _QueueStatus {
             isVisible: false, canBook: true, tintCard: false,
             label: '', btnLabel: 'Book',
             color: kPrimary, icon: Icons.calendar_today_rounded);
+      case _QueueState.onLeave:
+        return const _QueueStatus(
+            isVisible: true, canBook: false, tintCard: false,
+            label: 'On leave today', btnLabel: 'Leave',
+            color: kError, icon: Icons.event_busy_rounded);
       case _QueueState.unavailable:
         return const _QueueStatus(
             isVisible: false, canBook: false, tintCard: false,
