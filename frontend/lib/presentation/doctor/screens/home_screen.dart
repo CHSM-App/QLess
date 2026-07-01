@@ -151,11 +151,11 @@ const List<_Tip> _kDoctorTips = [
 
 class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   bool _hasFetched = false;
-  bool _walkInExpanded = false;
   final Map<int, bool> _patientsExpanded = {};
   final Map<int, bool> _sessionExpanded = {};
   late final ProviderSubscription<int?> _doctorIdSub;
   ProviderSubscription<String?>? _clinicIdSub;
+  final ScrollController _scrollController = ScrollController();
 
   final PageController _tipsController = PageController();
   int _currentTip = 0;
@@ -195,6 +195,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   void dispose() {
     _tipsTimer?.cancel();
     _tipsController.dispose();
+    _scrollController.dispose();
     _doctorIdSub.close();
     _clinicIdSub?.close();
     super.dispose();
@@ -716,9 +717,17 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         ? (ref.watch(receptionistLoginViewModelProvider).name ?? 'Receptionist')
         : ref.watch(doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'));
 
+    // Pill nav (60) + its bottom padding (18) + extra clearance = 100, plus system safe area
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final fabBottom  = safeBottom + 100.0;
+    // List bottom padding: above FAB (56) + pill nav + gap
+    final listBottom = safeBottom + 100.0 + 56.0 + 16.0;
+
     return Scaffold(
-      backgroundColor: kPageBg, // ← grey-50
-      body: appointmentsAsync.when(
+      backgroundColor: kPageBg,
+      body: Stack(
+        children: [
+          appointmentsAsync.when(
         loading: () => _buildLoadingBody(doctorName),
         error: (e, _) => _buildErrorBody(e, doctorName),
         data: (list) {
@@ -741,31 +750,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           return _buildRefreshableScrollView(
             slivers: [
               SliverToBoxAdapter(child: _buildHeader(doctorName)),
-
-              // ── WALK-IN CARD ───────────────────────────────────────
-              SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildWalkInCard(),
-                        AnimatedSize(
-                          duration: const Duration(milliseconds: 250),
-                          curve: Curves.easeInOut,
-                          child: _walkInExpanded && !_isDoctorOnLeaveToday
-                              ? Padding(
-                                  padding: const EdgeInsets.only(top: 10),
-                                  child: _WalkInInlinePanel(
-                                    onBooked: () => setState(() => _walkInExpanded = false),
-                                  ),
-                                )
-                              : const SizedBox.shrink(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
 
               // ── SESSION QUEUE CARDS / EMPTY STATE ──────────────────
               if (visibleSessions.isEmpty) ...[
@@ -826,10 +810,33 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               //   ),
               // ),
 
-              const SliverToBoxAdapter(child: SizedBox(height: 80)),
+              SliverToBoxAdapter(child: SizedBox(height: listBottom)),
             ],
           );
         },
+      ),
+          if (!_isDoctorOnLeaveToday)
+            Positioned(
+              right: 16,
+              bottom: fabBottom,
+              child: FloatingActionButton(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    barrierDismissible: true,
+                    builder: (_) => _WalkInDialog(
+                      onBooked: () => Navigator.of(context).pop(),
+                    ),
+                  );
+                },
+                backgroundColor: kPrimaryDark,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                tooltip: 'Add Walk-in Patient',
+                child: const Icon(Icons.person_add_rounded),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -843,6 +850,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       color: kPrimary,
       onRefresh: _refreshData,
       child: CustomScrollView(
+        controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: slivers,
       ),
@@ -1168,13 +1176,17 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               const Expanded(child: Text('Session',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary))),
             const SizedBox(width: 8),
-            _queueStateBadge(queueState),
+            isEmergency
+                ? _badgeDot('Emergency', kPurpleLight, kPurpleDark, kPurple)
+                : _queueStateBadge(queueState),
             const SizedBox(width: 8),
             _neuIconBtn(
               icon: isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
               color: isRunning ? kAmberDark : kPrimaryDark,
               tooltip: isRunning ? 'Pause' : isPaused ? 'Resume' : 'Start',
-              onTap: isRunning ? () => _onQueuePause(queueId) : () => _onQueueStart(queueId),
+              onTap: isRunning
+                  ? () => _showPauseOptionsDialog(queueId)
+                  : () => _onQueueStart(queueId),
             ),
             if (!isEmergency) ...[
               const SizedBox(width: 6),
@@ -1185,13 +1197,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                 onTap: () => _showCloseDialog(queueId),
               ),
             ],
-            const SizedBox(width: 6),
-            _neuIconBtn(
-              icon: Icons.warning_amber_rounded,
-              color: kPurpleDark,
-              tooltip: 'Emergency pause',
-              onTap: () => _showEmergencyDialog(queueId),
-            ),
+            // emergency pause button — available via pause dialog
+            // const SizedBox(width: 6),
+            // _neuIconBtn(
+            //   icon: Icons.warning_amber_rounded,
+            //   color: kPurpleDark,
+            //   tooltip: 'Emergency pause',
+            //   onTap: () => _showEmergencyDialog(queueId),
+            // ),
           ]),
         ),
 
@@ -1303,11 +1316,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
     return Container(
       decoration: const BoxDecoration(
-        color: kPrimaryDark,
+      //  color: kPrimaryDark,
+          color: Color.fromARGB(255, 25, 136, 108),
         borderRadius: BorderRadius.all(Radius.circular(16)),
         boxShadow: [
-          BoxShadow(color: Color(0xFF0A4A35), offset: Offset(4, 4), blurRadius: 10),
-          BoxShadow(color: Color(0xFF2EC48A), offset: Offset(-3, -3), blurRadius: 8),
+          BoxShadow(color: Color(0x2E000000), offset: Offset(3, 3), blurRadius: 7),
+                BoxShadow(color: Color(0x0FFFFFFF), offset: Offset(-2, -2), blurRadius: 5),
+          // BoxShadow(color: Color(0xFF0A4A35), offset: Offset(4, 4), blurRadius: 10),
+          // BoxShadow(color: Color(0xFF2EC48A), offset: Offset(-3, -3), blurRadius: 8),
         ],
       ),
       padding: const EdgeInsets.all(14),
@@ -1352,12 +1368,31 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
                     color: Colors.white, height: 1.2),
                 overflow: TextOverflow.ellipsis),
-            if (p.gender != null) ...[
-              const SizedBox(height: 3),
-              Text(p.gender!,
-                  style: const TextStyle(fontSize: 12, color: Colors.white60,
-                      fontWeight: FontWeight.w500)),
-            ],
+            const SizedBox(height: 4),
+            Row(children: [
+              if (isIP)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0x33FFFFFF),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0x55FFFFFF)),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    Container(width: 5, height: 5,
+                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle)),
+                    const SizedBox(width: 4),
+                    const Text('In Progress',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700,
+                            color: Colors.white, letterSpacing: 0.2)),
+                  ]),
+                ),
+              if (isIP && p.gender != null) const SizedBox(width: 6),
+              if (p.gender != null)
+                Text(p.gender!,
+                    style: const TextStyle(fontSize: 12, color: Colors.white60,
+                        fontWeight: FontWeight.w500)),
+            ]),
           ])),
         ]),
         const SizedBox(height: 14),
@@ -1413,10 +1448,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   }
 
   Widget _buildUpNextCard(AppointmentList p, QueueState queueState) {
-    final name      = p.patientName ?? 'Patient';
-    final status    = p.status?.toLowerCase().trim() ?? '';
-    final isSkipped = status == 'skipped';
-    final queueActive = queueState == QueueState.running || queueState == QueueState.paused;
+    final name          = p.patientName ?? 'Patient';
+    final status        = p.status?.toLowerCase().trim() ?? '';
+    final isSkipped     = status == 'skipped';
+    final isBooked      = status == 'booked';
+    final queueActive   = queueState == QueueState.running || queueState == QueueState.paused;
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
 
     return Container(
       decoration: const BoxDecoration(
@@ -1469,21 +1506,31 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                 style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500)),
         ])),
         const SizedBox(width: 10),
-        if (isSkipped && queueActive)
+        if (isSkipped && queueActive && !isReceptionist)
           GestureDetector(
             onTap: () => _startSession(p),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: const BoxDecoration(
-                color: kPageBg,
-                borderRadius: BorderRadius.all(Radius.circular(9)),
-                boxShadow: [
-                  BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 6),
-                  BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3),  blurRadius: 6),
-                ],
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 32, 173, 138),
+                borderRadius: BorderRadius.circular(9),
               ),
               child: const Text('Recall',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPrimaryDark)),
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          )
+        else if (isBooked && queueActive && isReceptionist)
+          GestureDetector(
+            onTap: () => _skipPatient(p),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: kRedLight,
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: kRedBorder),
+              ),
+              child: const Text('Skip',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kRedDark)),
             ),
           )
         else
@@ -1621,6 +1668,90 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   // ─────────────────────────────────────────────────────────────────────────
   // DIALOGS
   // ─────────────────────────────────────────────────────────────────────────
+
+  Future<void> _showPauseOptionsDialog(int? queueId) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Container(
+              width: 48, height: 48,
+              decoration: const BoxDecoration(color: kAmberLight, shape: BoxShape.circle),
+              child: const Icon(Icons.pause_rounded, color: kAmberDark, size: 24),
+            ),
+            const SizedBox(height: 12),
+            const Text('Pause Queue',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: kTextPrimary)),
+            const SizedBox(height: 6),
+            const Text('Choose how you want to pause the queue.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: kTextSecondary, height: 1.4)),
+            const SizedBox(height: 20),
+            // Pause
+            GestureDetector(
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await _onQueuePause(queueId);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                decoration: BoxDecoration(
+                  color: kAmberLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kAmberBorder),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Pause',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kAmberDark)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Emergency Pause
+            GestureDetector(
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                await _showEmergencyDialog(queueId);
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                decoration: BoxDecoration(
+                  color: kPurpleLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kPurpleBorder),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Emergency Pause',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kPurpleDark)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            // Cancel
+            GestureDetector(
+              onTap: () => Navigator.of(ctx).pop(),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: const Text('Cancel',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: kTextSecondary)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
 
   Future<void> _showCloseDialog(int? queueId) async {
     final vmState     = ref.read(appointmentViewModelProvider);
@@ -1803,55 +1934,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (confirmed == true) await _onQueuePauseEmergency(queueId);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // WALK-IN CARD  (receptionist only)
-  // ─────────────────────────────────────────────────────────────────────────
-
-  Widget _buildWalkInCard() {
-    final onLeave = _isDoctorOnLeaveToday;
-    return GestureDetector(
-      onTap: onLeave ? null : () => setState(() => _walkInExpanded = !_walkInExpanded),
-      child: Container(
-        decoration: BoxDecoration(
-          color: onLeave ? const Color(0xFFF1F5F9) : kPrimaryLight,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: onLeave ? const Color(0xFFCBD5E1) : const Color(0xFF9FE1CB)),
-        ),
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Row(children: [
-          Container(
-            width: 42, height: 30,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: onLeave ? const Color(0xFFCBD5E1) : const Color(0xFF9FE1CB)),
-            ),
-            alignment: Alignment.center,
-            child: Icon(Icons.person_add_rounded, size: 20, color: onLeave ? kTextMuted : kPrimaryDark),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Add Walk-in Patient',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
-                      color: onLeave ? kTextMuted : Colors.black)),
-              if (onLeave) ...[
-                const SizedBox(height: 3),
-                const Text('Doctor is on leave today',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFFEF4444))),
-              ],
-            ]),
-          ),
-          if (!onLeave)
-            AnimatedRotation(
-              turns: _walkInExpanded ? 0.25 : 0,
-              duration: const Duration(milliseconds: 200),
-              child: const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: kPrimaryDark),
-            ),
-        ]),
-      ),
-    );
-  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // HOME QUICK ACTIONS
@@ -2323,6 +2405,63 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 // WALK-IN INLINE PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// WALK-IN DIALOG
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WalkInDialog extends StatelessWidget {
+  final VoidCallback onBooked;
+  const _WalkInDialog({required this.onBooked});
+
+  @override
+  Widget build(BuildContext context) {
+    final screenH = MediaQuery.of(context).size.height;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: Colors.white,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: screenH * 0.80),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          // ── Header ───────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 12, 10),
+            child: Row(children: [
+              Container(
+                width: 32, height: 32,
+                decoration: const BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle),
+                child: const Icon(Icons.person_add_rounded, size: 16, color: kPrimaryDark),
+              ),
+              const SizedBox(width: 10),
+              const Text('Add Walk-in Patient',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+              const Spacer(),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded, size: 20, color: kTextSecondary),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ]),
+          ),
+          const Divider(height: 1, color: kBorder),
+          // ── Body ─────────────────────────────────────────────────────
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: _WalkInInlinePanel(onBooked: onBooked),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WALK-IN INLINE PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _WalkInInlinePanel extends ConsumerStatefulWidget {
   final VoidCallback onBooked;
   const _WalkInInlinePanel({required this.onBooked});
@@ -2412,7 +2551,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
           .where((slot) {
             if (_hasSessionEndedToday(slot.endTime)) return false;
             final mode = slot.bookingMode ?? 0;
-            return mode == 1 || mode == 2 || mode == 3;
+            return mode == 1 || mode == 3; // queue only — exclude slots-only (mode 2)
           })
           .map((slot) => DoctorAvailabilityModel(
                 dayOfWeek:   dayName,

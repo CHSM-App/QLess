@@ -103,6 +103,9 @@ class _DoctorProfileSetupScreenState
   late Animation<double> _fadeAnim;
 
   // ── Step 1 & 2 Controllers ───────────────────────────────────────────────
+  final _step1FormKey = GlobalKey<FormState>();
+  final _step2FormKey = GlobalKey<FormState>();
+
   final _fullNameController        = TextEditingController();
   final _contactController         = TextEditingController();
   final _emailController           = TextEditingController();
@@ -323,8 +326,6 @@ class _DoctorProfileSetupScreenState
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  bool _isBlank(TextEditingController c) => c.text.trim().isEmpty;
-
   bool _isValidEmail(String email) =>
       RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
           .hasMatch(email.trim());
@@ -427,14 +428,10 @@ class _DoctorProfileSetupScreenState
   // ── Submit handler ────────────────────────────────────────────────────────
   Future<void> _handleSubmit() async {
     if (_step == 1) {
-      if (_isBlank(_fullNameController)) {
-        return _showError('Full Name is required');
-      }
-      if (_isBlank(_contactController)) {
-        return _showError('Contact No is required');
-      }
-      if (_contactController.text.trim().length != 10) {
-        return _showError('Contact No must be 10 digits');
+      if (!(_step1FormKey.currentState?.validate() ?? false)) return;
+
+      if (_mobileExistsError != null) {
+        return _showError(_mobileExistsError!);
       }
       if (ref.read(connectivityNotifierProvider).isOffline) {
         return _showError(connectivityErrorMessage);
@@ -451,27 +448,11 @@ class _DoctorProfileSetupScreenState
       }
       setState(() => _mobileExistsError = null);
 
-      if (_emailController.text.trim().isNotEmpty &&
-          !_isValidEmail(_emailController.text)) {
-        return _showError('Please enter a valid Email Address');
-      }
       if (_selectedGenderId == null || _selectedGenderId! <= 0) {
         return _showError('Gender is required');
       }
       if (_selectedSpecialization.isEmpty) {
         return _showError('Specialization is required');
-      }
-      if (_isBlank(_qualificationController)) {
-        return _showError('Qualification is required');
-      }
-      if (_isBlank(_licenseController)) {
-        return _showError('License Number is required');
-      }
-      if (_isBlank(_experienceController)) {
-        return _showError('Experience is required');
-      }
-      if (int.tryParse(_experienceController.text.trim()) == null) {
-        return _showError('Experience must be a valid number');
       }
       setState(() => _step = 2);
       _animateStep();
@@ -479,19 +460,8 @@ class _DoctorProfileSetupScreenState
     }
 
     if (_step == 2) {
-      if (_isBlank(_clinicNameController)) {
-        return _showError('Clinic Name is required');
-      }
-      if (_isBlank(_clinicAddressController)) {
-        return _showError('Clinic Address is required');
-      }
-      if (_isBlank(_clinicContactController)) {
-        return _showError('Clinic Contact is required');
-      }
-      if (_clinicEmailController.text.trim().isNotEmpty &&
-          !_isValidEmail(_clinicEmailController.text)) {
-        return _showError('Please enter a valid Clinic Email Address');
-      }
+      if (!(_step2FormKey.currentState?.validate() ?? false)) return;
+
       if (ref.read(connectivityNotifierProvider).isOffline) {
         return _showError(connectivityErrorMessage);
       }
@@ -747,182 +717,222 @@ class _DoctorProfileSetupScreenState
 
   // ─── Step 1: Personal & Professional Info ─────────────────────────────────
   Widget _buildStep1() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Avatar picker
-        // Center(child: _DoctorAvatarPicker(
-        //   photo: _doctorPhoto,
-        //   onTap: () => _pickImage(true),
-        // )),
-        // const SizedBox(height: 22),
+    return Form(
+      key: _step1FormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Basic Details card
+          _SectionCard(
+            icon: Icons.person_outline_rounded,
+            iconBg: kPrimaryLight,
+            iconColor: kPrimaryDark,
+            title: 'Basic Details',
+            subtitle: 'Your personal information',
+            children: [
+              _buildField('Full Name', _fullNameController,
+                  hint: 'Dr. Arjun Sharma',
+                  required: true,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Full name is required'
+                      : null),
+              _buildField('Contact No', _contactController,
+                  hint: '9876543210',
+                  keyboard: TextInputType.phone,
+                  required: true,
+                  onChanged: _onContactChanged,
+                  errorText: _mobileExistsError,
+                  prefixWidget: const _PhonePrefix(),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Contact No is required';
+                    if (v.trim().length != 10) return 'Enter a valid 10-digit number';
+                    return null;
+                  }),
+              _buildField('Email Address', _emailController,
+                  hint: 'doctor@email.com',
+                  icon: Icons.email_outlined,
+                  keyboard: TextInputType.emailAddress,
+                  validator: (v) {
+                    if (v != null && v.trim().isNotEmpty && !_isValidEmail(v)) {
+                      return 'Enter a valid email address';
+                    }
+                    return null;
+                  }),
+              const _FieldLabel(label: 'Gender', required: true),
+              const SizedBox(height: 10),
+              _GenderSelector(
+                options: _genderOptions
+                    .map((e) => e['label'] as String)
+                    .toList(),
+                selected: _selectedGender,
+                onChanged: (val) => setState(() {
+                  _selectedGender = val;
+                  _selectedGenderId = _genderOptions
+                      .firstWhere((e) => e['label'] == val)['id'] as int;
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
 
-        // Basic Details card
-        _SectionCard(
-          icon: Icons.person_outline_rounded,
-          iconBg: kPrimaryLight,
-          iconColor: kPrimaryDark,
-          title: 'Basic Details',
-          subtitle: 'Your personal information',
-          children: [
-            _buildField('Full Name', _fullNameController,
-                hint: 'Dr. Arjun Sharma', required: true),
-            _buildField('Contact No', _contactController,
-                hint: '9876543210',
-                keyboard: TextInputType.phone,
-                required: true,
-                onChanged: _onContactChanged,
-                errorText: _mobileExistsError,
-                prefixWidget: const _PhonePrefix(),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(10),
-                ]),
-            _buildField('Email Address', _emailController,
-                hint: 'doctor@email.com',
-                icon: Icons.email_outlined,
-                keyboard: TextInputType.emailAddress),
-            const _FieldLabel(label: 'Gender', required: true),
-            const SizedBox(height: 10),
-            _GenderSelector(
-              options: _genderOptions
-                  .map((e) => e['label'] as String)
-                  .toList(),
-              selected: _selectedGender,
-              onChanged: (val) => setState(() {
-                _selectedGender = val;
-                _selectedGenderId = _genderOptions
-                    .firstWhere((e) => e['label'] == val)['id'] as int;
-              }),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-
-        // Professional Info card
-        _SectionCard(
-          icon: Icons.workspace_premium_outlined,
-          iconBg: kInfoLight,
-          iconColor: kInfo,
-          title: 'Professional Info',
-          subtitle: 'Your credentials and expertise',
-          children: [
-            _buildSpecializationDropdown(),
-            _buildField('Qualification', _qualificationController,
-                hint: 'MBBS, MD...',
-                icon: Icons.school_outlined,
-                required: true),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildField('License No', _licenseController,
-                      hint: 'MCI-XXXXX',
-                      icon: Icons.badge_outlined,
-                      required: true),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildField(
-                      'Experience (yrs)', _experienceController,
-                      hint: 'e.g. 8',
-                      icon: Icons.work_history_outlined,
-                      keyboard: TextInputType.number,
-                      required: true),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
+          // Professional Info card
+          _SectionCard(
+            icon: Icons.workspace_premium_outlined,
+            iconBg: kInfoLight,
+            iconColor: kInfo,
+            title: 'Professional Info',
+            subtitle: 'Your credentials and expertise',
+            children: [
+              _buildSpecializationDropdown(),
+              _buildField('Qualification', _qualificationController,
+                  hint: 'MBBS, MD...',
+                  icon: Icons.school_outlined,
+                  required: true,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Qualification is required'
+                      : null),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField('License No', _licenseController,
+                        hint: 'MCI-XXXXX',
+                        icon: Icons.badge_outlined,
+                        required: true,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'License No is required'
+                            : null),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                        'Experience (yrs)', _experienceController,
+                        hint: 'e.g. 8',
+                        icon: Icons.work_history_outlined,
+                        keyboard: TextInputType.number,
+                        required: true,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Experience is required';
+                          if (int.tryParse(v.trim()) == null) return 'Enter a valid number';
+                          return null;
+                        }),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   // ─── Step 2: Clinic Details ───────────────────────────────────────────────
   Widget _buildStep2() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Clinic photos
-        _ClinicPhotoGrid(
-          photos: _clinicPhotos,
-          onAdd: () => _pickImage(false),
-          onRemove: (i) => setState(() => _clinicPhotos.removeAt(i)),
-          onPreview: (i) => _previewClinicPhoto(_clinicPhotos[i]),
-        ),
-        const SizedBox(height: 18),
+    return Form(
+      key: _step2FormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Clinic photos
+          _ClinicPhotoGrid(
+            photos: _clinicPhotos,
+            onAdd: () => _pickImage(false),
+            onRemove: (i) => setState(() => _clinicPhotos.removeAt(i)),
+            onPreview: (i) => _previewClinicPhoto(_clinicPhotos[i]),
+          ),
+          const SizedBox(height: 18),
 
-        // Clinic Details card
-        _SectionCard(
-          icon: Icons.local_hospital_outlined,
-          iconBg: kPrimaryLight,
-          iconColor: kPrimaryDark,
-          title: 'Clinic Details',
-          subtitle: 'Where your patients can find you',
-          children: [
-            _buildField('Clinic Name', _clinicNameController,
-                hint: 'Apollo Clinic',
-                icon: Icons.business_outlined,
-                required: true),
-            _buildTextArea(
-                'Clinic Address', _clinicAddressController,
-                hint: '123, MG Road, Panaji, Goa',
-                required: true),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildField(
-                      'Clinic Contact', _clinicContactController,
-                      hint: '9876543210',
-                      keyboard: TextInputType.phone,
-                      required: true,
-                      icon: Icons.phone_outlined,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
-                      ]),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildField(
-                      'Clinic Email', _clinicEmailController,
-                      hint: 'clinic@...',
-                      icon: Icons.email_outlined,
-                      keyboard: TextInputType.emailAddress),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildField(
-                      'Website', _clinicWebsiteController,
-                      hint: 'www.clinic.com',
-                      icon: Icons.language_outlined),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildField(
-                      'Fee (₹)', _consultationFeeController,
-                      hint: '500',
-                      icon: Icons.currency_rupee_rounded,
-                      keyboard: TextInputType.number),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
+          // Clinic Details card
+          _SectionCard(
+            icon: Icons.local_hospital_outlined,
+            iconBg: kPrimaryLight,
+            iconColor: kPrimaryDark,
+            title: 'Clinic Details',
+            subtitle: 'Where your patients can find you',
+            children: [
+              _buildField('Clinic Name', _clinicNameController,
+                  hint: 'Apollo Clinic',
+                  icon: Icons.business_outlined,
+                  required: true,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Clinic name is required'
+                      : null),
+              _buildTextArea(
+                  'Clinic Address', _clinicAddressController,
+                  hint: '123, MG Road, Panaji, Goa',
+                  required: true,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Clinic address is required'
+                      : null),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                        'Clinic Contact', _clinicContactController,
+                        hint: '9876543210',
+                        keyboard: TextInputType.phone,
+                        required: true,
+                        icon: Icons.phone_outlined,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Clinic contact is required'
+                            : null),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                        'Clinic Email', _clinicEmailController,
+                        hint: 'clinic@...',
+                        icon: Icons.email_outlined,
+                        keyboard: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v != null && v.trim().isNotEmpty && !_isValidEmail(v)) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        }),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                        'Website', _clinicWebsiteController,
+                        hint: 'www.clinic.com',
+                        icon: Icons.language_outlined),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                        'Fee (₹)', _consultationFeeController,
+                        hint: '500',
+                        icon: Icons.currency_rupee_rounded,
+                        keyboard: TextInputType.number),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
 
-        // Location card
-        _SectionCard(
-          icon: Icons.location_on_outlined,
-          iconBg: kAmberLight,
-          iconColor: kWarning,
-          title: 'Clinic Location',
-          subtitle: 'Pin your clinic on the map',
-          children: [_buildLocationField()],
-        ),
-      ],
+          // Location card
+          _SectionCard(
+            icon: Icons.location_on_outlined,
+            iconBg: kAmberLight,
+            iconColor: kWarning,
+            title: 'Clinic Location',
+            subtitle: 'Pin your clinic on the map',
+            children: [_buildLocationField()],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1119,6 +1129,7 @@ class _DoctorProfileSetupScreenState
     String? errorText,
     Widget? prefixWidget,
     List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1127,11 +1138,12 @@ class _DoctorProfileSetupScreenState
         children: [
           _FieldLabel(label: label, required: required),
           const SizedBox(height: 8),
-          TextField(
+          TextFormField(
             controller: controller,
             keyboardType: keyboard,
             onChanged: onChanged,
             inputFormatters: inputFormatters,
+            validator: validator,
             style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF1A1D2E),
@@ -1163,6 +1175,16 @@ class _DoctorProfileSetupScreenState
                     ? const BorderSide(color: kError, width: 1.6)
                     : const BorderSide(color: kPrimary, width: 1.6),
               ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError, width: 1.6),
+              ),
+              errorStyle: const TextStyle(
+                  fontSize: 9.5, color: kError, fontWeight: FontWeight.w600),
             ),
           ),
           if (errorText != null) ...[
@@ -1190,6 +1212,7 @@ class _DoctorProfileSetupScreenState
     TextEditingController controller, {
     String hint = '',
     bool required = false,
+    String? Function(String?)? validator,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1198,9 +1221,10 @@ class _DoctorProfileSetupScreenState
         children: [
           _FieldLabel(label: label, required: required),
           const SizedBox(height: 8),
-          TextField(
+          TextFormField(
             controller: controller,
             maxLines: 3,
+            validator: validator,
             style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF1A1D2E),
@@ -1224,6 +1248,16 @@ class _DoctorProfileSetupScreenState
                 borderRadius: BorderRadius.circular(13),
                 borderSide: const BorderSide(color: kPrimary, width: 1.6),
               ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError, width: 1.6),
+              ),
+              errorStyle: const TextStyle(
+                  fontSize: 9.5, color: kError, fontWeight: FontWeight.w600),
             ),
           ),
         ],

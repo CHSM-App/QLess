@@ -147,17 +147,17 @@ String? _networkImageUrl;   // ← add this
     if (!_didSubmit) return;
     if (next.isSuccess && !(prev?.isSuccess ?? false)) {
       _didSubmit = false;
+      _isSubmitting = false;
+      // Pop immediately — don't wait for checkPhonePatient before navigating.
+      // Profile screen's .then() already re-fetches the profile on return.
+      if (!mounted) return;
       _snack('Profile updated successfully', success: true);
       final mobile = next.mobileNo;
-      Future<void>(() async {
-        if (mobile != null && mobile.trim().isNotEmpty) {
-          await ref
-              .read(patientLoginViewModelProvider.notifier)
-              .checkPhonePatient(mobile);
-        }
-        if (!mounted) return;
-        Navigator.pop(context, true);
-      });
+      Navigator.pop(context, true);
+      // Refresh in background so profile screen has latest data.
+      if (mobile != null && mobile.trim().isNotEmpty) {
+        ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+      }
       return;
     }
     if (next.error != null && next.error != prev?.error) {

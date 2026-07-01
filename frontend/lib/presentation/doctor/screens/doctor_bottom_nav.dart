@@ -384,12 +384,16 @@ final showAppBar = false;
         padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
         child: Container(
           height: navHeight,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: _neuNavBg,
-            borderRadius: BorderRadius.all(Radius.circular(32)),
+            borderRadius: const BorderRadius.all(Radius.circular(32)),
             boxShadow: [
-              BoxShadow(color: _neuLight, offset: Offset(-6, -6), blurRadius: 14, spreadRadius: 1),
-              BoxShadow(color: _neuDark,  offset: Offset(6, 6),   blurRadius: 14, spreadRadius: 1),
+              // bottom
+              BoxShadow(color: Colors.black.withValues(alpha: 0.15), offset: const Offset(0, 6),  blurRadius: 14, spreadRadius: -1),
+              // left
+              BoxShadow(color: Colors.black.withValues(alpha: 0.15), offset: const Offset(-5, 2), blurRadius: 12, spreadRadius: -1),
+              // right
+              BoxShadow(color: Colors.black.withValues(alpha: 0.15), offset: const Offset(5, 2),  blurRadius: 12, spreadRadius: -1),
             ],
           ),
           child: LayoutBuilder(
