@@ -32,7 +32,7 @@ router.delete("/deleteFamilyMember/:member_id", async (req, res) => {
       success,
       message
     });
-    
+
   } catch (err) {
     log.error('Error in deleteFamily Members API: ' + err.message);
 
@@ -49,7 +49,7 @@ router.delete("/favoriteDoctor/:patient_id/:doctor_id/:clinic_id", async (req, r
   try {
     const { patient_id, doctor_id, clinic_id } = req.params;
 
-    if (!patient_id || !doctor_id|| !clinic_id) {
+    if (!patient_id || !doctor_id || !clinic_id) {
       return res.status(400).json({
         success: false,
         message: "patient_id, doctor_id, and clinic_id are required"
@@ -60,7 +60,7 @@ router.delete("/favoriteDoctor/:patient_id/:doctor_id/:clinic_id", async (req, r
     request.input("operation", "Delete");
     request.input("patient_id", sql.Int, parseInt(patient_id));
     request.input("doctor_id", sql.Int, parseInt(doctor_id));
-   request.input("clinic_id", sql.NVarChar(50), clinic_id);
+    request.input("clinic_id", sql.NVarChar(50), clinic_id);
 
     const result = await request.execute("sp_favorite_doctors");
 

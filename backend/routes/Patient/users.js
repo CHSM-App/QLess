@@ -40,7 +40,7 @@ router.get('/getDoctorAvailability/:doctor_id/:clinic_id', async (req, res) => {
     const result = await db.request()
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id || null)
-	  .input('operation', 'doctor_availability')
+      .input('operation', 'doctor_availability')
       .execute('sp_patients');
 
     res.status(200).json(result.recordset);
@@ -57,7 +57,7 @@ router.get('/getDoctorAvailability/:doctor_id/:clinic_id', async (req, res) => {
 // Active future leave ranges for a doctor — patient app greys these
 // out in the appointment-date calendar.
 router.get('/getDoctorLeaveDates/:doctor_id/:clinic_id', async (req, res) => {
-  const { doctor_id,clinic_id } = req.params;
+  const { doctor_id, clinic_id } = req.params;
 
   try {
     const result = await db.request()
@@ -68,7 +68,7 @@ router.get('/getDoctorLeaveDates/:doctor_id/:clinic_id', async (req, res) => {
 
     res.status(200).json(result.recordset || []);
 
-    
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -84,7 +84,7 @@ router.get('/getDoctors/:patient_id', async (req, res) => {
 
     const result = await db.request()
       .input('operation', 'getDoctors')
-	  .input('patient_id', patient_id)
+      .input('patient_id', patient_id)
       .execute('sp_patients');
 
     res.status(200).json(result.recordset);
@@ -105,7 +105,7 @@ router.get('/patientPrescriptionList/:patient_id', async (req, res) => {
 
     const result = await db.request()
       .input('patient_id', patient_id)
-	  .input('operation', 'PatientPrescriptionList')
+      .input('operation', 'PatientPrescriptionList')
       .execute('sp_prescription');
 
     res.status(200).json(result.recordset);
@@ -128,7 +128,7 @@ router.get('/patientPrescriptionDetails/:prescription_id', async (req, res) => {
 
     const result = await db.request()
       .input('prescription_id', prescription_id)
-	  .input('operation', 'PrescriptionDetail')
+      .input('operation', 'PrescriptionDetail')
       .execute('sp_prescription');
 
     res.status(200).json(result.recordset);
@@ -151,7 +151,7 @@ router.get('/appointment/getBookedSlots/:doctor_id/:clinic_id', async (req, res)
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
-	  
+
     res.status(200).json(result.recordset);
 
   } catch (error) {
@@ -235,9 +235,9 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
               estimated_arrival_time: q.estimated_arrival_time,
               queue_started: q.queue_started,
               is_my_turn: q.is_my_turn,
-				total_queue: q?.total_queue ?? null,
-        current_serving: q?.current_serving ?? null,
-				queue_state: q?.status ?? null
+              total_queue: q?.total_queue ?? null,
+              current_serving: q?.current_serving ?? null,
+              queue_state: q?.status ?? null
             };
           }
         } catch (err) {
@@ -393,7 +393,7 @@ router.get('/review/doctor/:doctor_id/:clinic_id', async (req, res) => {
     const result = await db.request()
       .input('operation', 'Fetch')
       .input('doctor_id', doctor_id)
-      .input('clinic_id', clinic_id )
+      .input('clinic_id', clinic_id)
       .execute('sp_review');
 
     res.status(200).json(result.recordset || []);

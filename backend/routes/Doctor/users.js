@@ -67,7 +67,7 @@ router.get('/getAllMedicines/:doctor_id', async (req, res) => {
     const result = await request.execute('sp_Medicine_Master');
 
     res.status(200).json(
-        result.recordset
+      result.recordset
     );
 
   } catch (error) {
@@ -99,11 +99,11 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
       if (!grouped[row.day_of_week]) {
         grouped[row.day_of_week] = {
           day: row.day_of_week,
-          is_enabled: row.is_enabled ? 1:0,
+          is_enabled: row.is_enabled ? 1 : 0,
           slots: []
         };
       }
- 
+
 
 
       if (row.slot_id) {
@@ -113,7 +113,7 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
           end_time: row.end_time,
           booking_mode: row.booking_mode,
           slot_duration: row.slot_duration,
-		  max_queue_length: row.max_queue_length
+          max_queue_length: row.max_queue_length
         });
       }
     }
@@ -121,8 +121,8 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
     const schedule = Object.values(grouped);
 
     res.status(200).json({
-        doctor_id: parseInt(doctor_id),
-        schedule: schedule
+      doctor_id: parseInt(doctor_id),
+      schedule: schedule
     });
 
   } catch (error) {
@@ -152,7 +152,7 @@ router.get('/patientAppointmentList/:doctor_id', async (req, res) => {
     const result = await request.execute('sp_appointment');
 
     res.status(200).json(
-        result.recordset
+      result.recordset
     );
 
   } catch (error) {
@@ -169,7 +169,7 @@ router.get('/appointmentWisePrescription/:appointment_id', async (req, res) => {
 
     const result = await db.request()
       .input('appointment_id', appointment_id)
-	  .input('operation', 'AppointmentWisePrescription')
+      .input('operation', 'AppointmentWisePrescription')
       .execute('sp_prescription');
 
     res.status(200).json(result.recordset);

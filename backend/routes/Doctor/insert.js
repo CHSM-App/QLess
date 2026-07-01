@@ -140,23 +140,23 @@ async function sendPositionNotifications(doctor_id, appointment_id) {
     if (rows.length === 0) return;
 
     for (const row of rows) {
-      const pos      = Number(row.position);
-      const doctor   = row.doctor_name || 'your doctor';
+      const pos = Number(row.position);
+      const doctor = row.doctor_name || 'your doctor';
       const patient_id = row.patient_id;
-      const aptId    = row.appointment_id;
-      const token    = row.token;
+      const aptId = row.appointment_id;
+      const token = row.token;
       if (!patient_id || !aptId) continue;
 
       let stage, title, body;
       if (pos === 1) {
-        stage = 'queue_next';  title = "You're Next!";
-        body  = `Dr. ${doctor} is ready for you. Please come in.`;
+        stage = 'queue_next'; title = "You're Next!";
+        body = `Dr. ${doctor} is ready for you. Please come in.`;
       } else if (pos === 2) {
         stage = 'queue_ready'; title = 'Get Ready!';
-        body  = `You're 2nd in line for Dr. ${doctor}. Please be at the clinic.`;
+        body = `You're 2nd in line for Dr. ${doctor}. Please be at the clinic.`;
       } else if (pos === 3) {
-        stage = 'queue_soon';  title = '3rd in Queue';
-        body  = `You're 3rd in line for Dr. ${doctor}. Get ready.`;
+        stage = 'queue_soon'; title = '3rd in Queue';
+        body = `You're 3rd in line for Dr. ${doctor}. Get ready.`;
       } else { continue; }
 
       const refId = `${aptId}:${stage}`;
@@ -1036,7 +1036,7 @@ router.post('/insertPrescription', async (req, res) => {
 
     if (appointment_id) {
       const reviewTitle = 'Appointment Complete';
-      const reviewBody  =
+      const reviewBody =
         `Your appointment with ${drLabel} is complete. Tap to leave a review.`;
 
       await insertNotification(
@@ -1221,7 +1221,7 @@ router.post('/appointment/queueStart', async (req, res) => {
       });
     }
 
-	  let doctorName = 'your doctor';
+    let doctorName = 'your doctor';
     try {
       const ctx = await db.request()
         .input('operation', 'APPT_CONTEXT_QUEUE')
@@ -1231,12 +1231,12 @@ router.post('/appointment/queueStart', async (req, res) => {
       doctorName = ctx.recordset?.[0]?.doctor_name || 'your doctor';
     } catch (e) { log.error('[queueStart] name lookup failed: ' + e.message); }
     const startTitle = 'Doctor Arrived';
-     const startBody = `Dr. ${doctorName} has started the queue. Please be ready.`;
+    const startBody = `Dr. ${doctorName} has started the queue. Please be ready.`;
 
     for (const tk of tokens) {
       await insertNotificationForToken(tk, startTitle, startBody, 'queue', doctor_id);
     }
-    
+
 
     // 🔥 SEND NOTIFICATION
     const message = {
@@ -1289,8 +1289,8 @@ router.post('/appointment/queuePause', async (req, res) => {
     // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
     // live in `result.recordsets[1]`.
     const recordsets = result.recordsets || [];
-    const statusRow  = recordsets[0]?.[0] || {};
-    const tokenRows  = recordsets[1] || [];
+    const statusRow = recordsets[0]?.[0] || {};
+    const tokenRows = recordsets[1] || [];
 
     // ✅ CHECK SUCCESS
     if (statusRow.success !== 1) {
@@ -1308,7 +1308,7 @@ router.post('/appointment/queuePause', async (req, res) => {
 
     // 🔔 SEND NOTIFICATION
     if (tokens.length > 0) {
-		 let doctorName = 'your doctor';
+      let doctorName = 'your doctor';
       try {
         const ctx = await db.request()
           .input('operation', 'APPT_CONTEXT_QUEUE')
@@ -1318,7 +1318,7 @@ router.post('/appointment/queuePause', async (req, res) => {
         doctorName = ctx.recordset?.[0]?.doctor_name || 'your doctor';
       } catch (e) { log.error('[queuePause] name lookup failed: ' + e.message); }
       const pauseTitle = 'Queue Paused';
-       const pauseBody = `Dr. ${doctorName} has paused the queue. Please wait.`;
+      const pauseBody = `Dr. ${doctorName} has paused the queue. Please wait.`;
 
       for (const tk of tokens) {
         await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', doctor_id);
@@ -1738,8 +1738,8 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
     // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
     // live in `result.recordsets[1]`.
     const recordsets = result.recordsets || [];
-    const statusRow  = recordsets[0]?.[0] || {};
-    const tokenRows  = recordsets[1] || [];
+    const statusRow = recordsets[0]?.[0] || {};
+    const tokenRows = recordsets[1] || [];
 
     log.debug('[queuePauseEmergency] recordsets count: ' + recordsets.length);
     log.debug('[queuePauseEmergency] status row: ' + JSON.stringify(statusRow));
@@ -2172,7 +2172,7 @@ router.post('/walkInBook', async (req, res) => {
       .execute('sp_appointment');
 
     const booked = bookRes.recordset[0].success === 1;
-    log.info(`walkInBook: patient_id=${patient_id} user_type=${user_type} family_id=${family_id||null} booked=${booked} msg=${bookRes.recordset[0].message}`);
+    log.info(`walkInBook: patient_id=${patient_id} user_type=${user_type} family_id=${family_id || null} booked=${booked} msg=${bookRes.recordset[0].message}`);
     if (booked) emitQueueUpdate(req, 'booked', doctor_id);
 
     return res.json({

@@ -90,13 +90,13 @@ router.post('/appointment/book', async (req, res) => {
 
     const result = await db.request()
       .input('operation', 'BOOK')
-	  .input('user_type', user_type)
+      .input('user_type', user_type)
       .input('doctor_id', doctor_id)
       .input('patient_id', patient_id)
       .input('appointment_date', appointment_date)
       .input('start_time', start_time)
-	  .input('slot_id', slot_id)
-	  .input('symptoms', symptoms)
+      .input('slot_id', slot_id)
+      .input('symptoms', symptoms)
       .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
@@ -237,8 +237,8 @@ router.post('/rescheduleAppointment', async (req, res) => {
     doctor_id,
     appointment_date,
     start_time,
-	slot_id,
-	  symptoms
+    slot_id,
+    symptoms
   } = req.body;
 
   try {
@@ -248,9 +248,9 @@ router.post('/rescheduleAppointment', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('appointment_date', appointment_date)
       .input('start_time', start_time)
-	  .input('slot_id', slot_id)
-		  .input('symptoms', symptoms)
-	
+      .input('slot_id', slot_id)
+      .input('symptoms', symptoms)
+
       .execute('sp_appointment');
 
     emitQueueUpdate(req, 'rescheduled', doctor_id);
@@ -279,7 +279,7 @@ router.post('/cancelAppointment/:appointment_id', async (req, res) => {
         .input('appointment_id', appointment_id)
         .query('SELECT TOP 1 doctor_id FROM appointments WHERE appointment_id = @appointment_id');
       doctor_id = dr.recordset?.[0]?.doctor_id ?? null;
-    } catch (_) {}
+    } catch (_) { }
 
     const result = await db.request()
       .input('operation', 'CANCEL_APPOINTMENT')
@@ -331,7 +331,7 @@ router.post('/queueEstimate', async (req, res) => {
 router.post('/queuePreviewEstimate', async (req, res) => {
   const {
     doctor_id,
-	  slot_id,
+    slot_id,
     clinic_id
   } = req.body;
 
@@ -339,7 +339,7 @@ router.post('/queuePreviewEstimate', async (req, res) => {
     const result = await db.request()
       .input('operation', 'QUEUE_PREVIEW_ESTIMATE')
       .input('doctor_id', doctor_id)
-	  .input('slot_id', slot_id)
+      .input('slot_id', slot_id)
       .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
@@ -414,7 +414,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
     }
 
     res.status(200).json(
-     enrichedAppointments
+      enrichedAppointments
     );
 
   } catch (error) {

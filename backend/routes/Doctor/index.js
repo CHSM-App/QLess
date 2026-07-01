@@ -33,7 +33,7 @@ router.delete("/deleteMedicine/:doctor_id/:medicine_id", async (req, res) => {
       success,
       message
     });
-    
+
   } catch (err) {
     log.error('Error in deleteMedicine API: ' + err.message);
 
@@ -115,7 +115,7 @@ router.delete("/deletereceptionist/:recep_id", async (req, res) => {
       success,
       message
     });
-    
+
   } catch (err) {
     log.error('Error in deleteReceptionist API: ' + err.message);
 
