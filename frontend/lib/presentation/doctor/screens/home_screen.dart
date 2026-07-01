@@ -294,6 +294,19 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
   }
 
+  List<AppointmentList> _todaySlotPatients(List<AppointmentList> all) {
+    final today = DateTime.now();
+    return all.where((a) {
+      if (a.bookingType != 2) return false;
+      final d = DateTime.tryParse(a.appointmentDate ?? '');
+      if (d == null) return false;
+      final s = a.status?.toLowerCase().trim() ?? '';
+      return (s == 'booked' || s == 'in_progress' || s == 'skipped') &&
+          d.year == today.year && d.month == today.month && d.day == today.day;
+    }).toList()
+      ..sort((a, b) => (a.startTime ?? '').compareTo(b.startTime ?? ''));
+  }
+
   int _todayTotalCount(List<AppointmentList> all) {
     final today = DateTime.now();
     return all.where((a) {
@@ -741,11 +754,39 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           final skipped        = _skippedToday(filteredList);
           final allSessions    = vmState.todayQueueResult?.value ?? [];
           final activeQueueIds = filteredList.map((a) => a.queueId).whereType<int>().toSet();
+          final todaySlotPts   = _todaySlotPatients(filteredList);
           final visibleSessions = allSessions
               .where((s) => _shouldShowSession(s) &&
-                  (currentClinicId == null || activeQueueIds.contains(s.queueId)))
+                  (currentClinicId == null ||
+                   activeQueueIds.contains(s.queueId) ||
+                   todaySlotPts.any((p) {
+                     final sessStart = _instantOf(s.startTime as String?);
+                     final sessEnd   = _instantOf(s.endTime as String?);
+                     final pt = _instantOf(p.startTime);
+                     if (pt == null) return true;
+                     if (sessStart != null && pt.isBefore(sessStart)) return false;
+                     if (sessEnd   != null && !pt.isBefore(sessEnd))  return false;
+                     return true;
+                   })))
               .toList();
           final todayActivePts = _todayActivePatients(filteredList);
+
+          // slot patients not matched to any visible session
+          final matchedSlotIds = <int?>{};
+          for (final s in visibleSessions) {
+            final ss = _instantOf(s.startTime as String?);
+            final se = _instantOf(s.endTime as String?);
+            for (final p in todaySlotPts) {
+              final pt = _instantOf(p.startTime);
+              final inRange = pt == null ||
+                  ((ss == null || !pt.isBefore(ss)) &&
+                   (se == null || pt.isBefore(se)));
+              if (inRange) matchedSlotIds.add(p.appointmentId);
+            }
+          }
+          final unmatchedSlotPts = todaySlotPts
+              .where((p) => !matchedSlotIds.contains(p.appointmentId))
+              .toList();
 
           return _buildRefreshableScrollView(
             slivers: [
@@ -753,14 +794,21 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
               // ── SESSION QUEUE CARDS / EMPTY STATE ──────────────────
               if (visibleSessions.isEmpty) ...[
-                if (_todayScheduledSlots().isEmpty)
+                if (todaySlotPts.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                      child: _buildStandaloneSlotSection(todaySlotPts),
+                    ),
+                  )
+                else if (_todayScheduledSlots().isEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                       child: _buildNoLiveSessions(),
                     ),
                   ),
-              ] else
+              ] else ...[
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                   sliver: SliverList(
@@ -784,16 +832,28 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                             ? sessionBooked.first.queueNumber
                             : null;
 
+                        // slot patients — match by session time range
+                        final sessStart = _instantOf(session.startTime as String?);
+                        final sessEnd   = _instantOf(session.endTime as String?);
+                        final sessionSlotPts = todaySlotPts.where((p) {
+                          final pt = _instantOf(p.startTime);
+                          if (pt == null) return true;
+                          if (sessStart != null && pt.isBefore(sessStart)) return false;
+                          if (sessEnd   != null && !pt.isBefore(sessEnd))  return false;
+                          return true;
+                        }).toList();
+
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 14),
                           child: _buildSessionAccordion(
-                            sessionIndex:   i,
-                            queueId:        session.queueId,
-                            slotLabel:      slotLbl,
-                            queueState:     sessionQs,
-                            sessionPts:     sessionPts,
-                            sessionHasIP:   sessionHasIP,
-                            sessionNextQNo: sessionNextQNo,
+                            sessionIndex:    i,
+                            queueId:         session.queueId,
+                            slotLabel:       slotLbl,
+                            queueState:      sessionQs,
+                            sessionPts:      sessionPts,
+                            sessionHasIP:    sessionHasIP,
+                            sessionNextQNo:  sessionNextQNo,
+                            sessionSlotPts:  sessionSlotPts,
                           ),
                         );
                       },
@@ -801,6 +861,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                     ),
                   ),
                 ),
+                if (unmatchedSlotPts.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                      child: _buildStandaloneSlotSection(unmatchedSlotPts),
+                    ),
+                  ),
+              ],
 
               // ── QUICK ACTIONS ───────────────────────────────────────
               // SliverToBoxAdapter(
@@ -1115,6 +1183,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     required List<AppointmentList> sessionPts,
     required bool sessionHasIP,
     required int? sessionNextQNo,
+    required List<AppointmentList> sessionSlotPts,
   }) {
     if (queueState == QueueState.stopped) return const SizedBox.shrink();
 
@@ -1136,11 +1205,14 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         .toList()
       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
 
+    final cardBorderColor = isRunning ? kCardBorder : isPaused ? kCardBorder : kCardBorder;
+
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: kPageBg,
-        borderRadius: BorderRadius.all(Radius.circular(22)),
-        boxShadow: [
+        borderRadius: const BorderRadius.all(Radius.circular(22)),
+        border: Border.fromBorderSide(BorderSide(color: cardBorderColor)),
+        boxShadow: const [
           BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-7, -7), blurRadius: 16, spreadRadius: 1),
           BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(7, 7),  blurRadius: 16, spreadRadius: 1),
         ],
@@ -1261,6 +1333,228 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           ),
         ] else
           const SizedBox(height: 14),
+
+        // ── SLOT PATIENTS ─────────────────────────────────────────────
+        if (sessionSlotPts.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+            child: Row(children: [
+              const Icon(Icons.schedule_rounded, size: 13, color: kTextSecondary),
+              const SizedBox(width: 6),
+              const Text('Scheduled Slots',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                      color: kTextSecondary, letterSpacing: 0.2)),
+              const Spacer(),
+              Text('${sessionSlotPts.length} booked',
+                  style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500)),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+            child: Column(children: sessionSlotPts
+                .map((p) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildSlotPatientCard(p, queueState),
+                    ))
+                .toList()),
+          ),
+        ] else
+          const SizedBox(height: 0),
+      ]),
+    );
+  }
+
+  Widget _buildStandaloneSlotSection(List<AppointmentList> patients) {
+    // find schedule slot's configured time range via slotId
+    final slotId = patients.first.slotId;
+    String? timeRange;
+    if (slotId != null) {
+      final scheduleSlots = _todayScheduledSlots();
+      final match = scheduleSlots.where((s) => s.slotId == slotId).firstOrNull;
+      if (match != null) {
+        final s = _fmtScheduleTime(match.startTime);
+        final e = _fmtScheduleTime(match.endTime);
+        if (s.isNotEmpty && e.isNotEmpty) { timeRange = '$s – $e'; }
+        else if (s.isNotEmpty) { timeRange = s; }
+      }
+    }
+    // fallback: first–last patient appointment times
+    timeRange ??= () {
+      final s = _fmtTime(patients.first.startTime);
+      final e = _fmtTime(patients.last.startTime);
+      if (s.isEmpty) return null;
+      return (e.isNotEmpty && e != s) ? '$s – $e' : s;
+    }();
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: kPageBg,
+        borderRadius: BorderRadius.all(Radius.circular(22)),
+        border: Border.fromBorderSide(BorderSide(color: kCardBorder)),
+        boxShadow: [
+          BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-7, -7), blurRadius: 16, spreadRadius: 1),
+          BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(7, 7),  blurRadius: 16, spreadRadius: 1),
+        ],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+          child: Row(children: [
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(color: kBlueLight, borderRadius: BorderRadius.circular(8)),
+              alignment: Alignment.center,
+              child: const Icon(Icons.calendar_month_rounded, size: 15, color: kBlueDark),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Slot Appointments',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                if (timeRange != null) ...[
+                  const SizedBox(height: 2),
+                  Text(timeRange,
+                      style: const TextStyle(fontSize: 11, color: kTextSecondary, fontWeight: FontWeight.w500)),
+                ],
+              ]),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: kBlueLight, borderRadius: BorderRadius.circular(20)),
+              child: Text('${patients.length}',
+                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: kBlueDark)),
+            ),
+          ]),
+        ),
+        const Divider(height: 1, color: kCardBorder),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+          child: Column(
+            children: patients.map((p) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildSlotPatientCard(p, QueueState.idle),
+            )).toList(),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildSlotPatientCard(AppointmentList p, QueueState queueState) {
+    final isReceptionist = ref.read(tokenProvider).roleId == 3;
+    final name      = p.patientName ?? 'Patient';
+    final status    = p.status?.toLowerCase().trim() ?? '';
+    final isIP      = status == 'in_progress';
+    final isSkipped = status == 'skipped';
+    final isBooked  = status == 'booked';
+    return Container(
+      decoration: const BoxDecoration(
+        color: kPageBg,
+        borderRadius: BorderRadius.all(Radius.circular(13)),
+        boxShadow: [
+          BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-4, -4), blurRadius: 8, spreadRadius: 1),
+          BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(4, 4),  blurRadius: 8, spreadRadius: 1),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(children: [
+        // slot time badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: const BoxDecoration(
+            color: kPageBg,
+            borderRadius: BorderRadius.all(Radius.circular(9)),
+            boxShadow: [
+              BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3), blurRadius: 5),
+              BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 5),
+            ],
+          ),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('TIME', style: TextStyle(fontSize: 7, color: kTextMuted,
+                fontWeight: FontWeight.w700, letterSpacing: 0.4)),
+            Text(_fmtTime(p.startTime),
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800,
+                    color: kPrimaryDark, height: 1.1)),
+          ]),
+        ),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(name,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
+              overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 3),
+          if (isIP)
+            _badgeDot('In Progress', kPrimaryLight, kPrimaryDark, kPrimary)
+          else if (isSkipped)
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 6, height: 6,
+                  decoration: const BoxDecoration(color: kAmber, shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              const Text('Skipped earlier',
+                  style: TextStyle(fontSize: 11, color: kAmberDark, fontWeight: FontWeight.w500)),
+            ])
+          else if (p.gender != null)
+            Text(p.gender!, style: const TextStyle(fontSize: 11, color: kTextSecondary)),
+        ])),
+        const SizedBox(width: 10),
+        // action buttons
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          if (isSkipped && !isReceptionist)
+            GestureDetector(
+              onTap: () => _startSession(p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(255, 32, 173, 138),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Text('Recall',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            )
+          else if ((isBooked || isIP) && !isReceptionist) ...[
+            GestureDetector(
+              onTap: () => _startSession(p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: kPrimaryDark,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(isIP ? 'Continue' : 'Start',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
+              ),
+            ),
+            const SizedBox(width: 6),
+            GestureDetector(
+              onTap: () => _skipPatient(p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: kRedLight, borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: kRedBorder),
+                ),
+                child: const Text('Skip',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kRedDark)),
+              ),
+            ),
+          ] else if (isBooked && isReceptionist)
+            GestureDetector(
+              onTap: () => _skipPatient(p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: kRedLight, borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: kRedBorder),
+                ),
+                child: const Text('Skip',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kRedDark)),
+              ),
+            )
+          else
+            const Text('Waiting',
+                style: TextStyle(fontSize: 12, color: kTextMuted, fontWeight: FontWeight.w500)),
+        ]),
       ]),
     );
   }
