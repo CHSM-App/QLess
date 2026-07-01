@@ -792,6 +792,23 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             slivers: [
               SliverToBoxAdapter(child: _buildHeader(doctorName)),
 
+              // // ── SESSION QUEUE CARDS / EMPTY STATE ──────────────────
+              // if (visibleSessions.isEmpty) ...[
+              //   if (todaySlotPts.isNotEmpty)
+              //     SliverToBoxAdapter(
+              //       child: Padding(
+              //         padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              //         child: _buildStandaloneSlotSection(todaySlotPts),
+              //       ),
+              //     )
+              //   else if (_todayScheduledSlots().isEmpty)
+              //     SliverToBoxAdapter(
+              //       child: Padding(
+              //         padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+              //         child: _buildNoLiveSessions(),
+              //       ),
+              //     ),
+              // ] else ...[
               // ── SESSION QUEUE CARDS / EMPTY STATE ──────────────────
               if (visibleSessions.isEmpty) ...[
                 if (todaySlotPts.isNotEmpty)
@@ -806,6 +823,13 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
                       child: _buildNoLiveSessions(),
+                    ),
+                  )
+                else
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                      child: _buildAwaitingBookingsState(),
                     ),
                   ),
               ] else ...[
@@ -1628,7 +1652,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   letterSpacing: 1.1, color: Colors.white60)),
           const Spacer(),
           Text(
-            'Token ${(p.queueNumber ?? 0).toString().padLeft(2, '0')} · 1 of $totalWaiting',
+            'Token ${(p.queueNumber ?? 0).toString().padLeft(2, '0')} · $totalWaiting',
             style: const TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w500),
           ),
         ]),
@@ -2378,6 +2402,36 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     );
   }
 
+Widget _buildAwaitingBookingsState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kCardBorder),
+      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Container(
+          width: 48, height: 48,
+          decoration: BoxDecoration(
+            color: kPrimaryLight, shape: BoxShape.circle,
+            border: Border.all(color: const Color(0xFF9FE1CB)),
+          ),
+          child: const Icon(Icons.hourglass_empty_rounded, color: kPrimaryDark, size: 22),
+        ),
+        const SizedBox(height: 10),
+        const Text('No Appointments Yet',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
+        const SizedBox(height: 4),
+        const Text(
+          'Your schedule is live for today, but no patients have booked yet.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.35),
+        ),
+      ]),
+    );
+  }
   // ─────────────────────────────────────────────────────────────────────────
   // PATIENT CARDS
   // ─────────────────────────────────────────────────────────────────────────
