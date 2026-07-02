@@ -1403,15 +1403,18 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
     final isRunning   = queueState == QueueState.running;
     final isPaused    = queueState == QueueState.paused;
+    final queueActive = isRunning || isPaused;
     final isEmergency = ref.read(appointmentViewModelProvider.notifier).isEmergencyPaused(queueId);
 
     // Current patient: in_progress first, then first booked by queue number
+    // (only surfaced once the queue has actually been started — before that,
+    // patients are shown as a plain waiting list, no "Now Serving" card)
     final ipPt = sessionPts.where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress').firstOrNull;
     final bookedSorted = sessionPts
         .where((p) => (p.status?.toLowerCase() ?? '') == 'booked')
         .toList()
       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
-    final currentPt = ipPt ?? bookedSorted.firstOrNull;
+    final currentPt = queueActive ? (ipPt ?? bookedSorted.firstOrNull) : null;
 
     // Up next = all except current, sorted by queue number
     final upNextPts = sessionPts
@@ -1495,33 +1498,37 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         ),
 
         // ── NOW SERVING ───────────────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-          child: currentPt != null
-              ? _buildNowServingCard(currentPt, queueState, sessionPts.length, sessionHasIP, sessionNextQNo)
-              : Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Container(
-                        width: 46, height: 46,
-                        decoration: const BoxDecoration(
-                          color: kPageBg,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 7),
-                            BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3),  blurRadius: 7),
-                          ],
-                        ),
-                        child: const Icon(Icons.inbox_rounded, color: kTextMuted, size: 20),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text('No patients waiting',
-                          style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
-                    ]),
+        if (currentPt != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+            child: _buildNowServingCard(currentPt, queueState, sessionPts.length, sessionHasIP, sessionNextQNo),
+          )
+        else if (queueActive)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  Container(
+                    width: 46, height: 46,
+                    decoration: const BoxDecoration(
+                      color: kPageBg,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Color(0xFFFFFFFF), offset: Offset(-3, -3), blurRadius: 7),
+                        BoxShadow(color: Color(0xFFCDD5DE), offset: Offset(3, 3),  blurRadius: 7),
+                      ],
+                    ),
+                    child: const Icon(Icons.inbox_rounded, color: kTextMuted, size: 20),
                   ),
-                ),
-        ),
+                  const SizedBox(height: 10),
+                  const Text('No patients waiting',
+                      style: TextStyle(color: kTextMuted, fontSize: 12, fontWeight: FontWeight.w500)),
+                ]),
+              ),
+            ),
+          ),
 
         // ── Up next ───────────────────────────────────────────────────
         if (upNextPts.isNotEmpty) ...[

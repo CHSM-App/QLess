@@ -558,7 +558,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final hPad = isTablet ? 18.0 : 12.0;
     final isReceptionist = ref.read(tokenProvider).roleId == 3;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 90),
+      padding: EdgeInsets.fromLTRB(hPad, 10, hPad, 130),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
