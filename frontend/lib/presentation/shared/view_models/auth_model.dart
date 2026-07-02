@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/data/repositories/auth_impl.dart';
 import 'package:qless/domain/models/token_response.dart';
 
@@ -16,12 +17,27 @@ class AuthViewModel extends StateNotifier<AsyncValue<void>> {
 
     try {
       final result = await authRepository.createLogin(token);
+      final accessToken = result.accessToken;
+      final refreshToken = result.refreshToken;
+      final roleId = result.roleId ?? 0;
+
+      if (accessToken == null ||
+          accessToken.isEmpty ||
+          refreshToken == null ||
+          refreshToken.isEmpty ||
+          roleId == 0) {
+        throw Exception('Login failed. Please try again.');
+      }
 
       await ref.read(tokenProvider.notifier).saveTokens(
-            result.accessToken ?? '',
-            result.refreshToken ?? '',
-            result.roleId ?? 0,
+            accessToken,
+            refreshToken,
+            roleId,
           );
+      final mobile = result.mobile ?? token.mobile;
+      if (mobile != null && mobile.isNotEmpty) {
+        await TokenStorage.saveValue('login_mobile', mobile);
+      }
 
       state = const AsyncValue.data(null);
       return "success";

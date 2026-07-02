@@ -3,12 +3,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
+import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — aligned with PatientListScreen
@@ -622,6 +625,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   int _lastDoctorId = 0;
   late final ProviderSubscription<int?> _doctorIdSub;
   bool _isSubmitting = false;
+  List<AppointmentList> _previousVisitsCache = const [];
 
   // @override
   // void initState() {
@@ -649,6 +653,49 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _maybeFetchMedicines(widget.doctorId);
     });
+    _fetchPreviousVisits();
+  }
+
+  // Doctor-wide, ALL-clinic history — deliberately bypasses the shared
+  // appointmentViewModelProvider list, which is scoped to whichever single
+  // clinic the doctor is currently active in. A patient's past visits with
+  // this doctor may have happened at a different clinic, so this hits the
+  // usecase directly with clinicId omitted instead of mutating the shared
+  // provider's "current clinic" state.
+  Future<void> _fetchPreviousVisits() async {
+    try {
+      final all = await ref.read(appointmentUsecaseProvider)
+          .fetchPatientAppointments(widget.doctorId);
+      if (!mounted) return;
+      final visits = all.where((a) =>
+          a.patientId == widget.patientId &&
+          a.appointmentId != widget.appointmentId &&
+          (a.status?.toLowerCase().trim() ?? '') == 'completed').toList();
+      visits.sort((a, b) {
+        final da = DateTime.tryParse(a.appointmentDate ?? '');
+        final db = DateTime.tryParse(b.appointmentDate ?? '');
+        if (da == null || db == null) return 0;
+        return db.compareTo(da);
+      });
+      setState(() => _previousVisitsCache = visits);
+    } catch (_) {
+      // Leave _previousVisitsCache as-is — card just won't show/refresh.
+    }
+  }
+
+  void _openPreviousHistory(List<AppointmentList> visits) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _PreviousHistoryPage(
+      patientName: widget.patientName,
+      visits: visits,
+      onSelect: (a) => Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorPrescriptionDetailScreen(
+        appointmentId: a.appointmentId ?? 0,
+        patientId:     widget.patientId,
+        patientName:   widget.patientName,
+        patientAge:    widget.patientAge,
+        patientGender: widget.patientGender,
+        queueNumber:   a.queueNumber,
+      ))),
+    )));
   }
  
   @override
@@ -1105,6 +1152,7 @@ Widget build(BuildContext context) {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
             children: [
               _patientCard(), _gap(12),
+              if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
               _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
               _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'),
               // _gap(10),
@@ -1155,6 +1203,7 @@ Widget build(BuildContext context) {
               padding: const EdgeInsets.fromLTRB(16, 14, 10, 110),
               children: [
                 _patientCard(), _gap(12),
+                if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
                 _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
                 _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
                 // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
@@ -1183,6 +1232,7 @@ Widget build(BuildContext context) {
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
         children: [
           _patientCard(), _gap(12),
+          if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
           _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
           _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(12),
           // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
@@ -1225,6 +1275,26 @@ Widget build(BuildContext context) {
       ])),
     ]));
   }
+
+  // ── Previous History card — only if this patient has past completed visits with this doctor ──
+  Widget _previousHistoryCard() => GestureDetector(
+    onTap: () => _openPreviousHistory(_previousVisitsCache),
+    child: _card(child: Row(children: [
+      Container(
+        width: 38, height: 38,
+        decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(10)),
+        child: const Icon(Icons.history_rounded, color: kPurpleDark, size: 18),
+      ),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Previous History', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+        const SizedBox(height: 2),
+        Text('${_previousVisitsCache.length} earlier visit${_previousVisitsCache.length == 1 ? '' : 's'} with this patient',
+            style: const TextStyle(fontSize: 11, color: kTextSecondary)),
+      ])),
+      const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
+    ])),
+  );
 
   Widget _textSection(String label, TextEditingController ctrl, String hint) =>
       _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1820,5 +1890,122 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
   );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  _PreviousHistorySheet — this patient's past visits with THIS doctor,
+//  newest first. Tap a date to open that visit's prescription.
+// ════════════════════════════════════════════════════════════════════
+class _PreviousHistoryPage extends StatelessWidget {
+  final String patientName;
+  final List<AppointmentList> visits;
+  final ValueChanged<AppointmentList> onSelect;
+
+  const _PreviousHistoryPage({
+    required this.patientName,
+    required this.visits,
+    required this.onSelect,
+  });
+
+  String _fmtDate(String? raw) {
+    final d = DateTime.tryParse(raw ?? '');
+    return d == null ? 'Unknown date' : DateFormat('EEEE, d MMMM yyyy').format(d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kBg,
+      body: Column(children: [
+        Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 34, height: 34,
+                    decoration: BoxDecoration(
+                      color: kBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded, color: kTextPrimary, size: 15),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: kPurpleLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: kPurple.withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.history_rounded, color: kPurpleDark, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Previous History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
+                  const SizedBox(height: 1),
+                  Text(patientName, style: const TextStyle(fontSize: 11, color: kTextSecondary), overflow: TextOverflow.ellipsis),
+                ])),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(20)),
+                  child: Text('${visits.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kPurpleDark)),
+                ),
+              ]),
+            ),
+          ),
+        ),
+        Expanded(
+          child: visits.isEmpty
+              ? const Center(child: Text('No previous visits', style: TextStyle(color: kTextMuted, fontSize: 13)))
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                  itemCount: visits.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final v = visits[i];
+                    return GestureDetector(
+                      onTap: () => onSelect(v),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: kBorder),
+                          boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(10)),
+                            child: const Icon(Icons.event_note_rounded, color: kPurpleDark, size: 16),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(_fmtDate(v.appointmentDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                            if (v.queueNumber != null) ...[
+                              const SizedBox(height: 3),
+                              Text('Queue #${v.queueNumber}', style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                            ],
+                          ])),
+                          const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ]),
+    );
+  }
 }
 

@@ -2848,7 +2848,7 @@ Widget _buildAwaitingBookingsState() {
     late Color bg, fg, dot;
     switch (state) {
       case QueueState.running:
-        label = 'Running'; bg = kPrimaryLight; fg = kPrimaryDark; dot = kPrimary; break;
+        label = 'Live'; bg = kPrimaryLight; fg = kPrimaryDark; dot = kPrimary; break;
       case QueueState.paused:
         label = 'Paused';  bg = kAmberLight;   fg = kAmberDark;   dot = kAmber;   break;
       case QueueState.stopped:
@@ -3034,12 +3034,26 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   bool                _addingNewMember   = false;
   final _newMemberCtr = TextEditingController();
   int  _newMemberGender = 1;
+  ProviderSubscription<String?>? _clinicIdSub;
 
   @override
   void initState() {
     super.initState();
     _mobileCtr.addListener(_onMobileChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadSessions());
+    // Clinic switch madhe walk-in sessions/queue time stale rahu naye mhanun refresh
+    _clinicIdSub = ref.listenManual<String?>(
+      doctorLoginViewModelProvider.select((s) => s.clinic_id),
+      (prev, next) {
+        if (next != prev) {
+          _selected = null;
+          _mobileCtr.clear();
+          _nameCtr.clear();
+          _clearPatientState();
+          _loadSessions();
+        }
+      },
+    );
   }
 
   @override
@@ -3049,6 +3063,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     _nameCtr.dispose();
     _mobileCtr.dispose();
     _newMemberCtr.dispose();
+    _clinicIdSub?.close();
     super.dispose();
   }
 

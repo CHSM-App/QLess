@@ -31,8 +31,33 @@ class _AuthGateState extends ConsumerState<AuthGate> {
     if (!mounted) return;
 
     Widget target;
-    if (tokenState.isLoggedIn && (tokenState.roleId == 1 || tokenState.roleId == 3)) {
+    if (tokenState.isLoggedIn &&
+        (tokenState.roleId == 1 || tokenState.roleId == 3)) {
       await ref.read(doctorLoginViewModelProvider.notifier).loadFromStorage();
+      if (tokenState.roleId == 1) {
+        final currentDoctorId =
+            ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+        if (currentDoctorId <= 0) {
+          final mobile = await TokenStorage.getValue('mobile') ??
+              await TokenStorage.getValue('login_mobile');
+          if (mobile != null && mobile.trim().isNotEmpty) {
+            await ref
+                .read(doctorLoginViewModelProvider.notifier)
+                .checkPhoneDoctor(mobile.trim());
+          }
+        }
+        final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+        if (doctorId <= 0) {
+          await ref.read(tokenProvider.notifier).clearTokens();
+          target = const ContinueAsScreen();
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => target),
+          );
+          return;
+        }
+      }
       if (tokenState.roleId == 3) {
         // Receptionist restart: if doctor mobile isn't in storage yet fall back.
         final doctorMobile = ref.read(doctorLoginViewModelProvider).mobile;
@@ -50,7 +75,9 @@ class _AuthGateState extends ConsumerState<AuthGate> {
         // Ensure receptionist's own name is in state (not doctor's name).
         final recepName = await TokenStorage.getValue('recep_name');
         if (recepName != null) {
-          ref.read(receptionistLoginViewModelProvider.notifier).setName(recepName);
+          ref
+              .read(receptionistLoginViewModelProvider.notifier)
+              .setName(recepName);
         }
       }
       // Populate clinicsList for the header dropdown (both doctor and receptionist).
@@ -58,7 +85,9 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       // Receptionist fallback: recep_doctor_id saved by setProfileFromCheck.
       final stateDocId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
       final fallbackId = tokenState.roleId == 3
-          ? (int.tryParse(await TokenStorage.getValue('recep_doctor_id') ?? '') ?? 0)
+          ? (int.tryParse(
+                  await TokenStorage.getValue('recep_doctor_id') ?? '') ??
+              0)
           : 0;
       final effectiveDoctorId = stateDocId > 0 ? stateDocId : fallbackId;
       if (effectiveDoctorId > 0) {
@@ -73,6 +102,27 @@ class _AuthGateState extends ConsumerState<AuthGate> {
       await ref
           .read(patientLoginViewModelProvider.notifier)
           .loadFromStoragePatient();
+      var patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      if (patientId <= 0) {
+        final mobile = await TokenStorage.getValue('mobile_no') ??
+            await TokenStorage.getValue('login_mobile');
+        if (mobile != null && mobile.trim().isNotEmpty) {
+          await ref
+              .read(patientLoginViewModelProvider.notifier)
+              .checkPhonePatient(mobile.trim());
+          patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+        }
+      }
+      if (patientId <= 0) {
+        await ref.read(tokenProvider.notifier).clearTokens();
+        target = const ContinueAsScreen();
+        if (!mounted) return;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => target),
+        );
+        return;
+      }
       patientShellKey = GlobalKey<PatientBottomNavState>();
       target = PatientBottomNav(
         key: patientShellKey,

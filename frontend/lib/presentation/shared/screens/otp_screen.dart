@@ -239,11 +239,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           .checkPhoneDoctor(widget.mobileNumber);
       if (!mounted) return;
       final doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
-      if (doctorId != null) {
-        await ref
-            .read(doctorLoginViewModelProvider.notifier)
-            .getDoctorClinics(doctorId);
+      if (doctorId == null || doctorId <= 0) {
+        await ref.read(tokenProvider.notifier).clearTokens();
+        _triggerError();
+        return;
       }
+      await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .getDoctorClinics(doctorId);
     } else if (roleId == 3) {
       // Receptionist table has no clinic_id — load doctor profile first,
       // then override clinic from picker selection (same as doctor login flow).
@@ -291,6 +294,13 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       await ref
           .read(patientLoginViewModelProvider.notifier)
           .checkPhonePatient(widget.mobileNumber);
+      if (!mounted) return;
+      final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      if (patientId <= 0) {
+        await ref.read(tokenProvider.notifier).clearTokens();
+        _triggerError();
+        return;
+      }
     }
 
     if (!mounted) return;
