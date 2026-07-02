@@ -81,6 +81,11 @@ const kBlueDark       = Color(0xFF1E40AF);
 // No shadows, no gradients
 const List<BoxShadow> kNoShadow = [];
 
+// Desktop layout
+const _kHomeWideBreak = 900.0;
+const _kHomeFullBreak = 1300.0;
+const _kHomeSideWidth = 260.0;
+
 int? _minutesFromTimeString(String? raw) {
   if (raw == null || raw.trim().isEmpty) return null;
   final value = raw.trim();
@@ -151,6 +156,7 @@ const List<_Tip> _kDoctorTips = [
 
 class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   bool _hasFetched = false;
+  bool _showWalkInForm = false;
   final Map<int, bool> _patientsExpanded = {};
   final Map<int, bool> _sessionExpanded = {};
   late final ProviderSubscription<int?> _doctorIdSub;
@@ -697,12 +703,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     return [];
   }
 
-  bool _shouldShowSession(dynamic session) {
+  bool _shouldShowSession(dynamic session, {required bool hasBooking}) {
     if (_isStaleQueueDate(session.queueDate as String?)) return false;
     final qs = session.queueStatus ?? 0;
     final hasSlot = session.startTime != null;
     if (qs == 3) return false;
-    if (qs == 0 && !hasSlot) return false;
+    if (qs == 0 && !hasSlot && !hasBooking) return false;
     return true;
   }
 
@@ -735,10 +741,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final fabBottom  = safeBottom + 100.0;
     // List bottom padding: above FAB (56) + pill nav + gap
     final listBottom = safeBottom + 100.0 + 56.0 + 16.0;
+    final isWide = MediaQuery.of(context).size.width >= _kHomeWideBreak;
+    final isFullWide = MediaQuery.of(context).size.width >= _kHomeFullBreak;
 
-    return Scaffold(
-      backgroundColor: kPageBg,
-      body: Stack(
+    final bodyStack = Stack(
         children: [
           appointmentsAsync.when(
         loading: () => _buildLoadingBody(doctorName),
@@ -756,7 +762,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           final activeQueueIds = filteredList.map((a) => a.queueId).whereType<int>().toSet();
           final todaySlotPts   = _todaySlotPatients(filteredList);
           final visibleSessions = allSessions
-              .where((s) => _shouldShowSession(s) &&
+              .where((s) => _shouldShowSession(s, hasBooking: activeQueueIds.contains(s.queueId)) &&
                   (currentClinicId == null ||
                    activeQueueIds.contains(s.queueId) ||
                    todaySlotPts.any((p) {
@@ -790,8 +796,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
           return _buildRefreshableScrollView(
             slivers: [
-              SliverToBoxAdapter(child: _buildHeader(doctorName)),
-
               // // ── SESSION QUEUE CARDS / EMPTY STATE ──────────────────
               // if (visibleSessions.isEmpty) ...[
               //   if (todaySlotPts.isNotEmpty)
@@ -907,19 +911,23 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           );
         },
       ),
-          if (!_isDoctorOnLeaveToday)
+          if (!_isDoctorOnLeaveToday && (!isWide || (!isFullWide && !_showWalkInForm)))
             Positioned(
               right: 16,
               bottom: fabBottom,
               child: FloatingActionButton(
                 onPressed: () {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: true,
-                    builder: (_) => _WalkInDialog(
-                      onBooked: () => Navigator.of(context).pop(),
-                    ),
-                  );
+                  if (isWide) {
+                    setState(() => _showWalkInForm = true);
+                  } else {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: true,
+                      builder: (_) => _WalkInDialog(
+                        onBooked: () => Navigator.of(context).pop(),
+                      ),
+                    );
+                  }
                 },
                 backgroundColor: kPrimaryDark,
                 foregroundColor: Colors.white,
@@ -929,9 +937,193 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               ),
             ),
         ],
+      );
+
+    return Scaffold(
+      backgroundColor: kPageBg,
+      body: Column(children: [
+        _buildHeader(doctorName),
+        Expanded(
+          child: isWide
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isFullWide || !_showWalkInForm) _buildOverviewSidebar(),
+                    Expanded(child: bodyStack),
+                    if (isFullWide || _showWalkInForm)
+                      SizedBox(width: 400, child: _buildWalkInFormPane(closable: !isFullWide)),
+                  ],
+                )
+              : bodyStack,
+        ),
+      ]),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DESKTOP WALK-IN FORM PANE (right column, queue stays visible alongside)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildWalkInFormPane({required bool closable}) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: kPageBg,
+        border: Border(left: BorderSide(color: kBorder)),
+      ),
+      child: Column(children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+          decoration: const BoxDecoration(
+            color: kCardBg,
+            border: Border(bottom: BorderSide(color: kBorder)),
+          ),
+          child: Row(children: [
+            Container(
+              width: 32, height: 32,
+              decoration: const BoxDecoration(color: kPrimaryLight, shape: BoxShape.circle),
+              child: const Icon(Icons.person_add_rounded, size: 16, color: kPrimaryDark),
+            ),
+            const SizedBox(width: 10),
+            const Text('Add Walk-in Patient',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: kTextPrimary)),
+            if (closable) ...[
+              const Spacer(),
+              IconButton(
+                onPressed: () => setState(() => _showWalkInForm = false),
+                icon: const Icon(Icons.close_rounded, size: 20, color: kTextSecondary),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
+            ],
+          ]),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: _WalkInInlinePanel(
+              onBooked: () => setState(() => _showWalkInForm = false),
+            ),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DESKTOP OVERVIEW SIDEBAR
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Widget _buildOverviewSidebar({double width = _kHomeSideWidth}) {
+    final vmState = ref.watch(appointmentViewModelProvider);
+    final list = vmState.patientAppointmentsList.value ?? <AppointmentList>[];
+    final currentClinicId = _clinicId;
+    final filteredList = currentClinicId == null
+        ? list
+        : list.where((a) => a.clinicId == currentClinicId).toList();
+
+    final allSessions = vmState.todayQueueResult?.value ?? [];
+    final activeQueueIds = filteredList.map((a) => a.queueId).whereType<int>().toSet();
+    final visibleSessions = allSessions
+        .where((s) => _shouldShowSession(s, hasBooking: activeQueueIds.contains(s.queueId)))
+        .toList();
+
+    final compact = width < _kHomeSideWidth;
+
+    return Container(
+      width: width,
+      decoration: const BoxDecoration(
+        color: kCardBg,
+        border: Border(right: BorderSide(color: kBorder)),
+      ),
+      child: SingleChildScrollView(
+          padding: EdgeInsets.all(compact ? 10 : 16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('OVERVIEW',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                    letterSpacing: 1.2, color: kTextMuted)),
+            const SizedBox(height: 12),
+            if (visibleSessions.isEmpty)
+              _buildSessionOverviewBlock(null, filteredList, compact: compact)
+            else
+              for (int i = 0; i < visibleSessions.length; i++) ...[
+                _buildSessionOverviewBlock(visibleSessions[i], filteredList, compact: compact),
+                if (i != visibleSessions.length - 1) const SizedBox(height: 16),
+              ],
+          ]),
       ),
     );
   }
+
+  Widget _buildSessionOverviewBlock(
+      dynamic session, List<AppointmentList> filteredList, {required bool compact}) {
+    final queueId = session?.queueId as int?;
+    final scoped = queueId == null
+        ? filteredList
+        : filteredList.where((a) => a.queueId == queueId).toList();
+
+    final total = _todayTotalCount(scoped);
+    final waiting = scoped.where((a) {
+      final s = a.status?.toLowerCase().trim() ?? '';
+      return (s == 'booked' || s == 'in_progress') && _isTodayAppt(a);
+    }).length;
+    final completed = scoped.where((a) =>
+        (a.status?.toLowerCase().trim() ?? '') == 'completed' && _isTodayAppt(a)).length;
+    final skipped = scoped.where((a) =>
+        (a.status?.toLowerCase().trim() ?? '') == 'skipped' && _isTodayAppt(a)).length;
+
+    final label = session?.startTime != null
+        ? '${_fmtTime(session.startTime as String?)} – ${_fmtTime(session.endTime as String?)}'
+        : 'Today';
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: kTextSecondary)),
+      const SizedBox(height: 8),
+      GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        crossAxisSpacing: compact ? 6 : 10,
+        mainAxisSpacing: compact ? 6 : 10,
+        childAspectRatio: compact ? 0.95 : 1.3,
+        children: [
+          _homeMiniStat('Total', total, kPrimary, compact: compact),
+          _homeMiniStat('Waiting', waiting, kBlueDark, compact: compact),
+          _homeMiniStat('Completed', completed, kGreen, compact: compact),
+          _homeMiniStat('Skipped', skipped, kAmberDark, compact: compact),
+        ],
+      ),
+    ]);
+  }
+
+  bool _isTodayAppt(AppointmentList a) {
+    final d = DateTime.tryParse(a.appointmentDate ?? '');
+    if (d == null) return false;
+    final today = DateTime.now();
+    return d.year == today.year && d.month == today.month && d.day == today.day;
+  }
+
+  Widget _homeMiniStat(String label, int value, Color color, {required bool compact}) => Container(
+    padding: EdgeInsets.all(compact ? 8 : 12),
+    decoration: BoxDecoration(
+      color: kPageBg,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: kBorder),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('$value', style: TextStyle(fontSize: compact ? 16 : 20, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(height: 2),
+        Text(label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: compact ? 10 : 11, color: kTextSecondary, fontWeight: FontWeight.w600)),
+      ],
+    ),
+  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // SCROLL / LOADING / ERROR
@@ -952,7 +1144,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   Widget _buildLoadingBody(String doctorName) =>
       _buildRefreshableScrollView(
         slivers: [
-          SliverToBoxAdapter(child: _buildHeader(doctorName)),
           const SliverFillRemaining(
             child: Center(child: CircularProgressIndicator(color: kPrimary)),
           ),
@@ -962,7 +1153,6 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   Widget _buildErrorBody(Object e, String doctorName) =>
       _buildRefreshableScrollView(
         slivers: [
-          SliverToBoxAdapter(child: _buildHeader(doctorName)),
           SliverFillRemaining(
             child: Center(
               child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -3086,9 +3276,12 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                       Row(children: [
                         const Icon(Icons.event_rounded, size: 14, color: kPrimary),
                         const SizedBox(width: 6),
-                        Text(
-                          'Today  ·  ${const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][DateTime.now().weekday - 1]}, ${DateTime.now().day} ${const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][DateTime.now().month - 1]}',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimary),
+                        Expanded(
+                          child: Text(
+                            'Today  ·  ${const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][DateTime.now().weekday - 1]}, ${DateTime.now().day} ${const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][DateTime.now().month - 1]}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       ]),
                       const SizedBox(height: 12),
@@ -3158,9 +3351,12 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                               child: Row(children: [
                                 const Icon(Icons.person_rounded, size: 14, color: kPrimaryDark),
                                 const SizedBox(width: 6),
-                                Text('${_foundPatient!.name}  ·  ${_foundPatient!.mobileNo ?? ''}',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                                        color: kPrimaryDark)),
+                                Expanded(
+                                  child: Text('${_foundPatient!.name}  ·  ${_foundPatient!.mobileNo ?? ''}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                          color: kPrimaryDark)),
+                                ),
                               ]),
                             ),
                             const Divider(height: 1, color: kBorder),
@@ -3176,9 +3372,12 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                                 child: Row(children: [
                                   const Icon(Icons.how_to_reg_rounded, size: 14, color: kPrimaryDark),
                                   const SizedBox(width: 8),
-                                  Text('Book for ${_foundPatient!.name}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                                          color: kPrimaryDark)),
+                                  Expanded(
+                                    child: Text('Book for ${_foundPatient!.name}',
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                                            color: kPrimaryDark)),
+                                  ),
                                 ]),
                               ),
                             ),

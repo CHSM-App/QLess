@@ -210,7 +210,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   bool _hasFetched = false;
   late final ProviderSubscription<int?> _idSub;
   AppointmentList? _selected;
-  _Tab _activeTab = _Tab.today;
+  _Tab _activeTab = _Tab.upcoming;
 
   _DateFilter _upcomingFilter  = _DateFilter.tomorrow;
   DateTime?   _upcomingFrom;
@@ -1030,26 +1030,6 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     return TabBarView(
       controller: _tabCtrl,
       children: [
-        // _SessionGroupedBody(          // Current Queue tab — commented out
-        //   allSessions: allSessions,
-        //   allAppointments: allAppointments,
-        //   todayPatients: today,
-        //   qs: qs,
-        //   onStart: _startSession,
-        //   onSkip: _skipPatient,
-        //   onPrescription: _viewPrescription,
-        //   onCancel: _cancelConfirm,
-        //   extraBottom: _kBottomClear,
-        //   onQueueStart: _onQueueStart,
-        //   onQueuePause: _onQueuePause,
-        //   onQueueStop: _onQueueStop,
-        //   onQueueEmergency: _onQueueEmergency,
-        //   emergencyQueueIds: ref.watch(appointmentViewModelProvider).emergencyQueueIds,
-        //   onRefresh: () async {
-        //     ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId);
-        //     await Future.delayed(const Duration(milliseconds: 600));
-        //   },
-        // ),
         _PatientListBody(
           patients: upcoming, tab: _Tab.upcoming, qs: qs,
           onStart: _startSession, onSkip: _skipPatient,
@@ -1083,45 +1063,22 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     return Row(children: [
       _DesktopSidebar(
         activeTab: _activeTab,
-        todayCount: today.length,
+        todayCount: upcoming.length,
         completedCount: completed.length,
-        total: today.length + completed.length,
+        total: upcoming.length + completed.length,
         searchCtrl: _searchCtrl,
         onTabChange: (t) => setState(() {
           _activeTab = t;
           _selected  = null;
-          _tabCtrl.animateTo(t == _Tab.upcoming ? 0 : 1);
+          _tabCtrl.animateTo(t == _Tab.completed ? 1 : 0);
         }),
       ),
       Expanded(
-        child: _activeTab == _Tab.today
-            ? _SessionGroupedBody(
-                allSessions: allSessions,
-                allAppointments: allAppointments,
-                todayPatients: today,
-                qs: qs,
-                onStart: _startSession,
-                onSkip: _skipPatient,
-                onPrescription: _viewPrescription,
-                onCancel: _cancelConfirm,
-                extraBottom: 0,
-                selected: _selected,
-                onSelect: (p) => setState(() => _selected = p),
-                onQueueStart: _onQueueStart,
-                onQueuePause: _onQueuePause,
-                onQueueStop: _onQueueStop,
-                onQueueEmergency: _onQueueEmergency,
-                emergencyQueueIds: ref.watch(appointmentViewModelProvider).emergencyQueueIds,
-                onRefresh: () async {
-                  ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId);
-                  await Future.delayed(const Duration(milliseconds: 600));
-                },
-              )
-            : _PatientListBody(
+        child: _PatientListBody(
                 patients: list, tab: _activeTab, qs: qs,
                 onStart: _startSession, onSkip: _skipPatient,
                 onPrescription: _viewPrescription, onCancel: _cancelConfirm,
-                onView: _activeTab == _Tab.upcoming ? _viewPatientInfo : null,
+                onView: _activeTab != _Tab.completed ? _viewPatientInfo : null,
                 extraBottom: 0,
                 selected: _selected,
                 onSelect: (p) => setState(() => _selected = p),
@@ -2362,9 +2319,9 @@ class _DesktopSidebar extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Column(children: [
-          _SideNavItem(icon: Icons.access_time_rounded, label: 'Current Queue',
-              count: todayCount, selected: activeTab == _Tab.today,
-              onTap: () => onTabChange(_Tab.today)),
+          _SideNavItem(icon: Icons.access_time_rounded, label: 'Upcoming',
+              count: todayCount, selected: activeTab == _Tab.upcoming,
+              onTap: () => onTabChange(_Tab.upcoming)),
           const SizedBox(height: 4),
           _SideNavItem(icon: Icons.check_circle_outline_rounded, label: 'Completed',
               count: completedCount, selected: activeTab == _Tab.completed,
@@ -2855,8 +2812,8 @@ class _PillTabBar extends StatelessWidget {
         splashFactory: NoSplash.splashFactory,
         overlayColor: WidgetStateProperty.all(Colors.transparent),
         tabs: [
-          Tab(text: 'Current Queue ($todayCount)'),
-          Tab(text: ' Current Completed ($completedCount)'),
+          Tab(text: 'Upcoming ($todayCount)'),
+          Tab(text: 'Completed ($completedCount)'),
         ],
       ),
     ),
