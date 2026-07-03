@@ -445,6 +445,21 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     }
   }
 
+  Future<void> _onToggleBookingClosed(int? queueId, bool closed) async {
+    try {
+      final res = await ref.read(appointmentViewModelProvider.notifier).stopBooking(
+            AppointmentRequestModel(
+              doctorId: _doctorId,
+              queueId: queueId,
+              bookingClosed: closed,
+            ),
+          );
+      _snack(res.message ?? (closed ? 'New bookings stopped' : 'New bookings resumed'));
+    } catch (_) {
+      _snack('Failed to update booking status');
+    }
+  }
+
   Future<void> _onQueueNext(AppointmentList current) async {
     try {
       final res = await ref
@@ -882,6 +897,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                             sessionHasIP:    sessionHasIP,
                             sessionNextQNo:  sessionNextQNo,
                             sessionSlotPts:  sessionSlotPts,
+                            bookingClosed:   session.bookingClosed == true,
                           ),
                         );
                       },
@@ -1398,6 +1414,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     required bool sessionHasIP,
     required int? sessionNextQNo,
     required List<AppointmentList> sessionSlotPts,
+    required bool bookingClosed,
   }) {
     if (queueState == QueueState.stopped) return const SizedBox.shrink();
 
@@ -1494,6 +1511,24 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             //   tooltip: 'Emergency pause',
             //   onTap: () => _showEmergencyDialog(queueId),
             // ),
+          ]),
+        ),
+
+        // ── Accepting new bookings toggle (below the queue time) ────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 13),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            _bookingToggleSwitch(
+              value: !bookingClosed,
+              tooltip: bookingClosed
+                  ? 'New bookings stopped — tap to resume. Patients already in the queue are not affected.'
+                  : 'Stop new bookings for today — patients already in the queue keep being served as usual.',
+              onTap: () => _onToggleBookingClosed(queueId, !bookingClosed),
+            ),
+            const SizedBox(width: 8),
+            Text(bookingClosed ? 'New bookings stopped' : 'Accepting new bookings',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                    color: bookingClosed ? kRedDark : kTextSecondary)),
           ]),
         ),
 
@@ -1780,6 +1815,43 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     );
   }
 
+  // Gradient pill switch — ON (accepting bookings) = teal→blue gradient with
+  // the knob on the right; OFF (booking stopped) = flat grey, knob on the left.
+  Widget _bookingToggleSwitch({
+    required bool value,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) =>
+      Tooltip(
+        message: tooltip,
+        preferBelow: false,
+        child: GestureDetector(
+          onTap: onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            curve: Curves.easeOut,
+            width: 46, height: 26,
+            padding: const EdgeInsets.all(3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: value
+                  ? const LinearGradient(colors: [Color(0xFF34D399), Color(0xFF3B82F6)])
+                  : null,
+              color: value ? null : const Color(0xFFD1D5DB),
+            ),
+            alignment: value ? Alignment.centerRight : Alignment.centerLeft,
+            child: Container(
+              width: 20, height: 20,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [BoxShadow(color: Color(0x33000000), blurRadius: 3, offset: Offset(0, 1))],
+              ),
+            ),
+          ),
+        ),
+      );
+
   Widget _neuIconBtn({
     required IconData icon,
     required Color color,
@@ -2065,6 +2137,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (queueState == QueueState.stopped) return const SizedBox.shrink();
     final isRunning = queueState == QueueState.running;
     final isPaused  = queueState == QueueState.paused;
+    final bookingClosed = ref.watch(appointmentViewModelProvider).bookingClosed;
 
     final ip = sessionPts.where((p) => (p.status?.toLowerCase() ?? '') == 'in_progress').firstOrNull;
     final booked = sessionPts.where((p) => (p.status?.toLowerCase() ?? '') == 'booked').toList()
@@ -2122,6 +2195,17 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               color: kPurpleDark, bg: kPurpleLight, border: kPurpleBorder,
               tooltip: 'Emergency pause',
               onTap: () => _showEmergencyDialog(queueId),
+            ),
+            const SizedBox(width: 5),
+            _liveIconBtn(
+              icon: bookingClosed ? Icons.event_busy_rounded : Icons.event_available_rounded,
+              color: bookingClosed ? kRedDark : kPrimaryDark,
+              bg: bookingClosed ? kRedLight : kPrimaryLight,
+              border: bookingClosed ? kRedBorder : const Color(0xFF9FE1CB),
+              tooltip: bookingClosed
+                  ? 'New bookings stopped — tap to resume accepting bookings. Patients already in the queue are not affected.'
+                  : 'Stop new bookings for today — patients already in the queue keep being served as usual.',
+              onTap: () => _onToggleBookingClosed(queueId, !bookingClosed),
             ),
           ]),
           // const SizedBox(height: 10),

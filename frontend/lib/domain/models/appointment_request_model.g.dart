@@ -21,6 +21,7 @@ AppointmentRequestModel _$AppointmentRequestModelFromJson(
   isNext: (json['is_next'] as num?)?.toInt(),
   symptoms: json['symptoms'] as String?,
   clinicId: json['clinic_id'] as String?,
+  bookingClosed: json['booking_closed'] as bool?,
 );
 
 Map<String, dynamic> _$AppointmentRequestModelToJson(
@@ -38,4 +39,5 @@ Map<String, dynamic> _$AppointmentRequestModelToJson(
   'is_next': instance.isNext,
   'symptoms': instance.symptoms,
   'clinic_id': instance.clinicId,
+  'booking_closed': instance.bookingClosed,
 };

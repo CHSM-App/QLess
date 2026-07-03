@@ -1499,6 +1499,48 @@ router.post('/appointment/queueStop', async (req, res) => {
     return res.status(500).json({ success: false, message: 'Queue stop failed', error: error.message });
   }
 });
+
+// STOP/RESUME BOOKING — toggles new-booking acceptance for today's queue
+// WITHOUT touching the queue itself. Existing waiting patients are left
+// exactly as-is (no cancellation, no forced completion); use queueStop for
+// that. Distinct from queue_status so a doctor can pause new patients from
+// joining while still serving whoever is already in line.
+router.post('/appointment/stopBooking', async (req, res) => {
+  const { doctor_id, queue_id, booking_closed } = req.body;
+
+  if (!doctor_id || !queue_id) {
+    return res.status(400).json({ success: false, message: 'doctor_id and queue_id are required' });
+  }
+
+  try {
+    const result = await db.request()
+      .input('queue_id', queue_id)
+      .input('doctor_id', doctor_id)
+      .input('booking_closed', booking_closed ? 1 : 0)
+      .query(`
+        UPDATE doctor_queue
+        SET booking_closed = @booking_closed
+        WHERE queue_id = @queue_id AND doctor_id = @doctor_id
+      `);
+
+    if (result.rowsAffected?.[0] === 0) {
+      return res.json({ success: false, message: 'Queue not found' });
+    }
+
+    emitQueueUpdate(req, 'booking_status_changed', doctor_id, { queue_id, booking_closed: !!booking_closed });
+
+    return res.json({
+      success: true,
+      message: booking_closed ? 'New bookings stopped' : 'New bookings resumed',
+      booking_closed: !!booking_closed,
+    });
+
+  } catch (error) {
+    log.error('stopBooking error: ' + error.message);
+    return res.status(500).json({ success: false, message: 'Stop booking failed', error: error.message });
+  }
+});
+
 //QUEUE SKIP
 router.post('/appointment/queueSkip', async (req, res) => {
   const { doctor_id, appointment_id, is_next } = req.body;

@@ -89,6 +89,13 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
+  Future<AppointmentResponseModel> stopBooking(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.stopBooking(appointmentRequest);
+  }
+
+  @override
   Future<AppointmentResponseModel> queueSkip(
     AppointmentRequestModel appointmentRequest,
   ) {

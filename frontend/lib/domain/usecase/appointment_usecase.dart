@@ -75,6 +75,12 @@ class AppointmentUsecase {
     return appointmentRepository.queueStop(appointmentRequest);
   }
 
+  Future<AppointmentResponseModel> stopBooking(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.stopBooking(appointmentRequest);
+  }
+
   Future<AppointmentResponseModel> queueSkip(
     AppointmentRequestModel appointmentRequest,
   ) {

@@ -218,6 +218,18 @@ router.get('/appointment/getTodayQueue/:doctor_id', async (req, res) => {
       });
     }
 
+    // Enrich with booking_closed (the "stop new bookings" toggle) — sp_appointment's
+    // GET_TODAY_QUEUE doesn't return it, so fetch it directly rather than touch the SP.
+    const queueIds = rows.map(r => r.queue_id).filter(id => id != null);
+    if (queueIds.length > 0) {
+      const bcRes = await db.request().query(`
+        SELECT queue_id, booking_closed FROM doctor_queue
+        WHERE queue_id IN (${queueIds.map(id => Number(id)).join(',')})
+      `);
+      const bcMap = new Map((bcRes.recordset || []).map(r => [r.queue_id, r.booking_closed]));
+      for (const r of rows) r.booking_closed = bcMap.get(r.queue_id) === true;
+    }
+
     return res.json(rows);
 
   } catch (error) {

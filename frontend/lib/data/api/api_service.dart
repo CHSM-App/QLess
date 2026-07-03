@@ -238,6 +238,11 @@ abstract class ApiService {
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("doctor/insert/appointment/stopBooking")
+  Future<AppointmentResponseModel> stopBooking(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
   @POST("doctor/insert/appointment/queueSkip")
   Future<AppointmentResponseModel> queueSkip(
     @Body() AppointmentRequestModel appointmentRequest,

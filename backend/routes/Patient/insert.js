@@ -88,6 +88,33 @@ router.post('/appointment/book', async (req, res) => {
       });
     }
 
+    // Hard-guard: reject booking if the doctor has manually closed today's
+    // queue (queueStop → doctor_queue.queue_status = 3). The patient's booking
+    // screen only checks the scheduled time window, so closing early (e.g. a
+    // 9-12 session stopped at 11:30) wouldn't otherwise block new bookings.
+    const queueRes = await db.request()
+      .input('doctor_id', doctor_id)
+      .input('appointment_date', appointment_date)
+      .query(`
+        SELECT TOP 1 queue_status, booking_closed FROM doctor_queue
+        WHERE doctor_id = @doctor_id AND queue_date = @appointment_date
+        ORDER BY queue_id DESC
+      `);
+
+    const queueRow = queueRes.recordset?.[0];
+    if (queueRow?.queue_status === 3) {
+      return res.json({
+        success: false,
+        message: 'Doctor has closed the queue for today. Please try again later or pick another date.',
+      });
+    }
+    if (queueRow?.booking_closed === true) {
+      return res.json({
+        success: false,
+        message: 'Doctor has stopped accepting new bookings for today. Please try again later or pick another date.',
+      });
+    }
+
     const result = await db.request()
       .input('operation', 'BOOK')
       .input('user_type', user_type)
@@ -343,7 +370,25 @@ router.post('/queuePreviewEstimate', async (req, res) => {
       .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
-    res.status(200).json(result.recordset[0]);
+    const preview = result.recordset[0] || {};
+
+    // Reflect today's manual "stop new bookings" toggle so the patient sees it
+    // live on the booking screen, not just as a rejection after tapping Book.
+    try {
+      const bcRes = await db.request()
+        .input('doctor_id', doctor_id)
+        .query(`
+          SELECT TOP 1 queue_status, booking_closed FROM doctor_queue
+          WHERE doctor_id = @doctor_id AND queue_date = CAST(GETDATE() AS DATE)
+          ORDER BY queue_id DESC
+        `);
+      const row = bcRes.recordset?.[0];
+      preview.booking_closed = row ? (row.booking_closed === true || row.queue_status === 3) : false;
+    } catch (e) {
+      preview.booking_closed = false;
+    }
+
+    res.status(200).json(preview);
 
   } catch (error) {
     res.status(500).json({

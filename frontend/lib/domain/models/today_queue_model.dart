@@ -12,6 +12,7 @@ class TodayQueueModel {
   final int? completedCount;
   final String? startedAt;
   final String? stoppedAt;
+  final bool bookingClosed;
 
   TodayQueueModel({
     this.queueId,
@@ -27,6 +28,7 @@ class TodayQueueModel {
     this.completedCount,
     this.startedAt,
     this.stoppedAt,
+    this.bookingClosed = false,
   });
 
   TodayQueueModel copyWith({
@@ -43,6 +45,7 @@ class TodayQueueModel {
     int? completedCount,
     String? startedAt,
     String? stoppedAt,
+    bool? bookingClosed,
   }) =>
       TodayQueueModel(
         queueId: queueId ?? this.queueId,
@@ -58,6 +61,7 @@ class TodayQueueModel {
         completedCount: completedCount ?? this.completedCount,
         startedAt: startedAt ?? this.startedAt,
         stoppedAt: stoppedAt ?? this.stoppedAt,
+        bookingClosed: bookingClosed ?? this.bookingClosed,
       );
 
   factory TodayQueueModel.fromJson(Map<String, dynamic> json) => TodayQueueModel(
@@ -74,6 +78,7 @@ class TodayQueueModel {
         completedCount: json['completed_count'] as int?,
         startedAt: json['started_at'] as String?,
         stoppedAt: json['stopped_at'] as String?,
+        bookingClosed: json['booking_closed'] as bool? ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -90,5 +95,6 @@ class TodayQueueModel {
         'completed_count': completedCount,
         'started_at': startedAt,
         'stopped_at': stoppedAt,
+        'booking_closed': bookingClosed,
       };
 }

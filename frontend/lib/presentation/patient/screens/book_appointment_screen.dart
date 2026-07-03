@@ -231,6 +231,9 @@ class _BookAppointmentScreenState
 
   String? _estimatedWaitTime;
   bool    _isEstimateLoading = false;
+  // Doctor manually stopped new bookings for today (independent of the
+  // scheduled time window) — reflected live via the queue estimate call.
+  bool    _bookingClosedByDoctor = false;
   final TextEditingController _symptomsController = TextEditingController();
 
   @override
@@ -371,6 +374,7 @@ void dispose() {
     if (!mounted) return;
 
     final qd = ref.read(appointmentViewModelProvider).queuePreviewEstimateResponse;
+    _bookingClosedByDoctor = qd?.bookingClosed == true;
     String? label;
     if (qd != null) {
       final mins    = qd.estimatedMinutes;
@@ -403,6 +407,7 @@ void dispose() {
       _selectedTime      = null;
       _estimatedWaitTime = null;
       _isEstimateLoading = false;
+      _bookingClosedByDoctor = false;
     });
 
     // if (widget.doctor.doctorId != null) {
@@ -426,6 +431,7 @@ void dispose() {
       _selectedTime      = null;
       _estimatedWaitTime = null;
       _isEstimateLoading = false;
+      _bookingClosedByDoctor = false;
     });
     if (slotId == null) return;
     final picked = enabled.firstWhere(
@@ -574,6 +580,11 @@ void dispose() {
       }
     }
 
+    // Doctor manually stopped bookings for today — overrides the time window.
+    if (isQueue && dayIsToday && _bookingClosedByDoctor) {
+      isQueueOpen = false;
+    }
+
     // Slot session end-time check (today only)
     bool isSlotSessionEnded = false;
     if (!isQueue && dayIsToday && selAvail != null) {
@@ -639,6 +650,7 @@ void dispose() {
                 bookedTimes:       bookedTimes,
                 queueOpenTimeStr:  queueOpenTimeStr,
                 isQueueOpen:       isQueueOpen,
+                bookingClosedByDoctor: _bookingClosedByDoctor,
                 estimatedWaitTime: _estimatedWaitTime,
                 isEstimateLoading: _isEstimateLoading,
                 onPickDate:        _pickDate,
@@ -1344,6 +1356,7 @@ class _Body extends StatelessWidget {
   final Set<String>  bookedTimes;
   final String?      queueOpenTimeStr;
   final bool         isQueueOpen;
+  final bool         bookingClosedByDoctor;
   final String?      estimatedWaitTime;
   final bool         isEstimateLoading;
   final bool         isSlotSessionEnded;
@@ -1365,6 +1378,7 @@ class _Body extends StatelessWidget {
     required this.onPickTime, required this.buildSlots, required this.fmtTime,
       required this.symptomsController,
     this.queueOpenTimeStr, this.isQueueOpen = true,
+    this.bookingClosedByDoctor = false,
     this.estimatedWaitTime, this.isEstimateLoading = false,
     this.isSlotSessionEnded = false,
   });
@@ -1447,6 +1461,7 @@ class _Body extends StatelessWidget {
                 symptomsController: symptomsController,   
               queueOpenTimeStr:  queueOpenTimeStr,
               isQueueOpen:       isQueueOpen,
+              bookingClosedByDoctor: bookingClosedByDoctor,
               estimatedWaitTime: estimatedWaitTime,
               isEstimateLoading: isEstimateLoading,
             )
@@ -1807,6 +1822,7 @@ class _QueueCard extends StatelessWidget {
   final DoctorAvailabilityModel avail;
   final String?                 queueOpenTimeStr;
   final bool                    isQueueOpen;
+  final bool                    bookingClosedByDoctor;
   final String?                 estimatedWaitTime;
   final bool                    isEstimateLoading;
   final TextEditingController   symptomsController;   // ← NEW
@@ -1816,6 +1832,7 @@ class _QueueCard extends StatelessWidget {
     required this.symptomsController,                 // ← NEW
     this.queueOpenTimeStr,
     this.isQueueOpen       = true,
+    this.bookingClosedByDoctor = false,
     this.estimatedWaitTime,
     this.isEstimateLoading = false,
   });
@@ -1828,12 +1845,14 @@ class _QueueCard extends StatelessWidget {
         : kRedLight.withOpacity(0.4);
     final noteIcon  = isQueueOpen
         ? Icons.check_circle_rounded
-        : Icons.access_time_rounded;
+        : (bookingClosedByDoctor ? Icons.event_busy_rounded : Icons.access_time_rounded);
     final noteText = isQueueOpen
         ? 'Queue booking is open'
-        : (queueOpenTimeStr != null
-            ? 'Queue opens at $queueOpenTimeStr'
-            : 'Queue booking has ended');
+        : (bookingClosedByDoctor
+            ? 'Doctor has stopped new bookings for today'
+            : (queueOpenTimeStr != null
+                ? 'Queue opens at $queueOpenTimeStr'
+                : 'Queue booking has ended'));
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _sectionLabel('Queue Booking'),

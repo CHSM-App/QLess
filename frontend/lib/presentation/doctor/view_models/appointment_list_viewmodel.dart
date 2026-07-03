@@ -29,6 +29,9 @@ class AppointmentListState {
   final Set<int> emergencyQueueIds;
   /// Number of pending offline operations waiting to be synced.
   final int pendingOpsCount;
+  /// Whether the doctor has stopped accepting NEW bookings for today's queue.
+  /// Independent of [queueState] — existing waiting patients are unaffected.
+  final bool bookingClosed;
 
   const AppointmentListState({
     this.isLoading = false,
@@ -39,6 +42,7 @@ class AppointmentListState {
     this.doctorPatientCount,
     this.emergencyQueueIds = const {},
     this.pendingOpsCount = 0,
+    this.bookingClosed = false,
   });
 
   AppointmentListState copyWith({
@@ -50,6 +54,7 @@ class AppointmentListState {
     int? doctorPatientCount,
     Set<int>? emergencyQueueIds,
     int? pendingOpsCount,
+    bool? bookingClosed,
   }) {
     return AppointmentListState(
       isLoading: isLoading ?? this.isLoading,
@@ -61,6 +66,7 @@ class AppointmentListState {
       doctorPatientCount: doctorPatientCount ?? this.doctorPatientCount,
       emergencyQueueIds: emergencyQueueIds ?? this.emergencyQueueIds,
       pendingOpsCount: pendingOpsCount ?? this.pendingOpsCount,
+      bookingClosed: bookingClosed ?? this.bookingClosed,
     );
   }
 }
@@ -321,6 +327,31 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         return result;
       },
     );
+  }
+
+  // ── Stop/Resume Booking ─────────────────────────────────────────────────────
+  // Toggles new-booking acceptance only. Unlike queueStop, this never touches
+  // queueState or existing waiting patients — the doctor keeps serving whoever
+  // is already in line. Online-only (no offline queueing): it's a rare,
+  // low-urgency toggle, not something a doctor needs mid-consult with no signal.
+
+  Future<AppointmentResponseModel> stopBooking(
+    AppointmentRequestModel appointmentRequest,
+  ) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final result = await usecase.stopBooking(appointmentRequest);
+      await fetchPatientAppointments(appointmentRequest.doctorId!,
+          isOnline: true, silent: true);
+      state = state.copyWith(
+        isLoading: false,
+        bookingClosed: appointmentRequest.bookingClosed ?? false,
+      );
+      return result;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      rethrow;
+    }
   }
 
   // ── Queue Next (Mark Complete) ──────────────────────────────────────────────
