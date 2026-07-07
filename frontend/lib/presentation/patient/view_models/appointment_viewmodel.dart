@@ -285,6 +285,20 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     }
   }
 
+  Future<bool> markArrived(int appointmentId, int patientId, int familyId) async {
+    try {
+      final result = await usecase.markArrived(
+        AppointmentRequestModel(appointmentId: appointmentId, patientId: patientId),
+      );
+      if (result.success == true) {
+        await getPatientAppointments(familyId, silent: true);
+      }
+      return result.success == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   ) async {

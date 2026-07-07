@@ -152,7 +152,8 @@ const _kDosageOpts = {
 //  MedicineEntry
 // ════════════════════════════════════════════════════════════════════
 class MedicineEntry {
-    final GlobalKey cardKey = GlobalKey(); 
+    final GlobalKey cardKey = GlobalKey();
+  bool hasError = false;
   MedicineType type;
   int?    medicineId;
   String? selectedName;
@@ -191,7 +192,7 @@ class MedicineEntry {
     medicineTypeId:   type.typeId,
     frequency:        frequency.isEmpty ? null : frequency,
     duration:         duration.isEmpty  ? null : duration,
-    timing:           timing.isEmpty    ? null : timing,
+    timing:           type == MedicineType.lotions ? null : (timing.isEmpty ? null : timing),
     tabletDosage:     type == MedicineType.tablet    ? (dosage.isEmpty ? null : dosage) : null,
     syrupDosageMl:    type == MedicineType.syrups     ? (dosage.isEmpty ? null : dosage) : null,
     injDosage:        type == MedicineType.injections ? (dosage.isEmpty ? null : dosage) : null,
@@ -620,6 +621,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final _diagCtrl = TextEditingController();
   final _clinCtrl = TextEditingController();
   final _advCtrl  = TextEditingController();
+  final _sympKey  = GlobalKey();
+  bool _symptomsError = false;
   DateTime? _followDate;
   final List<MedicineEntry> _meds = [];
   int _lastDoctorId = 0;
@@ -733,12 +736,28 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   String? _validate() {
-    if (_sympCtrl.text.trim().isEmpty) return 'Please enter symptoms';
-    for (int i = 0; i < _meds.length; i++) {
-      if (_meds[i].selectedName == null || _meds[i].medicineId == null)
-        return 'Please select medicine name for Medicine ${i + 1}';
+    final symptomsEmpty = _sympCtrl.text.trim().isEmpty;
+    MedicineEntry? badMed;
+    for (final m in _meds) {
+      m.hasError = m.selectedName == null || m.medicineId == null;
+      badMed ??= m.hasError ? m : null;
     }
-    return null;
+    _symptomsError = symptomsEmpty;
+
+    if (!symptomsEmpty && badMed == null) return null;
+
+    setState(() {});
+    final key = symptomsEmpty ? _sympKey : badMed!.cardKey;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250), alignment: 0.2);
+      }
+    });
+
+    return symptomsEmpty
+        ? 'Please enter symptoms'
+        : 'Please select medicine name for Medicine ${_meds.indexOf(badMed!) + 1}';
   }
 
   String _todayApi() {
@@ -1113,6 +1132,7 @@ Widget build(BuildContext context) {
             ),
           ),
           const SizedBox(width: 10),
+          
           // Icon badge — same 34×34 style as PatientListScreen
           Container(
             width: 34, height: 34,
@@ -1153,7 +1173,7 @@ Widget build(BuildContext context) {
             children: [
               _patientCard(), _gap(12),
               if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
-              _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+              _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
               _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'),
               // _gap(10),
               // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
@@ -1204,7 +1224,7 @@ Widget build(BuildContext context) {
               children: [
                 _patientCard(), _gap(12),
                 if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
-                _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+                _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
                 _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
                 // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
                 _followUpCard(),
@@ -1233,7 +1253,7 @@ Widget build(BuildContext context) {
         children: [
           _patientCard(), _gap(12),
           if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
-          _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+          _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
           _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(12),
           // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
           _medicinesHeader(), _gap(10),
@@ -1296,15 +1316,19 @@ Widget build(BuildContext context) {
     ])),
   );
 
-  Widget _textSection(String label, TextEditingController ctrl, String hint) =>
-      _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  Widget _textSection(String label, TextEditingController ctrl, String hint, {bool hasError = false, Key? key}) =>
+      Container(key: key, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _secLabel(label), _gap(8),
         TextField(
           controller: ctrl, maxLines: 3,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
-          decoration: _ideco(hint),
+          decoration: _ideco(hint, hasError: hasError),
         ),
-      ]));
+        if (hasError) ...[
+          _gap(4),
+          const Text('This field is required', style: TextStyle(fontSize: 11, color: kError, fontWeight: FontWeight.w600)),
+        ],
+      ])));
 
   Widget _medicinesHeader() => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1467,14 +1491,14 @@ List<Widget> _buildMedCards(List<Medicine> medicines) =>
     child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
   );
 
-  InputDecoration _ideco(String hint) => InputDecoration(
+  InputDecoration _ideco(String hint, {bool hasError = false}) => InputDecoration(
     hintText: hint,
     hintStyle: const TextStyle(fontSize: 12, color: kTextMuted),
     filled: true, fillColor: kBg,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+    border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: hasError ? kError : kBorder)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: hasError ? kError : kBorder)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: hasError ? kError : kPrimary, width: 1.5)),
   );
 }
 
@@ -1501,6 +1525,7 @@ class _MedCardState extends State<_MedCard> {
   MedicineEntry get e => widget.entry;
   late TextEditingController _durCtrl;
   late TextEditingController _areaCtrl;
+  bool _showSuggestions = false;
 
   @override
   void initState() { super.initState(); _initControllers(); }
@@ -1583,7 +1608,7 @@ void _onTypeChange(MedicineType t) {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: tc.withOpacity(0.30), width: 1.2),
+        border: Border.all(color: e.hasError ? kError : tc.withOpacity(0.30), width: e.hasError ? 1.6 : 1.2),
         boxShadow: [BoxShadow(color: tc.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1715,11 +1740,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     _nameSearch(), _gap(10),
     _txtField('Apply Area / Body Part', 'e.g. Scalp, Face', _areaCtrl, onChanged: (v) => e.lotionApplyArea = v),
     _gap(10), _dosagePicker(label: 'Application per slot'), _gap(10),
-    _r2([
-      _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
-      _dropField('Timing', e.timing, ['Morning', 'Evening', 'Night', 'Morning & Night', 'As Directed'],
-          (v) => setState(() => e.timing = v!)),
-    ]),
+    _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
   ]);
 
   Widget _sprayBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1741,19 +1762,24 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
       _onTypeChange(newType);
     }
     setState(() {
-      e.selectedName = m.medicineName ?? '';
-      e.medicineId   = m.medicineId;
-      e.searchText   = '';
+      e.selectedName    = m.medicineName ?? '';
+      e.medicineId      = m.medicineId;
+      e.searchText      = '';
+      _showSuggestions  = false;
     });
   }
 
   Widget _nameSearch() {
     final all = widget.medicines;
     final filtered = e.searchText.isEmpty
-        ? <Medicine>[]
+        ? (List<Medicine>.from(all)
+            ..sort((a, b) => (a.medicineName ?? '').toLowerCase().compareTo((b.medicineName ?? '').toLowerCase())))
         : all.where((m) => (m.medicineName ?? '').toLowerCase().contains(e.searchText.toLowerCase())).toList();
+    final showDropdown = _showSuggestions || e.searchText.isNotEmpty;
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return TapRegion(
+      onTapOutside: (_) { if (_showSuggestions) setState(() => _showSuggestions = false); },
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _lbl('Medicine Name'), _gap(5),
       if (e.selectedName != null)
         Container(
@@ -1786,7 +1812,8 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
         )
       else ...[
         TextField(
-          onChanged: (v) => setState(() => e.searchText = v),
+          onTap: () => setState(() => _showSuggestions = true),
+          onChanged: (v) => setState(() { e.searchText = v; _showSuggestions = true; }),
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: _ideco('Search medicine name…').copyWith(
             prefixIcon: const Padding(padding: EdgeInsets.symmetric(horizontal: 11),
@@ -1794,7 +1821,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
             prefixIconConstraints: const BoxConstraints(minWidth: 40),
           ),
         ),
-        if (e.searchText.isNotEmpty) ...[
+        if (showDropdown) ...[
           _gap(4),
           if (filtered.isNotEmpty)
             Container(
@@ -1840,12 +1867,14 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
             Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
               const Icon(Icons.info_outline_rounded, size: 12, color: kTextMuted),
               const SizedBox(width: 5),
-              Expanded(child: Text('No medicine found for "${e.searchText}"',
+              Expanded(child: Text(e.searchText.isEmpty
+                      ? 'No medicines added yet'
+                      : 'No medicine found for "${e.searchText}"',
                   style: const TextStyle(fontSize: 11, color: kTextMuted))),
             ])),
         ],
       ],
-    ]);
+    ]));
   }
 
   Widget _txtField(String label, String hint, TextEditingController ctrl,

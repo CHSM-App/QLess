@@ -238,9 +238,15 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           .read(doctorLoginViewModelProvider.notifier)
           .checkPhoneDoctor(widget.mobileNumber);
       if (!mounted) return;
-      final doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
+      final doctorState = ref.read(doctorLoginViewModelProvider);
+      final doctorId = doctorState.doctorId;
       if (doctorId == null || doctorId <= 0) {
-        await ref.read(tokenProvider.notifier).clearTokens();
+        // Only treat this as "no such doctor" when the lookup actually
+        // succeeded and came back empty — a network/server error here must
+        // not wipe out the token we just received.
+        if (!doctorState.phoneCheckResult.hasError) {
+          await ref.read(tokenProvider.notifier).clearTokens();
+        }
         _triggerError();
         return;
       }
@@ -295,9 +301,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           .read(patientLoginViewModelProvider.notifier)
           .checkPhonePatient(widget.mobileNumber);
       if (!mounted) return;
-      final patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+      final patientState = ref.read(patientLoginViewModelProvider);
+      final patientId = patientState.patientId ?? 0;
       if (patientId <= 0) {
-        await ref.read(tokenProvider.notifier).clearTokens();
+        // Only clear tokens when the lookup succeeded and found no record —
+        // a network/server error must not wipe out the token we just got.
+        if (!patientState.patientPhoneCheck.hasError) {
+          await ref.read(tokenProvider.notifier).clearTokens();
+        }
         _triggerError();
         return;
       }

@@ -200,6 +200,11 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
   List<DoctorDetails> _recentDoctors(List<DoctorDetails> all) =>
       all.where((d) => d.isRecentlyVisited == 1).take(10).toList();
 
+  // Doctors farther than this from the selected location are treated as a
+  // different city and excluded — keeps the list to "this city's" doctors
+  // instead of padding it with doctors from wherever else has any nearby fix.
+  static const double _cityRadiusKm = 30;
+
   List<DoctorDetails> _nearbyDoctors(List<DoctorDetails> all, Position? position) {
     if (position == null) return [];
     final withDist = all
@@ -209,9 +214,10 @@ class _DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
               _haversineKm(position.latitude, position.longitude,
                   d.latitude!, d.longitude!),
             ))
+        .where((e) => e.value <= _cityRadiusKm)
         .toList()
       ..sort((a, b) => a.value.compareTo(b.value));
-    return withDist.take(20).map((e) => e.key).toList();
+    return withDist.map((e) => e.key).toList();
   }
 
   List<String> _uniqueSpecialties(List<DoctorDetails> all) {

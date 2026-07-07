@@ -46,8 +46,11 @@ class _AuthGateState extends ConsumerState<AuthGate> {
                 .checkPhoneDoctor(mobile.trim());
           }
         }
-        final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
-        if (doctorId <= 0) {
+        final doctorState = ref.read(doctorLoginViewModelProvider);
+        final doctorId = doctorState.doctorId ?? 0;
+        // Only force logout when the lookup actually succeeded and found no
+        // doctor — a network/server error must not wipe a valid session.
+        if (doctorId <= 0 && !doctorState.phoneCheckResult.hasError) {
           await ref.read(tokenProvider.notifier).clearTokens();
           target = const ContinueAsScreen();
           if (!mounted) return;
@@ -113,7 +116,11 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           patientId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
         }
       }
-      if (patientId <= 0) {
+      final patientCheckHasError =
+          ref.read(patientLoginViewModelProvider).patientPhoneCheck.hasError;
+      // Only force logout when the lookup actually succeeded and found no
+      // patient — a network/server error must not wipe a valid session.
+      if (patientId <= 0 && !patientCheckHasError) {
         await ref.read(tokenProvider.notifier).clearTokens();
         target = const ContinueAsScreen();
         if (!mounted) return;

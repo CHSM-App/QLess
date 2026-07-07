@@ -39,6 +39,13 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
+  Future<AppointmentResponseModel> markArrived(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.markArrived(appointmentRequest);
+  }
+
+  @override
   Future<AppointmentResponseModel> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   ) {

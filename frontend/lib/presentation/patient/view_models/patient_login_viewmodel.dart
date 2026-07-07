@@ -155,6 +155,7 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
           final p = cached.first;
           state = state.copyWith(
             patientPhoneCheck: AsyncValue.data(cached),
+            patientId: p.patientId ?? state.patientId,
             name:     p.name     ?? state.name,
             mobileNo: p.mobileNo ?? state.mobileNo,
             email:    p.email    ?? state.email,

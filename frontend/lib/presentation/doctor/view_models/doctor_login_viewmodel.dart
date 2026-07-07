@@ -264,6 +264,12 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
     try {
       final result = await usecase.checkPhoneDoctor(mobile);
+      if (result.isEmpty) {
+        // Genuinely no doctor record for this mobile — distinct from a
+        // network/server failure below, which must not be treated the same.
+        state = state.copyWith(phoneCheckResult: AsyncValue.data(result));
+        return;
+      }
       final existingClinicId = state.clinic_id;
       if (existingClinicId != null) {
         // Clinic already selected via picker.

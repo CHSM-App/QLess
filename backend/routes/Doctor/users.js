@@ -150,10 +150,31 @@ router.get('/patientAppointmentList/:doctor_id', async (req, res) => {
     if (clinic_id) request.input('clinic_id', clinic_id);
 
     const result = await request.execute('sp_appointment');
+    const rows = result.recordset || [];
 
-    res.status(200).json(
-      result.recordset
-    );
+    // sp_appointment predates is_arrived — patch it in with a lookup instead
+    // of touching the stored procedure.
+    const skippedIds = rows
+      .filter(r => (r.status || '').toLowerCase() === 'skipped')
+      .map(r => r.appointment_id);
+    if (skippedIds.length > 0) {
+      const arrivedRes = await db.request()
+        .query(`
+          SELECT appointment_id, is_arrived, arrived_at
+          FROM appointments
+          WHERE appointment_id IN (${skippedIds.map(id => Number(id)).join(',')})
+        `);
+      const arrivedMap = new Map(
+        (arrivedRes.recordset || []).map(r => [r.appointment_id, r])
+      );
+      for (const r of rows) {
+        const a = arrivedMap.get(r.appointment_id);
+        r.is_arrived = a?.is_arrived ?? false;
+        r.arrived_at = a?.arrived_at ?? null;
+      }
+    }
+
+    res.status(200).json(rows);
 
   } catch (error) {
     res.status(500).json({

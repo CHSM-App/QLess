@@ -80,14 +80,16 @@ class PatientBottomNavState extends State<PatientBottomNav>
   late final List<Animation<double>> _iconScales;
 
   // ── Palette ────────────────────────────────────────────────────
-// ── Palette (update these to match doctor) ─────────────────────
-static const _accent      = Color(0xFF6366F1); // match doctor indigo
-static const _inactiveClr = Color(0xFF1E293B); // match doctor dark slate
-static const _pillBg      = Color(0x12FFFFFF);
-static const _pillBorder  = Color(0x26000000);
-static const _activePill  = Color(0x1A6366F1); // match doctor 10% indigo tint
-static const _compactNavHeight = 48.0;
-static const _regularNavHeight = 56.0;
+static const _accent      = Color(0xFF6366F1); // indigo
+static const _accentDark  = Color(0xFF4F46E5);
+static const _inactiveClr = Color(0xFF94A3B8); // muted slate for inactive icons/labels
+static const _pillBg      = Colors.white;
+static const _pillBorder  = Color(0xFFE2E8F0);
+static const _activePill  = Color(0x1A6366F1); // 10% indigo tint
+static const _iconChipInactive = Color(0xFFEEF0FF); // soft indigo chip bg
+static const _iconChipActive   = Color(0xFF6366F1); // solid indigo (active)
+static const _compactNavHeight = 54.0;
+static const _regularNavHeight = 64.0;
 
   static const _navItems = [
     _NavItem(
@@ -236,12 +238,12 @@ Widget build(BuildContext context) {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Colors.white,
+        systemNavigationBarColor: Color(0xFFF3F4F8),
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
         extendBody: true,
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF3F4F8),
         body: Stack(
           children: [
             Positioned.fill(
@@ -263,177 +265,67 @@ Widget build(BuildContext context) {
     ),
   );
 }
-  // ── Floating Glass Pill ───────────────────────────────────────
+  // ── Expanding Pill Bar — selected tab grows into a tinted pill with
+  // icon + label side by side; others stay as plain grey icons. ──────
   Widget _buildBottomNav() {
-    final isCompact = MediaQuery.of(context).size.width < 360;
-    final navHeight = isCompact ? _compactNavHeight : _regularNavHeight;
-    final pillHeight = navHeight - 10;
-
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(30),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-              child: Container(
-                height: navHeight,
-                decoration: BoxDecoration(
-                  color: _pillBg,
-                  borderRadius: BorderRadius.circular(30),
-                  border: Border.all(
-                    color: _pillBorder,
-                    width: 0.3,
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: _pillBorder, width: 0.6)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(_navItems.length, (i) {
+              final selected = _tab == i;
+              return GestureDetector(
+                onTap: () => _setTab(i),
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: selected ? _iconChipInactive : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                ),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final totalWidth = constraints.maxWidth;
-                    final itemCount = _navItems.length;
-                    final itemWidth = totalWidth / itemCount;
-                    final pillWidth = itemWidth - 10;
-                    final currentCenter = (_tab + 0.5) * itemWidth;
-                    final minCenter = itemWidth / 2;
-                    final maxCenter = totalWidth - itemWidth / 2;
-                    final dragCenter = (_dragX ?? currentCenter)
-                        .clamp(minCenter, maxCenter)
-                        .toDouble();
-                    final pillLeft = (dragCenter - pillWidth / 2)
-                        .clamp(0.0, totalWidth - pillWidth)
-                        .toDouble();
-
-                    return GestureDetector(
-                      onHorizontalDragStart: (details) {
-                        setState(() {
-                          _isDragging = true;
-                          _dragX = details.localPosition.dx;
-                          _dragHoverIndex = _tab;
-                        });
-                      },
-                      onHorizontalDragUpdate: (details) {
-                        setState(() {
-                          _dragX = details.localPosition.dx
-                              .clamp(minCenter, maxCenter)
-                              .toDouble();
-                          final hoverIndex =
-                              ((_dragX ?? currentCenter) / itemWidth)
-                                  .floor()
-                                  .clamp(0, itemCount - 1);
-                          if (hoverIndex != _dragHoverIndex) {
-                            _dragHoverIndex = hoverIndex;
-                            HapticFeedback.selectionClick();
-                          }
-                        });
-                      },
-                      onHorizontalDragEnd: (_) {
-                        final targetCenter = (_dragX ?? currentCenter)
-                            .clamp(minCenter, maxCenter)
-                            .toDouble();
-                        final newIndex = (targetCenter / itemWidth)
-                            .floor()
-                            .clamp(0, itemCount - 1);
-                        setState(() {
-                          _isDragging = false;
-                          _dragX = null;
-                          _dragHoverIndex = null;
-                        });
-                        _setTab(newIndex);
-                      },
-                      onHorizontalDragCancel: () {
-                        setState(() {
-                          _isDragging = false;
-                          _dragX = null;
-                          _dragHoverIndex = null;
-                        });
-                      },
-                      behavior: HitTestBehavior.translucent,
-                      child: Stack(
-                        children: [
-                          AnimatedPositioned(
-                            duration: _isDragging
-                                ? Duration.zero
-                                : const Duration(milliseconds: 220),
-                            curve: Curves.easeInOut,
-                            left: pillLeft,
-                            top: 5,
-                            width: pillWidth,
-                            height: pillHeight,
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: _activePill,
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                            ),
-                          ),
-                          Row(
-                            children: List.generate(_navItems.length, (i) {
-                              final selected = _tab == i;
-                              return Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _setTab(i),
-                                  behavior: HitTestBehavior.opaque,
-                                  child: AnimatedBuilder(
-                                    animation: _iconScales[i],
-                                    builder: (context, _) => Container(
-                                      margin: const EdgeInsets.symmetric(
-                                        horizontal: 3,
-                                        vertical: 4,
-                                      ),
-                                      child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Transform.scale(
-                                            scale: _iconScales[i].value,
-                                            child: Icon(
-                                              selected
-                                                  ? _navItems[i].activeIcon
-                                                  : _navItems[i].icon,
-                                              size: isCompact ? 18 : 20,
-                                              color: selected
-                                                  ? _accent
-                                                  : _inactiveClr,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          AnimatedDefaultTextStyle(
-                                            duration: const Duration(
-                                                milliseconds: 200),
-                                            style: TextStyle(
-                                              fontSize: isCompact ? 8 : 9,
-                                              fontWeight: selected
-                                                  ? FontWeight.w700
-                                                  : FontWeight.w500,
-                                              color: selected
-                                                  ? _accent
-                                                  : _inactiveClr,
-                                              letterSpacing: 0.1,
-                                            ),
-                                            child: Text(
-                                              _navItems[i].label,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        selected ? _navItems[i].activeIcon : _navItems[i].icon,
+                        size: 22,
+                        color: selected ? _accentDark : _inactiveClr,
+                      ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOut,
+                        child: selected
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _navItems[i].label,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: _accentDark,
                                     ),
                                   ),
-                                ),
-                              );
-                            }),
-                          ),
-                        ],
+                                ],
+                              )
+                            : const SizedBox.shrink(),
                       ),
-                    );
-                  },
+                    ],
+                  ),
                 ),
-              ),
-            ),
+              );
+            }),
           ),
         ),
       ),

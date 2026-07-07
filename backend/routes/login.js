@@ -602,18 +602,22 @@ router.post('/patient', uploadHandler(upload.single("image")), async (req, res) 
 
 		const operation = patient_id && patient_id > 0 ? "Update" : "Insert";
 
+		// Optional fields arrive as "" over multipart/form-data when left blank —
+		// SQL Server can't implicitly convert "" to decimal/int, so null them out.
+		const clean = (v) => (v === "" || v === undefined ? null : v);
+
 		const request = db.request();
 
 		request.input("operation", operation);
 		request.input("patient_id", patient_id || null);
 		request.input("name", name);
 		request.input("mobile_no", mobile_no);
-		request.input("email", email);
-		request.input("Address", address);
+		request.input("email", clean(email));
+		request.input("Address", clean(address));
 		request.input("gender_id", gender_id);
 		request.input("DOB", DOB);
-		request.input("blood_group_id", blood_group_id);
-		request.input("weight", weight);
+		request.input("blood_group_id", clean(blood_group_id));
+		request.input("weight", clean(weight));
 
 		const result = await request.execute("sp_patients");
 

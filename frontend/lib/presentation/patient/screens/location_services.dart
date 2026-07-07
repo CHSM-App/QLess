@@ -9,6 +9,23 @@ import 'package:http/http.dart' as http;
 
 
 class LocationService {
+  static Future<LocationPermission>? _pendingPermissionRequest;
+
+  /// Every caller must request permission through here instead of calling
+  /// `Geolocator.requestPermission()` directly. Android only allows one
+  /// native permission prompt in flight; firing a second request while the
+  /// first is still resolving (e.g. from the home screen's pre-check and
+  /// then again from inside [getCurrentPosition]/[getCurrentAddress]) can
+  /// leave the second caller's Future stuck forever with no error. Routing
+  /// every call through one shared in-flight Future means concurrent callers
+  /// just await the same native request.
+  static Future<LocationPermission> requestPermissionOnce() {
+    return _pendingPermissionRequest ??=
+        Geolocator.requestPermission().whenComplete(() {
+      _pendingPermissionRequest = null;
+    });
+  }
+
   /// Returns the raw GPS [Position] (lat/lng) or null if unavailable.
   static Future<Position?> getCurrentPosition() async {
     try {
@@ -17,7 +34,7 @@ class LocationService {
 
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await requestPermissionOnce();
       }
       if (permission == LocationPermission.denied ||
           permission == LocationPermission.deniedForever) {
@@ -28,13 +45,19 @@ class LocationService {
           await Geolocator.getCurrentPosition(
             locationSettings: const LocationSettings(
               accuracy: LocationAccuracy.high,
-              timeLimit: Duration(seconds: 8),
+              timeLimit: Duration(seconds: 15),
             ),
           );
     } catch (_) {
       return null;
     }
   }
+
+  /// Reverse-geocodes an already-fetched [Position]. Exposed so callers that
+  /// already have a fresh fix (e.g. from [getCurrentPosition]) can resolve an
+  /// address without triggering a second, independent GPS fix.
+  static Future<String> addressFromPosition(Position position) =>
+      _reverseGeocodeOrFallback(position);
 
   static Future<String> getCurrentAddress() async {
     bool serviceEnabled;
@@ -51,7 +74,7 @@ class LocationService {
       // Permission check
       permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+        permission = await requestPermissionOnce();
         if (permission == LocationPermission.denied) {
           final ip = await _maybeIpFallback();
           return ip ?? "Permission Denied";
@@ -73,7 +96,7 @@ class LocationService {
 
       position ??= await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 8),
+        timeLimit: const Duration(seconds: 15),
       );
 
       return _reverseGeocodeOrFallback(position);

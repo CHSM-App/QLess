@@ -416,6 +416,11 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("patient/insert/appointment/markArrived")
+  Future<AppointmentResponseModel> markArrived(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
   @POST("patient/insert/cancelAppointment/{appointment_id}")
   Future<AppointmentResponseModel> cancelAppointment(
     @Path("appointment_id") int appointmentId,

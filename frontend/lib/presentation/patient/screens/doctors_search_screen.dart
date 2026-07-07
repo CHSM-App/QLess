@@ -87,9 +87,9 @@ _QueueState _queueStateFor(DoctorDetails d) {
   }
 
   if (d.isBookingStarted != 1)    return _QueueState.opensSoon;
-  if (d.isQueueFull == 1)         return _QueueState.full;
   final cur = d.currentQueueLength ?? 0;
   final max = d.maxQueueLength ?? 0;
+  if (d.isQueueFull == 1 || (max > 0 && cur >= max)) return _QueueState.full;
   if (cur == 0 && max == 0)       return _QueueState.open;
   return _QueueState.hasQueue;
 }
@@ -155,14 +155,16 @@ class _QueueStatus {
             label: 'Open', btnLabel: 'Book',
             color: kPrimary, icon: Icons.event_available_rounded);
       case _QueueState.hasQueue:
-        final cur  = d.currentQueueLength ?? 0;
-        final max  = d.maxQueueLength ?? 1;
-        final prog = (cur / max).clamp(0.0, 1.0);
+        final cur = d.currentQueueLength ?? 0;
+        final max = d.maxQueueLength ?? 0;
+        final hasMax = max > 0;
         return _QueueStatus(
             isVisible: true, canBook: true, tintCard: false,
-            label: '$cur/$max in queue', btnLabel: 'Book',
+            label: hasMax ? '$cur/$max in queue' : '$cur in queue',
+            btnLabel: 'Book',
             color: cur > 5 ? kError : kWarning,
-            icon: Icons.people_alt_rounded, progress: prog);
+            icon: Icons.people_alt_rounded,
+            progress: hasMax ? (cur / max).clamp(0.0, 1.0) : null);
     }
   }
 

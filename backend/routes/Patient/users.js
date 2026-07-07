@@ -266,6 +266,19 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
         }
       }
 
+      if ((item.status || '').toLowerCase() === 'skipped') {
+        try {
+          const arrivedRes = await db.request()
+            .input('appointment_id', item.appointment_id)
+            .query('SELECT is_arrived, arrived_at FROM appointments WHERE appointment_id = @appointment_id');
+          const a = arrivedRes.recordset?.[0];
+          queueData.is_arrived = a?.is_arrived ?? false;
+          queueData.arrived_at = a?.arrived_at ?? null;
+        } catch (err) {
+          // ignore — not critical to the appointment list rendering
+        }
+      }
+
       enrichedAppointments.push({
         ...item,
         ...queueData

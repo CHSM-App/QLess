@@ -20,6 +20,10 @@ abstract class AppointmentRepository {
 
   Future<AppointmentResponseModel> cancelAppointment(int appointmentId);
 
+  Future<AppointmentResponseModel> markArrived(
+    AppointmentRequestModel appointmentRequest,
+  );
+
   Future<AppointmentResponseModel> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   );

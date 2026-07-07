@@ -31,7 +31,8 @@ import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Page & card surfaces
-const kPageBg         = Color(0xFFF8F9FB); // grey-50
+// const kPageBg         = Color(0xFFF8F9FB); // grey-50
+const kPageBg         = Color(0xFFFAFAFA); // grey-50
 const kCardBg         = Colors.white;
 const kCardBorder     = Color(0xFFE2E8F0);
 
@@ -414,14 +415,16 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     ref.read(doctorNavTabRequestProvider.notifier).state = kDoctorPatientListTab;
   }
 
-  Future<void> _onQueuePause(int? queueId) async {
-    final ok = await _confirm(
-      title: 'Pause Queue?',
-      message: 'Waiting patients will be notified that the queue is paused. You can resume any time.',
-      confirmLabel: 'Pause',
-      confirmColor: kAmberDark,
-    );
-    if (!ok) return;
+  Future<void> _onQueuePause(int? queueId, {bool confirmFirst = true}) async {
+    if (confirmFirst) {
+      final ok = await _confirm(
+        title: 'Pause Queue?',
+        message: 'Waiting patients will be notified that the queue is paused. You can resume any time.',
+        confirmLabel: 'Pause',
+        confirmColor: kAmberDark,
+      );
+      if (!ok) return;
+    }
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
@@ -1439,6 +1442,23 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         .toList()
       ..sort((a, b) => (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0));
 
+    // Skipped patients waiting to return — pulled out of "Up next" and shown
+    // first. Patients who tapped "I've Arrived" jump to the very front (they're
+    // physically at the clinic right now); within each group, oldest-skipped
+    // first (queue number order == skip order since skips happen in queue
+    // sequence), so the doctor recalls in the right order.
+    final skippedWaitingPts = upNextPts
+        .where((p) => (p.status?.toLowerCase() ?? '') == 'skipped')
+        .toList()
+      ..sort((a, b) {
+        final arrivedCmp = (b.isArrived == true ? 1 : 0).compareTo(a.isArrived == true ? 1 : 0);
+        if (arrivedCmp != 0) return arrivedCmp;
+        return (a.queueNumber ?? 0).compareTo(b.queueNumber ?? 0);
+      });
+    final bookedUpNextPts = upNextPts
+        .where((p) => (p.status?.toLowerCase() ?? '') != 'skipped')
+        .toList();
+
     final cardBorderColor = isRunning ? kCardBorder : isPaused ? kCardBorder : kCardBorder;
 
     return Container(
@@ -1454,7 +1474,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Session header ────────────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 13, 14, 13),
+          padding: const EdgeInsets.fromLTRB(14, 13, 14, 6),
           child: Row(children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
@@ -1516,7 +1536,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
         // ── Accepting new bookings toggle (below the queue time) ────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 13),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             _bookingToggleSwitch(
               value: !bookingClosed,
@@ -1525,9 +1545,9 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   : 'Stop new bookings for today — patients already in the queue keep being served as usual.',
               onTap: () => _onToggleBookingClosed(queueId, !bookingClosed),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(bookingClosed ? 'New bookings stopped' : 'Accepting new bookings',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                     color: bookingClosed ? kRedDark : kTextSecondary)),
           ]),
         ),
@@ -1536,7 +1556,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         if (currentPt != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
-            child: _buildNowServingCard(currentPt, queueState, sessionPts.length, sessionHasIP, sessionNextQNo),
+            child: _buildNowServingCard(currentPt, queueState, sessionPts.length - 1, sessionHasIP, sessionNextQNo),
           )
         else if (queueActive)
           Padding(
@@ -1565,29 +1585,76 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             ),
           ),
 
-        // ── Up next ───────────────────────────────────────────────────
-        if (upNextPts.isNotEmpty) ...[
+        // ── Skipped — waiting to return ─────────────────────────────────
+        // Collapsed by default (only the highest-priority — first skipped —
+        // patient shown) so a long skipped list doesn't push "Up next" down.
+        if (skippedWaitingPts.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+            child: Row(children: [
+              Container(width: 6, height: 6,
+                  decoration: const BoxDecoration(color: kAmber, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              const Text('Skipped — waiting to return',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                      color: kAmberDark, letterSpacing: 0.2)),
+              const Spacer(),
+              Text('${skippedWaitingPts.length} waiting',
+                  style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500)),
+            ]),
+          ),
+          Builder(builder: (_) {
+            final key = queueId ?? sessionIndex;
+            final expanded = _patientsExpanded[key] ?? false;
+            final visiblePts = expanded ? skippedWaitingPts : skippedWaitingPts.take(2).toList();
+            final hiddenCount = skippedWaitingPts.length - visiblePts.length;
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 2),
+              child: Column(children: [
+                ...visiblePts.map((p) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildUpNextCard(p, queueState),
+                    )),
+                if (hiddenCount > 0 || expanded)
+                  GestureDetector(
+                    onTap: () => setState(() => _patientsExpanded[key] = !expanded),
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        expanded ? 'Show less' : '+$hiddenCount more skipped',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                            color: kAmberDark),
+                      ),
+                    ),
+                  ),
+              ]),
+            );
+          }),
+        ],
+
+        // ── Up next ───────────────────────────────────────────────────
+        if (bookedUpNextPts.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 2, 14, 0),
             child: Row(children: [
               const Text('Up next',
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
                       color: kTextSecondary, letterSpacing: 0.2)),
               const Spacer(),
-              Text('${upNextPts.length} waiting',
+              Text('${bookedUpNextPts.length} waiting',
                   style: const TextStyle(fontSize: 11, color: kTextMuted, fontWeight: FontWeight.w500)),
             ]),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
-            child: Column(children: upNextPts
+            child: Column(children: bookedUpNextPts
                 .map((p) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _buildUpNextCard(p, queueState),
                     ))
                 .toList()),
           ),
-        ] else
+        ] else if (skippedWaitingPts.isEmpty)
           const SizedBox(height: 14),
 
         // ── SLOT PATIENTS ─────────────────────────────────────────────
@@ -1830,8 +1897,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
-            width: 46, height: 26,
-            padding: const EdgeInsets.all(3),
+            width: 34, height: 19,
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
               gradient: value
@@ -1841,7 +1908,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             ),
             alignment: value ? Alignment.centerRight : Alignment.centerLeft,
             child: Container(
-              width: 20, height: 20,
+              width: 15, height: 15,
               decoration: const BoxDecoration(
                 color: Colors.white,
                 shape: BoxShape.circle,
@@ -1921,7 +1988,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                   letterSpacing: 1.1, color: Colors.white60)),
           const Spacer(),
           Text(
-            'Token ${(p.queueNumber ?? 0).toString().padLeft(2, '0')} · $totalWaiting',
+            'Token ${(p.queueNumber ?? 0).toString().padLeft(2, '0')}  •  $totalWaiting waiting',
             style: const TextStyle(fontSize: 11, color: Colors.white54, fontWeight: FontWeight.w500),
           ),
         ]),
@@ -2034,11 +2101,15 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     );
   }
 
+  Widget _maybeBlink(bool blink, Widget child) =>
+      blink ? _ArrivedBlinkBadge(child: child) : child;
+
   Widget _buildUpNextCard(AppointmentList p, QueueState queueState) {
     final name          = p.patientName ?? 'Patient';
     final status        = p.status?.toLowerCase().trim() ?? '';
     final isSkipped     = status == 'skipped';
     final isBooked      = status == 'booked';
+    final isArrived     = isSkipped && p.isArrived == true;
     final queueActive   = queueState == QueueState.running || queueState == QueueState.paused;
     final isReceptionist = ref.read(tokenProvider).roleId == 3;
 
@@ -2080,7 +2151,15 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 3),
-          if (isSkipped)
+          if (isArrived)
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Container(width: 6, height: 6,
+                  decoration: const BoxDecoration(color: kRed, shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              const Text('Arrived at clinic — recall now',
+                  style: TextStyle(fontSize: 11, color: kRedDark, fontWeight: FontWeight.w700)),
+            ])
+          else if (isSkipped)
             Row(mainAxisSize: MainAxisSize.min, children: [
               Container(width: 6, height: 6,
                   decoration: const BoxDecoration(color: kAmber, shape: BoxShape.circle)),
@@ -2094,16 +2173,19 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         ])),
         const SizedBox(width: 10),
         if (isSkipped && queueActive && !isReceptionist)
-          GestureDetector(
-            onTap: () => _startSession(p),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 32, 173, 138),
-                borderRadius: BorderRadius.circular(9),
+          _maybeBlink(
+            isArrived,
+            GestureDetector(
+              onTap: () => _startSession(p),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(255, 32, 173, 138),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Text('Recall',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
               ),
-              child: const Text('Recall',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
             ),
           )
         else if (isBooked && queueActive && isReceptionist)
@@ -2295,7 +2377,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             GestureDetector(
               onTap: () async {
                 Navigator.of(ctx).pop();
-                await _onQueuePause(queueId);
+                await _onQueuePause(queueId, confirmFirst: false);
               },
               child: Container(
                 width: double.infinity,
@@ -2315,7 +2397,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
             GestureDetector(
               onTap: () async {
                 Navigator.of(ctx).pop();
-                await _showEmergencyDialog(queueId);
+                if (ref.read(appointmentViewModelProvider.notifier).isEmergencyPaused(queueId)) {
+                  _snack('Already emergency paused');
+                  return;
+                }
+                await _onQueuePauseEmergency(queueId);
               },
               child: Container(
                 width: double.infinity,
@@ -3028,6 +3114,61 @@ Widget _buildAwaitingBookingsState() {
       decoration: const BoxDecoration(color: kPrimary, shape: BoxShape.circle),
     ),
   );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARRIVED BLINK — highlights a skipped patient who tapped "I've Arrived"
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ArrivedBlinkBadge extends StatefulWidget {
+  final Widget child;
+  const _ArrivedBlinkBadge({required this.child});
+
+  @override
+  State<_ArrivedBlinkBadge> createState() => _ArrivedBlinkBadgeState();
+}
+
+class _ArrivedBlinkBadgeState extends State<_ArrivedBlinkBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 850))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (context, child) => Transform.scale(
+        scale: 1.0 + 0.10 * _ctrl.value,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: [
+              BoxShadow(
+                color: kGreen.withOpacity(0.35 + 0.35 * _ctrl.value),
+                blurRadius: 10 + 6 * _ctrl.value,
+                spreadRadius: 1 + 2 * _ctrl.value,
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+      child: widget.child,
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

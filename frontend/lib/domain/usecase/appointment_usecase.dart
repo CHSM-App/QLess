@@ -33,6 +33,12 @@ class AppointmentUsecase {
     return appointmentRepository.cancelAppointment(appointmentId);
   }
 
+  Future<AppointmentResponseModel> markArrived(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.markArrived(appointmentRequest);
+  }
+
   Future<AppointmentResponseModel> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   ) {

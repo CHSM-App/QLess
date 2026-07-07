@@ -329,6 +329,56 @@ router.post('/cancelAppointment/:appointment_id', async (req, res) => {
 });
 
 
+// PATIENT MARKS THEMSELVES ARRIVED AT CLINIC AFTER BEING SKIPPED —
+// doctor's queue screen highlights this patient so they get recalled first.
+router.post('/appointment/markArrived', async (req, res) => {
+  const { appointment_id, patient_id } = req.body;
+
+  if (!appointment_id || !patient_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'appointment_id and patient_id are required'
+    });
+  }
+
+  try {
+    const result = await db.request()
+      .input('appointment_id', appointment_id)
+      .input('patient_id', patient_id)
+      .query(`
+        UPDATE appointments
+        SET is_arrived = 1, arrived_at = GETDATE()
+        OUTPUT INSERTED.doctor_id
+        WHERE appointment_id = @appointment_id
+          AND patient_id = @patient_id
+          AND LOWER(status) = 'skipped'
+      `);
+
+    const doctorId = result.recordset?.[0]?.doctor_id;
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointment not found or not currently skipped'
+      });
+    }
+
+    emitQueueUpdate(req, 'patient_arrived', doctorId, { appointment_id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Doctor has been notified that you are at the clinic'
+    });
+
+  } catch (error) {
+    log.error('markArrived error: ' + error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to notify the clinic',
+      error: error.message
+    });
+  }
+});
+
 router.post('/queueEstimate', async (req, res) => {
   const {
     appointment_id,

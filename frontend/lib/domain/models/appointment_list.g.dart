@@ -46,6 +46,8 @@ AppointmentList _$AppointmentListFromJson(Map<String, dynamic> json) =>
       symptoms: json['symptoms'] as String?,
       isReviewed: json['is_reviewed'] as bool?,
       mobile: json['mobile'] as String?,
+      isArrived: json['is_arrived'] as bool?,
+      arrivedAt: json['arrived_at'] as String?,
     )..patientName = json['patient_name'] as String?;
 
 Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
@@ -89,4 +91,6 @@ Map<String, dynamic> _$AppointmentListToJson(AppointmentList instance) =>
       'symptoms': instance.symptoms,
       'is_reviewed': instance.isReviewed,
       'mobile': instance.mobile,
+      'is_arrived': instance.isArrived,
+      'arrived_at': instance.arrivedAt,
     };
