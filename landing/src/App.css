@@ -18,7 +18,7 @@
 }
 
 .hero {
-  position: relative;
+  position: relative; 
 
   .base,
   .framework,
