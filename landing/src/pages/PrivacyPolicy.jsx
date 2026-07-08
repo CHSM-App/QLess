@@ -18,6 +18,7 @@ const SECTIONS = [
   { id: 'consent',      n: '09', icon: FileCheck,   title: 'Consent & Its Management' },
   { id: 'children',     n: '10', icon: Baby,        title: "Children's Privacy" },
   { id: 'retention',    n: '11', icon: Clock,       title: 'Data Retention' },
+  { id: 'deletion-request', n: '11A', icon: FileCheck, title: 'How to Request Data Deletion' },
   { id: 'thirdparty',   n: '12', icon: Link2,       title: 'Third-Party Links & Services' },
   { id: 'changes',      n: '13', icon: RefreshCw,   title: 'Changes to This Policy' },
   { id: 'contact',      n: '14', icon: Mail,        title: 'Contact & Grievance Redressal' },
@@ -336,7 +337,7 @@ export default function PrivacyPolicy() {
               {[
                 ['Access', 'View your profile, appointments, family member profiles, and prescriptions within the app.'],
                 ['Correction', 'Update inaccurate or outdated profile details directly in the app at any time.'],
-                ['Erasure', 'Delete your account, bookings, prescriptions, and linked family profiles — in-app (Profile → Delete Account) or via our Delete Account page.'],
+                ['Erasure', 'Request deletion of your account, bookings, prescriptions, and linked family profiles at any time — in-app via Profile → Delete Account → Confirm deletion, or by emailing support@vengurlatech.com with the subject "Data Deletion Request". Requests are processed within 30 calendar days of identity verification (see Section 11A).'],
                 ['Data Portability', 'Contact us to request a copy of your data in a structured, machine-readable format.'],
                 ['Grievance Redressal', 'File a complaint with us; escalate to the Data Protection Board of India if unresolved.'],
                 ['Withdraw Consent', 'Withdraw consent for any processing at any time — see Section 09.'],
@@ -386,7 +387,13 @@ export default function PrivacyPolicy() {
           </Section>
 
           <Section id="retention" n="11" icon={Clock} title="Data Retention">
-            <p>We retain Personal Data only as long as necessary for the purpose it was collected, or as required by Indian law.</p>
+            <p>
+              We retain personal data only for as long as necessary to provide our Services, comply with our
+              legal and regulatory obligations, resolve disputes, prevent fraud and abuse, and enforce our
+              agreements. Once none of these purposes apply, the data is securely deleted or permanently
+              anonymised so that it can no longer be linked back to you.
+            </p>
+            <p>Beyond this general principle, Personal Data is retained only as long as necessary for the purpose it was collected, or as required by Indian law.</p>
             <div className="overflow-x-auto rounded-xl border border-gray-100">
               <table className="w-full border-collapse">
                 <thead><tr><Th>Data Category</Th><Th>Retention Period</Th></tr></thead>
@@ -404,6 +411,38 @@ export default function PrivacyPolicy() {
               When you delete your account, we permanently delete or anonymise your Personal Data within{' '}
               <strong className="text-gray-800">30 calendar days</strong> of the request, except where longer
               retention of medical records or other categories above is legally required.
+            </p>
+          </Section>
+
+          <Section id="deletion-request" n="11A" icon={FileCheck} title="How to Request Data Deletion">
+            <p>
+              You may request deletion of your personal data at any time. We offer two ways to submit a
+              deletion request:
+            </p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                <p className="text-xs font-bold text-gray-800 mb-1">In-App Deletion</p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Go to <strong className="text-gray-700">Profile → Delete Account → Confirm deletion</strong>.
+                  This is the fastest way to initiate deletion and does not require contacting support.
+                </p>
+              </div>
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                <p className="text-xs font-bold text-gray-800 mb-1">Email Deletion Request</p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Email{' '}
+                  <a href="mailto:support@vengurlatech.com" className="text-sky-500 hover:underline">support@vengurlatech.com</a>{' '}
+                  with the subject <strong className="text-gray-700">"Data Deletion Request"</strong>, including
+                  your registered mobile number or email address so we can verify your identity.
+                </p>
+              </div>
+            </div>
+            <p className="pt-2">
+              Deletion requests are processed and your Personal Data is permanently deleted or anonymised
+              within <strong className="text-gray-800">30 calendar days</strong> of the request, after
+              identity verification, except where retention is required by applicable law (see the retention
+              periods in Section 11 above — for example, medical records required to be retained under
+              healthcare regulations). You will receive a confirmation once deletion is complete.
             </p>
           </Section>
 
