@@ -416,15 +416,24 @@ export default function PrivacyPolicy() {
 
           <Section id="deletion-request" n="11A" icon={FileCheck} title="How to Request Data Deletion">
             <p>
-              You may request deletion of your personal data at any time. We offer two ways to submit a
-              deletion request:
+              You may request deletion of your personal data at any time. We offer the following ways to
+              submit a deletion request:
             </p>
-            <div className="grid sm:grid-cols-2 gap-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
                 <p className="text-xs font-bold text-gray-800 mb-1">In-App Deletion</p>
                 <p className="text-xs text-gray-500 leading-relaxed">
                   Go to <strong className="text-gray-700">Profile → Delete Account → Confirm deletion</strong>.
                   This is the fastest way to initiate deletion and does not require contacting support.
+                </p>
+              </div>
+              <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
+                <p className="text-xs font-bold text-gray-800 mb-1">Account Deletion Webpage</p>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Users may also request account deletion through our public account deletion page available at{' '}
+                  <a href="https://qless.vengurlatech.com/delete-account" target="_blank" rel="noreferrer" className="text-sky-500 hover:underline break-all">
+                    qless.vengurlatech.com/delete-account
+                  </a>.
                 </p>
               </div>
               <div className="rounded-xl bg-gray-50 border border-gray-100 p-4">
@@ -438,11 +447,18 @@ export default function PrivacyPolicy() {
               </div>
             </div>
             <p className="pt-2">
-              Deletion requests are processed and your Personal Data is permanently deleted or anonymised
-              within <strong className="text-gray-800">30 calendar days</strong> of the request, after
-              identity verification, except where retention is required by applicable law (see the retention
-              periods in Section 11 above — for example, medical records required to be retained under
-              healthcare regulations). You will receive a confirmation once deletion is complete.
+              After your deletion request is approved, your account will be permanently deactivated and your
+              personal information will be permanently deleted or irreversibly anonymised within{' '}
+              <strong className="text-gray-800">30 calendar days</strong>, except where we are legally
+              required to retain specific information (for example, medical records retained under applicable
+              healthcare regulations).
+            </p>
+            <p className="pt-2">
+              <strong className="text-gray-800">Data Retained After Account Deletion</strong> — some
+              information may be retained after account deletion where required by applicable law, including
+              medical records, audit logs, fraud prevention records, and information necessary to comply with
+              legal, regulatory, accounting, or dispute resolution obligations. Such retained information is
+              securely stored and is not used for marketing or any unrelated purpose.
             </p>
           </Section>
 
