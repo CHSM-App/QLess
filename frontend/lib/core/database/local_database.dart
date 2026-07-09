@@ -13,7 +13,7 @@ class LocalDatabase {
   static final LocalDatabase instance = LocalDatabase._();
 
   static const _dbName    = 'qless_offline.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 7;
 
   // Table names
   static const _tQueues        = 'queues';
@@ -61,6 +61,8 @@ class LocalDatabase {
         completed_count INTEGER,
         started_at      TEXT,
         stopped_at      TEXT,
+        booking_closed  INTEGER,
+        clinic_id       TEXT,
         updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
       )
     ''');
@@ -197,6 +199,20 @@ class LocalDatabase {
     if (oldVersion < 5) {
       await _createPatientProfileTable(db);
     }
+    if (oldVersion < 6) {
+      // Column was missing entirely — every cacheQueues() write was silently
+      // throwing (caught by an empty catch upstream) because TodayQueueModel.
+      // toJson() always includes booking_closed, so the queues cache never
+      // populated properly and offline reads fell back to bare minimal rows
+      // (no start/end time, sessions missing).
+      await db.execute('ALTER TABLE $_tQueues ADD COLUMN booking_closed INTEGER');
+    }
+    if (oldVersion < 7) {
+      // Sessions cached with no clinic_id at all — a multi-clinic doctor's
+      // sessions from every clinic were mixed under one doctor_id with no way
+      // to separate them, so offline could show the wrong clinic's queue.
+      await db.execute('ALTER TABLE $_tQueues ADD COLUMN clinic_id TEXT');
+    }
   }
 
   // ── Queue cache ─────────────────────────────────────────────────────────────
@@ -214,8 +230,24 @@ class LocalDatabase {
     await batch.commit(noResult: true);
   }
 
-  Future<List<Map<String, dynamic>>> getQueuesForDoctor(int doctorId) async {
+  /// [clinicId] scopes the read to a single clinic when provided — a
+  /// multi-clinic doctor's cache holds every clinic's sessions under the same
+  /// doctor_id, so an unscoped read here is exactly how the wrong clinic's
+  /// queue could show up offline. Rows with a NULL clinic_id (cached before
+  /// this column existed, or by an offline optimistic insert that ran before
+  /// the clinic was ever confirmed) are still included — a strict equality
+  /// match would silently hide a real, previously-visible session instead of
+  /// just not being able to tell which clinic it belongs to.
+  Future<List<Map<String, dynamic>>> getQueuesForDoctor(int doctorId, {String? clinicId}) async {
     final db = await database;
+    if (clinicId != null) {
+      return db.query(
+        _tQueues,
+        where: 'doctor_id = ? AND (clinic_id = ? OR clinic_id IS NULL)',
+        whereArgs: [doctorId, clinicId],
+        orderBy: 'queue_id DESC',
+      );
+    }
     return db.query(
       _tQueues,
       where: 'doctor_id = ?',
@@ -224,9 +256,17 @@ class LocalDatabase {
     );
   }
 
-  Future<void> updateQueueStatus(int queueId, int newStatus) async {
+  /// Updates the cached queue's status. If no row is cached yet for this
+  /// [queueId] (e.g. the doctor went offline before `getTodayQueue` ever
+  /// synced it), a plain UPDATE silently touches zero rows and the session
+  /// card would vanish from the offline list entirely. Fall back to inserting
+  /// a minimal row so the card still renders (queue_date/start/end unset —
+  /// [TodayQueueModel] tolerates nulls for all of these). [clinicId] is only
+  /// used for that fallback insert — an existing row already has its clinic
+  /// stamped from when it was first cached.
+  Future<void> updateQueueStatus(int queueId, int newStatus, {int? doctorId, String? clinicId}) async {
     final db = await database;
-    await db.update(
+    final affected = await db.update(
       _tQueues,
       {
         'queue_status': newStatus,
@@ -235,6 +275,20 @@ class LocalDatabase {
       where: 'queue_id = ?',
       whereArgs: [queueId],
     );
+    if (affected == 0) {
+      await db.insert(
+        _tQueues,
+        {
+          'queue_id': queueId,
+          'doctor_id': doctorId,
+          'queue_date': DateTime.now().toIso8601String().split('T').first,
+          'queue_status': newStatus,
+          'clinic_id': clinicId,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
   }
 
   // ── Appointments cache ───────────────────────────────────────────────────────
@@ -261,6 +315,14 @@ class LocalDatabase {
       whereArgs: [doctorId],
       orderBy: 'queue_number ASC',
     );
+  }
+
+  /// Removes a single cached appointment row — used to drop the placeholder
+  /// row created for an offline walk-in booking once the real synced row
+  /// (with the server-assigned appointment_id) has landed.
+  Future<void> deleteAppointment(int appointmentId) async {
+    final db = await database;
+    await db.delete(_tAppointments, where: 'appointment_id = ?', whereArgs: [appointmentId]);
   }
 
   /// Locally mark a patient appointment with a new status (e.g. 'completed',

@@ -104,8 +104,17 @@ class OfflineQueueStore {
 
   // ── Cache writes ─────────────────────────────────────────────────────────────
 
-  Future<void> cacheQueues(List<TodayQueueModel> queues) async {
-    final rows = queues.map((q) => q.toJson()).toList();
+  /// [clinicId] is the clinic this batch was fetched for — stamped onto every
+  /// row (overriding whatever the row itself carries, if anything) so the
+  /// offline cache can always tell a multi-clinic doctor's sessions apart.
+  Future<void> cacheQueues(List<TodayQueueModel> queues, {String? clinicId}) async {
+    // SQLite/sqflite has no bool column type — a raw Dart bool in the values
+    // map throws on insert. Store booking_closed as 0/1 like the other flags.
+    final rows = queues.map((q) => {
+          ...q.toJson(),
+          'booking_closed': q.bookingClosed ? 1 : 0,
+          if (clinicId != null) 'clinic_id': clinicId,
+        }).toList();
     await _db.upsertQueues(rows);
   }
 
@@ -116,15 +125,18 @@ class OfflineQueueStore {
 
   // ── Cache reads ──────────────────────────────────────────────────────────────
 
-  Future<List<TodayQueueModel>> getCachedQueues(int doctorId) async {
-    final rows = await _db.getQueuesForDoctor(doctorId);
+  Future<List<TodayQueueModel>> getCachedQueues(int doctorId, {String? clinicId}) async {
+    final rows = await _db.getQueuesForDoctor(doctorId, clinicId: clinicId);
     // Parse each row defensively — a single malformed cached row (e.g. an int
     // where the model expects a bool) must not blow up the whole offline load
     // and push the screen into a hard error state.
     final out = <TodayQueueModel>[];
     for (final row in rows) {
       try {
-        out.add(TodayQueueModel.fromJson(row));
+        // SQLite stores booking_closed as 0/1 — convert back to bool for
+        // fromJson (a raw int there would throw and drop the whole row).
+        final json = {...row, 'booking_closed': (row['booking_closed'] as int?) == 1};
+        out.add(TodayQueueModel.fromJson(json));
       } catch (e) {
         debugPrint('[OfflineQueueStore] Skipped bad cached queue row: $e');
       }
@@ -152,27 +164,36 @@ class OfflineQueueStore {
   Future<void> applyOfflineQueueOp(
     OfflineOperation op,
     int? queueId,
-    int? appointmentId,
-  ) async {
+    int? appointmentId, {
+    int? doctorId,
+    String? clinicId,
+  }) async {
     switch (op) {
       case OfflineOperation.queueStart:
-        if (queueId != null) await _db.updateQueueStatus(queueId, 1);
+        if (queueId != null) await _db.updateQueueStatus(queueId, 1, doctorId: doctorId, clinicId: clinicId);
         break;
       case OfflineOperation.queuePause:
       case OfflineOperation.queuePauseEmergency:
-        if (queueId != null) await _db.updateQueueStatus(queueId, 2);
+        if (queueId != null) await _db.updateQueueStatus(queueId, 2, doctorId: doctorId, clinicId: clinicId);
         break;
       case OfflineOperation.queueStop:
-        if (queueId != null) await _db.updateQueueStatus(queueId, 3);
+        if (queueId != null) await _db.updateQueueStatus(queueId, 3, doctorId: doctorId, clinicId: clinicId);
         break;
       case OfflineOperation.queueNext:
         if (appointmentId != null) {
           await _db.updateAppointmentStatus(appointmentId, 'completed');
+          // Online QUEUE_NEXT atomically completes the current patient AND
+          // auto-starts the next one server-side — mirror that here so the
+          // doctor's next screen and the home list both show a real "current"
+          // patient instead of everyone sitting at 'booked' until manually
+          // started.
+          await _autoAdvance(doctorId, queueId, appointmentId);
         }
         break;
       case OfflineOperation.queueSkip:
         if (appointmentId != null) {
           await _db.updateAppointmentStatus(appointmentId, 'skipped');
+          await _autoAdvance(doctorId, queueId, appointmentId);
         }
         break;
       case OfflineOperation.queueRecall:
@@ -199,6 +220,43 @@ class OfflineQueueStore {
     }
   }
 
+  /// Picks the next booked (non-slot) patient in the same session, today, and
+  /// marks it in_progress — the offline mirror of what the server does
+  /// atomically inside QUEUE_NEXT / QUEUE_SKIP. Scoped to [queueId] when known
+  /// so a doctor running multiple sessions the same day doesn't jump into a
+  /// different session's queue. Best-effort: swallows read failures since this
+  /// is a secondary UX nicety, not something that should block the primary
+  /// complete/skip mutation.
+  Future<void> _autoAdvance(
+      int? doctorId, int? queueId, int? excludeAppointmentId) async {
+    if (doctorId == null) return;
+    List<AppointmentList> appts;
+    try {
+      appts = await getCachedAppointments(doctorId);
+    } catch (_) {
+      return;
+    }
+    final today = DateTime.now();
+    bool isSlot(AppointmentList a) =>
+        a.bookingType == 2 ||
+        (a.bookingType == null && a.startTime != null && a.endTime != null);
+    final candidates = appts.where((a) {
+      if ((a.status ?? '').toLowerCase().trim() != 'booked') return false;
+      if (a.appointmentId == excludeAppointmentId) return false;
+      if (queueId != null && a.queueId != queueId) return false;
+      if (isSlot(a)) return false;
+      final d = DateTime.tryParse(a.appointmentDate ?? '');
+      if (d == null) return false;
+      return d.year == today.year && d.month == today.month && d.day == today.day;
+    }).toList()
+      ..sort((a, b) => (a.queueNumber ?? 1 << 30).compareTo(b.queueNumber ?? 1 << 30));
+    if (candidates.isEmpty) return;
+    final nextId = candidates.first.appointmentId;
+    if (nextId != null) {
+      await _db.updateAppointmentStatus(nextId, 'in_progress');
+    }
+  }
+
   // ── Pending-op queue ─────────────────────────────────────────────────────────
 
   Future<void> enqueueOp(
@@ -216,14 +274,65 @@ class OfflineQueueStore {
     debugPrint('[OfflineQueueStore] Enqueued offline op: ${op.name}');
   }
 
-  /// Enqueue a walk-in booking made while offline.
+  /// Internal payload key marking the placeholder appointment id — stripped
+  /// before the body is ever sent to the server.
+  static const _tempApptKey = '_offlineTempApptId';
+
+  /// Enqueue a walk-in booking made while offline. Also inserts a placeholder
+  /// row into the appointments cache so the patient shows up in the queue
+  /// immediately, the same as a normal online walk-in booking would —
+  /// without this, a walk-in booked offline was invisible until the doctor
+  /// reconnected and synced.
   Future<void> enqueueWalkInBook(Map<String, dynamic> body, int? doctorId) async {
+    final tempId = await _insertOptimisticWalkIn(body, doctorId);
+    final payload = tempId == null ? body : {...body, _tempApptKey: tempId};
     await _db.enqueuePendingOp(
       operation: OfflineOperation.walkInBook.name,
-      payload:   body,
+      payload:   payload,
       doctorId:  doctorId,
     );
     debugPrint('[OfflineQueueStore] Enqueued offline walkInBook for doctor $doctorId');
+  }
+
+  /// Builds the placeholder appointment row. Uses a negative synthetic id —
+  /// real appointment ids from the server are always positive — so it can
+  /// never collide with a synced row, and is removed once the booking
+  /// actually flushes (see [flushPendingWalkIns]).
+  Future<int?> _insertOptimisticWalkIn(
+      Map<String, dynamic> body, int? doctorId) async {
+    if (doctorId == null) return null;
+    try {
+      final slotId = body['slot_id'] as int?;
+      int? queueId;
+      if (slotId != null) {
+        final queues = await getCachedQueues(doctorId);
+        for (final q in queues) {
+          if (q.slotId == slotId) { queueId = q.queueId; break; }
+        }
+      }
+      final existing = await getCachedAppointments(doctorId);
+      final sameQueue = existing.where((a) => queueId == null || a.queueId == queueId);
+      final maxQueueNo = sameQueue.fold<int>(0, (m, a) => (a.queueNumber ?? 0) > m ? a.queueNumber! : m);
+      final tempId = -(DateTime.now().microsecondsSinceEpoch % 1000000000);
+      await _db.upsertAppointments([{
+        'appointment_id':   tempId,
+        'patient_id':       body['patient_id'],
+        'queue_id':         queueId,
+        'doctor_id':        doctorId,
+        'patient_name':     body['name'],
+        'mobile':           body['mobile_no'],
+        'queue_number':     maxQueueNo + 1,
+        'booking_type':     1,
+        'status':           'booked',
+        'user_type':        body['user_type'],
+        'appointment_date': body['appointment_date'],
+        'clinic_id':        body['clinic_id'],
+      }]);
+      return tempId;
+    } catch (e) {
+      debugPrint('[OfflineQueueStore] Optimistic walk-in insert failed: $e');
+      return null;
+    }
   }
 
   /// Flush all pending walk-in bookings by calling [executor].
@@ -242,7 +351,11 @@ class OfflineQueueStore {
       final id = row['id'] as int;
       try {
         final payload = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+        final tempId = payload.remove(_tempApptKey) as int?;
         await executor(payload);
+        // Drop the placeholder — the real synced row (server appointment_id)
+        // lands separately via the caller's post-flush fetchPatientAppointments.
+        if (tempId != null) await _db.deleteAppointment(tempId);
         await deletePendingOp(id);
         flushed++;
         debugPrint('[OfflineQueueStore] Flushed walkInBook op $id');

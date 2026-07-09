@@ -138,6 +138,15 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
   }
 
   Future<bool> _checkInternet() async {
+    if (await _lookupOnce()) return true;
+    // Radio can still be waking from doze right after the app resumes from
+    // background — retry once before declaring offline to avoid a false
+    // offline->online flicker.
+    await Future.delayed(const Duration(milliseconds: 800));
+    return _lookupOnce();
+  }
+
+  Future<bool> _lookupOnce() async {
     try {
       final result = await InternetAddress.lookup('google.com')
           .timeout(const Duration(seconds: 5));

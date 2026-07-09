@@ -154,7 +154,7 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
   }
 
   Future<void> getDoctorSchedule(int doctorId, {String? clinicId}) async {
-    state = state.copyWith(isLoading: true, errorMessage: '', clearSchedule: true);
+    state = state.copyWith(isLoading: true, errorMessage: '');
     try {
       final schedule = await doctorSettingsUsecase.getDoctorSchedule(doctorId, clinicId: clinicId);
       state = state.copyWith(doctorSchedule: schedule);

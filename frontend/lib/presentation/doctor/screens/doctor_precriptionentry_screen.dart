@@ -12,6 +12,7 @@ import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — aligned with PatientListScreen
@@ -596,6 +597,12 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
   final String  patientStatus;
   final String? symptoms;
   final String? clinicId;
+  /// The session this patient belongs to. A doctor can have multiple queue
+  /// sessions running the same day (e.g. two slot blocks), each with its own
+  /// token numbering starting at 1 — without this, "Complete & Next" picks
+  /// the lowest token number across ALL sessions and can jump back to the
+  /// first patient of a different, unrelated session.
+  final int?    queueId;
 
   const PrescriptionScreen({
     super.key,
@@ -610,6 +617,7 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
     this.patientStatus = 'booked',
     this.symptoms,
     this.clinicId,
+    this.queueId,
   });
 
   @override
@@ -796,6 +804,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   Future<AppointmentResponseModel?> _completeQueueAction() async {
     try {
+      final isOnline = ref.read(connectivityNotifierProvider).isOnline;
       final isSkipped = widget.patientStatus.toLowerCase().trim() == 'skipped';
       final AppointmentResponseModel result;
       if (isSkipped) {
@@ -805,7 +814,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
               appointmentId: widget.appointmentId,
               patientId:     widget.patientId,
               clinicId:      widget.clinicId,
-            ));
+            ), isOnline: isOnline);
       } else {
         result = await ref.read(appointmentViewModelProvider.notifier)
             .queueNext(AppointmentRequestModel(
@@ -815,7 +824,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
               patientId:       widget.patientId,
               appointmentDate: _todayApi(),
               clinicId:        widget.clinicId,
-            ));
+              queueId:         widget.queueId,
+            ), isOnline: isOnline);
       }
       if (result.success == true) return result;
       // Show user-friendly message — never expose raw SQL errors
@@ -853,8 +863,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
     final nextToken = result.data?.isNotEmpty == true ? result.data!.first.nextToken : null;
 
-    await ref.read(appointmentViewModelProvider.notifier)
-        .fetchPatientAppointments(widget.doctorId);
+    await ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(
+        widget.doctorId,
+        isOnline: ref.read(connectivityNotifierProvider).isOnline,
+        clinicId: widget.clinicId);
     if (!mounted) return;
 
     final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
@@ -883,6 +895,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       patientStatus: next.status ?? 'booked',
       symptoms:      next.symptoms,
       clinicId:      widget.clinicId,
+      queueId:       next.queueId ?? widget.queueId,
     )));
   }
 
@@ -892,7 +905,14 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       (a.bookingType == null && a.startTime != null && a.endTime != null);
 
   AppointmentList? _pickNextAppointment(List<AppointmentList> list, {int? preferredQueue}) {
-    final inProgress = list.where((a) {
+    // Scope to this patient's own session when we know it — a doctor can run
+    // multiple queue sessions the same day, each with its own token numbering
+    // starting at 1, so an unscoped pick can jump to a different session's
+    // first patient instead of this session's real next one.
+    final sameSession = widget.queueId == null
+        ? list
+        : list.where((a) => a.queueId == widget.queueId).toList();
+    final inProgress = sameSession.where((a) {
       final s = a.status?.toLowerCase().trim() ?? '';
       return s == 'in_progress' && a.appointmentId != widget.appointmentId
           && _isToday(_parseDate(a.appointmentDate))
@@ -902,7 +922,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       inProgress.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
       return inProgress.first;
     }
-    final candidates = list.where((a) {
+    final candidates = sameSession.where((a) {
       final s = a.status?.toLowerCase().trim() ?? '';
       return s == 'booked' && _isToday(_parseDate(a.appointmentDate))
           && a.appointmentId != widget.appointmentId
@@ -965,6 +985,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
           patientId:     widget.patientId,
           clinicId:      widget.clinicId,
         ),
+        isOnline: ref.read(connectivityNotifierProvider).isOnline,
       ).catchError((_) => AppointmentResponseModel(success: false));
       _showSnack('Prescription saved', isError: false);
       await Future.delayed(const Duration(milliseconds: 300));
@@ -976,10 +997,11 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
 
   Future<void> _onSkip() async {
     try {
+      final isOnline = ref.read(connectivityNotifierProvider).isOnline;
       final skipRes = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
         AppointmentRequestModel(doctorId: widget.doctorId,
             appointmentId: widget.appointmentId, patientId: widget.patientId,
-            isNext: 1));
+            isNext: 1, queueId: widget.queueId), isOnline: isOnline);
       if (!mounted) return;
 
       // SP rejected the skip (queue not started, invalid state, …) —
@@ -998,8 +1020,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         return;
       }
 
-      await ref.read(appointmentViewModelProvider.notifier)
-          .fetchPatientAppointments(widget.doctorId);
+      await ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(
+          widget.doctorId, isOnline: isOnline, clinicId: widget.clinicId);
       if (!mounted) return;
       final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
           .maybeWhen(data: (l) => l, orElse: () => <AppointmentList>[]);
@@ -1022,6 +1044,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         patientStatus: next.status ?? 'booked',
         symptoms:      next.symptoms,
         clinicId:      widget.clinicId,
+        queueId:       next.queueId ?? widget.queueId,
       )));
     } catch (e) { _showSnack('Skip failed: $e', isError: true); }
   }

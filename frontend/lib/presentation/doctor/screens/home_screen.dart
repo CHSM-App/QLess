@@ -15,6 +15,7 @@ import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
@@ -162,6 +163,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   final Map<int, bool> _sessionExpanded = {};
   late final ProviderSubscription<int?> _doctorIdSub;
   ProviderSubscription<String?>? _clinicIdSub;
+  ProviderSubscription<ConnectivityStatus>? _connectivitySub;
   final ScrollController _scrollController = ScrollController();
 
   final PageController _tipsController = PageController();
@@ -182,6 +184,22 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       doctorLoginViewModelProvider.select((s) => s.clinic_id),
       (prev, next) {
         if (next != null && next != prev) _loadData(force: true);
+      },
+    );
+    // _loadData relies on fetchPatientAppointments's network-error catch to
+    // fall back to cache, which works but can sit waiting on a slow/failing
+    // request first. React to connectivity transitions directly so going
+    // offline snaps straight to cache, and coming back online forces a fresh
+    // fetch instead of leaving stale cached data on screen.
+    _connectivitySub = ref.listenManual<ConnectivityStatus>(
+      connectivityNotifierProvider.select((s) => s.status),
+      (prev, next) {
+        if (prev == next) return;
+        final wasOnline = prev == ConnectivityStatus.online || prev == ConnectivityStatus.backOnline;
+        final isOnlineNow = next == ConnectivityStatus.online || next == ConnectivityStatus.backOnline;
+        if (next == ConnectivityStatus.offline || (wasOnline == false && isOnlineNow)) {
+          _loadData(force: true);
+        }
       },
     );
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -205,11 +223,13 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     _scrollController.dispose();
     _doctorIdSub.close();
     _clinicIdSub?.close();
+    _connectivitySub?.close();
     super.dispose();
   }
 
   int get _doctorId => ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
   String? get _clinicId => ref.read(doctorLoginViewModelProvider).clinic_id;
+  bool get _isOnline => ref.read(connectivityNotifierProvider).isOnline;
 
   String get _doctorName {
     if (ref.read(tokenProvider).roleId == 3) {
@@ -239,9 +259,11 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     if (_doctorId == 0) return;
     if (_hasFetched && !force) return;
     _hasFetched = true;
+    final isOnline = ref.read(connectivityNotifierProvider).isOnline;
     ref.read(appointmentViewModelProvider.notifier).joinClinic(_doctorId, clinicId: _clinicId);
     await Future.wait([
-      ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(_doctorId, clinicId: _clinicId),
+      ref.read(appointmentViewModelProvider.notifier)
+          .fetchPatientAppointments(_doctorId, isOnline: isOnline, clinicId: _clinicId),
       ref.read(doctorSettingsViewModelProvider.notifier).getDoctorSchedule(_doctorId, clinicId: _clinicId),
       ref.read(doctorSettingsViewModelProvider.notifier).getDoctorLeaves(_doctorId),
     ]);
@@ -401,7 +423,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+          .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId), isOnline: _isOnline, offlineClinicId: _clinicId);
       _snack(res.message ?? 'Queue started');
       _refreshQueueStatus();
     } catch (_) {
@@ -428,7 +450,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+          .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId), isOnline: _isOnline, offlineClinicId: _clinicId);
       _snack(res.message ?? 'Queue paused');
       _refreshQueueStatus();
     } catch (_) {
@@ -440,7 +462,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+          .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId), isOnline: _isOnline, offlineClinicId: _clinicId);
       _snack(res.message ?? 'Queue closed');
       _refreshQueueStatus();
     } catch (_) {
@@ -485,7 +507,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
           .queueSkip(AppointmentRequestModel(
             doctorId: _doctorId,
             appointmentId: current.appointmentId ?? 0,
-          ));
+          ), isOnline: _isOnline, offlineClinicId: _clinicId);
       _snack(res.message ?? 'Patient skipped');
     } catch (_) {
       _snack('Failed to skip');
@@ -497,7 +519,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     try {
       final res = await ref
           .read(appointmentViewModelProvider.notifier)
-          .queuePauseEmergency(queueId);
+          .queuePauseEmergency(queueId, isOnline: _isOnline, doctorId: _doctorId, clinicId: _clinicId);
       _snack(res.message ?? 'Queue paused (emergency)');
       _refreshQueueStatus();
     } catch (_) {
@@ -540,6 +562,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       try {
         final res = await ref.read(appointmentViewModelProvider.notifier).startSession(
           AppointmentRequestModel(doctorId: did, patientId: pid, appointmentId: p.appointmentId ?? 0),
+          isOnline: _isOnline,
+          offlineClinicId: _clinicId,
         );
         if (!mounted) return;
         if (res.success != true) { _snack(res.message ?? 'Could not start session'); return; }
@@ -561,6 +585,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         patientStatus: p.status ?? 'booked',
         symptoms: p.symptoms,
         clinicId: _clinicId,
+        queueId: p.queueId,
       ),
     ));
     if (!mounted) return;
@@ -573,8 +598,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
       final res = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
         AppointmentRequestModel(
           doctorId: _doctorId, appointmentId: p.appointmentId ?? 0,
-          patientId: p.patientId ?? 0, isNext: 0,
+          patientId: p.patientId ?? 0, isNext: 0, queueId: p.queueId,
         ),
+        isOnline: _isOnline,
+        offlineClinicId: _clinicId,
       );
       if (!mounted) return;
       _snack(res.message ?? (res.success == true ? 'Patient skipped' : 'Skip failed'));
@@ -721,6 +748,21 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     return [];
   }
 
+  // Online, session order comes pre-sorted from the server. Offline, the
+  // local cache read has no such guarantee (its own ORDER BY is by queue_id,
+  // not chronological), so the displayed order could differ between the two.
+  // Sorting explicitly here — applied identically regardless of source —
+  // guarantees the same order online and offline, chronological by start
+  // time with undated (walk-in queue-type, no fixed slot) sessions last.
+  int _bySessionStartTime(dynamic a, dynamic b) {
+    final at = _instantOf(a.startTime as String?);
+    final bt = _instantOf(b.startTime as String?);
+    if (at == null && bt == null) return 0;
+    if (at == null) return 1;
+    if (bt == null) return -1;
+    return at.compareTo(bt);
+  }
+
   bool _shouldShowSession(dynamic session, {required bool hasBooking}) {
     if (_isStaleQueueDate(session.queueDate as String?)) return false;
     final qs = session.queueStatus ?? 0;
@@ -783,6 +825,22 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
               .where((s) => _shouldShowSession(s, hasBooking: activeQueueIds.contains(s.queueId)) &&
                   (currentClinicId == null ||
                    activeQueueIds.contains(s.queueId) ||
+                   // A queue the doctor has explicitly started/paused/stopped
+                   // already belongs to this clinic context by construction —
+                   // don't hide it just because its patient list happens to be
+                   // empty in the (possibly stale, offline) appointments cache.
+                   // Without this, a live/paused second queue with no cached
+                   // bookings at that instant vanishes from the list entirely.
+                   (s.queueStatus ?? 0) != 0 ||
+                   // A session with a defined slot start time came straight from
+                   // getTodayQueue(doctorId, clinicId: ...) — already clinic-scoped
+                   // server-side — so it's a legitimate session for this clinic
+                   // even before it starts and even if its (queue-type) patient
+                   // hasn't landed in the appointments cache yet. Without this, a
+                   // second, not-yet-started session with a real booking vanishes
+                   // on refresh because queue-type patients never populate
+                   // todaySlotPts (that's slot-booking only).
+                   s.startTime != null ||
                    todaySlotPts.any((p) {
                      final sessStart = _instantOf(s.startTime as String?);
                      final sessEnd   = _instantOf(s.endTime as String?);
@@ -792,7 +850,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
                      if (sessEnd   != null && !pt.isBefore(sessEnd))  return false;
                      return true;
                    })))
-              .toList();
+              .toList()
+            ..sort(_bySessionStartTime);
           final todayActivePts = _todayActivePatients(filteredList);
 
           // slot patients not matched to any visible session
@@ -1044,7 +1103,8 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     final activeQueueIds = filteredList.map((a) => a.queueId).whereType<int>().toSet();
     final visibleSessions = allSessions
         .where((s) => _shouldShowSession(s, hasBooking: activeQueueIds.contains(s.queueId)))
-        .toList();
+        .toList()
+      ..sort(_bySessionStartTime);
 
     final compact = width < _kHomeSideWidth;
 
@@ -3267,6 +3327,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   final _newMemberCtr = TextEditingController();
   int  _newMemberGender = 1;
   ProviderSubscription<String?>? _clinicIdSub;
+  ProviderSubscription<ConnectivityStatus>? _connectivitySub;
 
   @override
   void initState() {
@@ -3286,6 +3347,17 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
         }
       },
     );
+    // Sessions load fail zali (net offline) tr, net back aalyavar retry karaycha —
+    // ha widget clinic-switch shivay kadhich swatah refresh hot nahi, so pull-to-refresh
+    // ne parent madhla schedule refresh hoto pan ha panel stale/"No sessions" var atkun rahto.
+    _connectivitySub = ref.listenManual<ConnectivityStatus>(
+      connectivityNotifierProvider.select((s) => s.status),
+      (prev, next) {
+        final backOnline = (next == ConnectivityStatus.online || next == ConnectivityStatus.backOnline) &&
+            (prev == ConnectivityStatus.offline || prev == ConnectivityStatus.unknown);
+        if (backOnline && _error != null) _loadSessions();
+      },
+    );
   }
 
   @override
@@ -3296,6 +3368,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     _mobileCtr.dispose();
     _newMemberCtr.dispose();
     _clinicIdSub?.close();
+    _connectivitySub?.close();
     super.dispose();
   }
 
@@ -3326,37 +3399,45 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       return;
     }
     final dayName = const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][DateTime.now().weekday - 1];
+    DoctorScheduleModel? schedule;
     try {
-      final schedule = await api.getDoctorSchedule(doctorId, clinicId: clinicId);
-      final todaySlots = (schedule.schedule ?? [])
-          .where((d) => d.day == dayName && (d.isEnabled ?? 0) == 1)
-          .expand((d) => d.slots ?? [])
-          .toList();
-      final sessions = todaySlots
-          .where((slot) {
-            if (_hasSessionEndedToday(slot.endTime)) return false;
-            final mode = slot.bookingMode ?? 0;
-            return mode == 1 || mode == 3; // queue only — exclude slots-only (mode 2)
-          })
-          .map((slot) => DoctorAvailabilityModel(
-                dayOfWeek:   dayName,
-                isEnabled:   true,
-                slotId:      slot.slotId,
-                startTime:   slot.startTime,
-                endTime:     slot.endTime,
-                bookingMode: slot.bookingMode,
-                slotDuration: slot.slotDuration,
-              ))
-          .toList();
-      if (!mounted) return;
-      setState(() {
-        _todaySessions = sessions;
-        _selected = sessions.length == 1 ? sessions.first : null;
-        _loading = false;
-      });
+      schedule = await api.getDoctorSchedule(doctorId, clinicId: clinicId);
     } catch (_) {
-      if (mounted) setState(() { _loading = false; _error = 'Could not load sessions'; });
+      // Offline / network failure — fall back to the schedule already cached in
+      // memory by the home screen's own load (doctorSettingsViewModelProvider),
+      // so walk-in booking still works offline instead of hard-erroring here.
+      schedule = ref.read(doctorSettingsViewModelProvider).doctorSchedule;
     }
+    if (schedule == null) {
+      if (mounted) setState(() { _loading = false; _error = 'Could not load sessions'; });
+      return;
+    }
+    final todaySlots = (schedule.schedule ?? [])
+        .where((d) => d.day == dayName && (d.isEnabled ?? 0) == 1)
+        .expand((d) => d.slots ?? [])
+        .toList();
+    final sessions = todaySlots
+        .where((slot) {
+          if (_hasSessionEndedToday(slot.endTime)) return false;
+          final mode = slot.bookingMode ?? 0;
+          return mode == 1 || mode == 3; // queue only — exclude slots-only (mode 2)
+        })
+        .map((slot) => DoctorAvailabilityModel(
+              dayOfWeek:   dayName,
+              isEnabled:   true,
+              slotId:      slot.slotId,
+              startTime:   slot.startTime,
+              endTime:     slot.endTime,
+              bookingMode: slot.bookingMode,
+              slotDuration: slot.slotDuration,
+            ))
+        .toList();
+    if (!mounted) return;
+    setState(() {
+      _todaySessions = sessions;
+      _selected = sessions.length == 1 ? sessions.first : null;
+      _loading = false;
+    });
   }
 
   void _onMobileChanged() {
@@ -3371,9 +3452,18 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   }
 
   Future<void> _lookupMobile(String mobile) async {
-    final api = _api;
-    if (api == null) return;
     setState(() { _checkingMobile = true; });
+    final isOnline = ref.read(connectivityNotifierProvider).isOnline;
+    if (!isOnline) {
+      await _lookupMobileOffline(mobile);
+      return;
+    }
+    final api = _api;
+    if (api == null) {
+      // No connection at the network-client layer either — same as offline.
+      await _lookupMobileOffline(mobile);
+      return;
+    }
     try {
       final results = await api.checkPhonePatient(mobile);
       if (!mounted) return;
@@ -3394,7 +3484,60 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
         setState(() { _clearPatientState(); _checkingMobile = false; });
       }
     } catch (_) {
-      if (mounted) setState(() { _checkingMobile = false; });
+      // Network failed mid-call (went offline just now) — fall back to the
+      // local match instead of just clearing, so the doctor still gets
+      // recognition for a patient this doctor has already seen before.
+      if (mounted) await _lookupMobileOffline(mobile);
+    }
+  }
+
+  /// Offline mobile lookup — a full cross-doctor patient search needs the
+  /// server, so this can only recognise patients THIS doctor has already
+  /// seen (present in the cached appointment history). A genuinely new
+  /// patient can't be identified offline; the doctor enters them as new and
+  /// the server reconciles/matches by mobile once the walk-in booking syncs.
+  Future<void> _lookupMobileOffline(String mobile) async {
+    try {
+      final isReceptionist = ref.read(tokenProvider).roleId == 3;
+      final doctorId = isReceptionist
+          ? ref.read(receptionistLoginViewModelProvider).doctorId
+          : ref.read(doctorLoginViewModelProvider).doctorId;
+      if (doctorId == null || doctorId == 0) {
+        if (mounted) setState(() { _clearPatientState(); _checkingMobile = false; });
+        return;
+      }
+      final cached = await ref.read(offlineQueueStoreProvider).getCachedAppointments(doctorId);
+      AppointmentList? match;
+      for (final a in cached) {
+        final m = (a.mobile ?? '').trim().replaceAll(RegExp(r'\D'), '');
+        if (m.length >= 10 && m.endsWith(mobile) && a.patientId != null) { match = a; break; }
+      }
+      debugPrint('[WalkIn offline lookup] doctorId=$doctorId cachedCount=${cached.length} '
+          'searching=$mobile matched=${match != null} '
+          'sampleMobiles=${cached.take(5).map((a) => a.mobile).toList()}');
+      if (!mounted) return;
+      final currentDigits = _mobileCtr.text.trim().replaceAll(RegExp(r'\D'), '');
+      if (currentDigits != mobile) return;
+      if (match != null) {
+        setState(() {
+          _foundPatient = Patients(
+            patientId: match!.patientId,
+            name:      match.patientName,
+            mobileNo:  match.mobile,
+            gender:    match.gender,
+            DOB:       DateTime.tryParse(match.dob ?? ''),
+          );
+          // Family members can't be resolved without the server — booking
+          // still works for the found patient themself (patient_id is set).
+          _familyMembers  = [];
+          _loadingMembers = false;
+          _checkingMobile = false;
+        });
+      } else {
+        setState(() { _clearPatientState(); _checkingMobile = false; });
+      }
+    } catch (_) {
+      if (mounted) setState(() { _clearPatientState(); _checkingMobile = false; });
     }
   }
 
@@ -3462,6 +3605,13 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       if (resp.success == true) {
         _didBook = true;
         _successMsg = resp.message ?? 'Walk-in patient booked';
+        if (!isOnline) {
+          // Online arrivals show up via the queue_update socket event; offline
+          // ones only exist in the local cache, so pull them into view now —
+          // otherwise the newly booked walk-in stays invisible until sync.
+          await ref.read(appointmentViewModelProvider.notifier)
+              .fetchPatientAppointments(doctorId, isOnline: false, clinicId: clinicId);
+        }
       } else {
         setState(() { _bookError = resp.message ?? 'Booking failed'; });
       }

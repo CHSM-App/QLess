@@ -136,7 +136,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         List<TodayQueueModel> todayQueues = [];
         try {
           todayQueues = await usecase.getTodayQueue(doctorId, clinicId: clinicIdToUse);
-          await offlineStore.cacheQueues(todayQueues);
+          await offlineStore.cacheQueues(todayQueues, clinicId: clinicIdToUse);
         } catch (_) {}
 
         final emIds = state.emergencyQueueIds;
@@ -150,22 +150,25 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         );
       } else {
         // Offline: load from local SQLite cache
-        await _loadFromCache(doctorId);
+        await _loadFromCache(doctorId, clinicId: clinicIdToUse);
       }
     } catch (e) {
       // Network error — fall back to cache. Offline must NEVER surface a hard
       // error screen; the worst case is an empty (but usable) queue plus the
       // offline banner.
       debugPrint('[AppointmentVM] Network fetch failed, loading cache: $e');
-      await _loadFromCache(doctorId);
+      await _loadFromCache(doctorId, clinicId: clinicIdToUse);
     }
   }
 
   /// Loads the queue + appointments from the local SQLite cache. Each read is
   /// independently guarded so a corrupt cache for one table still lets the
   /// other render, and a total failure degrades to an empty list rather than
-  /// an error state (offline should always stay usable).
-  Future<void> _loadFromCache(int doctorId) async {
+  /// an error state (offline should always stay usable). [clinicId] scopes
+  /// the queues read — a multi-clinic doctor's cache holds every clinic's
+  /// sessions under the same doctor_id, so an unscoped read would leak or
+  /// even swap in the wrong clinic's queue.
+  Future<void> _loadFromCache(int doctorId, {String? clinicId}) async {
     List<AppointmentList> cachedAppts = const [];
     List<TodayQueueModel> cachedQueues = const [];
     int pendingCount = 0;
@@ -176,7 +179,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       debugPrint('[AppointmentVM] Cache appointments read failed: $e');
     }
     try {
-      cachedQueues = await offlineStore.getCachedQueues(doctorId);
+      cachedQueues = await offlineStore.getCachedQueues(doctorId, clinicId: clinicId);
     } catch (e) {
       debugPrint('[AppointmentVM] Cache queues read failed: $e');
     }
@@ -266,11 +269,15 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   Future<AppointmentResponseModel> queueStart(
     AppointmentRequestModel appointmentRequest, {
     bool isOnline = true,
+    // Scopes the OFFLINE cache read/write only — never sent to the server,
+    // so the online request payload is unchanged.
+    String? offlineClinicId,
   }) {
     return _onlineOrOffline(
       isOnline: isOnline,
       op: OfflineOperation.queueStart,
       request: appointmentRequest,
+      offlineClinicId: offlineClinicId,
       newQueueState: QueueState.running,
       online: () async {
         final result = await usecase.queueStart(appointmentRequest);
@@ -289,11 +296,13 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   Future<AppointmentResponseModel> queuePause(
     AppointmentRequestModel appointmentRequest, {
     bool isOnline = true,
+    String? offlineClinicId,
   }) {
     return _onlineOrOffline(
       isOnline: isOnline,
       op: OfflineOperation.queuePause,
       request: appointmentRequest,
+      offlineClinicId: offlineClinicId,
       newQueueState: QueueState.paused,
       online: () async {
         final result = await usecase.queuePause(appointmentRequest);
@@ -311,11 +320,13 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   Future<AppointmentResponseModel> queueStop(
     AppointmentRequestModel appointmentRequest, {
     bool isOnline = true,
+    String? offlineClinicId,
   }) {
     return _onlineOrOffline(
       isOnline: isOnline,
       op: OfflineOperation.queueStop,
       request: appointmentRequest,
+      offlineClinicId: offlineClinicId,
       newQueueState: QueueState.stopped,
       online: () async {
         final result = await usecase.queueStop(appointmentRequest);
@@ -381,11 +392,13 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   Future<AppointmentResponseModel> queueSkip(
     AppointmentRequestModel appointmentRequest, {
     bool isOnline = true,
+    String? offlineClinicId,
   }) {
     return _onlineOrOffline(
       isOnline: isOnline,
       op: OfflineOperation.queueSkip,
       request: appointmentRequest,
+      offlineClinicId: offlineClinicId,
       online: () async {
         final result = await usecase.queueSkip(appointmentRequest);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
@@ -421,13 +434,16 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   Future<AppointmentResponseModel> startSession(
     AppointmentRequestModel appointmentRequest, {
     bool isOnline = true,
+    String? offlineClinicId,
   }) {
     return _onlineOrOffline(
       isOnline: isOnline,
       op: OfflineOperation.startSession,
       request: appointmentRequest,
+      offlineClinicId: offlineClinicId,
       offlineGuard: () => _startSessionOfflineGuard(
-          appointmentRequest.doctorId, appointmentRequest.appointmentId),
+          appointmentRequest.doctorId, appointmentRequest.appointmentId,
+          clinicId: offlineClinicId ?? appointmentRequest.clinicId),
       online: () async {
         final result = await usecase.startSession(appointmentRequest);
         await fetchPatientAppointments(appointmentRequest.doctorId!,
@@ -462,6 +478,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     int queueId, {
     bool isOnline = true,
     int? doctorId,
+    String? clinicId,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     if (isOnline) {
@@ -490,18 +507,29 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       // Offline emergency pause
       await offlineStore.enqueueEmergencyPause(queueId, doctorId ?? queueId);
       await offlineStore.applyOfflineQueueOp(
-          OfflineOperation.queuePauseEmergency, queueId, null);
+          OfflineOperation.queuePauseEmergency, queueId, null,
+          doctorId: doctorId, clinicId: clinicId);
 
+      // Set emergencyQueueIds BEFORE reloading so _loadFromCache (which reads
+      // state.emergencyQueueIds internally) applies it correctly.
       final newSet = {...state.emergencyQueueIds, queueId};
-      final queues = state.todayQueueResult?.value ?? [];
+      state = state.copyWith(emergencyQueueIds: newSet);
+
+      // Reload every session fresh from cache — matching queueStart/queuePause's
+      // offline path — instead of only patching whatever was already in memory.
+      // Patching alone can't recover a second session that wasn't in that
+      // in-memory snapshot, so it stayed missing after an emergency pause.
+      if (doctorId != null) {
+        await _loadFromCache(doctorId, clinicId: clinicId);
+      } else {
+        final queues = state.todayQueueResult?.value ?? [];
+        state = state.copyWith(todayQueueResult: AsyncValue.data(_applyEmergency(queues, newSet)));
+      }
+
       final pendingCount = await offlineStore.pendingOpsCount();
-      state = state.copyWith(
-        isLoading: false,
-        queueState: QueueState.paused,
-        emergencyQueueIds: newSet,
-        todayQueueResult: AsyncValue.data(_applyEmergency(queues, newSet)),
-        pendingOpsCount: pendingCount,
-      );
+      // Applied after the reload so it isn't overwritten by _loadFromCache's
+      // own (less reliable, "first appointment" based) queueState derivation.
+      state = state.copyWith(isLoading: false, queueState: QueueState.paused, pendingOpsCount: pendingCount);
       return AppointmentResponseModel(success: true, message: 'Saved offline');
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -537,16 +565,16 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       List<TodayQueueModel> result;
       if (isOnline) {
         result = await usecase.getTodayQueue(doctorId, clinicId: clinicId);
-        await offlineStore.cacheQueues(result);
+        await offlineStore.cacheQueues(result, clinicId: clinicId);
       } else {
-        result = await offlineStore.getCachedQueues(doctorId);
+        result = await offlineStore.getCachedQueues(doctorId, clinicId: clinicId);
       }
       state = state.copyWith(todayQueueResult: AsyncValue.data(result));
       return result;
     } catch (e, st) {
       // Fallback to cache on error
       try {
-        final cached = await offlineStore.getCachedQueues(doctorId);
+        final cached = await offlineStore.getCachedQueues(doctorId, clinicId: clinicId);
         state = state.copyWith(todayQueueResult: AsyncValue.data(cached));
         return cached;
       } catch (_) {
@@ -615,6 +643,8 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     required Future<AppointmentResponseModel> Function() online,
     QueueState? newQueueState,
     Future<AppointmentResponseModel?> Function()? offlineGuard,
+    // Offline-cache scoping only — never touches the online() call/payload.
+    String? offlineClinicId,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     if (isOnline) {
@@ -645,6 +675,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         op: op,
         request: request,
         newQueueState: newQueueState,
+        offlineClinicId: offlineClinicId,
       );
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
@@ -656,7 +687,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   /// have one patient in progress at a time. Returns a blocking response when
   /// another patient (not [appointmentId]) is already in progress locally.
   Future<AppointmentResponseModel?> _startSessionOfflineGuard(
-      int? doctorId, int? appointmentId) async {
+      int? doctorId, int? appointmentId, {String? clinicId}) async {
     if (doctorId == null) return null;
     // Mirror the backend START_SESSION rule that rejects starting a consult
     // while the queue is paused. We read the cached QUEUES table here rather
@@ -664,7 +695,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     // queues cache, while _deriveQueueState reads the appointment rows it never
     // touches — so state.queueState reverts to "running" on the next cache
     // reload and can't be trusted as the paused signal.
-    if (await _isQueuePausedOffline(doctorId)) {
+    if (await _isQueuePausedOffline(doctorId, clinicId: clinicId)) {
       return AppointmentResponseModel(
         success: false,
         message:
@@ -703,10 +734,10 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
   /// allows starting; otherwise any paused queue (status 2, including an
   /// emergency-paused one) means the doctor must resume before starting. An
   /// unreadable/empty cache never blocks — offline must stay usable.
-  Future<bool> _isQueuePausedOffline(int doctorId) async {
+  Future<bool> _isQueuePausedOffline(int doctorId, {String? clinicId}) async {
     List<TodayQueueModel> queues;
     try {
-      queues = await offlineStore.getCachedQueues(doctorId);
+      queues = await offlineStore.getCachedQueues(doctorId, clinicId: clinicId);
     } catch (_) {
       return false;
     }
@@ -778,13 +809,19 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     required OfflineOperation op,
     required AppointmentRequestModel request,
     QueueState? newQueueState,
+    String? offlineClinicId,
   }) async {
+    // Falls back to request.clinicId for callers (queueNext/endSession) that
+    // already embed it in the request sent online — unchanged behaviour.
+    final clinicId = offlineClinicId ?? request.clinicId;
+
     // 1. Persist to pending-ops queue
     await offlineStore.enqueueOp(op, request, queueId: request.queueId);
 
     // 2. Apply optimistic local mutation
     await offlineStore.applyOfflineQueueOp(
-        op, request.queueId, request.appointmentId);
+        op, request.queueId, request.appointmentId,
+        doctorId: request.doctorId, clinicId: clinicId);
 
     // A start (resume) or regular pause supersedes an emergency pause — mirror
     // the online path's _clearEmergency here so an offline resume drops the
@@ -799,7 +836,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
 
     // 3. Reload UI from cache so optimistic changes are visible
     if (request.doctorId != null) {
-      await _loadFromCache(request.doctorId!);
+      await _loadFromCache(request.doctorId!, clinicId: clinicId);
     }
 
     // 4. Update queue state machine in memory

@@ -28,8 +28,11 @@ class AppointmentState {
   final AsyncValue<List<AppointmentList>>?  patientAppointmentsList;
   final int? doctorPatientCount;
   final Set<int> offlineDoctors; // doctor IDs whose network is currently down
-  // Live queue status per doctorId: 'queue_started' | 'queue_paused' | 'queue_paused_emergency' | 'queue_stopped'
-  final Map<int, String> doctorQueueEvents;
+  // Live queue status per "doctorId_queueId": 'queue_started' | 'queue_paused' |
+  // 'queue_paused_emergency' | 'queue_stopped'. Keyed by queue_id (not just
+  // doctorId) so a doctor running two simultaneous queues/sessions doesn't have
+  // one queue's "live" banner bleed onto the other queue's appointment card.
+  final Map<String, String> doctorQueueEvents;
   // Real current_serving per "doctorId_clinicId" from socket events (overrides SP value).
   final Map<String, int> doctorCurrentServing;
 
@@ -70,7 +73,7 @@ class AppointmentState {
     int? doctorPatientCount,
     bool clearDoctorPatientCount = false,
     Set<int>? offlineDoctors,
-    Map<int, String>? doctorQueueEvents,
+    Map<String, String>? doctorQueueEvents,
     Map<String, int>? doctorCurrentServing,
   }) {
     return AppointmentState(
@@ -148,9 +151,13 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
           state = state.copyWith(doctorCurrentServing: csMap);
         }
         if (event != null && bannerEvents.contains(event)) {
-          final evMap = Map<int, String>.from(state.doctorQueueEvents);
-          evMap[dId] = event;
-          state = state.copyWith(doctorQueueEvents: evMap);
+          final rawQ = data['queue_id'];
+          final qId  = rawQ is int ? rawQ : int.tryParse(rawQ?.toString() ?? '');
+          if (qId != null) {
+            final evMap = Map<String, String>.from(state.doctorQueueEvents);
+            evMap['${dId}_$qId'] = event;
+            state = state.copyWith(doctorQueueEvents: evMap);
+          }
         }
       }
       getPatientAppointments(patientId, silent: true);

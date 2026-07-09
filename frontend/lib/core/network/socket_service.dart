@@ -19,7 +19,7 @@ class SocketService {
     _socket = sio.io(
       serverUrl,
       sio.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .enableReconnection()
           .setReconnectionAttempts(double.infinity)

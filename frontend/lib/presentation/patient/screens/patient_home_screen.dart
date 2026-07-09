@@ -3873,7 +3873,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     isToday: _isToday(e.value),
                     isNext: e.key == 0,
                     doctorOffline: offline.contains(e.value.doctorId),
-                    queueEvent: vmState.doctorQueueEvents[e.value.doctorId],
+                    queueEvent: vmState.doctorQueueEvents['${e.value.doctorId}_${e.value.queueId}'],
                     currentServingOverride: vmState.doctorCurrentServing['${e.value.doctorId}_${e.value.clinicId}'],
                     onMarkArrived: () {
                       final familyId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
@@ -6002,7 +6002,6 @@ class _TodayAppointmentPopup extends StatelessWidget {
     final isSkipped = appt.queueState?.toLowerCase() == 'skipped';
     final typeLabel = _bookingLabel(appt.bookingType);
     final typeColor = _bookingColor(appt.bookingType);
-    final doctorID = appt.appointmentId ?? 'general';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -6077,7 +6076,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '$doctorName ($doctorID)',
+                                doctorName,
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,

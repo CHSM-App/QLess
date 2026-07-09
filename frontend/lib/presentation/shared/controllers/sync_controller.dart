@@ -5,7 +5,8 @@ import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 
 /// Watches [connectivityNotifierProvider] and, whenever the device transitions
 /// from offline → online, flushes any pending offline queue operations via
-/// [AppointmentListViewmodel.syncPendingOps].
+/// [AppointmentListViewmodel.syncPendingOps], plus walk-in patients booked
+/// while offline via [ReceptionistLoginViewmodel.syncPendingWalkIns].
 ///
 /// Initialise once at the root (e.g. inside [ProviderScope] via [ref.read] in
 /// main.dart, or by watching this provider inside the root widget).
@@ -27,6 +28,16 @@ final syncControllerProvider = Provider<void>((ref) {
 
       final appointmentVm = ref.read(appointmentViewModelProvider.notifier);
       await appointmentVm.syncPendingOps(doctorId);
+
+      // Walk-in patients booked offline (doctor or receptionist) — queued
+      // separately since they don't replay against an existing appointment.
+      final receptionistVm = ref.read(receptionistLoginViewModelProvider.notifier);
+      await receptionistVm.syncPendingWalkIns();
+
+      // Always refetch on reconnect, even with nothing pending to flush —
+      // otherwise a doctor who only viewed (never acted on) the queue while
+      // offline stays on stale cached data until they manually pull-to-refresh.
+      await appointmentVm.fetchPatientAppointments(doctorId, isOnline: true, silent: true);
     }
   });
 });

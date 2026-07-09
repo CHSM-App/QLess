@@ -268,13 +268,16 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
 
   int get _doctorId =>
       widget.doctorId ?? ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+  bool get _isOnline => ref.read(connectivityNotifierProvider).isOnline;
+  String? get _clinicId => ref.read(doctorLoginViewModelProvider).clinic_id;
 
   void _refresh({required bool force}) {
     if (_hasFetched && !force) return;
     final id = _doctorId;
     if (id == 0) return;
     _hasFetched = true;
-    ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(id);
+    ref.read(appointmentViewModelProvider.notifier)
+        .fetchPatientAppointments(id, isOnline: _isOnline);
   }
 
   DateTime? _pd(String? s) => s == null ? null : DateTime.tryParse(s.trim());
@@ -373,6 +376,8 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       try {
         final res = await ref.read(appointmentViewModelProvider.notifier).startSession(
           AppointmentRequestModel(doctorId: did, patientId: pid, appointmentId: p.appointmentId ?? 0),
+          isOnline: ref.read(connectivityNotifierProvider).isOnline,
+          offlineClinicId: _clinicId,
         );
         if (!mounted) return;
         if (res.success != true) { _snack(res.message ?? 'Could not start session', isError: true); return; }
@@ -395,6 +400,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
         patientStatus: p.status ?? 'booked',
         symptoms: p.symptoms,
         clinicId: clinicId,
+        queueId: p.queueId,
       ),
     ));
     if (!mounted) return;
@@ -409,8 +415,10 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       final res = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
         AppointmentRequestModel(
           doctorId: did, appointmentId: p.appointmentId ?? 0,
-          patientId: p.patientId ?? 0, isNext: 0,
+          patientId: p.patientId ?? 0, isNext: 0, queueId: p.queueId,
         ),
+        isOnline: _isOnline,
+        offlineClinicId: _clinicId,
       );
       if (!mounted) return;
       _snack(res.success == true ? (res.message ?? 'Patient skipped') : (res.message ?? 'Skip failed'),
@@ -618,7 +626,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     if (!ok) return;
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier)
-          .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+          .queueStart(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId), isOnline: _isOnline, offlineClinicId: _clinicId);
       _snack(res.message ?? 'Queue started');
     } catch (_) {
       _snack('Failed to start queue', isError: true);
@@ -635,7 +643,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     if (!ok) return;
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier)
-          .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+          .queuePause(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId), isOnline: _isOnline, offlineClinicId: _clinicId);
       _snack(res.message ?? 'Queue paused');
     } catch (_) {
       _snack('Failed to pause queue', isError: true);
@@ -751,7 +759,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     if (confirmed != true) return;
     try {
       final res = await ref.read(appointmentViewModelProvider.notifier)
-          .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId));
+          .queueStop(AppointmentRequestModel(doctorId: _doctorId, queueId: queueId), isOnline: _isOnline, offlineClinicId: _clinicId);
       _snack(res.message ?? 'Queue closed');
     } catch (_) {
       _snack('Failed to close queue', isError: true);
@@ -767,7 +775,8 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
     final confirmed = await _showEmergencyDialog();
     if (confirmed != true) return;
     try {
-      final res = await ref.read(appointmentViewModelProvider.notifier).queuePauseEmergency(queueId);
+      final res = await ref.read(appointmentViewModelProvider.notifier)
+          .queuePauseEmergency(queueId, isOnline: _isOnline, doctorId: _doctorId, clinicId: _clinicId);
       _snack(res.message ?? 'Queue paused (emergency)');
     } catch (_) {
       _snack('Failed to pause queue', isError: true);
@@ -1148,7 +1157,12 @@ class _SessionGroupedBodyState extends State<_SessionGroupedBody> {
     final qs      = session.queueStatus ?? 0;
     final hasSlot = _slotTimeLabel(session.startTime as String?, session.endTime as String?) != null;
     if (qs == 3) return false;
-    if (qs == 0 && !hasSlot) return false;
+    // A queue not yet started (idle) still needs to show if it already has
+    // booked patients waiting — otherwise a doctor's second/unstarted queue
+    // vanishes from this list even though patients are booked into it
+    // (matches the hasBooking exception in home_screen.dart's equivalent check).
+    final hasBooking = widget.allAppointments.any((a) => a.queueId == session.queueId);
+    if (qs == 0 && !hasSlot && !hasBooking) return false;
     return true;
   }
 
@@ -2180,7 +2194,10 @@ class _PatientCard extends ConsumerWidget {
               appointmentId: patient.appointmentId ?? 0,
               patientId: patient.patientId ?? 0,
               isNext: 0,
+              queueId: patient.queueId,
             ),
+            isOnline: ref.read(connectivityNotifierProvider).isOnline,
+            offlineClinicId: ref.read(doctorLoginViewModelProvider).clinic_id,
           );
         };
       }
