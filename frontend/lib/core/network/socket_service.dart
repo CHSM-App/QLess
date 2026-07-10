@@ -79,6 +79,13 @@ class SocketService {
     if (_joinedRooms.isEmpty && _doctorRooms.isEmpty) _socket.disconnect();
   }
 
+  // Explicit doctor logout — tells the server to mark this doctor offline
+  // immediately, skipping the reconnect grace period used for network blips.
+  void doctorLogout(int doctorId) {
+    if (_socket.connected) _socket.emit('doctorLogout', doctorId);
+    _doctorRooms.remove(doctorId);
+  }
+
   void disconnect() {
     _joinedRooms.clear();
     _doctorRooms.clear();

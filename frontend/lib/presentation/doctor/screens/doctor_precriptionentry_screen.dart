@@ -4,6 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:qless/core/navigation/navigator_key.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
@@ -842,48 +843,64 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   Future<void> _handleNextPatient() async {
+    debugPrint('[RxDebug] _handleNextPatient: start');
     final result = await _completeQueueAction();
-    if (!mounted) return;
+    debugPrint('[RxDebug] _handleNextPatient: _completeQueueAction returned '
+        'success=${result?.success} message=${result?.message}');
+    // Deliberately NOT gated on `mounted` from here on — `State.mounted`
+    // stays true while this widget is merely deactivated (e.g. a Navigator
+    // transition already under way), so it can't be trusted to skip
+    // navigation. All Navigator calls below go through the app-root
+    // `navigatorKey` instead of `Navigator.of(context)`, so they work even
+    // if this screen's own context is no longer attached to the tree.
     if (result == null) {
+      debugPrint('[RxDebug] _handleNextPatient: result null, popping');
       // queueNext failed but prescription was already saved — navigate back
       // so the user isn't stuck on the prescription screen.
       await Future.delayed(const Duration(milliseconds: 600));
-      if (mounted) Navigator.pop(context);
+      navigatorKey.currentState?.pop();
       return;
     }
 
     // API explicitly says no more queue patients — go back to patient list
     final msg = result.message?.trim() ?? '';
     if (msg.toLowerCase().contains('no patient left')) {
+      debugPrint('[RxDebug] _handleNextPatient: "no patient left", popping');
       _showSnack(msg, isError: false);
       await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) Navigator.pop(context);
+      navigatorKey.currentState?.pop();
       return;
     }
 
     final nextToken = result.data?.isNotEmpty == true ? result.data!.first.nextToken : null;
 
+    debugPrint('[RxDebug] _handleNextPatient: fetching patient appointments…');
     await ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(
         widget.doctorId,
         isOnline: ref.read(connectivityNotifierProvider).isOnline,
         clinicId: widget.clinicId);
-    if (!mounted) return;
+    debugPrint('[RxDebug] _handleNextPatient: fetch done');
 
     final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
         .maybeWhen(data: (l) => l, orElse: () => const <AppointmentList>[]);
+    debugPrint('[RxDebug] _handleNextPatient: fetched ${all.length} appointments: '
+        '${all.map((a) => '(id=${a.appointmentId},status=${a.status},queueId=${a.queueId},queueNum=${a.queueNumber})').join(', ')}');
+    debugPrint('[RxDebug] _handleNextPatient: widget.appointmentId=${widget.appointmentId} widget.queueId=${widget.queueId}');
 
     final next = _pickNextAppointment(all, preferredQueue: nextToken);
+    debugPrint('[RxDebug] _handleNextPatient: picked next = '
+        '${next == null ? 'NULL' : '(id=${next.appointmentId}, patient=${next.patientName}, status=${next.status})'}');
     if (next == null) {
       _showSnack('No next patient found', isError: true);
-      Navigator.pop(context);
+      navigatorKey.currentState?.pop();
       return;
     }
 
     _showSnack('Prescription saved. Opening next patient…', isError: false);
     await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
 
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PrescriptionScreen(
+    debugPrint('[RxDebug] _handleNextPatient: pushReplacement -> appointmentId=${next.appointmentId}');
+    navigatorKey.currentState?.pushReplacement(MaterialPageRoute(builder: (_) => PrescriptionScreen(
       patientId:     next.patientId     ?? 0,
       doctorId:      next.doctorId      ?? widget.doctorId,
       userTypeId:    next.userType      ?? widget.userTypeId,
@@ -952,30 +969,40 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   Future<void> _completePrescription() async {
-    if (_isSubmitting) return;
+    debugPrint('[RxDebug] _completePrescription: tapped, _isSubmitting=$_isSubmitting');
+    if (_isSubmitting) { debugPrint('[RxDebug] _completePrescription: blocked, already submitting'); return; }
     final error = _validate();
-    if (error != null) { _showSnack(error, isError: true); return; }
+    if (error != null) { debugPrint('[RxDebug] _completePrescription: validation failed: $error'); _showSnack(error, isError: true); return; }
     setState(() => _isSubmitting = true);
     try {
+      debugPrint('[RxDebug] _completePrescription: calling insertPrescription…');
       await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
-      if (!mounted) return;
+      debugPrint('[RxDebug] _completePrescription: insertPrescription returned, mounted=$mounted');
+      if (!mounted) { debugPrint('[RxDebug] _completePrescription: unmounted, abort'); return; }
       final state = ref.read(prescriptionViewModelProvider);
+      debugPrint('[RxDebug] _completePrescription: state.error=${state.error}');
       if (state.error != null) { _showSnack(state.error!, isError: true); return; }
       await _handleNextPatient();
+      debugPrint('[RxDebug] _completePrescription: _handleNextPatient returned');
     } finally {
+      debugPrint('[RxDebug] _completePrescription: finally, mounted=$mounted');
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
   Future<void> _completeAndBack() async {
-    if (_isSubmitting) return;
+    debugPrint('[RxDebug] _completeAndBack: tapped, _isSubmitting=$_isSubmitting');
+    if (_isSubmitting) { debugPrint('[RxDebug] _completeAndBack: blocked, already submitting'); return; }
     final error = _validate();
-    if (error != null) { _showSnack(error, isError: true); return; }
+    if (error != null) { debugPrint('[RxDebug] _completeAndBack: validation failed: $error'); _showSnack(error, isError: true); return; }
     setState(() => _isSubmitting = true);
     try {
+      debugPrint('[RxDebug] _completeAndBack: calling insertPrescription…');
       await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
-      if (!mounted) return;
+      debugPrint('[RxDebug] _completeAndBack: insertPrescription returned, mounted=$mounted');
+      if (!mounted) { debugPrint('[RxDebug] _completeAndBack: unmounted, abort'); return; }
       final state = ref.read(prescriptionViewModelProvider);
+      debugPrint('[RxDebug] _completeAndBack: state.error=${state.error}');
       if (state.error != null) { _showSnack(state.error!, isError: true); return; }
       // Fire-and-forget — don't let endSession block or unmount the widget before pop
       ref.read(appointmentViewModelProvider.notifier).endSession(
@@ -989,8 +1016,12 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       ).catchError((_) => AppointmentResponseModel(success: false));
       _showSnack('Prescription saved', isError: false);
       await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) Navigator.pop(context);
+      debugPrint('[RxDebug] _completeAndBack: about to pop');
+      // Uses navigatorKey, not Navigator.of(context) — `mounted` alone can't
+      // be trusted to gate this (see _showSnack).
+      navigatorKey.currentState?.pop();
     } finally {
+      debugPrint('[RxDebug] _completeAndBack: finally, mounted=$mounted');
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
@@ -1016,7 +1047,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       if (skipMsg.toLowerCase().contains('last patient')) {
         _showSnack(skipMsg, isError: false);
         await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) Navigator.pop(context);
+        navigatorKey.currentState?.pop();
         return;
       }
 
@@ -1029,10 +1060,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       if (next == null) {
         _showSnack(skipRes.message ?? 'Patient skipped', isError: false);
         await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) Navigator.pop(context);
+        navigatorKey.currentState?.pop();
         return;
       }
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PrescriptionScreen(
+      navigatorKey.currentState?.pushReplacement(MaterialPageRoute(builder: (_) => PrescriptionScreen(
         patientId:     next.patientId     ?? 0,
         doctorId:      next.doctorId      ?? widget.doctorId,
         userTypeId:    next.userType      ?? widget.userTypeId,
@@ -1049,22 +1080,34 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     } catch (e) { _showSnack('Skip failed: $e', isError: true); }
   }
 
+  // `State.mounted` can still read true while this widget is deactivated
+  // (mid-removal from the tree, e.g. a Navigator transition already in
+  // flight) — in that window `ScaffoldMessenger.of(context)` throws
+  // "Looking up a deactivated widget's ancestor is unsafe", which used to
+  // abort _handleNextPatient/_completeAndBack BEFORE they reached the
+  // Navigator call that actually opens the next patient / pops back. Use the
+  // app-root ScaffoldMessenger key instead of a context lookup so this can
+  // never throw on a deactivated context, and callers can rely on it.
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(
-          isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-          color: Colors.white, size: 14,
-        ),
-        const SizedBox(width: 7),
-        Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, color: Colors.white))),
-      ]),
-      backgroundColor: isError ? kError : kPrimary,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-      duration: const Duration(seconds: 2),
-    ));
+    try {
+      rootScaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
+        content: Row(children: [
+          Icon(
+            isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+            color: Colors.white, size: 14,
+          ),
+          const SizedBox(width: 7),
+          Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, color: Colors.white))),
+        ]),
+        backgroundColor: isError ? kError : kPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+        duration: const Duration(seconds: 2),
+      ));
+    } catch (e) {
+      debugPrint('[RxDebug] _showSnack failed: $e');
+    }
   }
 
   double get _width => MediaQuery.of(context).size.width;

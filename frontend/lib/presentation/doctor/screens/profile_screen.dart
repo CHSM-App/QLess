@@ -17,6 +17,7 @@ import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dar
 import 'package:qless/presentation/shared/screens/continue_as.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/core/network/socket_service.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart' hide appointmentViewModelProvider;
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart' show appointmentUsecaseProvider;
 import 'package:url_launcher/url_launcher.dart';
@@ -1653,6 +1654,14 @@ Widget _buildAvailabilityCard() => Container(
                           child: ElevatedButton(
                             onPressed: () async {
                               Navigator.pop(context);
+                              final loggedOutDoctorId =
+                                  ref.read(doctorLoginViewModelProvider).doctorId;
+                              final socketService =
+                                  ref.read(socketServiceProvider);
+                              if (loggedOutDoctorId != null) {
+                                socketService.doctorLogout(loggedOutDoctorId);
+                              }
+                              socketService.disconnect();
                               await ref
                                   .read(tokenProvider.notifier)
                                   .clearTokens();

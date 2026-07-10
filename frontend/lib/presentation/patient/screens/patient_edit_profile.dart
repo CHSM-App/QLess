@@ -14,6 +14,7 @@ import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -457,7 +458,7 @@ String? _networkImageUrl;   // ← add this
     final isSaving = _isSubmitting || loginState.isLoading;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:kPageBg,
       appBar: _buildAppBar(isSaving),
       body: Form(
         key: _formKey,
@@ -561,6 +562,7 @@ String? _networkImageUrl;   // ← add this
                         side: const BorderSide(color: kBorder),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
+                            backgroundColor: Colors.white,
                         foregroundColor: kTextSecondary,
                       ),
                       child: const Text('Cancel',

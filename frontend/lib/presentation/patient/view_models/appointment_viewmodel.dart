@@ -137,6 +137,10 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
       final event = data['event'] as String?;
       final raw   = data['doctor_id'];
       final dId   = raw is int ? raw : int.tryParse(raw.toString());
+      // TEMP DEBUG — remove after diagnosing stuck current_serving.
+      debugPrint('[QN-DEBUG] queue_update recv: event=$event doctor_id=$raw '
+          'current_serving=${data['current_serving']} clinic_id=${data['clinic_id']} '
+          'queue_id=${data['queue_id']}');
       if (dId != null) {
         // Capture real current_serving from socket, keyed by "doctorId_clinicId"
         // so a CL001 event never pollutes CL002 patient's NOW circle.
@@ -149,6 +153,13 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
           final csMap = Map<String, int>.from(state.doctorCurrentServing);
           csMap[key] = cs;
           state = state.copyWith(doctorCurrentServing: csMap);
+          // TEMP DEBUG — override applied.
+          debugPrint('[QN-DEBUG] override APPLIED: key=$key -> $cs '
+              '| full map=$csMap');
+        } else {
+          // TEMP DEBUG — override DROPPED (missing/zero cs or missing clinic_id).
+          debugPrint('[QN-DEBUG] override DROPPED: cs=$cs clinicId=$clinicId '
+              '(event=$event) — NOW circle will fall back to SP current_serving');
         }
         if (event != null && bannerEvents.contains(event)) {
           final rawQ = data['queue_id'];

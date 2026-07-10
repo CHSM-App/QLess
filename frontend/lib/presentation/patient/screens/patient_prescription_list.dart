@@ -16,7 +16,7 @@ import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
-
+const kPageBg = Color(0xFFF8F9FB);
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
 const kTextMuted     = Color(0xFFA0AEC0);
@@ -292,7 +292,7 @@ class _PatientPrescriptionListScreenState
                  + _filtered(mapped, 'expired',   pid, pName, members);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg,
       // ── AppBar — back arrow + icon badge + title ──────────────────
       appBar: AppBar(
         backgroundColor: Colors.white,
@@ -1376,14 +1376,14 @@ class _PrescriptionDetailEntryState
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor:kPageBg,
         body: Center(child: CircularProgressIndicator(color: kPrimary)),
       );
     }
 
     if (_error != null || _details == null || _details!.isEmpty) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: kPageBg,
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,

@@ -2399,6 +2399,7 @@ class _SymptomsField extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: kPrimary, width: 1.5),
               ),
+              
             ),
           ),
         ]),

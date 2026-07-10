@@ -49,6 +49,14 @@ void requestAppointmentsRatingDialog(int appointmentId) {
   }
 }
 
+// "View all specialties" on Home switches to the Doctors tab (index 1) and
+// scrolls it to the Browse by Specialty section — the tab is kept alive in
+// an IndexedStack, so this must drive the existing instance rather than
+// push a standalone route (which would hide the bottom bar).
+void requestDoctorExploreSpecialty() {
+  patientShellKey.currentState?.openDoctorExploreSpecialty();
+}
+
 class PatientBottomNav extends StatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
@@ -74,6 +82,8 @@ class PatientBottomNavState extends State<PatientBottomNav>
 
   final GlobalKey<AppointmentScreenState> _appointmentsKey =
       GlobalKey<AppointmentScreenState>();
+  final GlobalKey<DoctorExploreScreenState> _doctorExploreKey =
+      GlobalKey<DoctorExploreScreenState>();
 
   late final List<Widget> _screens;
   late final List<AnimationController> _iconControllers;
@@ -151,6 +161,15 @@ static const _regularNavHeight = 64.0;
     });
   }
 
+  // 'View all specialties' on Home: switch to the Doctors tab (index 1) and
+  // scroll it to the Browse by Specialty section.
+  void openDoctorExploreSpecialty() {
+    _setTab(1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _doctorExploreKey.currentState?.scrollToSpecialtySection();
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -182,7 +201,7 @@ static const _regularNavHeight = 64.0;
         onSeeAllAppointments: () => openAppointmentsDeepLink(filter: 'upcoming'),
       ),
       
-      const DoctorExploreScreen(),
+      DoctorExploreScreen(key: _doctorExploreKey),
       AppointmentScreen(key: _appointmentsKey, onTabChange: _setTab),
       const PatientProfilePage(),
     ];

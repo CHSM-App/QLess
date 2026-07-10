@@ -16,6 +16,7 @@ import 'package:qless/presentation/shared/widgets/app_expandable_header_search.d
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -366,7 +367,7 @@ Widget build(BuildContext context) {
   final isLoading = doctorsState.isLoading;
 
   return Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: kPageBg,
     appBar: AppBar(
       backgroundColor: Colors.white,
       // Keep the bar flat white when the list scrolls under it — no M3 tint
@@ -882,7 +883,7 @@ class _DoctorCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FA),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: qs.tintCard ? kError.withOpacity(0.25) : kBorder),

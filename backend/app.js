@@ -228,6 +228,26 @@ io.on('connection', (socket) => {
     socket.leave(`clinic_${clinicId}`);
   });
 
+  // Explicit doctor logout — skip the reconnect grace period and tell
+  // patients immediately, since this isn't a network blip.
+  socket.on('doctorLogout', (doctorId) => {
+    console.log(`[DOCTOR] doctorLogout doctorId=${doctorId} socket=${socket.id}`);
+    const pendingTimer = doctorOfflineTimers.get(doctorId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      doctorOfflineTimers.delete(doctorId);
+    }
+    const sockets = doctorSockets.get(doctorId);
+    if (sockets) {
+      sockets.delete(socket.id);
+      if (sockets.size === 0) doctorSockets.delete(doctorId);
+    }
+    doctorStatus.set(doctorId, false);
+    doctorStatusAt.set(doctorId, Date.now());
+    io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false });
+    console.log(`[DOCTOR] emitted online=false to clinic_${doctorId} (explicit logout)`);
+  });
+
   socket.on('disconnect', () => {
     console.log('Socket disconnected:', socket.id, '| doctorRooms:', socket._doctorRooms ? [...socket._doctorRooms] : 'none');
     if (socket._doctorRooms) {

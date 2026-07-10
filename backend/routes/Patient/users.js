@@ -7,7 +7,27 @@ const log = require('../middleware/logger');
 const path = require("path");
 const fs = require("fs-extra");
 
-
+// The furthest token the queue has actually reached — MAX(queue_number) among
+// in_progress + completed only (skipped tokens are handled outside the main
+// queue and must not count). This is the SAME rule the doctor's GET_TODAY_QUEUE
+// and the socket `fetchCurrentServing` use, so every surface shows one value.
+// We compute it here to override sp_appointment's QUEUE_ESTIMATE_SMART, whose
+// current_serving lags/miscounts for the patient list.
+async function correctCurrentServing(appointment_id) {
+  try {
+    const res = await db.request()
+      .input('appointment_id', sql.Int, parseInt(appointment_id))
+      .query(`
+        SELECT MAX(a.queue_number) AS current_serving
+        FROM   appointments a
+        WHERE  a.queue_id = (SELECT queue_id FROM appointments WHERE appointment_id = @appointment_id)
+          AND  a.status   IN ('in_progress', 'completed')
+      `);
+    return res.recordset[0]?.current_serving ?? null;
+  } catch (_) {
+    return null;
+  }
+}
 
 
 router.get('/fetchFamilyMembers/:family_id', async (req, res) => {
@@ -250,6 +270,12 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
           if (queueResult.recordset.length > 0) {
             const q = queueResult.recordset[0];
 
+            // Override the SP's current_serving with the correct MAX-token value
+            // so the patient's NOW circle matches the doctor screen and never
+            // lags after a complete/skip/recall. Fall back to the SP value only
+            // if our query returns null.
+            const serving = await correctCurrentServing(item.appointment_id);
+
             queueData = {
               my_queue_number: q.my_queue_number,
               patients_ahead: q.patients_ahead,
@@ -257,7 +283,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
               queue_started: q.queue_started,
               is_my_turn: q.is_my_turn,
               total_queue: q?.total_queue ?? null,
-              current_serving: q?.current_serving ?? null,
+              current_serving: serving ?? q?.current_serving ?? null,
               queue_state: q?.status ?? null
             };
           }
