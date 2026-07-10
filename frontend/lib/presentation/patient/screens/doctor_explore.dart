@@ -1869,10 +1869,9 @@ class _SectionTitle extends StatelessWidget {
               children: [
                 Text(title,
                     style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                        color: _kTextPrimary,
-                        letterSpacing: -0.2)),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _kTextPrimary)),
                 if (subtitle != null) ...[
                   const SizedBox(height: 1),
                   Text(subtitle!,
@@ -1885,18 +1884,11 @@ class _SectionTitle extends StatelessWidget {
           if (action != null)
             GestureDetector(
               onTap: onAction,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _kPrimaryLight,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(action!,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _kPrimaryDark)),
-              ),
+              child: Text(action!,
+                  style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: _kPrimary)),
             ),
         ],
       );
@@ -1916,7 +1908,6 @@ class _RecentDoctorCard extends StatelessWidget {
     required this.onBook,
     this.favorited = false,
   });
-
   @override
   Widget build(BuildContext context) {
     final accent    = _accentFor(doctor.specialization);

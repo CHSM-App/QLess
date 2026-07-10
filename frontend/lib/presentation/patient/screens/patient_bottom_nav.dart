@@ -246,8 +246,7 @@ static const _regularNavHeight = 64.0;
 
   @override
 Widget build(BuildContext context) {
-  return ConnectivityBannerWrapper(
-    child: PopScope(
+  return PopScope(
     canPop: _tab == 0,
     onPopInvokedWithResult: (didPop, _) {
       if (!didPop) _setTab(0);
@@ -261,26 +260,18 @@ Widget build(BuildContext context) {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
-        extendBody: true,
         backgroundColor: const Color(0xFFF3F4F8),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: SafeArea(
-                bottom: false,
-                child: IndexedStack(index: _tab, children: _screens),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _buildBottomNav(),
-            ),
-          ],
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Expanded(child: IndexedStack(index: _tab, children: _screens)),
+              _buildBottomNav(),
+              const ConnectivityBannerBar(),
+            ],
+          ),
         ),
       ),
-    ),
     ),
   );
 }

@@ -40,6 +40,36 @@ class ConnectivityBannerWrapper extends ConsumerWidget {
   }
 }
 
+/// Offline/online strip for screens with a persistent bottom nav bar —
+/// place it directly *after* the nav bar in a Column
+/// (`[Expanded(content), navBar, ConnectivityBannerBar()]`) so it grows in
+/// below the tab bar (in the safe-area strip at the very bottom of the
+/// screen) instead of overlapping the tab bar or the page content.
+class ConnectivityBannerBar extends ConsumerWidget {
+  const ConnectivityBannerBar({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final connectivity = ref.watch(connectivityNotifierProvider);
+
+    final showOffline    = connectivity.isOffline;
+    final showBackOnline = connectivity.showBackOnlineBanner;
+    final showAny        = showOffline || showBackOnline;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: showAny
+          ? _ConnectivityBanner(
+              isOffline:    showOffline,
+              isBackOnline: showBackOnline,
+            )
+          : const SizedBox(width: double.infinity, height: 0),
+    );
+  }
+}
+
 class _ConnectivityBanner extends StatelessWidget {
   const _ConnectivityBanner({
     required this.isOffline,

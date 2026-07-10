@@ -11398,11 +11398,24 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: kTextPrimary)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 3,
+                height: 15,
+                decoration: BoxDecoration(
+                    color: kPrimary,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(width: 7),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+            ],
+          ),
           if (action != null)
             GestureDetector(
               onTap: onAction,

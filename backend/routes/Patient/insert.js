@@ -95,9 +95,11 @@ router.post('/appointment/book', async (req, res) => {
     const queueRes = await db.request()
       .input('doctor_id', doctor_id)
       .input('appointment_date', appointment_date)
+      .input('slot_id', slot_id)
       .query(`
         SELECT TOP 1 queue_status, booking_closed FROM doctor_queue
         WHERE doctor_id = @doctor_id AND queue_date = @appointment_date
+          AND (@slot_id IS NULL OR slot_id = @slot_id)
         ORDER BY queue_id DESC
       `);
 
@@ -427,9 +429,11 @@ router.post('/queuePreviewEstimate', async (req, res) => {
     try {
       const bcRes = await db.request()
         .input('doctor_id', doctor_id)
+        .input('slot_id', slot_id)
         .query(`
           SELECT TOP 1 queue_status, booking_closed FROM doctor_queue
           WHERE doctor_id = @doctor_id AND queue_date = CAST(GETDATE() AS DATE)
+            AND (@slot_id IS NULL OR slot_id = @slot_id)
           ORDER BY queue_id DESC
         `);
       const row = bcRes.recordset?.[0];

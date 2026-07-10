@@ -863,35 +863,35 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
     // Profile page hides the shared app bar (manages its own header)
     final showAppBar = false;
 
-    return ConnectivityBannerWrapper(
-      child: PopScope(
-        canPop: _currentIndex == 0,
-        onPopInvokedWithResult: (didPop, _) {
-          if (!didPop) _onTabTap(0);
-        },
-        child: isWide
-            ? _buildWideLayout(showAppBar)
-            : _buildMobileLayout(showAppBar),
-      ),
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _onTabTap(0);
+      },
+      child: isWide
+          ? _buildWideLayout(showAppBar)
+          : _buildMobileLayout(showAppBar),
     );
   }
 
   // ── WIDE layout (tablet / desktop): sidebar rail + content ────────────────
 
   Widget _buildWideLayout(bool showAppBar) {
-    return Scaffold(
-      backgroundColor: DoctorNavTheme.scaffoldBg,
-      appBar: null,
-      body: Row(
-        children: [
-          _buildSideRail(),
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: _pages,
+    return ConnectivityBannerWrapper(
+      child: Scaffold(
+        backgroundColor: DoctorNavTheme.scaffoldBg,
+        appBar: null,
+        body: Row(
+          children: [
+            _buildSideRail(),
+            Expanded(
+              child: IndexedStack(
+                index: _currentIndex,
+                children: _pages,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -909,26 +909,21 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
       ),
       child: Scaffold(
         backgroundColor: _neuNavBg,
-        extendBody: true,
         appBar: null,
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: SafeArea(
-                bottom: false,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Expanded(
                 child: IndexedStack(
                   index: _currentIndex,
                   children: _pages,
                 ),
               ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _buildPillNav(),
-            ),
-          ],
+              _buildPillNav(),
+              const ConnectivityBannerBar(),
+            ],
+          ),
         ),
       ),
     );
