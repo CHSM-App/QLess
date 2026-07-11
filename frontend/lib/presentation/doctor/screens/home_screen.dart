@@ -156,7 +156,7 @@ const List<_Tip> _kDoctorTips = [
       'Tap Close at the end of a session — frees the slot and updates today\'s stats.'),
 ];
 
-class _QueueHomePageState extends ConsumerState<QueueHomePage> {
+class _QueueHomePageState extends ConsumerState<QueueHomePage> with WidgetsBindingObserver {
   bool _hasFetched = false;
   bool _showWalkInForm = false;
   final Map<int, bool> _patientsExpanded = {};
@@ -173,6 +173,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _doctorIdSub = ref.listenManual<int?>(
       doctorLoginViewModelProvider.select((s) => s.doctorId),
       (_, next) {
@@ -218,6 +219,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tipsTimer?.cancel();
     _tipsController.dispose();
     _scrollController.dispose();
@@ -225,6 +227,19 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
     _clinicIdSub?.close();
     _connectivitySub?.close();
     super.dispose();
+  }
+
+  // Backgrounding/closing the app isn't a network problem — tell the server
+  // so patients see a plain offline status instead of a scary connectivity
+  // banner. On resume, rejoin so presence flips back to online.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_doctorId == 0) return;
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      ref.read(appointmentViewModelProvider.notifier).notifyAppBackgrounded();
+    } else if (state == AppLifecycleState.resumed) {
+      _refreshQueueStatus();
+    }
   }
 
   int get _doctorId => ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
@@ -796,11 +811,12 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> {
         ? (ref.watch(receptionistLoginViewModelProvider).name ?? 'Receptionist')
         : ref.watch(doctorLoginViewModelProvider.select((s) => s.name ?? 'Doctor'));
 
-    // Pill nav (60) + its bottom padding (18) + extra clearance = 100, plus system safe area
-    final safeBottom = MediaQuery.of(context).padding.bottom;
-    final fabBottom  = safeBottom + 100.0;
-    // List bottom padding: above FAB (56) + pill nav + gap
-    final listBottom = safeBottom + 100.0 + 56.0 + 16.0;
+    // Pill nav sits below this page (Column layout, not overlaid), so the
+    // page's own bottom edge already borders the nav bar — only a small
+    // clearance is needed here.
+    final fabBottom  = 16.0;
+    // List bottom padding: above FAB (56) + gap
+    final listBottom = 16.0 + 56.0 + 16.0;
     final isWide = MediaQuery.of(context).size.width >= _kHomeWideBreak;
     final isFullWide = MediaQuery.of(context).size.width >= _kHomeFullBreak;
 

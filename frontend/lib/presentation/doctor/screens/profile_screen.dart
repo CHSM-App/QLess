@@ -1659,7 +1659,7 @@ Widget _buildAvailabilityCard() => Container(
                               final socketService =
                                   ref.read(socketServiceProvider);
                               if (loggedOutDoctorId != null) {
-                                socketService.doctorLogout(loggedOutDoctorId);
+                                await socketService.doctorLogout(loggedOutDoctorId);
                               }
                               socketService.disconnect();
                               await ref

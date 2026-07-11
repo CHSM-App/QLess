@@ -418,18 +418,24 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
                 return LayoutBuilder(
                   builder: (_, constraints) {
                     final isWide = constraints.maxWidth > 700;
-                    return RefreshIndicator(
-                      color: kPrimary,
-                      strokeWidth: 2.5,
-                      displacement: 40,
-                      onRefresh: () async {
-                        _refresh(force: true);
-                        // wait a bit so indicator is visible
-                        await Future.delayed(const Duration(milliseconds: 600));
+                    return NotificationListener<ScrollEndNotification>(
+                      onNotification: (_) {
+                        if (!_fabVisible) setState(() => _fabVisible = true);
+                        return false;
                       },
-                      child: isWide
-                          ? _buildGrid(filtered)
-                          : _buildList(filtered, _scrollCtrl),
+                      child: RefreshIndicator(
+                        color: kPrimary,
+                        strokeWidth: 2.5,
+                        displacement: 40,
+                        onRefresh: () async {
+                          _refresh(force: true);
+                          // wait a bit so indicator is visible
+                          await Future.delayed(const Duration(milliseconds: 600));
+                        },
+                        child: isWide
+                            ? _buildGrid(filtered)
+                            : _buildList(filtered, _scrollCtrl),
+                      ),
                     );
                   },
                 );
@@ -441,14 +447,14 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
 
       // ── FAB ─────────────────────────────────────────────────────────────
       floatingActionButton: ref.read(tokenProvider).roleId == 3 ? null : AnimatedSlide(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 220),
         curve: Curves.easeInOut,
         offset: _fabVisible ? Offset.zero : const Offset(0, 0.6),
         child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 220),
           opacity: _fabVisible ? 1.0 : 0.0,
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 80),
+            padding: const EdgeInsets.only(bottom: 16),
             child: GestureDetector(
               onTap: _fabVisible ? _goToAdd : null,
               child: Container(
@@ -530,7 +536,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
     final showDelete = ref.read(tokenProvider).roleId != 3;
     return ListView.separated(
       controller: controller,
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 140),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 90),
       itemCount: medicines.length,
       separatorBuilder: (_, __) => const SizedBox(height: 6),
       itemBuilder: (_, i) => _MedicineCard(
@@ -545,7 +551,7 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   Widget _buildGrid(List<Medicine> medicines) {
     final showDelete = ref.read(tokenProvider).roleId != 3;
     return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 120),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 90),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: 320,
         childAspectRatio: 3.6,
@@ -874,7 +880,7 @@ class _SkeletonList extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListView.separated(
     physics: const NeverScrollableScrollPhysics(),
-    padding: const EdgeInsets.fromLTRB(12, 6, 12, 140),
+    padding: const EdgeInsets.fromLTRB(12, 6, 12, 90),
     itemCount: 7,
     separatorBuilder: (_, __) => const SizedBox(height: 6),
     itemBuilder: (_, __) => const _SkeletonCard(),

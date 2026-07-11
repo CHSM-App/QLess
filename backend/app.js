@@ -152,6 +152,9 @@ app.set('io', io);
 const doctorSockets = new Map();
 const doctorStatus  = new Map();
 const doctorStatusAt = new Map();
+// doctorStatusReason: doctorId → 'disconnect' | 'logout'  (why the last offline happened,
+// so patients can tell a real network problem apart from an intentional logout)
+const doctorStatusReason = new Map();
 // doctorOfflineTimers: doctorId → Timeout  (pending offline broadcast, cancelled on reconnect)
 const doctorOfflineTimers = new Map();
 // Grace period before telling patients a doctor is offline. Covers brief
@@ -179,7 +182,11 @@ io.on('connection', (socket) => {
       const isOnline = doctorStatus.get(clinicId);
       const age = Date.now() - (doctorStatusAt.get(clinicId) || 0);
       if (isOnline || age < DOCTOR_OFFLINE_STALE_MS) {
-        socket.emit('doctor_status', { doctor_id: clinicId, online: isOnline });
+        socket.emit('doctor_status', {
+          doctor_id: clinicId,
+          online: isOnline,
+          reason: isOnline ? undefined : doctorStatusReason.get(clinicId),
+        });
       }
     }
     // Fetch today's furthest-served token for this doctor and push it so the
@@ -220,6 +227,7 @@ io.on('connection', (socket) => {
 
     doctorStatus.set(doctorId, true);
     doctorStatusAt.set(doctorId, Date.now());
+    doctorStatusReason.delete(doctorId);
     io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: true });
     console.log(`[DOCTOR] emitted online=true to clinic_${doctorId}`);
   });
@@ -244,7 +252,8 @@ io.on('connection', (socket) => {
     }
     doctorStatus.set(doctorId, false);
     doctorStatusAt.set(doctorId, Date.now());
-    io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false });
+    doctorStatusReason.set(doctorId, 'logout');
+    io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false, reason: 'logout' });
     console.log(`[DOCTOR] emitted online=false to clinic_${doctorId} (explicit logout)`);
   });
 
@@ -267,7 +276,8 @@ io.on('connection', (socket) => {
               if (stillConnected && stillConnected.size > 0) return; // reconnected in the meantime
               doctorStatus.set(doctorId, false); // remember offline state
               doctorStatusAt.set(doctorId, Date.now());
-              io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false });
+              doctorStatusReason.set(doctorId, 'disconnect');
+              io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false, reason: 'disconnect' });
               console.log(`[DOCTOR] emitted online=false to clinic_${doctorId} (after grace period)`);
             }, DOCTOR_OFFLINE_GRACE_MS);
             doctorOfflineTimers.set(doctorId, timer);

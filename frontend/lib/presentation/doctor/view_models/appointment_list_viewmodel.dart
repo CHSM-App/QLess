@@ -104,6 +104,16 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     }
   }
 
+  // App backgrounded/closed (not the explicit logout button) — tell the
+  // server this is an intentional close so patients get a plain "offline"
+  // status instead of a "network problem" banner. Keeps _currentDoctorId so
+  // rejoining on resume (via joinClinic) works as before.
+  void notifyAppBackgrounded() {
+    if (_currentDoctorId != null) {
+      socketService.doctorLogout(_currentDoctorId!);
+    }
+  }
+
   @override
   void dispose() {
     _socketSub?.cancel();

@@ -81,8 +81,15 @@ class SocketService {
 
   // Explicit doctor logout — tells the server to mark this doctor offline
   // immediately, skipping the reconnect grace period used for network blips.
-  void doctorLogout(int doctorId) {
-    if (_socket.connected) _socket.emit('doctorLogout', doctorId);
+  // Callers that follow this with disconnect() must await it first: emit()
+  // only queues the message, so disconnecting right away can close the
+  // transport before the event reaches the server, leaving the server to
+  // see a bare disconnect and (wrongly) report a network problem instead.
+  Future<void> doctorLogout(int doctorId) async {
+    if (_socket.connected) {
+      _socket.emit('doctorLogout', doctorId);
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
     _doctorRooms.remove(doctorId);
   }
 

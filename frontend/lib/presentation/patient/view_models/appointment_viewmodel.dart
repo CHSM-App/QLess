@@ -123,9 +123,17 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
       final raw      = data['doctor_id'];
       final doctorId = raw is int ? raw : int.tryParse(raw.toString());
       final online   = data['online'] as bool? ?? true;
+      final reason   = data['reason'] as String?;
       if (doctorId == null) return;
       final updated = Set<int>.from(state.offlineDoctors);
-      if (online) { updated.remove(doctorId); } else { updated.add(doctorId); }
+      // Only show the "network problem" banner for a real disconnect. An
+      // explicit doctor logout/app-close is intentional, not a network
+      // issue, so it shouldn't scare the patient with a connectivity warning.
+      if (online || reason != 'disconnect') {
+        updated.remove(doctorId);
+      } else {
+        updated.add(doctorId);
+      }
       debugPrint('[SOCKET] offlineDoctors updated: $updated');
       state = state.copyWith(offlineDoctors: updated);
     });

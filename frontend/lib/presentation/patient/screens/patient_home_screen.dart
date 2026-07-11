@@ -10648,7 +10648,7 @@ Widget _buildTopRatedDoctorsSection(List<DoctorDetails> doctors, bool isLoading)
 
                   _fade(4, _buildSpecialtiesSection(
                       doctorsState.doctors, doctorsState.isLoading)),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 10),
 
                   _fade(5, _buildTopRatedDoctorsSection(
                       doctorsState.doctors, doctorsState.isLoading)),
