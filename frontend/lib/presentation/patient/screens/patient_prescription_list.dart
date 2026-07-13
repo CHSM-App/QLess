@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -284,8 +285,18 @@ class _PatientPrescriptionListScreenState
 
     final state   = ref.watch(prescriptionViewModelProvider);
     final apiList = state.prescriptionsListPatient ?? const <PrescriptionModel>[];
-    final mapped  = apiList.map((m) => PatientPrescription.fromModel(m,
-        fallbackPatientId: pid, fallbackPatientName: pName)).toList();
+    // API returns one row per medicine (flat) — group by prescriptionId so
+    // each card aggregates its real medicine list instead of counting 0/1
+    // from a single flat row (mirrors the detail screen's fromFlatList use).
+    final byRx = <int, List<PrescriptionModel>>{};
+    for (final m in apiList) {
+      final key = m.prescriptionId ?? -(byRx.length + 1);
+      byRx.putIfAbsent(key, () => []).add(m);
+    }
+    final mapped = byRx.values
+        .map((rows) => PatientPrescription.fromFlatList(rows,
+            fallbackPatientId: pid, fallbackPatientName: pName))
+        .toList();
 
     final all    = _filtered(mapped, 'all',       pid, pName, members);
     final active = _filtered(mapped, 'active',    pid, pName, members);
@@ -752,26 +763,12 @@ class _PrescriptionCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Doctor avatar
-                Container(
-                  width: 34, height: 34,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        colors: [kPrimaryDark, kPrimary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(Icons.person_rounded,
-                      color: Colors.white, size: 16),
-                ),
-                const SizedBox(width: 8),
                 // Doctor info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(prescription.doctorName,
+                      Text(doctorDisplayName(prescription.doctorName),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1629,7 +1626,7 @@ class _PatientPrescriptionViewScreenState
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_rx.doctorName,
+                  Text(doctorDisplayName(_rx.doctorName),
                       style: const TextStyle(
                           color: Colors.white, fontSize: 13,
                           fontWeight: FontWeight.w700)),
@@ -1890,7 +1887,7 @@ class _PatientPrescriptionViewScreenState
           child: Column(children: [
             const Divider(color: kTextPrimary, thickness: 0.8),
             const SizedBox(height: 3),
-            Text(_rx.doctorName,
+            Text(doctorDisplayName(_rx.doctorName),
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(

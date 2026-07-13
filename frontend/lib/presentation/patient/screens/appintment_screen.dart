@@ -2809,7 +2809,7 @@
 //                                 ),
 //                                 const SizedBox(height: 2),
 //                                 Text(
-//                                   'Dr. $doctorName${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
+//                                   '${doctorDisplayName(doctorName)}${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
 //                                   maxLines: 1,
 //                                   overflow: TextOverflow.ellipsis,
 //                                   style: const TextStyle(
@@ -3195,6 +3195,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/core/navigation/navigator_key.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/review_request_model.dart';
@@ -3832,6 +3833,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     final doctor = DoctorDetails(
       doctorId: a.doctorId, name: a.doctorName,
       specialization: a.specialization, experience: a.experience,
+      clinicId: a.clinicId,
       clinicName: a.clinicName, clinicAddress: a.clinicAddress,
       latitude: a.latitude, longitude: a.longitude,
       clinicContact: a.clinicContact,
@@ -4843,7 +4845,9 @@ class _AppointmentCard extends StatelessWidget {
                                           size: 10, color: kPrimary),
                                       const SizedBox(width: 3),
                                       Expanded(
-                                        child: Text(a.doctorName ?? '—',
+                                        child: Text(
+                                            doctorDisplayName(a.doctorName,
+                                                fallback: '—'),
                                             style: const TextStyle(
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w500,
@@ -5649,7 +5653,9 @@ class _DetailSheet extends StatelessWidget {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(a.doctorName ?? '—',
+                                  Text(
+                                      doctorDisplayName(a.doctorName,
+                                          fallback: '—'),
                                       style: const TextStyle(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w700,
@@ -6067,7 +6073,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Dr. $doctorName${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
+                                  '${doctorDisplayName(doctorName)}${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(

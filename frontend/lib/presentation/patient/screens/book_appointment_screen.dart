@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -715,7 +716,7 @@ void dispose() {
   void _showFavSnack(bool added) {
     _snack(
       added
-          ? 'Dr. ${widget.doctor.name ?? ''} added to favourites'
+          ? '${doctorDisplayName(widget.doctor.name)} added to favourites'
           : 'Removed from favourites',
       isError: false,
     );
@@ -973,7 +974,7 @@ class _AppBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Dr. ${doctor.name ?? 'Unknown'}',
+            doctorDisplayName(doctor.name, fallback: 'Unknown'),
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,

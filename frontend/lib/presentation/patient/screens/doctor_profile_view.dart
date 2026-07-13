@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/network/auth_image_url.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/review_model.dart';
@@ -287,7 +288,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
             const SizedBox(width: 8),
             Flexible(
               child: Text(
-                'Dr. ${d.name ?? 'Profile'}',
+                doctorDisplayName(d.name, fallback: 'Profile'),
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                     fontSize: 15,
@@ -489,7 +490,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Dr. ${d.name ?? 'Unknown'}',
+                  Text(doctorDisplayName(d.name, fallback: 'Unknown'),
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 15,
@@ -735,7 +736,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
   // ── About card ─────────────────────────────────────────────────────
   Widget _buildAboutCard(DoctorDetails d) => _Card(
         child: Text(
-          'Dr. ${d.name ?? 'Unknown'} is a specialist in '
+          '${doctorDisplayName(d.name, fallback: 'Unknown')} is a specialist in '
           '${_cap(d.specialization ?? 'medicine')} with over '
           '${d.experience ?? 0} years of experience. Known for '
           'compassionate care, thorough diagnosis, and a patient-first approach.',

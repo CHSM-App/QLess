@@ -666,6 +666,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/presentation/doctor/screens/home_screen.dart';
 import 'package:qless/presentation/doctor/screens/medicine_screen.dart';
 import 'package:qless/presentation/doctor/screens/patient_list.dart';
@@ -1247,7 +1248,7 @@ class _DoctorCardAppBar extends StatelessWidget implements PreferredSizeWidget {
                           ),
                         ),
                         Text(
-                          'Dr. $doctorName',
+                          doctorDisplayName(doctorName),
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

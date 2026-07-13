@@ -2253,7 +2253,7 @@
 // //                       const SizedBox(width: 6),
 // //                       Expanded(
 // //                         child: Text(
-// //                           'Dr. ${appt.doctorName ?? 'Doctor'} has a network connection issue. Please come at your estimated time.',
+// //                           '${doctorDisplayName(appt.doctorName)} has a network connection issue. Please come at your estimated time.',
 // //                           style: const TextStyle(
 // //                             fontSize: 10,
 // //                             fontWeight: FontWeight.w600,
@@ -2833,7 +2833,7 @@
 // //   @override
 // //   Widget build(BuildContext context) {
 // //     final appt = appointment;
-// //     final doctorName = appt.doctorName ?? 'Doctor';
+// //     final doctorName = doctorDisplayName(appt.doctorName);
 // //     final spec = appt.specialization ?? '';
 // //     final clinic = appt.clinicName ?? '';
 // //     final isQueue =
@@ -5396,7 +5396,7 @@
 //                       const SizedBox(width: 6),
 //                       Expanded(
 //                         child: Text(
-//                           'Dr. ${appt.doctorName ?? 'Doctor'} has a network connection issue. Please come at your estimated time.',
+//                           '${doctorDisplayName(appt.doctorName)} has a network connection issue. Please come at your estimated time.',
 //                           style: const TextStyle(
 //                             fontSize: 10,
 //                             fontWeight: FontWeight.w600,
@@ -5986,7 +5986,7 @@
 //   @override
 //   Widget build(BuildContext context) {
 //     final appt = appointment;
-//     final doctorName = appt.doctorName ?? 'Doctor';
+//     final doctorName = doctorDisplayName(appt.doctorName);
 //     final spec = appt.specialization ?? '';
 //     final clinic = appt.clinicName ?? '';
 //     final isQueue =
@@ -8608,7 +8608,7 @@
 //                       const SizedBox(width: 6),
 //                       Expanded(
 //                         child: Text(
-//                           'Dr. ${appt.doctorName ?? 'Doctor'} has a network connection issue. Please come at your estimated time.',
+//                           '${doctorDisplayName(appt.doctorName)} has a network connection issue. Please come at your estimated time.',
 //                           style: const TextStyle(
 //                             fontSize: 10,
 //                             fontWeight: FontWeight.w600,
@@ -9188,7 +9188,7 @@
 //   @override
 //   Widget build(BuildContext context) {
 //     final appt = appointment;
-//     final doctorName = appt.doctorName ?? 'Doctor';
+//     final doctorName = doctorDisplayName(appt.doctorName);
 //     final spec = appt.specialization ?? '';
 //     final clinic = appt.clinicName ?? '';
 //     final isQueue =
@@ -9564,6 +9564,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
@@ -11675,7 +11676,7 @@ class _TopDoctorCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text('Dr. ${name?.isNotEmpty == true ? name : 'Doctor'}',
+            Text(doctorDisplayName(name),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -11946,7 +11947,7 @@ String _fmtClockTime(String? raw) {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Dr. ${appt.doctorName ?? 'Doctor'} has a network connection issue. Please come at your estimated time.',
+                          '${doctorDisplayName(appt.doctorName)} has a network connection issue. Please come at your estimated time.',
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
@@ -12073,7 +12074,7 @@ String _fmtClockTime(String? raw) {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name,
+                          Text(doctorDisplayName(name),
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -12536,7 +12537,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appt = appointment;
-    final doctorName = appt.doctorName ?? 'Doctor';
+    final doctorName = doctorDisplayName(appt.doctorName);
     final spec = appt.specialization ?? '';
     final clinic = appt.clinicName ?? '';
     final isQueue =

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/core/network/dio_provider.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/data/api/api_service.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
@@ -1329,7 +1330,7 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> with WidgetsBindi
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      isReceptionist ? doctorName : 'Dr. $doctorName',
+                      isReceptionist ? doctorName : doctorDisplayName(doctorName),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(

@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
@@ -952,7 +953,7 @@ class _DoctorCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          'Dr. ${d.name ?? 'Unknown'}',
+                          doctorDisplayName(d.name, fallback: 'Unknown'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
