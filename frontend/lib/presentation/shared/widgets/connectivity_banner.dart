@@ -102,17 +102,17 @@ class _ConnectivityBanner extends StatelessWidget {
 
     return Container(
       color: bgColor,
-      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + bottomPad),
+      padding: EdgeInsets.fromLTRB(16, 1, 12, 1 + bottomPad),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: textColor, size: 16),
+          Icon(icon, color: textColor, size: 14),
           const SizedBox(width: 8),
           Text(
             message,
             style: TextStyle(
               color:      textColor,
-              fontSize:   12,
+              fontSize:   11,
               fontWeight: FontWeight.w500,
               letterSpacing: 0.2,
             ),

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctor_explore.dart';
 import 'package:qless/presentation/patient/screens/patient_home_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/profile.dart';
 import 'package:qless/presentation/shared/widgets/connectivity_banner.dart';
 
@@ -118,6 +119,11 @@ static const _regularNavHeight = 64.0;
       label: 'Appointments',
     ),
     _NavItem(
+      icon: Icons.description_outlined,
+      activeIcon: Icons.description_rounded,
+      label: 'Records',
+    ),
+    _NavItem(
       icon: Icons.person_outline,
       activeIcon: Icons.person_rounded,
       label: 'Profile',
@@ -175,7 +181,7 @@ static const _regularNavHeight = 64.0;
     super.initState();
 
     // clamp initial tab
-    _tab = widget.initialTab.clamp(0, 3);
+    _tab = widget.initialTab.clamp(0, 4);
 
     // animation controllers
     _iconControllers = List.generate(
@@ -203,6 +209,7 @@ static const _regularNavHeight = 64.0;
       
       DoctorExploreScreen(key: _doctorExploreKey),
       AppointmentScreen(key: _appointmentsKey, onTabChange: _setTab),
+      const PatientPrescriptionListScreen(showBackButton: false),
       const PatientProfilePage(),
     ];
 

@@ -518,10 +518,18 @@ Widget build(BuildContext context) {
         const SizedBox(width: 4),
         Expanded(
           child: DropdownButtonHideUnderline(
-            child: DropdownButton<int?>(
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                hoverColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+              ),
+              child: DropdownButton<int?>(
               value: _selectedMemberId,
               isDense: true,
               isExpanded: true,
+              focusColor: Colors.transparent,
               icon: const Icon(Icons.keyboard_arrow_down_rounded,
                   size: 15, color: kPrimary),
               dropdownColor: Colors.white,
@@ -555,6 +563,7 @@ Widget build(BuildContext context) {
                 ...members.map((m) =>
                     _DropSelected(m.memberName?.split(' ').first ?? '?')),
               ],
+              ),
             ),
           ),
         ),
@@ -871,9 +880,9 @@ class _DoctorCard extends StatelessWidget {
     final qs         = _QueueStatus.from(d);
     final accent     = _accentFor(d.specialization);
     final specBg     = _bgFor(d.specialization);
-    final init       = (d.name?.isNotEmpty ?? false)
-        ? d.name![0].toUpperCase()
-        : 'D';
+    // final init       = (d.name?.isNotEmpty ?? false)
+    //     ? d.name![0].toUpperCase()
+    //     : 'D';
     final clinicText = [d.clinicName, d.clinicAddress]
         .where((s) => s != null && s.isNotEmpty)
         .join(' · ');
@@ -899,38 +908,38 @@ class _DoctorCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Avatar ─────────────────────────────────────────
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 46, height: 46,
-                  decoration: BoxDecoration(
-                    color: accent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: accent.withOpacity(0.2), width: 1.5),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(init,
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: accent)),
-                ),
-                Positioned(
-                  bottom: -2, right: -2,
-                  child: Container(
-                    width: 11, height: 11,
-                    decoration: BoxDecoration(
-                      color: qs.dot,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 10),
+            // Stack(
+            //   clipBehavior: Clip.none,
+            //   children: [
+            //     Container(
+            //       width: 46, height: 46,
+            //       decoration: BoxDecoration(
+            //         color: accent.withOpacity(0.12),
+            //         borderRadius: BorderRadius.circular(12),
+            //         border: Border.all(
+            //             color: accent.withOpacity(0.2), width: 1.5),
+            //       ),
+            //       alignment: Alignment.center,
+            //       child: Text(init,
+            //           style: TextStyle(
+            //               fontSize: 17,
+            //               fontWeight: FontWeight.w700,
+            //               color: accent)),
+            //     ),
+            //     Positioned(
+            //       bottom: -2, right: -2,
+            //       child: Container(
+            //         width: 11, height: 11,
+            //         decoration: BoxDecoration(
+            //           color: qs.dot,
+            //           shape: BoxShape.circle,
+            //           border: Border.all(color: Colors.white, width: 2),
+            //         ),
+            //       ),
+            //     ),
+            //   ],
+            // ),
+            // const SizedBox(width: 10),
 
             // ── Info ───────────────────────────────────────────
             Expanded(

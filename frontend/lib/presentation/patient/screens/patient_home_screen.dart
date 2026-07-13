@@ -9577,7 +9577,6 @@ import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
-import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 
 // ── Colour Palette ─────────────────────────────────────────────────
 const kPageBg = Color(0xFFF8F9FB);
@@ -10631,11 +10630,7 @@ Widget _buildTopRatedDoctorsSection(List<DoctorDetails> doctors, bool isLoading)
                             icon: Icons.medical_information_rounded,
                             label: 'Records',
                             color: kWarning,
-                            onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (_) =>
-                                        const PatientPrescriptionListScreen())),
+                            onTap: () => widget.onTabChange(3),
                           ),
                         ),
                       ]),

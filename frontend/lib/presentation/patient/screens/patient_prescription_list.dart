@@ -78,7 +78,8 @@ extension _DateFilterX on _DateFilter {
 //  PRESCRIPTION LIST SCREEN
 // ════════════════════════════════════════════════════════════════════
 class PatientPrescriptionListScreen extends ConsumerStatefulWidget {
-  const PatientPrescriptionListScreen({super.key});
+  final bool showBackButton;
+  const PatientPrescriptionListScreen({super.key, this.showBackButton = true});
   @override
   ConsumerState<PatientPrescriptionListScreen> createState() =>
       _PatientPrescriptionListScreenState();
@@ -297,20 +298,23 @@ class _PatientPrescriptionListScreenState
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-           margin: const EdgeInsets.all(10), 
-            decoration: BoxDecoration(
-              color: kPrimaryLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kPrimary.withOpacity(0.2)),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: kPrimary, size: 15),
-          ),
-        ),
-        leadingWidth: 54,
+        automaticallyImplyLeading: false,
+        leading: widget.showBackButton
+            ? GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                 margin: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: kPrimary.withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: kPrimary, size: 15),
+                ),
+              )
+            : null,
+        leadingWidth: widget.showBackButton ? 54 : null,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
