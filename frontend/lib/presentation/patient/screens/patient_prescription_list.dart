@@ -789,24 +789,6 @@ class _PrescriptionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Row(mainAxisSize: MainAxisSize.min, children: [
-                      Container(
-                        width: 18, height: 18,
-                        decoration: const BoxDecoration(
-                            color: kPrimary, shape: BoxShape.circle),
-                        alignment: Alignment.center,
-                        child: Text(
-                          prescription.patientName
-                              .split(' ')
-                              .where((w) => w.isNotEmpty)
-                              .take(1)
-                              .map((w) => w[0].toUpperCase())
-                              .join(),
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 8,
-                              fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 80),
                         child: Text(prescription.patientName,

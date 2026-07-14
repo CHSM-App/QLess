@@ -136,6 +136,20 @@ String _fmtDateRel(String? d) {
   return DateFormat('dd MMM yyyy').format(p);
 }
 
+/// True when [_fmtDateRel] returns a relative label (Today/Tomorrow/Yesterday/
+/// In N days) rather than falling back to the same formatted date as
+/// [_fmtDate] — used to avoid showing the identical date twice.
+bool _isRelativeDateLabel(String? d) {
+  if (d == null) return false;
+  final p = DateTime.tryParse(d);
+  if (p == null) return false;
+  final now   = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final date  = DateTime(p.year, p.month, p.day);
+  final diff  = date.difference(today).inDays;
+  return diff >= -1 && diff <= 7;
+}
+
 String _fmtTime(String? t) {
   if (t == null) return '';
   final value = t.trim();
@@ -1584,8 +1598,6 @@ class _AppointmentCard extends StatelessWidget {
     final sColor = _statusColor(a.status);
     final sBg    = _statusBg(a.status);
     final sIcon  = _statusIcon(a.status);
-    final hasMap = a.latitude != null && a.longitude != null;
-    final init   = (a.patientName ?? '?')[0].toUpperCase();
 
     return Stack(
       clipBehavior: Clip.none,
@@ -1618,24 +1630,6 @@ class _AppointmentCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Container(
-                              width: 36, height: 36,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [kPrimary, kPrimaryDark],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(11),
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(init,
-                                  style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white)),
-                            ),
-                            const SizedBox(width: 9),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1711,7 +1705,9 @@ class _AppointmentCard extends StatelessWidget {
                                   icon: Icons.calendar_today_rounded,
                                   iconFg: kInfo, iconBg: kInfoLight,
                                   top: _fmtDateRel(a.appointmentDate),
-                                  bottom: _fmtDate(a.appointmentDate),
+                                  bottom: _isRelativeDateLabel(a.appointmentDate)
+                                      ? _fmtDate(a.appointmentDate)
+                                      : '',
                                 ),
                               ),
                               if (_hasAppointmentTime(a)) ...[
@@ -1812,71 +1808,6 @@ class _AppointmentCard extends StatelessWidget {
                               _iconBtn(Icons.cancel_rounded,
                                   kRedLight, kError, onCancel!),
                             ],
-                            const SizedBox(width: 5),
-                            if (hasMap) ...[
-                              _iconBtn(Icons.map_rounded, kInfoLight, kInfo,
-                                  () => openMap(
-                                      a.latitude!, a.longitude!, a.clinicName)),
-                              const SizedBox(width: 5),
-                            ],
-                            _iconBtn(
-                              Icons.call_rounded, kPrimaryLight, kPrimary,
-                              () => showDialog(
-                                context: context,
-                                builder: (ctx) => Dialog(
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16)),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(20),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 44, height: 44,
-                                          decoration: const BoxDecoration(
-                                              color: kPrimaryLight,
-                                              shape: BoxShape.circle),
-                                          child: const Icon(Icons.call_rounded,
-                                              color: kPrimary, size: 22),
-                                        ),
-                                        const SizedBox(height: 10),
-                                        const Text('Contact',
-                                            style: TextStyle(
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.w700,
-                                                color: kTextPrimary)),
-                                        const SizedBox(height: 16),
-                                        if (a.clinicContact?.isNotEmpty == true)
-                                          _callOption(
-                                              ctx,
-                                              'Call Clinic',
-                                              a.clinicName ?? 'Clinic',
-                                              a.clinicContact!,
-                                              Icons.local_hospital_rounded,
-                                              kWarning,
-                                              kAmberLight)
-                                        else
-                                          const Text('No contact available',
-                                              style: TextStyle(
-                                                  fontSize: 13,
-                                                  color: kTextMuted)),
-                                        const SizedBox(height: 14),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          child: TextButton(
-                                            onPressed: () => Navigator.pop(ctx),
-                                            child: const Text('Cancel',
-                                                style: TextStyle(
-                                                    color: kTextSecondary,
-                                                    fontSize: 13)),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ],
@@ -1977,49 +1908,13 @@ class _AppointmentCard extends StatelessWidget {
         ),
       );
 
-  Widget _callOption(BuildContext ctx, String title, String subtitle,
-          String number, IconData icon, Color fg, Color bg) =>
-      GestureDetector(
-        onTap: () async {
-          Navigator.pop(ctx);
-          final uri = Uri(scheme: 'tel', path: number);
-          if (await canLaunchUrl(uri)) await launchUrl(uri);
-        },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: bg.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: fg.withOpacity(0.2)),
-          ),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-              child: Icon(icon, size: 16, color: fg),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: fg)),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 11, color: kTextSecondary),
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-            Icon(Icons.call_rounded, size: 16, color: fg),
-          ]),
-        ),
-      );
+}
+
+Future<void> _callNumber(String number) async {
+  final uri = Uri(scheme: 'tel', path: number);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2528,32 +2423,65 @@ class _DetailSheet extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            if (hasMap) ...[
+                            if (hasMap || a.clinicContact?.isNotEmpty == true) ...[
                               const SizedBox(height: 11),
                               const Divider(height: 1, color: kBorder),
                               const SizedBox(height: 11),
-                              SizedBox(
-                                width: double.infinity, height: 40,
-                                child: ElevatedButton.icon(
-                                  onPressed: () => openMap(
-                                      a.latitude!,
-                                      a.longitude!,
-                                      a.clinicName),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: kInfoLight,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(12)),
-                                  ),
-                                  icon: const Icon(Icons.map_rounded,
-                                      color: kInfo, size: 16),
-                                  label: const Text('Open in Maps',
-                                      style: TextStyle(
-                                          color: kInfo,
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13)),
-                                ),
+                              Row(
+                                children: [
+                                  if (hasMap)
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => openMap(
+                                              a.latitude!,
+                                              a.longitude!,
+                                              a.clinicName),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: kInfoLight,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12)),
+                                          ),
+                                          icon: const Icon(Icons.map_rounded,
+                                              color: kInfo, size: 16),
+                                          label: const Text('Open in Maps',
+                                              style: TextStyle(
+                                                  color: kInfo,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13)),
+                                        ),
+                                      ),
+                                    ),
+                                  if (hasMap && a.clinicContact?.isNotEmpty == true)
+                                    const SizedBox(width: 8),
+                                  if (a.clinicContact?.isNotEmpty == true)
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () =>
+                                              _callNumber(a.clinicContact!),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: kPrimaryLight,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12)),
+                                          ),
+                                          icon: const Icon(Icons.call_rounded,
+                                              color: kPrimary, size: 16),
+                                          label: const Text('Call Clinic',
+                                              style: TextStyle(
+                                                  color: kPrimary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13)),
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                             ],
                           ],
