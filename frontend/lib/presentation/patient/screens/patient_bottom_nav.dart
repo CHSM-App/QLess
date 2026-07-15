@@ -263,13 +263,13 @@ Widget build(BuildContext context) {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
         statusBarBrightness: Brightness.light,
-        systemNavigationBarColor: Color(0xFFF3F4F8),
+        systemNavigationBarColor: Colors.white,
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFFF3F4F8),
         body: SafeArea(
-          bottom: false,
+          top: false,
           child: Column(
             children: [
               Expanded(child: IndexedStack(index: _tab, children: _screens)),
@@ -282,6 +282,7 @@ Widget build(BuildContext context) {
     ),
   );
 }
+
   // ── Expanding Pill Bar — selected tab grows into a tinted pill with
   // icon + label side by side; others stay as plain grey icons. ──────
   Widget _buildBottomNav() {

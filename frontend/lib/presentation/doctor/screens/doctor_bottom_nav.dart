@@ -247,7 +247,7 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
         backgroundColor: _neuNavBg,
         appBar: null,
         body: SafeArea(
-          bottom: false,
+          top: false,
           child: Column(
             children: [
               Expanded(
