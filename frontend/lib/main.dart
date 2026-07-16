@@ -176,7 +176,7 @@ class HealthcareApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'HealthConnect',
+      title: 'QLess',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: rootScaffoldMessengerKey,

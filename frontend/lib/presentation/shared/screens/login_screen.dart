@@ -437,7 +437,7 @@ class _LandscapeLayout extends StatelessWidget {
                         _BrandLogo(size: 84),
                         const SizedBox(height: 22),
                         const Text(
-                          'HealthConnect',
+                          'QLess',
                           style: TextStyle(
                             fontSize: 29,
                             fontWeight: FontWeight.w800,
@@ -1257,7 +1257,7 @@ class _RegisterCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'New to HealthConnect?',
+                      'New to QLess?',
                       style: TextStyle(
                         fontSize: 12,
                         color: kTextSecondary,

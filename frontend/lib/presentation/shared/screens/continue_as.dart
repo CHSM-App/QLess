@@ -351,7 +351,7 @@ class _LandscapeLayout extends StatelessWidget {
                         _BrandLogo(size: 88),
                         const SizedBox(height: 22),
                         const Text(
-                          'HealthConnect',
+                          'QLess',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 30,
