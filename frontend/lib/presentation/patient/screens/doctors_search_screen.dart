@@ -193,6 +193,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   double?   _filterRating;
   int?      _filterMinExp;
   double?   _filterMaxDistKm;
+  bool      _queueOpenOnly   = false;
   Position? _userPosition;
   final Map<String, double> _ratings = {};
 
@@ -200,7 +201,8 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       (_specialty != null ? 1 : 0) +
       (_filterRating != null ? 1 : 0) +
       (_filterMinExp != null ? 1 : 0) +
-      (_filterMaxDistKm != null ? 1 : 0);
+      (_filterMaxDistKm != null ? 1 : 0) +
+      (_queueOpenOnly ? 1 : 0);
 
   @override
   void initState() {
@@ -316,7 +318,10 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
               d.latitude!, d.longitude!);
           matchD = metres <= _filterMaxDistKm! * 1000;
         }
-        return matchQ && matchS && matchR && matchE && matchD;
+        final matchQueue = !_queueOpenOnly ||
+            _queueStateFor(d) == _QueueState.open ||
+            _queueStateFor(d) == _QueueState.hasQueue;
+        return matchQ && matchS && matchR && matchE && matchD && matchQueue;
       }).toList();
 
   List<String> _specialties(List<DoctorDetails> all) {
@@ -482,13 +487,15 @@ Widget build(BuildContext context) {
         selectedRating:   _filterRating,
         selectedMinExp:   _filterMinExp,
         selectedMaxDist:  _filterMaxDistKm,
+        selectedQueueOpenOnly: _queueOpenOnly,
         hasLocation:      _userPosition != null,
-        onApply: (spec, rating, minExp, maxDist) {
+        onApply: (spec, rating, minExp, maxDist, queueOpenOnly) {
           setState(() {
             _specialty        = spec;
             _filterRating     = rating;
             _filterMinExp     = minExp;
             _filterMaxDistKm  = maxDist;
+            _queueOpenOnly    = queueOpenOnly;
           });
         },
         onClear: () => setState(() {
@@ -496,6 +503,7 @@ Widget build(BuildContext context) {
           _filterRating    = null;
           _filterMinExp    = null;
           _filterMaxDistKm = null;
+          _queueOpenOnly   = false;
         }),
       ),
     );
@@ -1384,8 +1392,9 @@ class _FilterSheet extends StatefulWidget {
   final double?      selectedRating;
   final int?         selectedMinExp;
   final double?      selectedMaxDist;
+  final bool         selectedQueueOpenOnly;
   final bool         hasLocation;
-  final void Function(String? spec, double? rating, int? minExp, double? maxDist) onApply;
+  final void Function(String? spec, double? rating, int? minExp, double? maxDist, bool queueOpenOnly) onApply;
   final VoidCallback onClear;
 
   const _FilterSheet({
@@ -1396,6 +1405,7 @@ class _FilterSheet extends StatefulWidget {
     this.selectedRating,
     this.selectedMinExp,
     this.selectedMaxDist,
+    this.selectedQueueOpenOnly = false,
     this.hasLocation = false,
   });
 
@@ -1409,21 +1419,24 @@ class _FilterSheetState extends State<_FilterSheet> {
   late double?  _rating;
   late int?     _minExp;
   double?       _maxDist;
+  late bool     _queueOpenOnly;
 
-  static const _panels = ['Category', 'Rating', 'Experience', 'Distance'];
+  static const _panels = ['Category', 'Rating', 'Experience', 'Distance', 'Queue'];
 
   @override
   void initState() {
     super.initState();
-    _spec     = widget.selectedSpec;
-    _rating   = widget.selectedRating;
-    _minExp   = widget.selectedMinExp;
-    _maxDist  = widget.selectedMaxDist;
+    _spec           = widget.selectedSpec;
+    _rating         = widget.selectedRating;
+    _minExp         = widget.selectedMinExp;
+    _maxDist        = widget.selectedMaxDist;
+    _queueOpenOnly  = widget.selectedQueueOpenOnly;
   }
 
   int get _active =>
       (_spec != null ? 1 : 0) + (_rating != null ? 1 : 0) +
-      (_minExp != null ? 1 : 0) + (_maxDist != null ? 1 : 0);
+      (_minExp != null ? 1 : 0) + (_maxDist != null ? 1 : 0) +
+      (_queueOpenOnly ? 1 : 0);
 
   @override
   Widget build(BuildContext context) {
@@ -1453,7 +1466,10 @@ class _FilterSheetState extends State<_FilterSheet> {
               const Spacer(),
               GestureDetector(
                 onTap: () {
-                  setState(() { _spec = null; _rating = null; _minExp = null; });
+                  setState(() {
+                    _spec = null; _rating = null; _minExp = null;
+                    _maxDist = null; _queueOpenOnly = false;
+                  });
                   widget.onClear();
                 },
                 child: Container(
@@ -1489,7 +1505,9 @@ class _FilterSheetState extends State<_FilterSheet> {
                     final sel = _activePanel == i;
                     final hasBadge = (i == 0 && _spec != null) ||
                         (i == 1 && _rating != null) ||
-                        (i == 2 && _minExp != null);
+                        (i == 2 && _minExp != null) ||
+                        (i == 3 && _maxDist != null) ||
+                        (i == 4 && _queueOpenOnly);
                     return GestureDetector(
                       onTap: () => setState(() => _activePanel = i),
                       child: Container(
@@ -1550,7 +1568,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             height: 46,
             child: ElevatedButton(
               onPressed: () {
-                widget.onApply(_spec, _rating, _minExp, _maxDist);
+                widget.onApply(_spec, _rating, _minExp, _maxDist, _queueOpenOnly);
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
@@ -1578,6 +1596,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       case 1:  return _ratingPanel();
       case 2:  return _experiencePanel();
       case 3:  return _distancePanel();
+      case 4:  return _queuePanel();
       default: return const SizedBox();
     }
   }
@@ -1673,6 +1692,16 @@ class _FilterSheetState extends State<_FilterSheet> {
             child: _optionTile(o.label, _maxDist == o.val,
                 () => setState(() => _maxDist = o.val)),
           )),
+    ]);
+  }
+
+  Widget _queuePanel() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _optionTile('Show all doctors', !_queueOpenOnly,
+          () => setState(() => _queueOpenOnly = false)),
+      const SizedBox(height: 6),
+      _optionTile('Queue open only', _queueOpenOnly,
+          () => setState(() => _queueOpenOnly = true)),
     ]);
   }
 
