@@ -8,7 +8,7 @@ publish_to: 'none'
 # not strictly greater than the previous build, so always bump N — even
 # for a hotfix that keeps the same X.Y.Z.
 # Bump via: scripts/bump-version.ps1 -Type patch (or minor/major).
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
