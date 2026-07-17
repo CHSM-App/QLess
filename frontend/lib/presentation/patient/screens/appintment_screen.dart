@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/core/navigation/navigator_key.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/review_request_model.dart';
@@ -23,6 +24,7 @@ import 'package:url_launcher/url_launcher.dart';
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -132,6 +134,20 @@ String _fmtDateRel(String? d) {
   if (diff == -1) return 'Yesterday';
   if (diff > 0 && diff <= 7) return 'In $diff days';
   return DateFormat('dd MMM yyyy').format(p);
+}
+
+/// True when [_fmtDateRel] returns a relative label (Today/Tomorrow/Yesterday/
+/// In N days) rather than falling back to the same formatted date as
+/// [_fmtDate] — used to avoid showing the identical date twice.
+bool _isRelativeDateLabel(String? d) {
+  if (d == null) return false;
+  final p = DateTime.tryParse(d);
+  if (p == null) return false;
+  final now   = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final date  = DateTime(p.year, p.month, p.day);
+  final diff  = date.difference(today).inDays;
+  return diff >= -1 && diff <= 7;
 }
 
 String _fmtTime(String? t) {
@@ -640,6 +656,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
     final doctor = DoctorDetails(
       doctorId: a.doctorId, name: a.doctorName,
       specialization: a.specialization, experience: a.experience,
+      clinicId: a.clinicId,
       clinicName: a.clinicName, clinicAddress: a.clinicAddress,
       latitude: a.latitude, longitude: a.longitude,
       clinicContact: a.clinicContact,
@@ -730,6 +747,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
         appointmentId: a.appointmentId!, doctorId: a.doctorId!,
         patientId: a.patientId!, rating: input.rating, comment: input.comment,
         reviewedByUserId: ref.read(patientLoginViewModelProvider).patientId!,
+        clinicId: a.clinicId,
       ),
     );
   }
@@ -821,7 +839,7 @@ bool get _hasDateFilter =>
     final async      = vmState.patientAppointmentsList;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg,
       body: SafeArea(
         top: false,
         child: Column(
@@ -1108,27 +1126,64 @@ Widget _filterChip({
           color: kPrimary,
           strokeWidth: 2,
           onRefresh: onRefresh,
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
-            itemCount: list.length,
-            itemBuilder: (_, i) {
-              final a    = list[i];
-              final live = _isLive(a);
-              return _AppointmentCard(
-                appointment:          a,
-                onViewDetails:        () => _openDetail(a),
-                onViewPrescription:   _isCompleted(a) && a.appointmentId != null ? () => _handleViewPrescription(a) : null,
-                onReview:             _canReview(a) ? () => _handleReview(context, a) : null,
-                onCancel:             _canCancel(a) ? () => _handleCancel(a) : null,
-                onReschedule:         _canReschedule(a) ? () => _handleReschedule(a) : null,
-                queueNumber:          live ? (a.myQueueNumber ?? a.queueNumber) : null,
-                isLiveQueue:          live,
-                queueStarted:         live ? (a.queueStarted ?? false) : false,
-                isMyTurn:             live ? (a.isMyTurn ?? false) : false,
-                patientsAhead:        live ? a.patientsAhead : null,
-                estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
-                queueState:           a.queueState,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isWide = constraints.maxWidth >= 700;
+              if (isWide) {
+                return GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                  gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                    maxCrossAxisExtent: 480,
+                    mainAxisExtent: 210,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: list.length,
+                  itemBuilder: (_, i) {
+                    final a    = list[i];
+                    final live = _isLive(a);
+                    return _AppointmentCard(
+                      appointment:          a,
+                      onViewDetails:        () => _openDetail(a),
+                      onViewPrescription:   _isCompleted(a) && a.appointmentId != null ? () => _handleViewPrescription(a) : null,
+                      onReview:             _canReview(a) ? () => _handleReview(context, a) : null,
+                      onCancel:             _canCancel(a) ? () => _handleCancel(a) : null,
+                      onReschedule:         _canReschedule(a) ? () => _handleReschedule(a) : null,
+                      queueNumber:          live ? (a.myQueueNumber ?? a.queueNumber) : null,
+                      isLiveQueue:          live,
+                      queueStarted:         live ? (a.queueStarted ?? false) : false,
+                      isMyTurn:             live ? (a.isMyTurn ?? false) : false,
+                      patientsAhead:        live ? a.patientsAhead : null,
+                      estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
+                      queueState:           a.queueState,
+                    );
+                  },
+                );
+              }
+              return ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(14, 10, 14, 80),
+                itemCount: list.length,
+                itemBuilder: (_, i) {
+                  final a    = list[i];
+                  final live = _isLive(a);
+                  return _AppointmentCard(
+                    appointment:          a,
+                    onViewDetails:        () => _openDetail(a),
+                    onViewPrescription:   _isCompleted(a) && a.appointmentId != null ? () => _handleViewPrescription(a) : null,
+                    onReview:             _canReview(a) ? () => _handleReview(context, a) : null,
+                    onCancel:             _canCancel(a) ? () => _handleCancel(a) : null,
+                    onReschedule:         _canReschedule(a) ? () => _handleReschedule(a) : null,
+                    queueNumber:          live ? (a.myQueueNumber ?? a.queueNumber) : null,
+                    isLiveQueue:          live,
+                    queueStarted:         live ? (a.queueStarted ?? false) : false,
+                    isMyTurn:             live ? (a.isMyTurn ?? false) : false,
+                    patientsAhead:        live ? a.patientsAhead : null,
+                    estimatedArrivalTime: live ? a.estimatedArrivalTime : null,
+                    queueState:           a.queueState,
+                  );
+                },
               );
             },
           ),
@@ -1510,7 +1565,7 @@ class _AppointmentDateFilterSheetState
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  APPOINTMENT CARD  (unchanged)
+//  APPOINTMENT CARD  (modernized visual design — logic unchanged)
 // ════════════════════════════════════════════════════════════════════
 class _AppointmentCard extends StatelessWidget {
   final AppointmentList appointment;
@@ -1543,8 +1598,6 @@ class _AppointmentCard extends StatelessWidget {
     final sColor = _statusColor(a.status);
     final sBg    = _statusBg(a.status);
     final sIcon  = _statusIcon(a.status);
-    final hasMap = a.latitude != null && a.longitude != null;
-    final init   = (a.patientName ?? '?')[0].toUpperCase();
 
     return Stack(
       clipBehavior: Clip.none,
@@ -1552,14 +1605,14 @@ class _AppointmentCard extends StatelessWidget {
         Container(
           margin: const EdgeInsets.only(bottom: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
+            color: Colors.white,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: kBorder),
             boxShadow: [
               BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4)),
+                  color: kTextPrimary.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3)),
             ],
           ),
           child: Material(
@@ -1568,256 +1621,199 @@ class _AppointmentCard extends StatelessWidget {
             child: InkWell(
               borderRadius: BorderRadius.circular(14),
               onTap: onViewDetails,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(11, 10, 11, 10),
+                    child: Column(
                       children: [
-                        Container(
-                          width: 44, height: 44,
-                          decoration: BoxDecoration(
-                            color: kPrimaryLight,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(init,
-                              style: const TextStyle(
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w700,
-                                  color: kPrimary)),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(a.patientName ?? 'Unknown',
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: kTextPrimary),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis),
-                              const SizedBox(height: 2),
-                              Row(
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.person_rounded,
-                                      size: 10, color: kTextMuted),
-                                  const SizedBox(width: 3),
-                                  Expanded(
-                                    child: Text(a.doctorName ?? '—',
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: kTextSecondary),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis),
+                                  Text(a.patientName ?? 'Unknown',
+                                      style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: kTextPrimary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.medical_services_rounded,
+                                          size: 10, color: kPrimary),
+                                      const SizedBox(width: 3),
+                                      Expanded(
+                                        child: Text(
+                                            doctorDisplayName(a.doctorName,
+                                                fallback: '—'),
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w500,
+                                                color: kTextSecondary),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 4),
+                              decoration: BoxDecoration(
+                                  color: sBg,
+                                  borderRadius: BorderRadius.circular(18)),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(sIcon, size: 10, color: sColor),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                      a.status?.toLowerCase() == 'cancled'
+                                          ? 'Cancelled by Doctor'
+                                          : _statusLabel(a.status),
+                                      style: TextStyle(
+                                          color: sColor,
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w700)),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
+
+                        const SizedBox(height: 8),
+
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 3),
+                              horizontal: 9, vertical: 7),
                           decoration: BoxDecoration(
-                              color: sBg,
-                              borderRadius: BorderRadius.circular(6)),
+                            color: const Color(0xFFF7F8FA),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                           child: Row(
-                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(sIcon, size: 10, color: sColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                  a.status?.toLowerCase() == 'cancled'
-                                      ? 'Cancelled by Doctor'
-                                      : _statusLabel(a.status),
-                                  style: TextStyle(
-                                      color: sColor,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600)),
+                              Expanded(
+                                child: _infoTile(
+                                  icon: Icons.calendar_today_rounded,
+                                  iconFg: kInfo, iconBg: kInfoLight,
+                                  top: _fmtDateRel(a.appointmentDate),
+                                  bottom: _isRelativeDateLabel(a.appointmentDate)
+                                      ? _fmtDate(a.appointmentDate)
+                                      : '',
+                                ),
+                              ),
+                              if (_hasAppointmentTime(a)) ...[
+                                Container(
+                                  width: 1, height: 22,
+                                  color: kDivider,
+                                  margin: const EdgeInsets.symmetric(horizontal: 6),
+                                ),
+                                Expanded(
+                                  child: _infoTile(
+                                    icon: Icons.access_time_rounded,
+                                    iconFg: kSuccess,
+                                    iconBg: kGreenLight,
+                                    top: _appointmentTimePrimary(a),
+                                    bottom: _appointmentTimeSecondary(a),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
-                      ],
-                    ),
 
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8),
-                      child: Divider(height: 1, color: kBorder),
-                    ),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _infoTile(
-                            icon: Icons.calendar_today_rounded,
-                            iconFg: kInfo, iconBg: kInfoLight,
-                            top: _fmtDateRel(a.appointmentDate),
-                            bottom: _fmtDate(a.appointmentDate),
-                          ),
-                        ),
-                        if (_hasAppointmentTime(a))
-                          Expanded(
-                            child: _infoTile(
-                              icon: Icons.access_time_rounded,
-                              iconFg: kSuccess,
-                              iconBg: kGreenLight,
-                              top: _appointmentTimePrimary(a),
-                              bottom: _appointmentTimeSecondary(a),
-                            ),
-                          ),
-                      ],
-                    ),
-
-                    if (isLiveQueue) ...[
-                      const SizedBox(height: 8),
-                      _LiveQueueBanner(
-                        queueNumber:          queueNumber,
-                        queueStarted:         queueStarted,
-                        isMyTurn:             isMyTurn,
-                        estimatedArrivalTime: estimatedArrivalTime,
-                        patientsAhead:        patientsAhead,
-                        queueState:           queueState,
-                      ),
-                    ],
-
-                    const SizedBox(height: 8),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 36,
-                            child: ElevatedButton(
-                              onPressed: onViewPrescription ?? onViewDetails,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: kPrimary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                              // Scale the label down to fit one line instead of
-                              // wrapping/clipping when the device font is large.
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                child: Text(
-                                    onViewPrescription != null
-                                        ? 'View Prescription'
-                                        : 'View Details',
-                                    maxLines: 1,
-                                    softWrap: false,
-                                    style: const TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600)),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (onReview != null) ...[
-                          const SizedBox(width: 6),
-                          SizedBox(
-                            height: 36,
-                            child: OutlinedButton(
-                              onPressed: onReview,
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: kPrimary,
-                                side: const BorderSide(color: kPrimary),
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10)),
-                              ),
-                              child: const Text('Review',
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600)),
-                            ),
+                        if (isLiveQueue) ...[
+                          const SizedBox(height: 8),
+                          _LiveQueueBanner(
+                            queueNumber:          queueNumber,
+                            queueStarted:         queueStarted,
+                            isMyTurn:             isMyTurn,
+                            estimatedArrivalTime: estimatedArrivalTime,
+                            patientsAhead:        patientsAhead,
+                            queueState:           queueState,
                           ),
                         ],
-                        if (onReschedule != null) ...[
-                          const SizedBox(width: 6),
-                          _iconBtn(Icons.edit_calendar_rounded,
-                              kAmberLight, kWarning, onReschedule!),
-                        ],
-                        if (onCancel != null &&
-                            queueState?.toLowerCase() != 'queue closed') ...[
-                          const SizedBox(width: 6),
-                          _iconBtn(Icons.cancel_rounded,
-                              kRedLight, kError, onCancel!),
-                        ],
-                        const SizedBox(width: 6),
-                        if (hasMap) ...[
-                          _iconBtn(Icons.map_rounded, kInfoLight, kInfo,
-                              () => openMap(
-                                  a.latitude!, a.longitude!, a.clinicName)),
-                          const SizedBox(width: 6),
-                        ],
-                        _iconBtn(
-                          Icons.call_rounded, kPrimaryLight, kPrimary,
-                          () => showDialog(
-                            context: context,
-                            builder: (ctx) => Dialog(
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16)),
-                              child: Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 44, height: 44,
-                                      decoration: const BoxDecoration(
-                                          color: kPrimaryLight,
-                                          shape: BoxShape.circle),
-                                      child: const Icon(Icons.call_rounded,
-                                          color: kPrimary, size: 22),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    const Text('Contact',
-                                        style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w700,
-                                            color: kTextPrimary)),
-                                    const SizedBox(height: 16),
-                                    if (a.clinicContact?.isNotEmpty == true)
-                                      _callOption(
-                                          ctx,
-                                          'Call Clinic',
-                                          a.clinicName ?? 'Clinic',
-                                          a.clinicContact!,
-                                          Icons.local_hospital_rounded,
-                                          kWarning,
-                                          kAmberLight)
-                                    else
-                                      const Text('No contact available',
-                                          style: TextStyle(
-                                              fontSize: 13,
-                                              color: kTextMuted)),
-                                    const SizedBox(height: 14),
-                                    SizedBox(
-                                      width: double.infinity,
-                                      child: TextButton(
-                                        onPressed: () => Navigator.pop(ctx),
-                                        child: const Text('Cancel',
-                                            style: TextStyle(
-                                                color: kTextSecondary,
-                                                fontSize: 13)),
-                                      ),
-                                    ),
-                                  ],
+
+                        const SizedBox(height: 8),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              child: SizedBox(
+                                height: 32,
+                                child: ElevatedButton(
+                                  onPressed: onViewPrescription ?? onViewDetails,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: kPrimary,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  // Scale the label down to fit one line instead of
+                                  // wrapping/clipping when the device font is large.
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                        onViewPrescription != null
+                                            ? 'View Prescription'
+                                            : 'View Details',
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700)),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
+                            if (onReview != null) ...[
+                              const SizedBox(width: 5),
+                              SizedBox(
+                                height: 32,
+                                child: OutlinedButton(
+                                  onPressed: onReview,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: kPrimary,
+                                    side: const BorderSide(color: kPrimary),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                  child: const Text('Review',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700)),
+                                ),
+                              ),
+                            ],
+                            if (onReschedule != null) ...[
+                              const SizedBox(width: 5),
+                              _iconBtn(Icons.edit_calendar_rounded,
+                                  kAmberLight, kWarning, onReschedule!),
+                            ],
+                            if (onCancel != null &&
+                                queueState?.toLowerCase() != 'queue closed') ...[
+                              const SizedBox(width: 5),
+                              _iconBtn(Icons.cancel_rounded,
+                                  kRedLight, kError, onCancel!),
+                            ],
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1826,24 +1822,28 @@ class _AppointmentCard extends StatelessWidget {
         if (queueNumber != null &&
             queueState?.toLowerCase() != 'queue closed')
           Positioned(
-            top: -7, left: 12,
+            top: -8, left: 14,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
               decoration: BoxDecoration(
-                color: kPrimary,
+                gradient: LinearGradient(
+                  colors: [kPrimary, kPrimaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                      color: kPrimary.withOpacity(0.35),
-                      blurRadius: 6,
-                      offset: const Offset(0, 2)),
+                      color: kPrimary.withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3)),
                 ],
               ),
               child: Text('Q$queueNumber',
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                       letterSpacing: 0.3)),
             ),
           ),
@@ -1863,23 +1863,30 @@ class _AppointmentCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
-                color: iconBg, borderRadius: BorderRadius.circular(6)),
-            child: Icon(icon, size: 12, color: iconFg),
+                color: iconBg, borderRadius: BorderRadius.circular(7)),
+            child: Icon(icon, size: 11, color: iconFg),
           ),
           const SizedBox(width: 6),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(top,
-                  style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: kTextPrimary)),
-              if (bottom.isNotEmpty)
-                Text(bottom,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(top,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 11, color: kTextSecondary)),
-            ],
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary)),
+                if (bottom.isNotEmpty)
+                  Text(bottom,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 10, color: kTextSecondary)),
+              ],
+            ),
           ),
         ],
       );
@@ -1887,7 +1894,7 @@ class _AppointmentCard extends StatelessWidget {
   Widget _iconBtn(
           IconData icon, Color bg, Color fg, VoidCallback onTap) =>
       SizedBox(
-        width: 36, height: 36,
+        width: 32, height: 32,
         child: ElevatedButton(
           onPressed: onTap,
           style: ElevatedButton.styleFrom(
@@ -1897,57 +1904,21 @@ class _AppointmentCard extends StatelessWidget {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
           ),
-          child: Icon(icon, color: fg, size: 16),
+          child: Icon(icon, color: fg, size: 15),
         ),
       );
 
-  Widget _callOption(BuildContext ctx, String title, String subtitle,
-          String number, IconData icon, Color fg, Color bg) =>
-      GestureDetector(
-        onTap: () async {
-          Navigator.pop(ctx);
-          final uri = Uri(scheme: 'tel', path: number);
-          if (await canLaunchUrl(uri)) await launchUrl(uri);
-        },
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: bg.withOpacity(0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: fg.withOpacity(0.2)),
-          ),
-          child: Row(children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-              child: Icon(icon, size: 16, color: fg),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: fg)),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 11, color: kTextSecondary),
-                      overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-            Icon(Icons.call_rounded, size: 16, color: fg),
-          ]),
-        ),
-      );
+}
+
+Future<void> _callNumber(String number) async {
+  final uri = Uri(scheme: 'tel', path: number);
+  if (await canLaunchUrl(uri)) {
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  LIVE QUEUE BANNER  (unchanged)
+//  LIVE QUEUE BANNER  (logic unchanged, visuals refreshed)
 // ════════════════════════════════════════════════════════════════════
 class _LiveQueueBanner extends StatefulWidget {
   final int?    queueNumber;
@@ -2012,26 +1983,24 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
         : _isSkipped ? kError
         : started    ? kPrimary
         : kWarning;
-    final topBg     = accentColor.withOpacity(0.06);
-    final topBorder = accentColor.withOpacity(0.22);
+    final topBg     = accentColor.withOpacity(0.08);
+    final topBorder = accentColor.withOpacity(0.25);
 
     return Column(
       children: [
         Container(
-          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+          padding: const EdgeInsets.fromLTRB(11, 9, 11, 9),
           decoration: BoxDecoration(
             color: topBg,
             borderRadius: _hasEstRow
-                ? const BorderRadius.vertical(top: Radius.circular(10))
-                : BorderRadius.circular(10),
-            border: Border.all(color: topBorder),
+                ? const BorderRadius.vertical(top: Radius.circular(14))
+                : BorderRadius.circular(14),
+            border: Border.all(color: topBorder, width: 1.2),
           ),
           child: Row(
             children: [
-              // ── Animated token circle ──────────────────────────
               _buildTokenCircle(q, accentColor, myTurn, started),
-              const SizedBox(width: 10),
-              // ── Status text ────────────────────────────────────
+              const SizedBox(width: 11),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2044,8 +2013,8 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                       : _isClosed  ? 'Queue closed'
                       :              'Not started yet',
                       style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
                           color: accentColor),
                     ),
                     const SizedBox(height: 2),
@@ -2063,12 +2032,11 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                   ],
                 ),
               ),
-              // ── Status badge ───────────────────────────────────
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(
                   color: accentColor,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -2091,7 +2059,7 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                       style: const TextStyle(
                           color: Colors.white,
                           fontSize: 9,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                           letterSpacing: 0.5),
                     ),
                   ],
@@ -2103,10 +2071,10 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
         if (_hasEstRow && arrival != null && !myTurn && started && ahead != null && ahead > 0)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.05),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10)),
+              color: accentColor.withOpacity(0.06),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
               border: Border(
                 left:   BorderSide(color: topBorder),
                 right:  BorderSide(color: topBorder),
@@ -2115,12 +2083,12 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
             ),
             child: Row(
               children: [
-                Icon(Icons.hourglass_top_rounded, size: 11, color: accentColor),
-                const SizedBox(width: 5),
+                Icon(Icons.hourglass_top_rounded, size: 12, color: accentColor),
+                const SizedBox(width: 6),
                 Text('Est. $arrival',
                     style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
                         color: accentColor)),
               ],
             ),
@@ -2135,7 +2103,6 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Ripple rings — only when queue is live
           if (started && !_isClosed && !_isSkipped)
             ...[0.0, 0.33, 0.66].map((phase) => AnimatedBuilder(
               animation: _rippleCtrl,
@@ -2155,9 +2122,8 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                 );
               },
             )),
-          // Gradient circle with token number
           Container(
-            width: 42, height: 42,
+            width: 44, height: 44,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -2167,9 +2133,9 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
               ),
               boxShadow: [
                 BoxShadow(
-                    color: color.withOpacity(0.35),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2)),
+                    color: color.withOpacity(0.4),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3)),
               ],
             ),
             child: Column(
@@ -2183,7 +2149,6 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                       color: Colors.white,
                       letterSpacing: 0.4),
                 ),
-                // Bounce when token number changes (socket update)
                 AnimatedSwitcher(
                   duration: const Duration(milliseconds: 350),
                   transitionBuilder: (child, anim) => ScaleTransition(
@@ -2212,7 +2177,7 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  DETAIL BOTTOM SHEET  (unchanged)
+//  DETAIL BOTTOM SHEET  (logic unchanged, visuals refreshed + responsive)
 // ════════════════════════════════════════════════════════════════════
 class _DetailSheet extends StatelessWidget {
   final AppointmentList appointment;
@@ -2229,366 +2194,415 @@ class _DetailSheet extends StatelessWidget {
     final a      = appointment;
     final sIcon  = _statusIcon(a.status);
     final hasMap = a.latitude != null && a.longitude != null;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final sheetMaxWidth = screenWidth >= 700 ? 560.0 : double.infinity;
 
-    return DraggableScrollableSheet(
-      initialChildSize: 0.78,
-      minChildSize: 0.5,
-      maxChildSize: 0.95,
-      builder: (_, ctrl) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            Container(
-              width: 36, height: 4,
-              decoration: BoxDecoration(
-                  color: kBorder, borderRadius: BorderRadius.circular(2)),
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: sheetMaxWidth),
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.78,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, ctrl) => Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-            const SizedBox(height: 14),
-            Expanded(
-              child: ListView(
-                controller: ctrl,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [kPrimaryDark, kPrimary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 52, height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(13),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            (a.patientName ?? '?')[0].toUpperCase(),
-                            style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(a.patientName ?? 'Unknown',
-                                  style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white)),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${a.gender ?? '—'}  ·  DOB: ${_fmtDate(a.dob)}',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color:
-                                        Colors.white.withOpacity(0.85)),
-                              ),
-                              const SizedBox(height: 7),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color:
-                                      Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                      color: Colors.white
-                                          .withOpacity(0.3)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(sIcon,
-                                        size: 11,
-                                        color: Colors.white),
-                                    const SizedBox(width: 5),
-                                    Text(_statusLabel(a.status),
-                                        style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _sectionLabel('Schedule'),
-                  const SizedBox(height: 8),
-                  Row(
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                      color: kBorder, borderRadius: BorderRadius.circular(2)),
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: ListView(
+                    controller: ctrl,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     children: [
-                      Expanded(
-                        child: _schedChip(
-                          icon: Icons.calendar_today_rounded,
-                          fg: kInfo, bg: kInfoLight,
-                          label: 'Date',
-                          value: _fmtDate(a.appointmentDate),
-                          sub: _fmtDateRel(a.appointmentDate),
-                        ),
-                      ),
-                      if (_hasAppointmentTime(a)) ...[
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _schedChip(
-                            icon: Icons.access_time_filled_rounded,
-                            fg: kSuccess, bg: kGreenLight,
-                            label: 'Time',
-                            value: _appointmentTimePrimary(a),
-                            sub: _appointmentTimeChipSub(a),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [kPrimaryDark, kPrimary],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: [
+                            BoxShadow(
+                                color: kPrimary.withOpacity(0.3),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6)),
+                          ],
                         ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  _sectionLabel('Doctor'),
-                  const SizedBox(height: 8),
-                  _infoCard(
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 44, height: 44,
-                          decoration: BoxDecoration(
-                              color: kPrimaryLight,
-                              borderRadius: BorderRadius.circular(11)),
-                          child: const Icon(Icons.person_rounded,
-                              color: kPrimary, size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(a.doctorName ?? '—',
-                                  style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: kTextPrimary)),
-                              const SizedBox(height: 2),
-                              Text(a.specialization ?? '—',
-                                  style: const TextStyle(
-                                      fontSize: 12,
-                                      color: kPrimary,
-                                      fontWeight: FontWeight.w500)),
-                              if (a.experience != null) ...[
-                                const SizedBox(height: 2),
-                                Text(
-                                    '${a.experience} yrs experience',
-                                    style: const TextStyle(
-                                        fontSize: 11,
-                                        color: kTextSecondary)),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _sectionLabel('Clinic'),
-                  const SizedBox(height: 8),
-                  _infoCard(
-                    child: Column(
-                      children: [
-                        Row(
+                        child: Row(
                           children: [
                             Container(
-                              width: 40, height: 40,
+                              width: 54, height: 54,
                               decoration: BoxDecoration(
-                                  color: kAmberLight,
-                                  borderRadius: BorderRadius.circular(10)),
-                              child: const Icon(
-                                  Icons.local_hospital_rounded,
-                                  color: kWarning, size: 18),
+                                color: Colors.white.withOpacity(0.22),
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                (a.patientName ?? '?')[0].toUpperCase(),
+                                style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white),
+                              ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 13),
                             Expanded(
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(a.clinicName ?? '—',
+                                  Text(a.patientName ?? 'Unknown',
                                       style: const TextStyle(
-                                          fontSize: 13,
+                                          fontSize: 16.5,
                                           fontWeight: FontWeight.w700,
-                                          color: kTextPrimary)),
-                                  if (a.clinicAddress != null)
-                                    Text(a.clinicAddress!,
-                                        style: const TextStyle(
-                                            fontSize: 11,
-                                            color: kTextSecondary)),
+                                          color: Colors.white)),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${a.gender ?? '—'}  ·  DOB: ${_fmtDate(a.dob)}',
+                                    style: TextStyle(
+                                        fontSize: 11.5,
+                                        color:
+                                            Colors.white.withOpacity(0.88)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 9, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          Colors.white.withOpacity(0.22),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                          color: Colors.white
+                                              .withOpacity(0.32)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(sIcon,
+                                            size: 11,
+                                            color: Colors.white),
+                                        const SizedBox(width: 5),
+                                        Text(_statusLabel(a.status),
+                                            style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700)),
+                                      ],
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
                           ],
                         ),
-                        if (hasMap) ...[
-                          const SizedBox(height: 10),
-                          const Divider(height: 1, color: kBorder),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity, height: 38,
-                            child: ElevatedButton.icon(
-                              onPressed: () => openMap(
-                                  a.latitude!,
-                                  a.longitude!,
-                                  a.clinicName),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: kInfoLight,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(10)),
-                              ),
-                              icon: const Icon(Icons.map_rounded,
-                                  color: kInfo, size: 16),
-                              label: const Text('Open in Maps',
-                                  style: TextStyle(
-                                      color: kInfo,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13)),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _sectionLabel('Details'),
-                  const SizedBox(height: 8),
-                  _infoCard(
-                    padding: EdgeInsets.zero,
-                    child: Column(
-                      children: [
-                        _detailRow(Icons.badge_rounded, kInfoLight, kInfo,
-                            'Patient', a.patientName ?? '—'),
-                        _divLine(),
-                        _detailRow(Icons.wc_rounded, kPurpleLight,
-                            kPurple, 'Gender', a.gender ?? '—'),
-                        _divLine(),
-                        _detailRow(Icons.cake_rounded, kAmberLight,
-                            kWarning, 'Date of Birth', _fmtDate(a.dob)),
-                        if (a.queueNumber != null) ...[
-                          _divLine(),
-                          _detailRow(Icons.queue_rounded, kGreenLight,
-                              kSuccess, 'Queue No.', 'Q #${a.queueNumber}'),
-                        ],
-                        if (a.bookingFor != null) ...[
-                          _divLine(),
-                          _detailRow(Icons.people_rounded, kPurpleLight,
-                              kPurple, 'Booking For', a.bookingFor!),
-                        ],
-                        if (a.cancelledBy != null) ...[
-                          _divLine(),
-                          _detailRow(Icons.cancel_rounded, kRedLight,
-                              kError, 'Cancelled By', _cap(a.cancelledBy)),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  if (onReschedule != null || onCancel != null) ...[
-                    Row(
-                      children: [
-                        if (onReschedule != null)
-                          Expanded(
-                            child: SizedBox(
-                              height: 44,
-                              child: ElevatedButton.icon(
-                                onPressed: onReschedule,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kAmberLight,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(10)),
-                                ),
-                                icon: const Icon(
-                                    Icons.edit_calendar_rounded,
-                                    color: kWarning, size: 16),
-                                label: const Text('Reschedule',
-                                    style: TextStyle(
-                                        color: kWarning,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13)),
-                              ),
-                            ),
-                          ),
-                        if (onReschedule != null && onCancel != null)
-                          const SizedBox(width: 10),
-                        if (onCancel != null)
-                          Expanded(
-                            child: SizedBox(
-                              height: 44,
-                              child: ElevatedButton.icon(
-                                onPressed: onCancel,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: kRedLight,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.circular(10)),
-                                ),
-                                icon: const Icon(Icons.cancel_rounded,
-                                    color: kError, size: 16),
-                                label: const Text('Cancel',
-                                    style: TextStyle(
-                                        color: kError,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 13)),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-
-                  SizedBox(
-                    height: 46, width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kPrimary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text('Close',
-                          style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w700)),
-                    ),
+                      const SizedBox(height: 18),
+
+                      _sectionLabel('Schedule'),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _schedChip(
+                              icon: Icons.calendar_today_rounded,
+                              fg: kInfo, bg: kInfoLight,
+                              label: 'Date',
+                              value: _fmtDate(a.appointmentDate),
+                              sub: _fmtDateRel(a.appointmentDate),
+                            ),
+                          ),
+                          if (_hasAppointmentTime(a)) ...[
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _schedChip(
+                                icon: Icons.access_time_filled_rounded,
+                                fg: kSuccess, bg: kGreenLight,
+                                label: 'Time',
+                                value: _appointmentTimePrimary(a),
+                                sub: _appointmentTimeChipSub(a),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      _sectionLabel('Doctor'),
+                      const SizedBox(height: 8),
+                      _infoCard(
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 46, height: 46,
+                              decoration: BoxDecoration(
+                                  color: kPrimaryLight,
+                                  borderRadius: BorderRadius.circular(13)),
+                              child: const Icon(Icons.person_rounded,
+                                  color: kPrimary, size: 22),
+                            ),
+                            const SizedBox(width: 13),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                      doctorDisplayName(a.doctorName,
+                                          fallback: '—'),
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: kTextPrimary)),
+                                  const SizedBox(height: 2),
+                                  Text(a.specialization ?? '—',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: kPrimary,
+                                          fontWeight: FontWeight.w600)),
+                                  if (a.experience != null) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                        '${a.experience} yrs experience',
+                                        style: const TextStyle(
+                                            fontSize: 11,
+                                            color: kTextSecondary)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      _sectionLabel('Clinic'),
+                      const SizedBox(height: 8),
+                      _infoCard(
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 42, height: 42,
+                                  decoration: BoxDecoration(
+                                      color: kAmberLight,
+                                      borderRadius: BorderRadius.circular(12)),
+                                  child: const Icon(
+                                      Icons.local_hospital_rounded,
+                                      color: kWarning, size: 18),
+                                ),
+                                const SizedBox(width: 13),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(a.clinicName ?? '—',
+                                          style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: kTextPrimary)),
+                                      if (a.clinicAddress != null)
+                                        Text(a.clinicAddress!,
+                                            style: const TextStyle(
+                                                fontSize: 11,
+                                                color: kTextSecondary)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (hasMap || a.clinicContact?.isNotEmpty == true) ...[
+                              const SizedBox(height: 11),
+                              const Divider(height: 1, color: kBorder),
+                              const SizedBox(height: 11),
+                              Row(
+                                children: [
+                                  if (hasMap)
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => openMap(
+                                              a.latitude!,
+                                              a.longitude!,
+                                              a.clinicName),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: kInfoLight,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12)),
+                                          ),
+                                          icon: const Icon(Icons.map_rounded,
+                                              color: kInfo, size: 16),
+                                          label: const Text('Open in Maps',
+                                              style: TextStyle(
+                                                  color: kInfo,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13)),
+                                        ),
+                                      ),
+                                    ),
+                                  if (hasMap && a.clinicContact?.isNotEmpty == true)
+                                    const SizedBox(width: 8),
+                                  if (a.clinicContact?.isNotEmpty == true)
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 40,
+                                        child: ElevatedButton.icon(
+                                          onPressed: () =>
+                                              _callNumber(a.clinicContact!),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: kPrimaryLight,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12)),
+                                          ),
+                                          icon: const Icon(Icons.call_rounded,
+                                              color: kPrimary, size: 16),
+                                          label: const Text('Call Clinic',
+                                              style: TextStyle(
+                                                  color: kPrimary,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 13)),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      _sectionLabel('Details'),
+                      const SizedBox(height: 8),
+                      _infoCard(
+                        padding: EdgeInsets.zero,
+                        child: Column(
+                          children: [
+                            _detailRow(Icons.badge_rounded, kInfoLight, kInfo,
+                                'Patient', a.patientName ?? '—'),
+                            _divLine(),
+                            _detailRow(Icons.wc_rounded, kPurpleLight,
+                                kPurple, 'Gender', a.gender ?? '—'),
+                            _divLine(),
+                            _detailRow(Icons.cake_rounded, kAmberLight,
+                                kWarning, 'Date of Birth', _fmtDate(a.dob)),
+                            if (a.queueNumber != null) ...[
+                              _divLine(),
+                              _detailRow(Icons.queue_rounded, kGreenLight,
+                                  kSuccess, 'Queue No.', 'Q #${a.queueNumber}'),
+                            ],
+                            if (a.bookingFor != null) ...[
+                              _divLine(),
+                              _detailRow(Icons.people_rounded, kPurpleLight,
+                                  kPurple, 'Booking For', a.bookingFor!),
+                            ],
+                            if (a.cancelledBy != null) ...[
+                              _divLine(),
+                              _detailRow(Icons.cancel_rounded, kRedLight,
+                                  kError, 'Cancelled By', _cap(a.cancelledBy)),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+
+                      if (onReschedule != null || onCancel != null) ...[
+                        Row(
+                          children: [
+                            if (onReschedule != null)
+                              Expanded(
+                                child: SizedBox(
+                                  height: 46,
+                                  child: ElevatedButton.icon(
+                                    onPressed: onReschedule,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: kAmberLight,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
+                                    ),
+                                    icon: const Icon(
+                                        Icons.edit_calendar_rounded,
+                                        color: kWarning, size: 16),
+                                    label: const Text('Reschedule',
+                                        style: TextStyle(
+                                            color: kWarning,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13)),
+                                  ),
+                                ),
+                              ),
+                            if (onReschedule != null && onCancel != null)
+                              const SizedBox(width: 10),
+                            if (onCancel != null)
+                              Expanded(
+                                child: SizedBox(
+                                  height: 46,
+                                  child: ElevatedButton.icon(
+                                    onPressed: onCancel,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: kRedLight,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
+                                    ),
+                                    icon: const Icon(Icons.cancel_rounded,
+                                        color: kError, size: 16),
+                                    label: const Text('Cancel',
+                                        style: TextStyle(
+                                            color: kError,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13)),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+
+                      SizedBox(
+                        height: 48, width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Close',
+                              style: TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -2598,17 +2612,17 @@ class _DetailSheet extends StatelessWidget {
         t.toUpperCase(),
         style: const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             color: kTextMuted,
             letterSpacing: 1.0),
       );
 
   Widget _infoCard({required Widget child, EdgeInsetsGeometry? padding}) =>
       Container(
-        padding: padding ?? const EdgeInsets.all(13),
+        padding: padding ?? const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: const Color(0xFFF7F8FA),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: kBorder),
         ),
         child: child,
@@ -2620,28 +2634,28 @@ class _DetailSheet extends StatelessWidget {
     required String label, required String value, required String sub,
   }) =>
       Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
           color: const Color(0xFFF7F8FA),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: kBorder),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                  color: bg, borderRadius: BorderRadius.circular(8)),
+                  color: bg, borderRadius: BorderRadius.circular(9)),
               child: Icon(icon, size: 14, color: fg),
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 8),
             Text(label,
                 style: const TextStyle(fontSize: 11, color: kTextSecondary)),
             const SizedBox(height: 2),
             Text(value,
                 style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                     color: kTextPrimary)),
             if (sub.isNotEmpty)
@@ -2654,13 +2668,13 @@ class _DetailSheet extends StatelessWidget {
   Widget _detailRow(IconData icon, Color bg, Color fg, String label,
           String value) =>
       Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                  color: bg, borderRadius: BorderRadius.circular(8)),
+                  color: bg, borderRadius: BorderRadius.circular(9)),
               child: Icon(icon, size: 13, color: fg),
             ),
             const SizedBox(width: 12),
@@ -2679,20 +2693,12 @@ class _DetailSheet extends StatelessWidget {
       );
 
   Widget _divLine() =>
-      const Divider(height: 1, color: kBorder, indent: 13, endIndent: 13);
+      const Divider(height: 1, color: kBorder, indent: 14, endIndent: 14);
 }
 
 // ════════════════════════════════════════════════════════════════════
 //  REVIEW DIALOG — responsive + half-star (Practo/Google-style)
-//
-//  - Rating is a `double` so half-stars round-trip end-to-end (UI →
-//    ReviewRequestModel → API → DB DECIMAL).
-//  - Tap detection: tap on the LEFT half of a star sets rating to N.5,
-//    RIGHT half sets it to N.0.
-//  - Width is clamped responsive so the dialog feels right on phones,
-//    tablets, and desktop without overflowing.
-//  - Wrapped in SingleChildScrollView so the keyboard never pushes the
-//    Submit button off-screen on short devices.
+//  (logic unchanged from original)
 // ════════════════════════════════════════════════════════════════════
 class AppointmentReviewInput {
   final double rating;
@@ -2727,14 +2733,11 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
     barrierDismissible: false,
     builder: (ctx) {
       final mq = MediaQuery.of(ctx);
-      // Phones: 92% width; tablets/desktop: cap at 420 so the row of stars
-      // doesn't sprawl across a wide screen.
       final maxDialogWidth =
           mq.size.width >= 600 ? 420.0 : (mq.size.width * 0.92);
 
       return StatefulBuilder(
         builder: (ctx, setState) {
-          // Whole-star "bucket" used for label/colour (3.5 → "Very good").
           final activeIdx   = rating.ceil().clamp(0, 5);
           final activeColor =
               activeIdx > 0 ? starColors[activeIdx] : kTextMuted;
@@ -2745,7 +2748,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
             backgroundColor: Colors.white,
             elevation: 12,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(22),
             ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
@@ -2758,7 +2761,6 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ── Header ────────────────────────────────────────
                       Row(
                         children: [
                           Container(
@@ -2769,7 +2771,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(13),
+                              borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 BoxShadow(
                                   color: kPrimary.withValues(alpha: 0.25),
@@ -2808,7 +2810,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Dr. $doctorName${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
+                                  '${doctorDisplayName(doctorName)}${doctorSpecialty != null ? ' · $doctorSpecialty' : ''}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -2833,7 +2835,6 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                       Container(height: 1, color: kBorder),
                       const SizedBox(height: 16),
 
-                      // ── Prompt + stars ────────────────────────────────
                       const Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
@@ -2847,13 +2848,11 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
                       ),
                       const SizedBox(height: 12),
 
-                      // Stars row — each star detects left/right-half tap
-                      // for .5 vs .0 precision (industry-standard pattern).
                       Center(
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: List.generate(5, (i) {
-                            final idx = i + 1; // 1..5
+                            final idx = i + 1;
                             final fill =
                                 (rating - (idx - 1)).clamp(0.0, 1.0);
 
@@ -2901,7 +2900,6 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
 
                       const SizedBox(height: 8),
 
-                      // Live label — "3.5 — Very good"
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 180),
                         child: rating > 0
@@ -2923,7 +2921,6 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
 
                       const SizedBox(height: 14),
 
-                      // ── Comment ───────────────────────────────────────
                       TextField(
                         controller: commentCtrl,
                         maxLines: 3,
@@ -2952,7 +2949,6 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
 
                       const SizedBox(height: 18),
 
-                      // ── Actions ───────────────────────────────────────
                       Row(
                         children: [
                           Expanded(
@@ -3025,7 +3021,7 @@ Future<AppointmentReviewInput?> showAppointmentReviewDialog(
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  SHIMMER SKELETON  (unchanged)
+//  SHIMMER SKELETON  (logic unchanged, softer look)
 // ════════════════════════════════════════════════════════════════════
 class _Shimmer extends StatefulWidget {
   final double width, height, radius;
@@ -3084,16 +3080,16 @@ class _SkeletonCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(11),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F8FA),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: kTextPrimary.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -3102,74 +3098,32 @@ class _SkeletonCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _Shimmer(width: 44, height: 44, radius: 12),
-              const SizedBox(width: 10),
+              _Shimmer(width: 36, height: 36, radius: 11),
+              const SizedBox(width: 9),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _Shimmer(width: 140, height: 13),
-                    const SizedBox(height: 6),
-                    _Shimmer(width: 100, height: 10),
+                    _Shimmer(width: 130, height: 12),
+                    const SizedBox(height: 5),
+                    _Shimmer(width: 90, height: 9),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              _Shimmer(width: 70, height: 22, radius: 6),
+              const SizedBox(width: 6),
+              _Shimmer(width: 68, height: 20, radius: 18),
             ],
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
-            child: Divider(height: 1, color: kBorder),
-          ),
+          const SizedBox(height: 8),
+          _Shimmer(height: 44, radius: 10),
+          const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(
-                child: Row(
-                  children: [
-                    _Shimmer(width: 26, height: 26, radius: 6),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _Shimmer(height: 12, width: 80),
-                          const SizedBox(height: 4),
-                          _Shimmer(height: 10, width: 60),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    _Shimmer(width: 26, height: 26, radius: 6),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _Shimmer(height: 12, width: 60),
-                          const SizedBox(height: 4),
-                          _Shimmer(height: 10, width: 50),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(child: _Shimmer(height: 36, radius: 10)),
-              const SizedBox(width: 6),
-              _Shimmer(width: 36, height: 36, radius: 10),
-              const SizedBox(width: 6),
-              _Shimmer(width: 36, height: 36, radius: 10),
+              Expanded(child: _Shimmer(height: 32, radius: 10)),
+              const SizedBox(width: 5),
+              _Shimmer(width: 32, height: 32, radius: 10),
+              const SizedBox(width: 5),
+              _Shimmer(width: 32, height: 32, radius: 10),
             ],
           ),
         ],

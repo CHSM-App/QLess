@@ -15,7 +15,12 @@ class TokenState {
   });
 
   bool get isLoggedIn =>
-      accessToken != null && refreshToken != null && roleId != 0;
+      accessToken != null &&
+      accessToken!.isNotEmpty &&
+      refreshToken != null &&
+      refreshToken!.isNotEmpty &&
+      roleId != null &&
+      roleId != 0;
 
   TokenState copyWith({
     String? accessToken,
@@ -39,10 +44,16 @@ class TokenNotifier extends StateNotifier<TokenState> {
   Future<void> loadTokens() async {
     final tokens = await TokenStorage.getTokens();
     if (tokens != null) {
+      final roleId = int.tryParse(tokens['roleId'] ?? '');
+      if (roleId == null || roleId == 0) {
+        await TokenStorage.clear();
+        state = state.copyWith(isLoading: false);
+        return;
+      }
       state = state.copyWith(
         accessToken: tokens['accessToken'],
         refreshToken: tokens['refreshToken'],
-        roleId: int.parse(tokens['roleId'] ?? '0'),
+        roleId: roleId,
         isLoading: false,
       );
     } else {

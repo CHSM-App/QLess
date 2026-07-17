@@ -1,11 +1,13 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/usecase/favorite_usecase.dart';
 
 class FavoriteState {
   final bool isLoading;
   final String? error;
-  final Map<int, bool> doctorFavorites;
+  // key = "${doctorId}_${clinicId}" so same doctor at different clinics tracked separately
+  final Map<String, bool> doctorFavorites;
 
   const FavoriteState({
     this.isLoading = false,
@@ -17,7 +19,7 @@ class FavoriteState {
     bool? isLoading,
     String? error,
     bool clearError = false,
-    Map<int, bool>? doctorFavorites,
+    Map<String, bool>? doctorFavorites,
   }) {
     return FavoriteState(
       isLoading: isLoading ?? this.isLoading,
@@ -32,13 +34,15 @@ class FavoriteViewmodel extends StateNotifier<FavoriteState> {
 
   FavoriteViewmodel(this.usecase) : super(const FavoriteState());
 
-  Future<bool> fetchFavoriteStatus(int patientId, int doctorId) async {
+  static String _key(int doctorId, String? clinicId) => '${doctorId}_${clinicId ?? ''}';
+
+  Future<bool> fetchFavoriteStatus(int patientId, int doctorId, String clinicId) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final result = await usecase.getFavoriteDoctor(patientId, doctorId);
+      final result = await usecase.getFavoriteDoctor(patientId, doctorId, clinicId);
       final isFav = _asBool(result['is_favorite']);
-      final updated = Map<int, bool>.from(state.doctorFavorites);
-      updated[doctorId] = isFav;
+      final updated = Map<String, bool>.from(state.doctorFavorites);
+      updated[_key(doctorId, clinicId)] = isFav;
       state = state.copyWith(isLoading: false, doctorFavorites: updated);
       return isFav;
     } catch (e) {
@@ -47,17 +51,14 @@ class FavoriteViewmodel extends StateNotifier<FavoriteState> {
     }
   }
 
-  Future<bool> addFavoriteDoctor(int patientId, int doctorId) async {
+  Future<bool> addFavoriteDoctor(int patientId, int doctorId, {String? clinicId}) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final result = await usecase.addFavoriteDoctor(patientId, doctorId);
+      final result = await usecase.addFavoriteDoctor(patientId, doctorId, clinicId: clinicId);
       final success = _asBool(result['success'], defaultValue: true);
-      final updated = Map<int, bool>.from(state.doctorFavorites);
-      updated[doctorId] = true;
-      state = state.copyWith(
-        isLoading: false,
-        doctorFavorites: updated,
-      );
+      final updated = Map<String, bool>.from(state.doctorFavorites);
+      updated[_key(doctorId, clinicId)] = true;
+      state = state.copyWith(isLoading: false, doctorFavorites: updated);
       return success;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractMessage(e));
@@ -65,17 +66,14 @@ class FavoriteViewmodel extends StateNotifier<FavoriteState> {
     }
   }
 
-  Future<bool> deleteFavoriteDoctor(int patientId, int doctorId) async {
+  Future<bool> deleteFavoriteDoctor(int patientId, int doctorId, String clinicId) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final result = await usecase.deleteFavoriteDoctor(patientId, doctorId);
+      final result = await usecase.deleteFavoriteDoctor(patientId, doctorId, clinicId);
       final success = _asBool(result['success'], defaultValue: true);
-      final updated = Map<int, bool>.from(state.doctorFavorites);
-      updated[doctorId] = false;
-      state = state.copyWith(
-        isLoading: false,
-        doctorFavorites: updated,
-      );
+      final updated = Map<String, bool>.from(state.doctorFavorites);
+      updated[_key(doctorId, clinicId)] = false;
+      state = state.copyWith(isLoading: false, doctorFavorites: updated);
       return success;
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _extractMessage(e));
@@ -84,18 +82,29 @@ class FavoriteViewmodel extends StateNotifier<FavoriteState> {
   }
 
   Future<void> fetchFavoritesForDoctors(
-      int patientId, List<int> doctorIds) async {
-    if (patientId <= 0 || doctorIds.isEmpty) return;
-    final results = await Future.wait(
-      doctorIds.map((did) => usecase
-          .getFavoriteDoctor(patientId, did)
-          .then((r) => MapEntry(did, _asBool(r['is_favorite'])))
-          .catchError((_) => MapEntry(did, false))),
-    );
-    // Build a fresh map from this patient's results — do NOT merge onto the
-    // previous state, otherwise a previously logged-in patient's favourites
-    // leak into the current patient's list.
-    state = state.copyWith(doctorFavorites: Map<int, bool>.fromEntries(results));
+      int patientId, List<DoctorDetails> doctors) async {
+    if (patientId <= 0) return;
+    try {
+      final rows = await usecase.getFavoriteDoctors(patientId);
+      // SP returns rows with doctor_id + clinic_id — build composite-key set
+      final favKeys = <String>{};
+      for (final row in rows) {
+        if (row is! Map) continue;
+        final id  = row['doctor_id'];
+        final cid = row['clinic_id']?.toString() ?? '';
+        if (id != null) {
+          final intId = id is int ? id : int.tryParse('$id') ?? -1;
+          if (intId > 0) favKeys.add(_key(intId, cid));
+        }
+      }
+      final updated = Map<String, bool>.from(state.doctorFavorites);
+      for (final d in doctors) {
+        if (d.doctorId != null) {
+          updated[_key(d.doctorId!, d.clinicId)] = favKeys.contains(_key(d.doctorId!, d.clinicId));
+        }
+      }
+      state = state.copyWith(doctorFavorites: updated);
+    } catch (_) {}
   }
 
   /// Wipe all favourite state. Call on logout so the next patient starts clean.

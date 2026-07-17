@@ -19,6 +19,7 @@ QueuePreviewResponseModel _$QueuePreviewResponseModelFromJson(
   queueStarted: json['queue_started'] as bool?,
   isMyTurn: json['is_my_turn'] as bool?,
   status: json['status'] as String?,
+  bookingClosed: _toBool(json['booking_closed']),
 );
 
 Map<String, dynamic> _$QueuePreviewResponseModelToJson(
@@ -34,4 +35,5 @@ Map<String, dynamic> _$QueuePreviewResponseModelToJson(
   'queue_started': instance.queueStarted,
   'is_my_turn': instance.isMyTurn,
   'status': instance.status,
+  'booking_closed': instance.bookingClosed,
 };

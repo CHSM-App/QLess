@@ -20,11 +20,15 @@ abstract class AppointmentRepository {
 
   Future<AppointmentResponseModel> cancelAppointment(int appointmentId);
 
+  Future<AppointmentResponseModel> markArrived(
+    AppointmentRequestModel appointmentRequest,
+  );
+
   Future<AppointmentResponseModel> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   );
 
-  Future<List<MonthSlotData>> getBookedSlots(int doctorId);
+  Future<List<MonthSlotData>> getBookedSlots(int doctorId, String clinicId);
 
   Future<List<AppointmentList>> fetchPatientAppointments(int doctorId, {String? clinicId});
 
@@ -43,6 +47,10 @@ abstract class AppointmentRepository {
   );
 
   Future<AppointmentResponseModel> queueStop(
+    AppointmentRequestModel appointmentRequest,
+  );
+
+  Future<AppointmentResponseModel> stopBooking(
     AppointmentRequestModel appointmentRequest,
   );
 

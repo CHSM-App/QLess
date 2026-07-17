@@ -264,6 +264,12 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     );
     try {
       final result = await usecase.checkPhoneDoctor(mobile);
+      if (result.isEmpty) {
+        // Genuinely no doctor record for this mobile — distinct from a
+        // network/server failure below, which must not be treated the same.
+        state = state.copyWith(phoneCheckResult: AsyncValue.data(result));
+        return;
+      }
       final existingClinicId = state.clinic_id;
       if (existingClinicId != null) {
         // Clinic already selected via picker.
@@ -556,6 +562,15 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       if (doctors.isEmpty) return;
       final d = doctors.first;
       debugPrint('[RecepDebug] d.clinicId=${d.clinicId} d.clinicName=${d.clinicName}');
+
+      // Preserve any clinic the user already selected (saved via selectClinic).
+      // On first login state.clinic_id is null → use API value.
+      // On app restart state.clinic_id is loaded from storage → keep it.
+      final existingClinicId   = state.clinic_id;
+      final existingClinicName = state.clinic_name;
+      final resolvedClinicId   = existingClinicId   ?? d.clinicId;
+      final resolvedClinicName = existingClinicName ?? d.clinicName;
+
       state = state.copyWith(
         doctorId: d.doctorId,
         name: d.name,
@@ -563,15 +578,19 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         email: d.email,
         roleId: d.roleId?.toString(),
         token: d.Token,
-        clinicId: d.clinicId,
-        clinic_name: d.clinicName,
+        clinicId: resolvedClinicId,
+        clinic_name: resolvedClinicName,
         leadTimeMinutes: d.leadTime,
         phoneCheckResult: AsyncValue.data(doctors),
       );
+      if (d.doctorId != null && d.doctorId! > 0) await TokenStorage.saveValue('doctor_id', d.doctorId.toString());
       if (d.name != null) await TokenStorage.saveValue('doctor_name', d.name!);
-      if (d.clinicId != null) await TokenStorage.saveValue('clinic_id', d.clinicId!);
-      if (d.clinicName != null) await TokenStorage.saveValue('clinic_name', d.clinicName!);
       if (d.mobile != null) await TokenStorage.saveValue('recep_doctor_mobile', d.mobile!);
+      // Only write clinic to storage when there was no previously saved selection.
+      if (existingClinicId == null) {
+        if (d.clinicId != null) await TokenStorage.saveValue('clinic_id', d.clinicId!);
+        if (d.clinicName != null) await TokenStorage.saveValue('clinic_name', d.clinicName!);
+      }
     } catch (e) {
       debugPrint('[RecepDebug] loadDoctorProfile ERROR: $e');
     }

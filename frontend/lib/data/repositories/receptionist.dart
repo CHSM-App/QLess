@@ -39,8 +39,8 @@ class ReceptionistImpl implements ReceptionistRepository {
   }
 
   @override
-  Future<List<ReceptionistApiModel>> fetchReceptionistList(String clinicId) {
-    return apiService.fetchReceptionistList(clinicId);
+  Future<List<ReceptionistApiModel>> fetchReceptionistList(int doctorId) {
+    return apiService.fetchReceptionistList(doctorId);
   }
 
   @override

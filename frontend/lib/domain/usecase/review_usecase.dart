@@ -15,7 +15,7 @@ class ReviewUsecase {
   Future<List<ReviewModel>> getAppointmentReviews(int appointmentId) {
     return reviewRepository.getAppointmentReviews(appointmentId);
   }
-  Future<List<ReviewModel>> getDoctorReviews(int doctorId) {
-    return reviewRepository.getDoctorReviews(doctorId);
+  Future<List<ReviewModel>> getDoctorReviews(int doctorId, String clinicId) {
+    return reviewRepository.getDoctorReviews(doctorId, clinicId);
   }
 }

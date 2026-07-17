@@ -7,7 +7,27 @@ const log = require('../middleware/logger');
 const path = require("path");
 const fs = require("fs-extra");
 
-
+// The furthest token the queue has actually reached — MAX(queue_number) among
+// in_progress + completed only (skipped tokens are handled outside the main
+// queue and must not count). This is the SAME rule the doctor's GET_TODAY_QUEUE
+// and the socket `fetchCurrentServing` use, so every surface shows one value.
+// We compute it here to override sp_appointment's QUEUE_ESTIMATE_SMART, whose
+// current_serving lags/miscounts for the patient list.
+async function correctCurrentServing(appointment_id) {
+  try {
+    const res = await db.request()
+      .input('appointment_id', sql.Int, parseInt(appointment_id))
+      .query(`
+        SELECT MAX(a.queue_number) AS current_serving
+        FROM   appointments a
+        WHERE  a.queue_id = (SELECT queue_id FROM appointments WHERE appointment_id = @appointment_id)
+          AND  a.status   IN ('in_progress', 'completed')
+      `);
+    return res.recordset[0]?.current_serving ?? null;
+  } catch (_) {
+    return null;
+  }
+}
 
 
 router.get('/fetchFamilyMembers/:family_id', async (req, res) => {
@@ -32,14 +52,15 @@ router.get('/fetchFamilyMembers/:family_id', async (req, res) => {
   }
 });
 
-router.get('/getDoctorAvailability/:doctor_id', async (req, res) => {
-  const { doctor_id } = req.params;
+router.get('/getDoctorAvailability/:doctor_id/:clinic_id', async (req, res) => {
+  const { doctor_id, clinic_id } = req.params;
 
   try {
 
     const result = await db.request()
       .input('doctor_id', doctor_id)
-	  .input('operation', 'doctor_availability')
+      .input('clinic_id', clinic_id || null)
+      .input('operation', 'doctor_availability')
       .execute('sp_patients');
 
     res.status(200).json(result.recordset);
@@ -55,16 +76,19 @@ router.get('/getDoctorAvailability/:doctor_id', async (req, res) => {
 
 // Active future leave ranges for a doctor — patient app greys these
 // out in the appointment-date calendar.
-router.get('/getDoctorLeaveDates/:doctor_id', async (req, res) => {
-  const { doctor_id } = req.params;
+router.get('/getDoctorLeaveDates/:doctor_id/:clinic_id', async (req, res) => {
+  const { doctor_id, clinic_id } = req.params;
 
   try {
     const result = await db.request()
       .input('operation', 'GET_LEAVE_DATES')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id)
       .execute('sp_doctor_leave');
 
     res.status(200).json(result.recordset || []);
+
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -77,14 +101,35 @@ router.get('/getDoctorLeaveDates/:doctor_id', async (req, res) => {
 router.get('/getDoctors/:patient_id', async (req, res) => {
   const { patient_id } = req.params;
   try {
-
     const result = await db.request()
       .input('operation', 'getDoctors')
-	  .input('patient_id', patient_id)
+      .input('patient_id', patient_id)
       .execute('sp_patients');
 
-    res.status(200).json(result.recordset);
+    const doctors = result.recordset;
+    const today = new Date().toISOString().split('T')[0];
 
+    // Parallel leave-check for each doctor (IS_BLOCKED covers today's date)
+    const leaveResults = await Promise.all(
+      doctors.map(async (d) => {
+        if (!d.doctor_id) return { doctor_id: d.doctor_id, blocked: 0 };
+        try {
+          const r = await db.request()
+            .input('operation', 'IS_BLOCKED')
+            .input('doctor_id', d.doctor_id)
+            .input('from_date', today)
+            .execute('sp_doctor_leave');
+          return { doctor_id: d.doctor_id, blocked: r.recordset?.[0]?.blocked ?? 0 };
+        } catch { return { doctor_id: d.doctor_id, blocked: 0 }; }
+      })
+    );
+
+    const leaveMap = {};
+    leaveResults.forEach(l => { leaveMap[l.doctor_id] = l.blocked; });
+
+    res.status(200).json(
+      doctors.map(d => ({ ...d, is_on_leave: leaveMap[d.doctor_id] ?? 0 }))
+    );
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -101,7 +146,7 @@ router.get('/patientPrescriptionList/:patient_id', async (req, res) => {
 
     const result = await db.request()
       .input('patient_id', patient_id)
-	  .input('operation', 'PatientPrescriptionList')
+      .input('operation', 'PatientPrescriptionList')
       .execute('sp_prescription');
 
     res.status(200).json(result.recordset);
@@ -124,7 +169,7 @@ router.get('/patientPrescriptionDetails/:prescription_id', async (req, res) => {
 
     const result = await db.request()
       .input('prescription_id', prescription_id)
-	  .input('operation', 'PrescriptionDetail')
+      .input('operation', 'PrescriptionDetail')
       .execute('sp_prescription');
 
     res.status(200).json(result.recordset);
@@ -138,15 +183,16 @@ router.get('/patientPrescriptionDetails/:prescription_id', async (req, res) => {
   }
 });
 
-router.get('/appointment/getBookedSlots/:doctor_id', async (req, res) => {
-  const { doctor_id } = req.params;
+router.get('/appointment/getBookedSlots/:doctor_id/:clinic_id', async (req, res) => {
+  const { doctor_id, clinic_id } = req.params;
 
   try {
     const result = await db.request()
       .input('operation', 'GET_MONTH_SLOTS')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
-	  
+
     res.status(200).json(result.recordset);
 
   } catch (error) {
@@ -218,10 +264,17 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
             .input('operation', 'QUEUE_ESTIMATE_SMART')
             .input('appointment_id', item.appointment_id)
             .input('doctor_id', item.doctor_id)
+            .input('clinic_id', item.clinic_id)
             .execute('sp_appointment');
 
           if (queueResult.recordset.length > 0) {
             const q = queueResult.recordset[0];
+
+            // Override the SP's current_serving with the correct MAX-token value
+            // so the patient's NOW circle matches the doctor screen and never
+            // lags after a complete/skip/recall. Fall back to the SP value only
+            // if our query returns null.
+            const serving = await correctCurrentServing(item.appointment_id);
 
             queueData = {
               my_queue_number: q.my_queue_number,
@@ -229,13 +282,26 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
               estimated_arrival_time: q.estimated_arrival_time,
               queue_started: q.queue_started,
               is_my_turn: q.is_my_turn,
-				total_queue: q?.total_queue ?? null,
-        current_serving: q?.current_serving ?? null,
-				queue_state: q?.status ?? null
+              total_queue: q?.total_queue ?? null,
+              current_serving: serving ?? q?.current_serving ?? null,
+              queue_state: q?.status ?? null
             };
           }
         } catch (err) {
           // ignore queue error per item
+        }
+      }
+
+      if ((item.status || '').toLowerCase() === 'skipped') {
+        try {
+          const arrivedRes = await db.request()
+            .input('appointment_id', item.appointment_id)
+            .query('SELECT is_arrived, arrived_at FROM appointments WHERE appointment_id = @appointment_id');
+          const a = arrivedRes.recordset?.[0];
+          queueData.is_arrived = a?.is_arrived ?? false;
+          queueData.arrived_at = a?.arrived_at ?? null;
+        } catch (err) {
+          // ignore — not critical to the appointment list rendering
         }
       }
 
@@ -258,14 +324,29 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
 
 
 
-router.get('/favoriteDoctor/:patient_id/:doctor_id', async (req, res) => {
+// SP Case 2: all favorites for a patient (doctor_id omitted → SP returns all rows)
+router.get('/favoriteDoctors/:patient_id', async (req, res) => {
   try {
-    const { patient_id, doctor_id } = req.params;
+    const result = await db.request()
+      .input('operation', 'Fetch')
+      .input('patient_id', req.params.patient_id)
+      .execute('sp_favorite_doctors');
+    res.status(200).json(result.recordset || []);
+  } catch (error) {
+    log.error('Error in get all favorites: ' + error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+router.get('/favoriteDoctor/:patient_id/:doctor_id/:clinic_id', async (req, res) => {
+  try {
+    const { patient_id, doctor_id, clinic_id } = req.params;
 
     const result = await db.request()
       .input('operation', 'Fetch')
       .input('patient_id', patient_id)
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id)
       .execute('sp_favorite_doctors');
 
     res.status(200).json({
@@ -364,14 +445,15 @@ router.post('/markAllNotificationsRead/:patient_id', async (req, res) => {
   }
 });
 
-// GET all reviews for doctor
-router.get('/review/doctor/:doctor_id', async (req, res) => {
+// GET all reviews for doctor (optional clinic_id param)
+router.get('/review/doctor/:doctor_id/:clinic_id', async (req, res) => {
   try {
-    const { doctor_id } = req.params;
+    const { doctor_id, clinic_id } = req.params;
 
     const result = await db.request()
       .input('operation', 'Fetch')
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id)
       .execute('sp_review');
 
     res.status(200).json(result.recordset || []);

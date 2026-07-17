@@ -14,12 +14,12 @@ class DoctorsUseCase {
     return doctorsRepository.fetchDoctors(patientID);
   }
 
-  Future<List<DoctorAvailabilityModel>> getDoctorAvailability(int doctorId) {
-    return doctorsRepository.getDoctorAvailability(doctorId);
+  Future<List<DoctorAvailabilityModel>> getDoctorAvailability(int doctorId, String clinicId) {
+    return doctorsRepository.getDoctorAvailability(doctorId, clinicId);
   }
 
-  Future<List<LeaveRange>> getDoctorLeaveDates(int doctorId) {
-    return doctorsRepository.getDoctorLeaveDates(doctorId);
+  Future<List<LeaveRange>> getDoctorLeaveDates(int doctorId, String clinicId) {
+    return doctorsRepository.getDoctorLeaveDates(doctorId, clinicId);
   }
 }
 

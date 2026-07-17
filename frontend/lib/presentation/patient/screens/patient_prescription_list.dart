@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
@@ -16,7 +17,7 @@ import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
-
+const kPageBg = Color(0xFFF8F9FB);
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
 const kTextMuted     = Color(0xFFA0AEC0);
@@ -78,7 +79,8 @@ extension _DateFilterX on _DateFilter {
 //  PRESCRIPTION LIST SCREEN
 // ════════════════════════════════════════════════════════════════════
 class PatientPrescriptionListScreen extends ConsumerStatefulWidget {
-  const PatientPrescriptionListScreen({super.key});
+  final bool showBackButton;
+  const PatientPrescriptionListScreen({super.key, this.showBackButton = true});
   @override
   ConsumerState<PatientPrescriptionListScreen> createState() =>
       _PatientPrescriptionListScreenState();
@@ -283,8 +285,18 @@ class _PatientPrescriptionListScreenState
 
     final state   = ref.watch(prescriptionViewModelProvider);
     final apiList = state.prescriptionsListPatient ?? const <PrescriptionModel>[];
-    final mapped  = apiList.map((m) => PatientPrescription.fromModel(m,
-        fallbackPatientId: pid, fallbackPatientName: pName)).toList();
+    // API returns one row per medicine (flat) — group by prescriptionId so
+    // each card aggregates its real medicine list instead of counting 0/1
+    // from a single flat row (mirrors the detail screen's fromFlatList use).
+    final byRx = <int, List<PrescriptionModel>>{};
+    for (final m in apiList) {
+      final key = m.prescriptionId ?? -(byRx.length + 1);
+      byRx.putIfAbsent(key, () => []).add(m);
+    }
+    final mapped = byRx.values
+        .map((rows) => PatientPrescription.fromFlatList(rows,
+            fallbackPatientId: pid, fallbackPatientName: pName))
+        .toList();
 
     final all    = _filtered(mapped, 'all',       pid, pName, members);
     final active = _filtered(mapped, 'active',    pid, pName, members);
@@ -292,25 +304,28 @@ class _PatientPrescriptionListScreenState
                  + _filtered(mapped, 'expired',   pid, pName, members);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg,
       // ── AppBar — back arrow + icon badge + title ──────────────────
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: Container(
-           margin: const EdgeInsets.all(10), 
-            decoration: BoxDecoration(
-              color: kPrimaryLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kPrimary.withOpacity(0.2)),
-            ),
-            child: const Icon(Icons.arrow_back_ios_new_rounded,
-                color: kPrimary, size: 15),
-          ),
-        ),
-        leadingWidth: 54,
+        automaticallyImplyLeading: false,
+        leading: widget.showBackButton
+            ? GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                 margin: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: kPrimary.withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: kPrimary, size: 15),
+                ),
+              )
+            : null,
+        leadingWidth: widget.showBackButton ? 54 : null,
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -748,26 +763,12 @@ class _PrescriptionCard extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Doctor avatar
-                Container(
-                  width: 34, height: 34,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        colors: [kPrimaryDark, kPrimary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: const Icon(Icons.person_rounded,
-                      color: Colors.white, size: 16),
-                ),
-                const SizedBox(width: 8),
                 // Doctor info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(prescription.doctorName,
+                      Text(doctorDisplayName(prescription.doctorName),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -788,24 +789,6 @@ class _PrescriptionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Row(mainAxisSize: MainAxisSize.min, children: [
-                      Container(
-                        width: 18, height: 18,
-                        decoration: const BoxDecoration(
-                            color: kPrimary, shape: BoxShape.circle),
-                        alignment: Alignment.center,
-                        child: Text(
-                          prescription.patientName
-                              .split(' ')
-                              .where((w) => w.isNotEmpty)
-                              .take(1)
-                              .map((w) => w[0].toUpperCase())
-                              .join(),
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 8,
-                              fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
                       ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 80),
                         child: Text(prescription.patientName,
@@ -1376,14 +1359,14 @@ class _PrescriptionDetailEntryState
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor:kPageBg,
         body: Center(child: CircularProgressIndicator(color: kPrimary)),
       );
     }
 
     if (_error != null || _details == null || _details!.isEmpty) {
       return Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: kPageBg,
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0,
@@ -1625,7 +1608,7 @@ class _PatientPrescriptionViewScreenState
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(_rx.doctorName,
+                  Text(doctorDisplayName(_rx.doctorName),
                       style: const TextStyle(
                           color: Colors.white, fontSize: 13,
                           fontWeight: FontWeight.w700)),
@@ -1886,7 +1869,7 @@ class _PatientPrescriptionViewScreenState
           child: Column(children: [
             const Divider(color: kTextPrimary, thickness: 0.8),
             const SizedBox(height: 3),
-            Text(_rx.doctorName,
+            Text(doctorDisplayName(_rx.doctorName),
                 textAlign: TextAlign.center,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(

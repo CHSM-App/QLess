@@ -75,7 +75,8 @@ router.post('/Createlogin', authLimiter, async (req, res) => {
 			.execute('ManageRefreshToken');
 
 
-		const roleId = result.recordset?.[0]?.role_id;
+		const spRoleId = result.recordset?.[0]?.role_id;
+		const roleId = spRoleId ?? (role === 'receptionist' ? 3 : role === 'patient' ? 2 : role === 'doctor' ? 1 : null);
 
 		const accessToken = createAccessToken({
 			mobile
@@ -415,16 +416,16 @@ router.get('/mobileExistReceptionist', lookupLimiter, async (req, res) => {
 
 
 router.post('/doctor', uploadHandler(upload.fields([{
-		name: "doctor_image",
-		maxCount: 1
-	},
-	{
-		// Flutter sends the gallery under "clinic_images" (plural, up to 5).
-		// Must match the field name the client uses or multer rejects the whole
-		// upload with LIMIT_UNEXPECTED_FILE before the handler ever runs.
-		name: "clinic_images",
-		maxCount: 5
-	}
+	name: "doctor_image",
+	maxCount: 1
+},
+{
+	// Flutter sends the gallery under "clinic_images" (plural, up to 5).
+	// Must match the field name the client uses or multer rejects the whole
+	// upload with LIMIT_UNEXPECTED_FILE before the handler ever runs.
+	name: "clinic_images",
+	maxCount: 5
+}
 ])), async (req, res) => {
 	try {
 
@@ -511,7 +512,7 @@ router.post('/doctor', uploadHandler(upload.fields([{
 			await fs.move(file.path, dest, {
 				overwrite: true
 			});
-			
+
 
 			doctorImageUrl = `${PUBLIC_BASE_URL}/uploads/doctor_images/${returnedDoctorId}/${file.filename}`;
 
@@ -573,7 +574,7 @@ router.post('/doctor', uploadHandler(upload.fields([{
 		log.error('doctor upsert error: ' + err.message);
 		// Drop any orphaned temp file the upload left behind so /uploads/temp
 		// doesn't grow forever when the SP / move step fails mid-request.
-		await cleanupFiles(req).catch(() => {});
+		await cleanupFiles(req).catch(() => { });
 		res.status(500).json({
 			success: false,
 			error: err.message
@@ -601,18 +602,22 @@ router.post('/patient', uploadHandler(upload.single("image")), async (req, res) 
 
 		const operation = patient_id && patient_id > 0 ? "Update" : "Insert";
 
+		// Optional fields arrive as "" over multipart/form-data when left blank —
+		// SQL Server can't implicitly convert "" to decimal/int, so null them out.
+		const clean = (v) => (v === "" || v === undefined ? null : v);
+
 		const request = db.request();
 
 		request.input("operation", operation);
 		request.input("patient_id", patient_id || null);
 		request.input("name", name);
 		request.input("mobile_no", mobile_no);
-		request.input("email", email);
-		request.input("Address", address);
+		request.input("email", clean(email));
+		request.input("Address", clean(address));
 		request.input("gender_id", gender_id);
 		request.input("DOB", DOB);
-		request.input("blood_group_id", blood_group_id);
-		request.input("weight", weight);
+		request.input("blood_group_id", clean(blood_group_id));
+		request.input("weight", clean(weight));
 
 		const result = await request.execute("sp_patients");
 
@@ -657,7 +662,7 @@ router.post('/patient', uploadHandler(upload.single("image")), async (req, res) 
 		});
 
 	} catch (err) {
-		await cleanupFiles(req).catch(() => {});
+		await cleanupFiles(req).catch(() => { });
 		res.status(500).json({
 			success: false,
 			error: err.message
@@ -667,142 +672,142 @@ router.post('/patient', uploadHandler(upload.single("image")), async (req, res) 
 
 
 router.post('/send-otp', async (req, res) => {
-  try {
-    const body = req.body || {};
-    let mobile_no = body.mobile_no ?? body.mobileNo ?? body.mobile;
+	try {
+		const body = req.body || {};
+		let mobile_no = body.mobile_no ?? body.mobileNo ?? body.mobile;
 
-    if (!mobile_no) {
-      return res.status(400).json({
-        status: 0,
-        message: 'Mobile number required'
-      });
-    }
+		if (!mobile_no) {
+			return res.status(400).json({
+				status: 0,
+				message: 'Mobile number required'
+			});
+		}
 
-    if (typeof mobile_no !== 'string') {
-      mobile_no = mobile_no.toString();
-    }
+		if (typeof mobile_no !== 'string') {
+			mobile_no = mobile_no.toString();
+		}
 
-    let normalized = mobile_no.trim().replace(/\D/g, '');
+		let normalized = mobile_no.trim().replace(/\D/g, '');
 
-    if (normalized.startsWith('91') && normalized.length > 10) {
-      normalized = normalized.slice(normalized.length - 10);
-    }
+		if (normalized.startsWith('91') && normalized.length > 10) {
+			normalized = normalized.slice(normalized.length - 10);
+		}
 
-    if (normalized.startsWith('0')) {
-      normalized = normalized.replace(/^0+/, '');
-    }
+		if (normalized.startsWith('0')) {
+			normalized = normalized.replace(/^0+/, '');
+		}
 
-    if (!/^[6-9]\d{9}$/.test(normalized)) {
-      return res.status(400).json({
-        status: 0,
-        message: 'Invalid mobile number'
-      });
-    }
+		if (!/^[6-9]\d{9}$/.test(normalized)) {
+			return res.status(400).json({
+				status: 0,
+				message: 'Invalid mobile number'
+			});
+		}
 
-    const mobile_no_cc = `91${normalized}`;
+		const mobile_no_cc = `91${normalized}`;
 
-    if (!process.env.WHATSAPP_API_TOKEN) {
-      return res.status(500).json({
-        status: 0,
-        message: 'WhatsApp API token not configured'
-      });
-    }
+		if (!process.env.WHATSAPP_API_TOKEN) {
+			return res.status(500).json({
+				status: 0,
+				message: 'WhatsApp API token not configured'
+			});
+		}
 
-    // ✅ Generate OTP
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+		// ✅ Generate OTP
+		const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // ✅ Send WhatsApp OTP
-    const waResponse = await axios.post(
-      "https://api2.smsala.com/whatsapp/SendOtp",
-      {
-        PhoneNumber: mobile_no_cc,
-        OtpCode: otp,
-        ApiToken: process.env.WHATSAPP_API_TOKEN,
-        TemplateId: 463
-      }
-    );
+		// ✅ Send WhatsApp OTP
+		const waResponse = await axios.post(
+			"https://api2.smsala.com/whatsapp/SendOtp",
+			{
+				PhoneNumber: mobile_no_cc,
+				OtpCode: otp,
+				ApiToken: process.env.WHATSAPP_API_TOKEN,
+				TemplateId: 463
+			}
+		);
 
-    if (!waResponse.data || waResponse.data.IsSuccess !== true) {
-      return res.status(400).json({
-        status: 0,
-        message: 'Failed to send OTP via WhatsApp',
-        response: waResponse.data
-      });
-    }
+		if (!waResponse.data || waResponse.data.IsSuccess !== true) {
+			return res.status(400).json({
+				status: 0,
+				message: 'Failed to send OTP via WhatsApp',
+				response: waResponse.data
+			});
+		}
 
-    // ✅ Hash OTP
-    const otp_hash = await bcrypt.hash(otp, 10);
+		// ✅ Hash OTP
+		const otp_hash = await bcrypt.hash(otp, 10);
 
-    // ✅ Save in DB using normalized local number
-    const dbResult = await db.request()
-      .input('operation', 'send_otp')
-      .input('mobile_no', normalized)
-      .input('otp_hash', otp_hash)
-      .execute('sp_otp');
+		// ✅ Save in DB using normalized local number
+		const dbResult = await db.request()
+			.input('operation', 'send_otp')
+			.input('mobile_no', normalized)
+			.input('otp_hash', otp_hash)
+			.execute('sp_otp');
 
-    if (dbResult.recordset[0].status === 0) {
-      return res.status(400).json(dbResult.recordset[0]);
-    }
+		if (dbResult.recordset[0].status === 0) {
+			return res.status(400).json(dbResult.recordset[0]);
+		}
 
-    res.json({
-      status: 1,
-      message: 'OTP sent successfully',
-      otp: otp // ⚠️ remove in production
-    });
+		res.json({
+			status: 1,
+			message: 'OTP sent successfully',
+			otp: otp // ⚠️ remove in production
+		});
 
-  } catch (err) {
-    res.status(500).json({
-      status: 0,
-      message: 'Server error',
-      error: err?.response?.data || err.message
-    });
-  }
+	} catch (err) {
+		res.status(500).json({
+			status: 0,
+			message: 'Server error',
+			error: err?.response?.data || err.message
+		});
+	}
 });
 router.post('/verify-otp', async (req, res) => {
-  const { mobile_no, otp } = req.body;
+	const { mobile_no, otp } = req.body;
 
-  try {
-    const result = await db.request()
-      .input('operation', 'verify_otp')
-      .input('mobile_no', mobile_no)
-      .execute('sp_otp');
+	try {
+		const result = await db.request()
+			.input('operation', 'verify_otp')
+			.input('mobile_no', mobile_no)
+			.execute('sp_otp');
 
-    const data = result.recordset[0];
+		const data = result.recordset[0];
 
-    if (data.status === 0) {
-      return res.status(400).json(data);
-    }
+		if (data.status === 0) {
+			return res.status(400).json(data);
+		}
 
-    const isMatch = await bcrypt.compare(otp, data.otp_hash);
+		const isMatch = await bcrypt.compare(otp, data.otp_hash);
 
-    if (!isMatch) {
-      // increase attempt
-      await db.request()
-        .input('operation', 'update_attempt')
-        .input('mobile_no', mobile_no)
-        .execute('sp_otp');
+		if (!isMatch) {
+			// increase attempt
+			await db.request()
+				.input('operation', 'update_attempt')
+				.input('mobile_no', mobile_no)
+				.execute('sp_otp');
 
-      return res.status(400).json({
-        status: 0,
-        message: 'Invalid OTP'
-      });
-    }
+			return res.status(400).json({
+				status: 0,
+				message: 'Invalid OTP'
+			});
+		}
 
-    // mark verified
-    await db.request()
-      .input('operation', 'mark_verified')
-      .input('mobile_no', mobile_no)
-      .execute('sp_otp');
+		// mark verified
+		await db.request()
+			.input('operation', 'mark_verified')
+			.input('mobile_no', mobile_no)
+			.execute('sp_otp');
 
-    res.json({
-      status: 1,
-      message: 'OTP verified successfully'
-    });
+		res.json({
+			status: 1,
+			message: 'OTP verified successfully'
+		});
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Server error' });
-  }
+	} catch (err) {
+		console.error(err);
+		res.status(500).json({ error: 'Server error' });
+	}
 });
 
 
@@ -892,7 +897,7 @@ router.post('/addClinic', uploadHandler(upload.fields([{ name: 'clinic_images', 
 		return res.json({ success: true, clinic_id: returnedClinicId, clinic_images: clinicImageUrls });
 	} catch (err) {
 		log.error('addClinic error: ' + err.message);
-		await cleanupFiles(req).catch(() => {});
+		await cleanupFiles(req).catch(() => { });
 		return res.status(500).json({ success: false, error: err.message });
 	}
 });
@@ -944,7 +949,7 @@ router.put('/updateClinic', uploadHandler(upload.fields([{ name: 'clinic_images'
 		return res.json({ success: true, clinic_id });
 	} catch (err) {
 		log.error('updateClinic error: ' + err.message);
-		await cleanupFiles(req).catch(() => {});
+		await cleanupFiles(req).catch(() => { });
 		return res.status(500).json({ success: false, error: err.message });
 	}
 });
@@ -1000,21 +1005,21 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 			hasImage: !!req.file,
 		});
 
-		const parsedRecepId  = recep_id  ? parseInt(recep_id)  : null;
+		const parsedRecepId = recep_id ? parseInt(recep_id) : null;
 		const parsedGenderId = gender_id ? parseInt(gender_id) : null;
 		const parsedDoctorId = doctor_id ? parseInt(doctor_id) : null;
 		const operation = parsedRecepId && parsedRecepId > 0 ? 'Update' : 'Insert';
 
 		const request = db.request();
-		request.input('operation',  operation);
-		request.input('recep_id',   parsedRecepId);
-		request.input('name',       name);
-		request.input('mobile_no',  mobile_no);
-		request.input('email',      email      || null);
-		request.input('Address',    address    || null);
-		request.input('gender_id',  parsedGenderId);
-		request.input('clinic_id',  (clinic_id != null && clinic_id !== undefined && String(clinic_id) !== '0') ? clinic_id : null);
-		request.input('doctor_id',  parsedDoctorId);
+		request.input('operation', operation);
+		request.input('recep_id', parsedRecepId);
+		request.input('name', name);
+		request.input('mobile_no', mobile_no);
+		request.input('email', email || null);
+		request.input('Address', address || null);
+		request.input('gender_id', parsedGenderId);
+		request.input('clinic_id', (clinic_id != null && clinic_id !== undefined && String(clinic_id) !== '0') ? clinic_id : null);
+		request.input('doctor_id', parsedDoctorId);
 
 		const result = await request.execute('sp_receptionist');
 
@@ -1042,32 +1047,32 @@ router.post('/receptionist', uploadHandler(upload.single("image")), async (req, 
 
 			await db.request()
 				.input('operation', 'uploadReceptionistImg')
-				.input('recep_id',  returnedRecepId)
-				.input('img_url',   imageUrl)
+				.input('recep_id', returnedRecepId)
+				.input('img_url', imageUrl)
 				.execute('sp_receptionist');
 		}
 
 		return res.json({
 			success: true,
-			recep_id:  returnedRecepId,
+			recep_id: returnedRecepId,
 			image_url: imageUrl,
-			message:   operation === 'Update' ? 'Updated' : 'Created',
+			message: operation === 'Update' ? 'Updated' : 'Created',
 		});
 
 	} catch (err) {
 		console.error('[ReceptionistDebug] save receptionist CATCH full:', {
-			message:         err?.message,
-			code:            err?.code,
-			number:          err?.number,
-			state:           err?.state,
-			class:           err?.class,
-			lineNumber:      err?.lineNumber,
-			procName:        err?.procName,
+			message: err?.message,
+			code: err?.code,
+			number: err?.number,
+			state: err?.state,
+			class: err?.class,
+			lineNumber: err?.lineNumber,
+			procName: err?.procName,
 			originalMessage: err?.originalError?.message,
-			preceding:       err?.precedingErrors?.map(e => e.message),
+			preceding: err?.precedingErrors?.map(e => e.message),
 		});
 		const errMsg = err?.originalError?.message || err?.message || err?.toString() || 'Unknown error';
-		await cleanupFiles(req).catch(() => {});
+		await cleanupFiles(req).catch(() => { });
 		res.status(500).json({ success: false, error: errMsg });
 	}
 });

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -72,16 +73,35 @@ class _DaySchedule {
   final String dayName;
   final String shortName;
   bool isEnabled;
-  bool isExpanded;
   List<_TimeSlot> timeSlots;
 
   _DaySchedule({
     required this.dayName,
     required this.shortName,
     this.isEnabled = false,
-    this.isExpanded = false,
     List<_TimeSlot>? timeSlots,
   }) : timeSlots = timeSlots ?? [];
+}
+
+// One "Add Slot" entry: a single Queue/Slot time range applied to whichever
+// days were selected when it was added. Multiple blocks can target the same
+// day (e.g. a morning Queue block and an evening Slots block on Monday).
+class _ScheduleBlock {
+  Set<int> dayIndices;
+  TimeOfDay startTime;
+  TimeOfDay endTime;
+  BookingMode bookingMode;
+  int slotDurationMinutes;
+  int? maxQueueLength;
+
+  _ScheduleBlock({
+    required this.dayIndices,
+    required this.startTime,
+    required this.endTime,
+    required this.bookingMode,
+    required this.slotDurationMinutes,
+    this.maxQueueLength,
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -103,6 +123,9 @@ class _DoctorProfileSetupScreenState
   late Animation<double> _fadeAnim;
 
   // ── Step 1 & 2 Controllers ───────────────────────────────────────────────
+  final _step1FormKey = GlobalKey<FormState>();
+  final _step2FormKey = GlobalKey<FormState>();
+
   final _fullNameController        = TextEditingController();
   final _contactController         = TextEditingController();
   final _emailController           = TextEditingController();
@@ -115,6 +138,20 @@ class _DoctorProfileSetupScreenState
   final _clinicEmailController     = TextEditingController();
   final _clinicWebsiteController   = TextEditingController();
   final _consultationFeeController = TextEditingController();
+
+  final _fullNameFocus      = FocusNode();
+  final _contactFocus       = FocusNode();
+  final _emailFocus         = FocusNode();
+  final _qualificationFocus = FocusNode();
+  final _licenseFocus       = FocusNode();
+  final _experienceFocus    = FocusNode();
+  final _clinicNameFocus    = FocusNode();
+  final _clinicAddressFocus = FocusNode();
+  final _clinicContactFocus = FocusNode();
+  final _clinicEmailFocus   = FocusNode();
+
+  final _genderKey         = GlobalKey();
+  final _specializationKey = GlobalKey();
 
   String  _selectedSpecialization = '';
   String? _selectedGender;
@@ -152,6 +189,20 @@ class _DoctorProfileSetupScreenState
 
   late List<_DaySchedule> _days;
 
+  // Added schedule blocks — each is one Queue/Slot time range applied to the
+  // days that were selected when it was added.
+  final List<_ScheduleBlock> _blocks = [];
+
+  // Draft: the day-group + Queue/Slot config currently being composed,
+  // added to _blocks via the "Add Slot" button.
+  final Set<int> _draftDays      = {};
+  BookingMode _draftMode         = BookingMode.queue;
+  TimeOfDay   _draftStart        = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay   _draftEnd          = const TimeOfDay(hour: 12, minute: 0);
+  int         _draftSlotDuration = 15;
+  int?        _draftMaxQueue;
+  late final TextEditingController _draftQueueCtrl;
+
   int _leadHours   = 0;
   int _leadMinutes = 0;
 
@@ -185,6 +236,7 @@ class _DoctorProfileSetupScreenState
     _days = _dayMeta
         .map((m) => _DaySchedule(dayName: m.$1, shortName: m.$2))
         .toList();
+    _draftQueueCtrl = TextEditingController();
   }
 
   @override
@@ -192,6 +244,7 @@ class _DoctorProfileSetupScreenState
     _animController.dispose();
     _tokenRefreshSub?.cancel();
     _mobileDebounce?.cancel();
+    _draftQueueCtrl.dispose();
     _fullNameController.dispose();
     _contactController.dispose();
     _emailController.dispose();
@@ -204,6 +257,16 @@ class _DoctorProfileSetupScreenState
     _clinicEmailController.dispose();
     _clinicWebsiteController.dispose();
     _consultationFeeController.dispose();
+    _fullNameFocus.dispose();
+    _contactFocus.dispose();
+    _emailFocus.dispose();
+    _qualificationFocus.dispose();
+    _licenseFocus.dispose();
+    _experienceFocus.dispose();
+    _clinicNameFocus.dispose();
+    _clinicAddressFocus.dispose();
+    _clinicContactFocus.dispose();
+    _clinicEmailFocus.dispose();
     super.dispose();
   }
 
@@ -323,11 +386,21 @@ class _DoctorProfileSetupScreenState
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  bool _isBlank(TextEditingController c) => c.text.trim().isEmpty;
-
   bool _isValidEmail(String email) =>
       RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$')
           .hasMatch(email.trim());
+
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+        alignment: 0.15,
+      );
+    }
+  }
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -355,6 +428,13 @@ class _DoctorProfileSetupScreenState
   // ── Schedule helpers ──────────────────────────────────────────────────────
   String _fmtTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}:00';
+
+  String _fmtTimeDisplay(TimeOfDay t) {
+    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
+    final m = t.minute.toString().padLeft(2, '0');
+    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
+    return '$h:$m $period';
+  }
 
   int _modeToInt(BookingMode m) => switch (m) {
         BookingMode.queue => 1,
@@ -396,45 +476,156 @@ class _DoctorProfileSetupScreenState
   }
 
   // ── Schedule mutations ────────────────────────────────────────────────────
-  void _toggleDay(int i, bool v) => setState(() {
-        _days[i].isEnabled = v;
-        if (!v) _days[i].isExpanded = false;
-      });
 
-  void _toggleExpand(int i) => setState(() {
-        if (_days[i].isEnabled) _days[i].isExpanded = !_days[i].isExpanded;
-      });
+  int _toMin(TimeOfDay t) => t.hour * 60 + t.minute;
 
-  void _addSlot(int i) => setState(() {
-        _days[i].timeSlots.add(_TimeSlot(
-          startTime: const TimeOfDay(hour: 9, minute: 0),
-          endTime:   const TimeOfDay(hour: 12, minute: 0),
-        ));
-        _days[i].isExpanded = true;
-      });
+  // Rebuilds _days from _blocks: a day is Off (no slots) unless at least one
+  // block includes it, in which case it gets every block's slot that
+  // includes that day.
+  void _rebuildDaysFromBlocks() {
+    for (int i = 0; i < _days.length; i++) {
+      final slots = _blocks
+          .where((b) => b.dayIndices.contains(i))
+          .map((b) => _TimeSlot(
+                startTime: b.startTime,
+                endTime: b.endTime,
+                bookingMode: b.bookingMode,
+                slotDurationMinutes: b.slotDurationMinutes,
+                maxQueueLength: b.maxQueueLength,
+              ))
+          .toList();
+      _days[i].timeSlots = slots;
+      _days[i].isEnabled = slots.isNotEmpty;
+    }
+  }
 
-  void _removeSlot(int di, int si) => setState(() {
-        _days[di].timeSlots.removeAt(si);
-        if (_days[di].timeSlots.isEmpty) {
-          _days[di].isEnabled  = false;
-          _days[di].isExpanded = false;
+  void _toggleDraftDay(int i) => setState(() {
+        if (_draftDays.contains(i)) {
+          _draftDays.remove(i);
+        } else {
+          _draftDays.add(i);
         }
       });
 
-  void _updateSlot(int di, int si, _TimeSlot updated) =>
-      setState(() => _days[di].timeSlots[si] = updated);
+  Future<void> _pickDraftTimeRange() async {
+    final result = await showModalBottomSheet<(TimeOfDay, TimeOfDay)>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _TimeRangePickerSheet(
+        initialStart: _draftStart,
+        initialEnd: _draftEnd,
+      ),
+    );
+    if (result == null) return;
+    setState(() {
+      _draftStart = result.$1;
+      _draftEnd   = result.$2;
+    });
+  }
+
+  void _setDraftMode(BookingMode m) => setState(() => _draftMode = m);
+
+  void _setDraftSlotDuration(int mins) =>
+      setState(() => _draftSlotDuration = mins);
+
+  void _setDraftMaxQueue(String val) => setState(
+      () => _draftMaxQueue = val.isEmpty ? null : int.tryParse(val));
+
+  // Commits the current draft as a new block. Day selection is kept as-is
+  // (not cleared) so adding a second slot — e.g. Queue in the morning and
+  // Slots in the evening — for the same days doesn't require reselecting them.
+  void _addDraftAsBlock() {
+    if (_draftDays.isEmpty) {
+      _showError('Select at least one day for this slot.');
+      return;
+    }
+    final draftS = _toMin(_draftStart);
+    final draftE = _toMin(_draftEnd);
+    for (final b in _blocks) {
+      if (!b.dayIndices.any(_draftDays.contains)) continue;
+      final bs = _toMin(b.startTime);
+      final be = _toMin(b.endTime);
+      if (draftS < be && bs < draftE) {
+        final clashDays = b.dayIndices
+            .where(_draftDays.contains)
+            .map((i) => _days[i].shortName)
+            .join(', ');
+        _showError('This time overlaps with an existing slot on $clashDays.');
+        return;
+      }
+    }
+    setState(() {
+      _blocks.add(_ScheduleBlock(
+        dayIndices: Set.of(_draftDays),
+        startTime: _draftStart,
+        endTime: _draftEnd,
+        bookingMode: _draftMode,
+        slotDurationMinutes: _draftSlotDuration,
+        maxQueueLength: _draftMaxQueue,
+      ));
+      _rebuildDaysFromBlocks();
+    });
+  }
+
+  void _removeBlock(int index) => setState(() {
+        _blocks.removeAt(index);
+        _rebuildDaysFromBlocks();
+      });
 
   // ── Submit handler ────────────────────────────────────────────────────────
   Future<void> _handleSubmit() async {
     if (_step == 1) {
-      if (_isBlank(_fullNameController)) {
-        return _showError('Full Name is required');
+      // Run the form validator first so every invalid field shows its
+      // red border / "required" error text, then focus/scroll to the
+      // first offending one below.
+      final step1Valid = _step1FormKey.currentState?.validate() ?? false;
+
+      if (_fullNameController.text.trim().isEmpty) {
+        _fullNameFocus.requestFocus();
+        return _showError('Full name is required');
       }
-      if (_isBlank(_contactController)) {
-        return _showError('Contact No is required');
+      final contact = _contactController.text.trim();
+      if (contact.isEmpty || contact.length != 10) {
+        _contactFocus.requestFocus();
+        return _showError(contact.isEmpty
+            ? 'Contact No is required'
+            : 'Enter a valid 10-digit number');
       }
-      if (_contactController.text.trim().length != 10) {
-        return _showError('Contact No must be 10 digits');
+      if (_emailController.text.trim().isNotEmpty &&
+          !_isValidEmail(_emailController.text)) {
+        _emailFocus.requestFocus();
+        return _showError('Enter a valid email address');
+      }
+      if (_selectedGenderId == null || _selectedGenderId! <= 0) {
+        _scrollToKey(_genderKey);
+        return _showError('Gender is required');
+      }
+      if (_selectedSpecialization.isEmpty) {
+        _scrollToKey(_specializationKey);
+        return _showError('Specialization is required');
+      }
+      if (_qualificationController.text.trim().isEmpty) {
+        _qualificationFocus.requestFocus();
+        return _showError('Qualification is required');
+      }
+      if (_licenseController.text.trim().isEmpty) {
+        _licenseFocus.requestFocus();
+        return _showError('License No is required');
+      }
+      if (_experienceController.text.trim().isEmpty ||
+          int.tryParse(_experienceController.text.trim()) == null) {
+        _experienceFocus.requestFocus();
+        return _showError(_experienceController.text.trim().isEmpty
+            ? 'Experience is required'
+            : 'Enter a valid number');
+      }
+
+      if (!step1Valid) return;
+
+      if (_mobileExistsError != null) {
+        _contactFocus.requestFocus();
+        return _showError(_mobileExistsError!);
       }
       if (ref.read(connectivityNotifierProvider).isOffline) {
         return _showError(connectivityErrorMessage);
@@ -447,51 +638,39 @@ class _DoctorProfileSetupScreenState
       if (!mounted) return;
       if (mobileCheck.isNotEmpty) {
         setState(() => _mobileExistsError = 'Mobile number already registered.');
+        _contactFocus.requestFocus();
         return _showError('Mobile number already registered.');
       }
       setState(() => _mobileExistsError = null);
 
-      if (_emailController.text.trim().isNotEmpty &&
-          !_isValidEmail(_emailController.text)) {
-        return _showError('Please enter a valid Email Address');
-      }
-      if (_selectedGenderId == null || _selectedGenderId! <= 0) {
-        return _showError('Gender is required');
-      }
-      if (_selectedSpecialization.isEmpty) {
-        return _showError('Specialization is required');
-      }
-      if (_isBlank(_qualificationController)) {
-        return _showError('Qualification is required');
-      }
-      if (_isBlank(_licenseController)) {
-        return _showError('License Number is required');
-      }
-      if (_isBlank(_experienceController)) {
-        return _showError('Experience is required');
-      }
-      if (int.tryParse(_experienceController.text.trim()) == null) {
-        return _showError('Experience must be a valid number');
-      }
       setState(() => _step = 2);
       _animateStep();
       return;
     }
 
     if (_step == 2) {
-      if (_isBlank(_clinicNameController)) {
-        return _showError('Clinic Name is required');
+      final step2Valid = _step2FormKey.currentState?.validate() ?? false;
+
+      if (_clinicNameController.text.trim().isEmpty) {
+        _clinicNameFocus.requestFocus();
+        return _showError('Clinic name is required');
       }
-      if (_isBlank(_clinicAddressController)) {
-        return _showError('Clinic Address is required');
+      if (_clinicAddressController.text.trim().isEmpty) {
+        _clinicAddressFocus.requestFocus();
+        return _showError('Clinic address is required');
       }
-      if (_isBlank(_clinicContactController)) {
-        return _showError('Clinic Contact is required');
+      if (_clinicContactController.text.trim().isEmpty) {
+        _clinicContactFocus.requestFocus();
+        return _showError('Clinic contact is required');
       }
       if (_clinicEmailController.text.trim().isNotEmpty &&
           !_isValidEmail(_clinicEmailController.text)) {
-        return _showError('Please enter a valid Clinic Email Address');
+        _clinicEmailFocus.requestFocus();
+        return _showError('Enter a valid email');
       }
+
+      if (!step2Valid) return;
+
       if (ref.read(connectivityNotifierProvider).isOffline) {
         return _showError(connectivityErrorMessage);
       }
@@ -580,48 +759,17 @@ class _DoctorProfileSetupScreenState
     final hasAnySchedule =
         _days.any((d) => d.isEnabled && d.timeSlots.isNotEmpty);
     if (!hasAnySchedule) {
-      _showError('Please add at least one available day with a time slot.');
+      _showError('Please select at least one working day and set its schedule.');
       return;
     }
 
-    for (final day in _days) {
-      if (!day.isEnabled) continue;
-      final slots = day.timeSlots;
-      for (int i = 0; i < slots.length; i++) {
-        for (int j = i + 1; j < slots.length; j++) {
-          final aS = slots[i].startTime.hour * 60 + slots[i].startTime.minute;
-          final aE = slots[i].endTime.hour   * 60 + slots[i].endTime.minute;
-          final bS = slots[j].startTime.hour * 60 + slots[j].startTime.minute;
-          final bE = slots[j].endTime.hour   * 60 + slots[j].endTime.minute;
-          if (aS < bE && bS < aE) {
-            setState(() => day.isExpanded = true);
-            _showError('${day.dayName} has overlapping time slots.');
-            return;
-          }
-        }
-      }
-    }
-
-    final invalid =
-        _days.where((d) => d.isEnabled && d.timeSlots.isEmpty).toList();
-    if (invalid.isNotEmpty) {
-      setState(() {
-        for (final d in invalid) d.isExpanded = true;
-      });
-      _showError(
-        '${invalid.map((d) => d.dayName).join(', ')} '
-        '${invalid.length == 1 ? 'is' : 'are'} enabled but ha'
-        '${invalid.length == 1 ? 's' : 've'} no time slots.',
-      );
-      return;
-    }
     if (ref.read(connectivityNotifierProvider).isOffline) {
       return _showError(connectivityErrorMessage);
     }
 
     await ref
         .read(doctorSettingsViewModelProvider.notifier)
-        .saveDoctorSchedule(_buildScheduleModel());
+        .saveDoctorSchedule(_buildScheduleModel(), clinicId: _savedClinicId);
 
     await ref
         .read(doctorLoginViewModelProvider.notifier)
@@ -747,182 +895,235 @@ class _DoctorProfileSetupScreenState
 
   // ─── Step 1: Personal & Professional Info ─────────────────────────────────
   Widget _buildStep1() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Avatar picker
-        // Center(child: _DoctorAvatarPicker(
-        //   photo: _doctorPhoto,
-        //   onTap: () => _pickImage(true),
-        // )),
-        // const SizedBox(height: 22),
+    return Form(
+      key: _step1FormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Basic Details card
+          _SectionCard(
+            icon: Icons.person_outline_rounded,
+            iconBg: kPrimaryLight,
+            iconColor: kPrimaryDark,
+            title: 'Basic Details',
+            subtitle: 'Your personal information',
+            children: [
+              _buildField('Full Name', _fullNameController,
+                  hint: 'Dr. Arjun Sharma',
+                  required: true,
+                  focusNode: _fullNameFocus,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Full name is required'
+                      : null),
+              _buildField('Contact No', _contactController,
+                  hint: '9876543210',
+                  keyboard: TextInputType.phone,
+                  required: true,
+                  focusNode: _contactFocus,
+                  onChanged: _onContactChanged,
+                  errorText: _mobileExistsError,
+                  prefixWidget: const _PhonePrefix(),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                  ],
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Contact No is required';
+                    if (v.trim().length != 10) return 'Enter a valid 10-digit number';
+                    return null;
+                  }),
+              _buildField('Email Address', _emailController,
+                  hint: 'doctor@email.com',
+                  icon: Icons.email_outlined,
+                  keyboard: TextInputType.emailAddress,
+                  focusNode: _emailFocus,
+                  validator: (v) {
+                    if (v != null && v.trim().isNotEmpty && !_isValidEmail(v)) {
+                      return 'Enter a valid email address';
+                    }
+                    return null;
+                  }),
+              Container(
+                key: _genderKey,
+                child: const _FieldLabel(label: 'Gender', required: true),
+              ),
+              const SizedBox(height: 10),
+              _GenderSelector(
+                options: _genderOptions
+                    .map((e) => e['label'] as String)
+                    .toList(),
+                selected: _selectedGender,
+                onChanged: (val) => setState(() {
+                  _selectedGender = val;
+                  _selectedGenderId = _genderOptions
+                      .firstWhere((e) => e['label'] == val)['id'] as int;
+                }),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
 
-        // Basic Details card
-        _SectionCard(
-          icon: Icons.person_outline_rounded,
-          iconBg: kPrimaryLight,
-          iconColor: kPrimaryDark,
-          title: 'Basic Details',
-          subtitle: 'Your personal information',
-          children: [
-            _buildField('Full Name', _fullNameController,
-                hint: 'Dr. Arjun Sharma', required: true),
-            _buildField('Contact No', _contactController,
-                hint: '9876543210',
-                keyboard: TextInputType.phone,
-                required: true,
-                onChanged: _onContactChanged,
-                errorText: _mobileExistsError,
-                prefixWidget: const _PhonePrefix(),
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(10),
-                ]),
-            _buildField('Email Address', _emailController,
-                hint: 'doctor@email.com',
-                icon: Icons.email_outlined,
-                keyboard: TextInputType.emailAddress),
-            const _FieldLabel(label: 'Gender', required: true),
-            const SizedBox(height: 10),
-            _GenderSelector(
-              options: _genderOptions
-                  .map((e) => e['label'] as String)
-                  .toList(),
-              selected: _selectedGender,
-              onChanged: (val) => setState(() {
-                _selectedGender = val;
-                _selectedGenderId = _genderOptions
-                    .firstWhere((e) => e['label'] == val)['id'] as int;
-              }),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-
-        // Professional Info card
-        _SectionCard(
-          icon: Icons.workspace_premium_outlined,
-          iconBg: kInfoLight,
-          iconColor: kInfo,
-          title: 'Professional Info',
-          subtitle: 'Your credentials and expertise',
-          children: [
-            _buildSpecializationDropdown(),
-            _buildField('Qualification', _qualificationController,
-                hint: 'MBBS, MD...',
-                icon: Icons.school_outlined,
-                required: true),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildField('License No', _licenseController,
-                      hint: 'MCI-XXXXX',
-                      icon: Icons.badge_outlined,
-                      required: true),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildField(
-                      'Experience (yrs)', _experienceController,
-                      hint: 'e.g. 8',
-                      icon: Icons.work_history_outlined,
-                      keyboard: TextInputType.number,
-                      required: true),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
+          // Professional Info card
+          _SectionCard(
+            icon: Icons.workspace_premium_outlined,
+            iconBg: kInfoLight,
+            iconColor: kInfo,
+            title: 'Professional Info',
+            subtitle: 'Your credentials and expertise',
+            children: [
+              _buildSpecializationDropdown(),
+              _buildField('Qualification', _qualificationController,
+                  hint: 'MBBS, MD...',
+                  icon: Icons.school_outlined,
+                  required: true,
+                  focusNode: _qualificationFocus,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Qualification is required'
+                      : null),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField('License No', _licenseController,
+                        hint: 'MCI-XXXXX',
+                        icon: Icons.badge_outlined,
+                        required: true,
+                        focusNode: _licenseFocus,
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'License No is required'
+                            : null),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                        'Experience (yrs)', _experienceController,
+                        hint: 'e.g. 8',
+                        icon: Icons.work_history_outlined,
+                        keyboard: TextInputType.number,
+                        required: true,
+                        focusNode: _experienceFocus,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Experience is required';
+                          if (int.tryParse(v.trim()) == null) return 'Enter a valid number';
+                          return null;
+                        }),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   // ─── Step 2: Clinic Details ───────────────────────────────────────────────
   Widget _buildStep2() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Clinic photos
-        _ClinicPhotoGrid(
-          photos: _clinicPhotos,
-          onAdd: () => _pickImage(false),
-          onRemove: (i) => setState(() => _clinicPhotos.removeAt(i)),
-          onPreview: (i) => _previewClinicPhoto(_clinicPhotos[i]),
-        ),
-        const SizedBox(height: 18),
+    return Form(
+      key: _step2FormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Clinic photos
+          _ClinicPhotoGrid(
+            photos: _clinicPhotos,
+            onAdd: () => _pickImage(false),
+            onRemove: (i) => setState(() => _clinicPhotos.removeAt(i)),
+            onPreview: (i) => _previewClinicPhoto(_clinicPhotos[i]),
+          ),
+          const SizedBox(height: 18),
 
-        // Clinic Details card
-        _SectionCard(
-          icon: Icons.local_hospital_outlined,
-          iconBg: kPrimaryLight,
-          iconColor: kPrimaryDark,
-          title: 'Clinic Details',
-          subtitle: 'Where your patients can find you',
-          children: [
-            _buildField('Clinic Name', _clinicNameController,
-                hint: 'Apollo Clinic',
-                icon: Icons.business_outlined,
-                required: true),
-            _buildTextArea(
-                'Clinic Address', _clinicAddressController,
-                hint: '123, MG Road, Panaji, Goa',
-                required: true),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildField(
-                      'Clinic Contact', _clinicContactController,
-                      hint: '9876543210',
-                      keyboard: TextInputType.phone,
-                      required: true,
-                      icon: Icons.phone_outlined,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(10),
-                      ]),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildField(
-                      'Clinic Email', _clinicEmailController,
-                      hint: 'clinic@...',
-                      icon: Icons.email_outlined,
-                      keyboard: TextInputType.emailAddress),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildField(
-                      'Website', _clinicWebsiteController,
-                      hint: 'www.clinic.com',
-                      icon: Icons.language_outlined),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildField(
-                      'Fee (₹)', _consultationFeeController,
-                      hint: '500',
-                      icon: Icons.currency_rupee_rounded,
-                      keyboard: TextInputType.number),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
+          // Clinic Details card
+          _SectionCard(
+            icon: Icons.local_hospital_outlined,
+            iconBg: kPrimaryLight,
+            iconColor: kPrimaryDark,
+            title: 'Clinic Details',
+            subtitle: 'Where your patients can find you',
+            children: [
+              _buildField('Clinic Name', _clinicNameController,
+                  hint: 'Apollo Clinic',
+                  icon: Icons.business_outlined,
+                  required: true,
+                  focusNode: _clinicNameFocus,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Clinic name is required'
+                      : null),
+              _buildTextArea(
+                  'Clinic Address', _clinicAddressController,
+                  hint: '123, MG Road, Panaji, Goa',
+                  required: true,
+                  focusNode: _clinicAddressFocus,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Clinic address is required'
+                      : null),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                        'Clinic Contact', _clinicContactController,
+                        hint: '9876543210',
+                        keyboard: TextInputType.phone,
+                        required: true,
+                        icon: Icons.phone_outlined,
+                        focusNode: _clinicContactFocus,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        validator: (v) => (v == null || v.trim().isEmpty)
+                            ? 'Clinic contact is required'
+                            : null),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                        'Clinic Email', _clinicEmailController,
+                        hint: 'clinic@...',
+                        icon: Icons.email_outlined,
+                        keyboard: TextInputType.emailAddress,
+                        focusNode: _clinicEmailFocus,
+                        validator: (v) {
+                          if (v != null && v.trim().isNotEmpty && !_isValidEmail(v)) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        }),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                        'Website', _clinicWebsiteController,
+                        hint: 'www.clinic.com',
+                        icon: Icons.language_outlined),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildField(
+                        'Fee (₹)', _consultationFeeController,
+                        hint: '500',
+                        icon: Icons.currency_rupee_rounded,
+                        keyboard: TextInputType.number),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
 
-        // Location card
-        _SectionCard(
-          icon: Icons.location_on_outlined,
-          iconBg: kAmberLight,
-          iconColor: kWarning,
-          title: 'Clinic Location',
-          subtitle: 'Pin your clinic on the map',
-          children: [_buildLocationField()],
-        ),
-      ],
+          // Location card
+          _SectionCard(
+            icon: Icons.location_on_outlined,
+            iconBg: kAmberLight,
+            iconColor: kWarning,
+            title: 'Clinic Location',
+            subtitle: 'Pin your clinic on the map',
+            children: [_buildLocationField()],
+          ),
+        ],
+      ),
     );
   }
 
@@ -986,17 +1187,90 @@ class _DoctorProfileSetupScreenState
           iconBg: kPrimaryLight,
           iconColor: kPrimaryDark,
           title: 'Weekly Schedule',
-          subtitle: 'Toggle days and add time slots',
+          subtitle: 'Pick days, set Queue/Slot timing, then Add Slot',
           children: [
-            ..._days.asMap().entries.map((e) => _ScheduleDayCard(
-                  schedule: e.value,
-                  onToggle: (v) => _toggleDay(e.key, v),
-                  onTapHeader: () => _toggleExpand(e.key),
-                  onAddSlot: () => _addSlot(e.key),
-                  onRemoveSlot: (si) => _removeSlot(e.key, si),
-                  onUpdateSlot: (si, updated) =>
-                      _updateSlot(e.key, si, updated),
-                )),
+            if (_blocks.isNotEmpty) ...[
+              ..._blocks.asMap().entries.map(
+                    (e) => _buildBlockSummaryCard(e.key, e.value),
+                  ),
+              const SizedBox(height: 4),
+              const Divider(height: 24, color: kDivider),
+            ],
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Days for this slot',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: kTextSecondary,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                if (_draftDays.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => setState(_draftDays.clear),
+                    child: const Text(
+                      'Clear days',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDark,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _buildDraftDaySelector(),
+            const SizedBox(height: 16),
+            _buildDraftScheduleConfig(),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _addDraftAsBlock,
+                icon: const Icon(Icons.add_rounded, size: 17),
+                label: const Text(
+                  'Add Slot',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kPrimaryDark,
+                  side: BorderSide(
+                      color: kPrimary.withOpacity(0.5), width: 1.4),
+                  backgroundColor: kPrimaryLight.withOpacity(0.4),
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11)),
+                ),
+              ),
+            ),
+            if (_blocks.isEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: kBgSoft,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: kBorderStrong),
+                ),
+                child: const Text(
+                  'Select days, set the Queue/Slot timing, then tap "Add '
+                  'Slot" to apply it to those days. Days you never add a '
+                  'slot for stay Off.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: kTextSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
 
@@ -1019,6 +1293,312 @@ class _DoctorProfileSetupScreenState
               : const SizedBox.shrink(),
         ),
       ],
+    );
+  }
+
+  Widget _buildDraftDaySelector() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _days.asMap().entries.map((e) {
+        final i = e.key;
+        final day = e.value;
+        final sel = _draftDays.contains(i);
+        return GestureDetector(
+          onTap: () => _toggleDraftDay(i),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            width: 46,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              gradient: sel
+                  ? const LinearGradient(colors: [kPrimary, kPrimaryDark])
+                  : null,
+              color: sel ? null : kBgSoft,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: sel ? kPrimary : kBorderStrong),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  day.shortName,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                    color: sel ? Colors.white : kTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  day.isEnabled ? 'Set' : 'Off',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    color: sel ? Colors.white70 : kTextMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  String _fmtBlockDays(_ScheduleBlock b) {
+    final indices = b.dayIndices.toList()..sort();
+    return indices.map((i) => _days[i].shortName).join(', ');
+  }
+
+  Widget _buildBlockSummaryCard(int index, _ScheduleBlock block) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: kPrimary.withOpacity(0.45), width: 1.4),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Icon(_modeIcon(block.bookingMode),
+                size: 16, color: kPrimaryDark),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _fmtBlockDays(block),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: kTextPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${_fmtTimeDisplay(block.startTime)} - '
+                  '${_fmtTimeDisplay(block.endTime)}  •  '
+                  '${_modeLabel(block.bookingMode)}',
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    color: kPrimaryDark,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () => _removeBlock(index),
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: kRedLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              alignment: Alignment.center,
+              child: const Icon(Icons.close_rounded, size: 14, color: kError),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _modeLabel(BookingMode m) => switch (m) {
+        BookingMode.queue => 'Queue',
+        BookingMode.slots => 'Slots',
+        BookingMode.both  => 'Both',
+      };
+
+  IconData _modeIcon(BookingMode m) => switch (m) {
+        BookingMode.queue => Icons.queue_rounded,
+        BookingMode.slots => Icons.event_available_rounded,
+        BookingMode.both  => Icons.all_inclusive_rounded,
+      };
+
+  Widget _buildDraftScheduleConfig() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: kBgSoft,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: kBorderStrong),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TimeRangePicker(
+            start: _fmtTimeDisplay(_draftStart),
+            end: _fmtTimeDisplay(_draftEnd),
+            onTap: _pickDraftTimeRange,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Booking Mode',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: kTextSecondary,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Row(
+            children: BookingMode.values.asMap().entries.map((e) {
+              final mode = e.value;
+              final isLast = e.key == BookingMode.values.length - 1;
+              final sel = _draftMode == mode;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () => _setDraftMode(mode),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    margin: EdgeInsets.only(right: isLast ? 0 : 7),
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    decoration: BoxDecoration(
+                      gradient: sel
+                          ? const LinearGradient(
+                              colors: [kPrimary, kPrimaryDark])
+                          : null,
+                      color: sel ? null : Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: sel ? kPrimary : kBorderStrong),
+                      boxShadow: sel
+                          ? [
+                              BoxShadow(
+                                color: kPrimary.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ]
+                          : [],
+                    ),
+                    alignment: Alignment.center,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(_modeIcon(mode),
+                            size: 13,
+                            color: sel ? Colors.white : kTextSecondary),
+                        const SizedBox(width: 4),
+                        Text(
+                          _modeLabel(mode),
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: sel ? Colors.white : kTextSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          if (_draftMode == BookingMode.queue ||
+              _draftMode == BookingMode.both) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Max Queue Length',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: kTextSecondary,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Container(
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBorderStrong),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 11),
+                  const Icon(Icons.people_alt_rounded,
+                      size: 16, color: kPrimaryDark),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: _draftQueueCtrl,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly
+                      ],
+                      style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1D2E)),
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        hintText: 'e.g. 20',
+                        hintStyle:
+                            TextStyle(fontSize: 13.5, color: kTextMuted),
+                        isDense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      onChanged: _setDraftMaxQueue,
+                    ),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                        color: kPrimaryLight,
+                        borderRadius: BorderRadius.circular(7)),
+                    child: const Text(
+                      'patients',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: kPrimaryDarker,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (_draftMode == BookingMode.slots ||
+              _draftMode == BookingMode.both) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'Slot Duration',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: kTextSecondary,
+                letterSpacing: 0.2,
+              ),
+            ),
+            const SizedBox(height: 7),
+            _SlotDurationPicker(
+              value: _draftSlotDuration,
+              onChanged: _setDraftSlotDuration,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1119,6 +1699,8 @@ class _DoctorProfileSetupScreenState
     String? errorText,
     Widget? prefixWidget,
     List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
+    FocusNode? focusNode,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1127,11 +1709,13 @@ class _DoctorProfileSetupScreenState
         children: [
           _FieldLabel(label: label, required: required),
           const SizedBox(height: 8),
-          TextField(
+          TextFormField(
             controller: controller,
+            focusNode: focusNode,
             keyboardType: keyboard,
             onChanged: onChanged,
             inputFormatters: inputFormatters,
+            validator: validator,
             style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF1A1D2E),
@@ -1163,6 +1747,16 @@ class _DoctorProfileSetupScreenState
                     ? const BorderSide(color: kError, width: 1.6)
                     : const BorderSide(color: kPrimary, width: 1.6),
               ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError, width: 1.6),
+              ),
+              errorStyle: const TextStyle(
+                  fontSize: 9.5, color: kError, fontWeight: FontWeight.w600),
             ),
           ),
           if (errorText != null) ...[
@@ -1190,6 +1784,8 @@ class _DoctorProfileSetupScreenState
     TextEditingController controller, {
     String hint = '',
     bool required = false,
+    String? Function(String?)? validator,
+    FocusNode? focusNode,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -1198,9 +1794,11 @@ class _DoctorProfileSetupScreenState
         children: [
           _FieldLabel(label: label, required: required),
           const SizedBox(height: 8),
-          TextField(
+          TextFormField(
             controller: controller,
+            focusNode: focusNode,
             maxLines: 3,
+            validator: validator,
             style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF1A1D2E),
@@ -1224,6 +1822,16 @@ class _DoctorProfileSetupScreenState
                 borderRadius: BorderRadius.circular(13),
                 borderSide: const BorderSide(color: kPrimary, width: 1.6),
               ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError),
+              ),
+              focusedErrorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(13),
+                borderSide: const BorderSide(color: kError, width: 1.6),
+              ),
+              errorStyle: const TextStyle(
+                  fontSize: 9.5, color: kError, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -1233,6 +1841,7 @@ class _DoctorProfileSetupScreenState
 
   Widget _buildSpecializationDropdown() {
     return Padding(
+      key: _specializationKey,
       padding: const EdgeInsets.only(bottom: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2084,625 +2693,174 @@ class _PhotoThumb extends StatelessWidget {
       );
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// SCHEDULE DAY CARD
-// ═════════════════════════════════════════════════════════════════════════════
-class _ScheduleDayCard extends StatelessWidget {
-  final _DaySchedule schedule;
-  final ValueChanged<bool> onToggle;
-  final VoidCallback onTapHeader;
-  final VoidCallback onAddSlot;
-  final ValueChanged<int> onRemoveSlot;
-  final void Function(int, _TimeSlot) onUpdateSlot;
-
-  const _ScheduleDayCard({
-    required this.schedule,
-    required this.onToggle,
-    required this.onTapHeader,
-    required this.onAddSlot,
-    required this.onRemoveSlot,
-    required this.onUpdateSlot,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: schedule.isEnabled ? kSurface : kBgSoft,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: schedule.isEnabled
-              ? kPrimary.withOpacity(0.45)
-              : kBorderStrong,
-          width: schedule.isEnabled ? 1.4 : 1,
-        ),
-      ),
-      child: Column(
-        children: [
-          _buildHeader(),
-          AnimatedCrossFade(
-            firstChild: const SizedBox(width: double.infinity),
-            secondChild: _buildExpanded(),
-            crossFadeState:
-                (schedule.isExpanded && schedule.isEnabled)
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 220),
-            sizeCurve: Curves.easeInOut,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() => InkWell(
-        onTap: onTapHeader,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: schedule.isEnabled ? kPrimaryLight : kBgSoft,
-                  borderRadius: BorderRadius.circular(11),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  schedule.shortName,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                    color: schedule.isEnabled
-                        ? kPrimaryDarker
-                        : kTextMuted,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      schedule.dayName,
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w800,
-                        color: schedule.isEnabled
-                            ? kTextPrimary
-                            : kTextMuted,
-                      ),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      schedule.isEnabled
-                          ? (schedule.timeSlots.isEmpty
-                              ? 'No slots added'
-                              : '${schedule.timeSlots.length} slot${schedule.timeSlots.length > 1 ? 's' : ''}')
-                          : 'Unavailable',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        color: schedule.isEnabled
-                            ? kPrimaryDark
-                            : kTextMuted,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (schedule.isEnabled)
-                AnimatedRotation(
-                  turns: schedule.isExpanded ? 0.5 : 0,
-                  duration: const Duration(milliseconds: 200),
-                  child: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: kTextSecondary,
-                      size: 22),
-                ),
-              const SizedBox(width: 4),
-              Transform.scale(
-                scale: 0.82,
-                child: Switch(
-                  value: schedule.isEnabled,
-                  onChanged: onToggle,
-                  activeColor: kPrimary,
-                  materialTapTargetSize:
-                      MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-
-  Widget _buildExpanded() => Container(
-        decoration: const BoxDecoration(
-          border: Border(top: BorderSide(color: kBorder)),
-        ),
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ...schedule.timeSlots.asMap().entries.map(
-                  (e) => _ScheduleTimeSlotCard(
-                    index: e.key,
-                    slot: e.value,
-                    allSlots: schedule.timeSlots,
-                    onRemove: () => onRemoveSlot(e.key),
-                    onUpdate: (u) => onUpdateSlot(e.key, u),
-                  ),
-                ),
-            const SizedBox(height: 4),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: onAddSlot,
-                icon: const Icon(Icons.add_rounded, size: 17),
-                label: const Text(
-                  'Add Time Slot',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: kPrimaryDark,
-                  side: BorderSide(
-                      color: kPrimary.withOpacity(0.5), width: 1.4),
-                  backgroundColor: kPrimaryLight.withOpacity(0.4),
-                  padding: const EdgeInsets.symmetric(vertical: 11),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(11)),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// SCHEDULE TIME SLOT CARD
-// ═════════════════════════════════════════════════════════════════════════════
-class _ScheduleTimeSlotCard extends StatefulWidget {
-  final int index;
-  final _TimeSlot slot;
-  final List<_TimeSlot> allSlots;
-  final VoidCallback onRemove;
-  final ValueChanged<_TimeSlot> onUpdate;
-
-  const _ScheduleTimeSlotCard({
-    required this.index,
-    required this.slot,
-    required this.allSlots,
-    required this.onRemove,
-    required this.onUpdate,
-  });
-
-  @override
-  State<_ScheduleTimeSlotCard> createState() =>
-      _ScheduleTimeSlotCardState();
-}
-
-class _ScheduleTimeSlotCardState
-    extends State<_ScheduleTimeSlotCard> {
-  late _TimeSlot _local;
-  late TextEditingController _queueCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _local = _TimeSlot(
-      startTime: widget.slot.startTime,
-      endTime: widget.slot.endTime,
-      bookingMode: widget.slot.bookingMode,
-      slotDurationMinutes: widget.slot.slotDurationMinutes,
-      maxQueueLength: widget.slot.maxQueueLength,
-    );
-    _queueCtrl = TextEditingController(
-        text: _local.maxQueueLength != null
-            ? '${_local.maxQueueLength}'
-            : '');
-  }
-
-  @override
-  void dispose() {
-    _queueCtrl.dispose();
-    super.dispose();
-  }
-
-  void _update() => widget.onUpdate(_local);
-
-  int _toMin(TimeOfDay t) => t.hour * 60 + t.minute;
-
-  bool _overlaps(TimeOfDay start, TimeOfDay end) {
-    final s = _toMin(start);
-    final e = _toMin(end);
-    for (int i = 0; i < widget.allSlots.length; i++) {
-      if (i == widget.index) continue;
-      final os = _toMin(widget.allSlots[i].startTime);
-      final oe = _toMin(widget.allSlots[i].endTime);
-      if (s < oe && os < e) return true;
-    }
-    return false;
-  }
-
-  Future<void> _pickTime(bool isStart) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: isStart ? _local.startTime : _local.endTime,
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-            colorScheme: const ColorScheme.light(primary: kPrimary)),
-        child: child!,
-      ),
-    );
-    if (picked == null) return;
-    final newStart = isStart ? picked : _local.startTime;
-    final newEnd = isStart ? _local.endTime : picked;
-    if (_overlaps(newStart, newEnd)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Row(children: [
-            Icon(Icons.warning_amber_rounded,
-                color: Colors.white, size: 16),
-            SizedBox(width: 8),
-            Expanded(
-                child: Text('This time overlaps with another slot.',
-                    style: TextStyle(fontSize: 13, color: Colors.white))),
-          ]),
-          backgroundColor: kTextPrimary,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-        ));
-      }
-      return;
-    }
-    setState(() =>
-        isStart ? _local.startTime = picked : _local.endTime = picked);
-    _update();
-  }
-
-  String _fmtTime(TimeOfDay t) {
-    final h = t.hourOfPeriod == 0 ? 12 : t.hourOfPeriod;
-    final m = t.minute.toString().padLeft(2, '0');
-    final period = t.period == DayPeriod.am ? 'AM' : 'PM';
-    return '$h:$m $period';
-  }
-
-  String _modeLabel(BookingMode m) => switch (m) {
-        BookingMode.queue => 'Queue',
-        BookingMode.slots => 'Slots',
-        BookingMode.both => 'Both',
-      };
-
-  IconData _modeIcon(BookingMode m) => switch (m) {
-        BookingMode.queue => Icons.queue_rounded,
-        BookingMode.slots => Icons.event_available_rounded,
-        BookingMode.both => Icons.all_inclusive_rounded,
-      };
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: kBgSoft,
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: kBorderStrong),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            children: [
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: kPrimary,
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '${widget.index + 1}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Time Slot',
-                style: TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                    color: kTextPrimary),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: widget.onRemove,
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: kRedLight,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.close_rounded,
-                      size: 14, color: kError),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Time pickers
-          Row(
-            children: [
-              Expanded(
-                child: _SchedTimePicker(
-                  label: 'Start',
-                  time: _fmtTime(_local.startTime),
-                  onTap: () => _pickTime(true),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Icon(Icons.arrow_forward_rounded,
-                    size: 14, color: kTextMuted),
-              ),
-              Expanded(
-                child: _SchedTimePicker(
-                  label: 'End',
-                  time: _fmtTime(_local.endTime),
-                  onTap: () => _pickTime(false),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Booking mode
-          const Text(
-            'Booking Mode',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: kTextSecondary,
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(height: 7),
-          Row(
-            children: BookingMode.values.asMap().entries.map((e) {
-              final mode = e.value;
-              final isLast =
-                  e.key == BookingMode.values.length - 1;
-              final sel = _local.bookingMode == mode;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() => _local.bookingMode = mode);
-                    _update();
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 160),
-                    margin: EdgeInsets.only(right: isLast ? 0 : 7),
-                    padding: const EdgeInsets.symmetric(vertical: 9),
-                    decoration: BoxDecoration(
-                      gradient: sel
-                          ? const LinearGradient(
-                              colors: [kPrimary, kPrimaryDark],
-                            )
-                          : null,
-                      color: sel ? null : Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: sel ? kPrimary : kBorderStrong,
-                      ),
-                      boxShadow: sel
-                          ? [
-                              BoxShadow(
-                                color: kPrimary.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ]
-                          : [],
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(_modeIcon(mode),
-                            size: 13,
-                            color: sel ? Colors.white : kTextSecondary),
-                        const SizedBox(width: 4),
-                        Text(
-                          _modeLabel(mode),
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: sel ? Colors.white : kTextSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-
-          // Max queue length
-          if (_local.bookingMode == BookingMode.queue ||
-              _local.bookingMode == BookingMode.both) ...[
-            const SizedBox(height: 12),
-            const Text(
-              'Max Queue Length',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: kTextSecondary,
-                letterSpacing: 0.2,
-              ),
-            ),
-            const SizedBox(height: 7),
-            Container(
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kBorderStrong),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 11),
-                  const Icon(Icons.people_alt_rounded,
-                      size: 16, color: kPrimaryDark),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: _queueCtrl,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly
-                      ],
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1A1D2E)),
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        hintText: 'e.g. 20',
-                        hintStyle: TextStyle(
-                            fontSize: 13.5, color: kTextMuted),
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      onChanged: (val) {
-                        setState(() => _local.maxQueueLength = val.isEmpty
-                            ? null
-                            : int.tryParse(val));
-                        _update();
-                      },
-                    ),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: kPrimaryLight,
-                        borderRadius: BorderRadius.circular(7)),
-                    child: const Text(
-                      'patients',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: kPrimaryDarker,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // Slot duration
-          if (_local.bookingMode == BookingMode.slots ||
-              _local.bookingMode == BookingMode.both) ...[
-            const SizedBox(height: 12),
-            const Text(
-              'Slot Duration',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: kTextSecondary,
-                letterSpacing: 0.2,
-              ),
-            ),
-            const SizedBox(height: 7),
-            _SlotDurationPicker(
-              value: _local.slotDurationMinutes,
-              onChanged: (val) {
-                setState(() => _local.slotDurationMinutes = val);
-                _update();
-              },
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _SchedTimePicker extends StatelessWidget {
-  final String label, time;
+// Single tappable field showing the whole Start→End range; opens
+// _TimeRangePickerSheet so both ends are picked together in one step.
+class _TimeRangePicker extends StatelessWidget {
+  final String start, end;
   final VoidCallback onTap;
-  const _SchedTimePicker(
-      {required this.label, required this.time, required this.onTap});
+  const _TimeRangePicker(
+      {required this.start, required this.end, required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
         onTap: onTap,
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: kBorderStrong),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: kTextMuted,
-                  letterSpacing: 0.3,
+              const Icon(Icons.access_time_rounded,
+                  size: 15, color: kPrimaryDark),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$start  →  $end',
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                    color: kTextPrimary,
+                  ),
                 ),
               ),
-              const SizedBox(height: 3),
-              Row(
-                children: [
-                  const Icon(Icons.access_time_rounded,
-                      size: 13, color: kPrimaryDark),
-                  const SizedBox(width: 4),
-                  Text(
-                    time,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w800,
-                      color: kTextPrimary,
-                    ),
-                  ),
-                ],
-              ),
+              const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 18, color: kTextMuted),
             ],
           ),
         ),
       );
+}
+
+// Bottom sheet letting the user set Start and End together, in one step,
+// via two side-by-side time wheels. Confirms with a single "Done" tap.
+class _TimeRangePickerSheet extends StatefulWidget {
+  final TimeOfDay initialStart;
+  final TimeOfDay initialEnd;
+  const _TimeRangePickerSheet(
+      {required this.initialStart, required this.initialEnd});
+
+  @override
+  State<_TimeRangePickerSheet> createState() => _TimeRangePickerSheetState();
+}
+
+class _TimeRangePickerSheetState extends State<_TimeRangePickerSheet> {
+  late TimeOfDay _start = widget.initialStart;
+  late TimeOfDay _end   = widget.initialEnd;
+
+  DateTime _toDateTime(TimeOfDay t) => DateTime(2024, 1, 1, t.hour, t.minute);
+
+  bool get _isValid =>
+      (_start.hour * 60 + _start.minute) < (_end.hour * 60 + _end.minute);
+
+  Widget _buildWheel(String label, TimeOfDay value, ValueChanged<TimeOfDay> onChange) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: kTextSecondary,
+              letterSpacing: 0.3,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 160,
+            child: CupertinoDatePicker(
+              mode: CupertinoDatePickerMode.time,
+              use24hFormat: false,
+              initialDateTime: _toDateTime(value),
+              onDateTimeChanged: (dt) =>
+                  onChange(TimeOfDay(hour: dt.hour, minute: dt.minute)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+        decoration: BoxDecoration(
+          color: kSurface,
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 14),
+              decoration: BoxDecoration(
+                color: kBorderStrong,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            const Text(
+              'Select Time Range',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: kTextPrimary,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _buildWheel('Start', _start, (v) => setState(() => _start = v)),
+                _buildWheel('End', _end, (v) => setState(() => _end = v)),
+              ],
+            ),
+            if (!_isValid) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'End time must be after start time.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: kError,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _isValid
+                    ? () => Navigator.pop(context, (_start, _end))
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kPrimary,
+                  disabledBackgroundColor: kBorderStrong,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text(
+                  'Done',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SlotDurationPicker extends StatelessWidget {

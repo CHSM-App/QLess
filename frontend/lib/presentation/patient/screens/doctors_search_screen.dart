@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
@@ -16,6 +17,7 @@ import 'package:qless/presentation/shared/widgets/app_expandable_header_search.d
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -62,7 +64,7 @@ String _cap(String s) =>
 
 
 // ── Queue State ───────────────────────────────────────────────────────────────
-enum _QueueState { noQueue, unavailable, ended, opensSoon, full, open, hasQueue }
+enum _QueueState { noQueue, unavailable, onLeave, ended, opensSoon, full, open, hasQueue }
 
 int _timeMins(String? t) {
   if (t == null || t.isEmpty) return -1;
@@ -75,6 +77,7 @@ int _timeMins(String? t) {
 }
 
 _QueueState _queueStateFor(DoctorDetails d) {
+  if (d.isOnLeave == 1)           return _QueueState.onLeave;
   if (d.isQueueAvailable == null) return _QueueState.noQueue;
   if (d.isQueueAvailable == 0)    return _QueueState.unavailable;
 
@@ -86,9 +89,9 @@ _QueueState _queueStateFor(DoctorDetails d) {
   }
 
   if (d.isBookingStarted != 1)    return _QueueState.opensSoon;
-  if (d.isQueueFull == 1)         return _QueueState.full;
   final cur = d.currentQueueLength ?? 0;
   final max = d.maxQueueLength ?? 0;
+  if (d.isQueueFull == 1 || (max > 0 && cur >= max)) return _QueueState.full;
   if (cur == 0 && max == 0)       return _QueueState.open;
   return _QueueState.hasQueue;
 }
@@ -115,6 +118,11 @@ class _QueueStatus {
             isVisible: false, canBook: true, tintCard: false,
             label: '', btnLabel: 'Book',
             color: kPrimary, icon: Icons.calendar_today_rounded);
+      case _QueueState.onLeave:
+        return const _QueueStatus(
+            isVisible: true, canBook: false, tintCard: false,
+            label: 'On leave today', btnLabel: 'Leave',
+            color: kError, icon: Icons.event_busy_rounded);
       case _QueueState.unavailable:
         return const _QueueStatus(
             isVisible: false, canBook: false, tintCard: false,
@@ -149,14 +157,16 @@ class _QueueStatus {
             label: 'Open', btnLabel: 'Book',
             color: kPrimary, icon: Icons.event_available_rounded);
       case _QueueState.hasQueue:
-        final cur  = d.currentQueueLength ?? 0;
-        final max  = d.maxQueueLength ?? 1;
-        final prog = (cur / max).clamp(0.0, 1.0);
+        final cur = d.currentQueueLength ?? 0;
+        final max = d.maxQueueLength ?? 0;
+        final hasMax = max > 0;
         return _QueueStatus(
             isVisible: true, canBook: true, tintCard: false,
-            label: '$cur/$max in queue', btnLabel: 'Book',
+            label: hasMax ? '$cur/$max in queue' : '$cur in queue',
+            btnLabel: 'Book',
             color: cur > 5 ? kError : kWarning,
-            icon: Icons.people_alt_rounded, progress: prog);
+            icon: Icons.people_alt_rounded,
+            progress: hasMax ? (cur / max).clamp(0.0, 1.0) : null);
     }
   }
 
@@ -183,14 +193,16 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   double?   _filterRating;
   int?      _filterMinExp;
   double?   _filterMaxDistKm;
+  bool      _queueOpenOnly   = false;
   Position? _userPosition;
-  final Map<int, double> _ratings = {};
+  final Map<String, double> _ratings = {};
 
   int get _activeFilters =>
       (_specialty != null ? 1 : 0) +
       (_filterRating != null ? 1 : 0) +
       (_filterMinExp != null ? 1 : 0) +
-      (_filterMaxDistKm != null ? 1 : 0);
+      (_filterMaxDistKm != null ? 1 : 0) +
+      (_queueOpenOnly ? 1 : 0);
 
   @override
   void initState() {
@@ -202,16 +214,11 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
       if (!mounted) return;
       if (pid > 0) {
         ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
-        final doctorIds = ref
-            .read(doctorsViewModelProvider)
-            .doctors
-            .map((d) => d.doctorId)
-            .whereType<int>()
-            .toList();
+        final doctors = ref.read(doctorsViewModelProvider).doctors;
         ref
             .read(favoriteViewModelProvider.notifier)
-            .fetchFavoritesForDoctors(pid, doctorIds);
-        _loadRatings(doctorIds);
+            .fetchFavoritesForDoctors(pid, doctors);
+        _loadRatings(doctors);
       }
       if (widget.initialSpecialty != null) {
         setState(() => _specialty = widget.initialSpecialty);
@@ -234,19 +241,45 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadRatings(List<int> doctorIds) async {
-    final toFetch = doctorIds.where((id) => !_ratings.containsKey(id)).toList();
+  Future<void> _loadRatings(List<DoctorDetails> doctors) async {
+    final toFetch = doctors
+        .where((d) {
+          if (d.doctorId == null) return false;
+          final key = '${d.doctorId}_${d.clinicId ?? ''}';
+          return !_ratings.containsKey(key);
+        })
+        .toList();
     if (toFetch.isEmpty) return;
-    final usecase = ref.read(reviewUsecaseProvider);
+    final reviewUsecase = ref.read(reviewUsecaseProvider);
+    final apptUsecase   = ref.read(appointmentUsecaseProvider);
     final results = await Future.wait(
-      toFetch.map((id) async {
+      toFetch.map((d) async {
+        final id       = d.doctorId!;
+        final clinicId = d.clinicId;
+        final key      = '${id}_${clinicId ?? ''}';
         try {
-          final reviews = await usecase.getDoctorReviews(id);
-          if (reviews.isEmpty) return MapEntry(id, 0.0);
+          final allReviews = await reviewUsecase.getDoctorReviews(id, clinicId ?? '');
+          if (allReviews.isEmpty) return MapEntry(key, 0.0);
+          var reviews = allReviews;
+          if (clinicId != null && clinicId.isNotEmpty) {
+            try {
+              final appts   = await apptUsecase.fetchPatientAppointments(id, clinicId: clinicId);
+              final apptIds = appts.map((a) => a.appointmentId).whereType<int>().toSet();
+              if (apptIds.isNotEmpty) {
+                final filtered = allReviews
+                    .where((r) => r.appointmentId != null && apptIds.contains(r.appointmentId))
+                    .toList();
+                if (filtered.isNotEmpty) reviews = filtered;
+              }
+            } catch (_) {
+              // appointment fetch failed — keep all reviews as fallback
+            }
+          }
+          if (reviews.isEmpty) return MapEntry(key, 0.0);
           final avg = reviews.fold<double>(0, (a, r) => a + (r.rating?.toDouble() ?? 0)) / reviews.length;
-          return MapEntry(id, avg);
+          return MapEntry(key, avg);
         } catch (_) {
-          return MapEntry(id, 0.0);
+          return MapEntry(key, 0.0);
         }
       }),
     );
@@ -263,9 +296,9 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   }
 
   List<DoctorDetails> _filtered(
-      List<DoctorDetails> all, Map<int, bool> favMap) =>
+      List<DoctorDetails> all, Map<String, bool> favMap) =>
       all.where((d) {
-        if (_favOnly) return favMap[d.doctorId] == true;
+        if (_favOnly) return favMap['${d.doctorId}_${d.clinicId ?? ''}'] == true;
         final q = _searchCtrl.text.toLowerCase();
         final matchQ = q.isEmpty ||
             (d.name?.toLowerCase().contains(q) ?? false) ||
@@ -274,7 +307,7 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
         final matchS = _specialty == null ||
             (d.specialization?.toLowerCase() == _specialty?.toLowerCase());
         final matchR = _filterRating == null ||
-            (_ratings[d.doctorId] ?? 0) >= _filterRating!;
+            (_ratings['${d.doctorId}_${d.clinicId ?? ''}'] ?? 0) >= _filterRating!;
         final matchE = _filterMinExp == null ||
             (d.experience ?? 0) >= _filterMinExp!;
         bool matchD = true;
@@ -285,7 +318,10 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
               d.latitude!, d.longitude!);
           matchD = metres <= _filterMaxDistKm! * 1000;
         }
-        return matchQ && matchS && matchR && matchE && matchD;
+        final matchQueue = !_queueOpenOnly ||
+            _queueStateFor(d) == _QueueState.open ||
+            _queueStateFor(d) == _QueueState.hasQueue;
+        return matchQ && matchS && matchR && matchE && matchD && matchQueue;
       }).toList();
 
   List<String> _specialties(List<DoctorDetails> all) {
@@ -302,16 +338,11 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     await ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid);
     if (!mounted || pid <= 0) return;
-    final doctorIds = ref
-        .read(doctorsViewModelProvider)
-        .doctors
-        .map((d) => d.doctorId)
-        .whereType<int>()
-        .toList();
+    final doctors = ref.read(doctorsViewModelProvider).doctors;
     ref
         .read(favoriteViewModelProvider.notifier)
-        .fetchFavoritesForDoctors(pid, doctorIds);
-    _loadRatings(doctorIds);
+        .fetchFavoritesForDoctors(pid, doctors);
+    _loadRatings(doctors);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -319,6 +350,17 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
   // ════════════════════════════════════════════════════════════════════
  @override
 Widget build(BuildContext context) {
+  // patientId loads asynchronously from storage — initState may run with id 0.
+  // Re-run fetch the moment a real id arrives so favorites populate correctly.
+  ref.listen(
+    patientLoginViewModelProvider.select((s) => s.patientId),
+    (prev, next) {
+      if ((prev == null || prev == 0) && next != null && next != 0) {
+        _refresh();
+      }
+    },
+  );
+
   final doctorsState = ref.watch(doctorsViewModelProvider);
   final patState     = ref.watch(patientLoginViewModelProvider);
   final famState     = ref.watch(familyViewModelProvider);
@@ -331,7 +373,7 @@ Widget build(BuildContext context) {
   final isLoading = doctorsState.isLoading;
 
   return Scaffold(
-    backgroundColor: Colors.white,
+    backgroundColor: kPageBg,
     appBar: AppBar(
       backgroundColor: Colors.white,
       // Keep the bar flat white when the list scrolls under it — no M3 tint
@@ -445,13 +487,15 @@ Widget build(BuildContext context) {
         selectedRating:   _filterRating,
         selectedMinExp:   _filterMinExp,
         selectedMaxDist:  _filterMaxDistKm,
+        selectedQueueOpenOnly: _queueOpenOnly,
         hasLocation:      _userPosition != null,
-        onApply: (spec, rating, minExp, maxDist) {
+        onApply: (spec, rating, minExp, maxDist, queueOpenOnly) {
           setState(() {
             _specialty        = spec;
             _filterRating     = rating;
             _filterMinExp     = minExp;
             _filterMaxDistKm  = maxDist;
+            _queueOpenOnly    = queueOpenOnly;
           });
         },
         onClear: () => setState(() {
@@ -459,6 +503,7 @@ Widget build(BuildContext context) {
           _filterRating    = null;
           _filterMinExp    = null;
           _filterMaxDistKm = null;
+          _queueOpenOnly   = false;
         }),
       ),
     );
@@ -482,10 +527,18 @@ Widget build(BuildContext context) {
         const SizedBox(width: 4),
         Expanded(
           child: DropdownButtonHideUnderline(
-            child: DropdownButton<int?>(
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                hoverColor: Colors.transparent,
+                focusColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                splashColor: Colors.transparent,
+              ),
+              child: DropdownButton<int?>(
               value: _selectedMemberId,
               isDense: true,
               isExpanded: true,
+              focusColor: Colors.transparent,
               icon: const Icon(Icons.keyboard_arrow_down_rounded,
                   size: 15, color: kPrimary),
               dropdownColor: Colors.white,
@@ -519,6 +572,7 @@ Widget build(BuildContext context) {
                 ...members.map((m) =>
                     _DropSelected(m.memberName?.split(' ').first ?? '?')),
               ],
+              ),
             ),
           ),
         ),
@@ -693,7 +747,7 @@ Widget build(BuildContext context) {
         itemBuilder: (_, i) => _DoctorCard(
           doctor: docs[i],
           selectedMemberId: _selectedMemberId,
-          cardRating: _ratings[docs[i].doctorId],
+          cardRating: _ratings['${docs[i].doctorId}_${docs[i].clinicId ?? ''}'],
           // Tapping the card → Book Appointment
           onTap: (d) => Navigator.push(
             context,
@@ -835,9 +889,9 @@ class _DoctorCard extends StatelessWidget {
     final qs         = _QueueStatus.from(d);
     final accent     = _accentFor(d.specialization);
     final specBg     = _bgFor(d.specialization);
-    final init       = (d.name?.isNotEmpty ?? false)
-        ? d.name![0].toUpperCase()
-        : 'D';
+    // final init       = (d.name?.isNotEmpty ?? false)
+    //     ? d.name![0].toUpperCase()
+    //     : 'D';
     final clinicText = [d.clinicName, d.clinicAddress]
         .where((s) => s != null && s.isNotEmpty)
         .join(' · ');
@@ -847,7 +901,7 @@ class _DoctorCard extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFF7F8FA),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
               color: qs.tintCard ? kError.withOpacity(0.25) : kBorder),
@@ -863,38 +917,38 @@ class _DoctorCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Avatar ─────────────────────────────────────────
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 46, height: 46,
-                  decoration: BoxDecoration(
-                    color: accent.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                        color: accent.withOpacity(0.2), width: 1.5),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(init,
-                      style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          color: accent)),
-                ),
-                Positioned(
-                  bottom: -2, right: -2,
-                  child: Container(
-                    width: 11, height: 11,
-                    decoration: BoxDecoration(
-                      color: qs.dot,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 10),
+            // Stack(
+            //   clipBehavior: Clip.none,
+            //   children: [
+            //     Container(
+            //       width: 46, height: 46,
+            //       decoration: BoxDecoration(
+            //         color: accent.withOpacity(0.12),
+            //         borderRadius: BorderRadius.circular(12),
+            //         border: Border.all(
+            //             color: accent.withOpacity(0.2), width: 1.5),
+            //       ),
+            //       alignment: Alignment.center,
+            //       child: Text(init,
+            //           style: TextStyle(
+            //               fontSize: 17,
+            //               fontWeight: FontWeight.w700,
+            //               color: accent)),
+            //     ),
+            //     Positioned(
+            //       bottom: -2, right: -2,
+            //       child: Container(
+            //         width: 11, height: 11,
+            //         decoration: BoxDecoration(
+            //           color: qs.dot,
+            //           shape: BoxShape.circle,
+            //           border: Border.all(color: Colors.white, width: 2),
+            //         ),
+            //       ),
+            //     ),
+            //   ],
+            // ),
+            // const SizedBox(width: 10),
 
             // ── Info ───────────────────────────────────────────
             Expanded(
@@ -907,7 +961,7 @@ class _DoctorCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          'Dr. ${d.name ?? 'Unknown'}',
+                          doctorDisplayName(d.name, fallback: 'Unknown'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1338,8 +1392,9 @@ class _FilterSheet extends StatefulWidget {
   final double?      selectedRating;
   final int?         selectedMinExp;
   final double?      selectedMaxDist;
+  final bool         selectedQueueOpenOnly;
   final bool         hasLocation;
-  final void Function(String? spec, double? rating, int? minExp, double? maxDist) onApply;
+  final void Function(String? spec, double? rating, int? minExp, double? maxDist, bool queueOpenOnly) onApply;
   final VoidCallback onClear;
 
   const _FilterSheet({
@@ -1350,6 +1405,7 @@ class _FilterSheet extends StatefulWidget {
     this.selectedRating,
     this.selectedMinExp,
     this.selectedMaxDist,
+    this.selectedQueueOpenOnly = false,
     this.hasLocation = false,
   });
 
@@ -1363,21 +1419,24 @@ class _FilterSheetState extends State<_FilterSheet> {
   late double?  _rating;
   late int?     _minExp;
   double?       _maxDist;
+  late bool     _queueOpenOnly;
 
-  static const _panels = ['Category', 'Rating', 'Experience', 'Distance'];
+  static const _panels = ['Category', 'Rating', 'Experience', 'Distance', 'Queue'];
 
   @override
   void initState() {
     super.initState();
-    _spec     = widget.selectedSpec;
-    _rating   = widget.selectedRating;
-    _minExp   = widget.selectedMinExp;
-    _maxDist  = widget.selectedMaxDist;
+    _spec           = widget.selectedSpec;
+    _rating         = widget.selectedRating;
+    _minExp         = widget.selectedMinExp;
+    _maxDist        = widget.selectedMaxDist;
+    _queueOpenOnly  = widget.selectedQueueOpenOnly;
   }
 
   int get _active =>
       (_spec != null ? 1 : 0) + (_rating != null ? 1 : 0) +
-      (_minExp != null ? 1 : 0) + (_maxDist != null ? 1 : 0);
+      (_minExp != null ? 1 : 0) + (_maxDist != null ? 1 : 0) +
+      (_queueOpenOnly ? 1 : 0);
 
   @override
   Widget build(BuildContext context) {
@@ -1407,7 +1466,10 @@ class _FilterSheetState extends State<_FilterSheet> {
               const Spacer(),
               GestureDetector(
                 onTap: () {
-                  setState(() { _spec = null; _rating = null; _minExp = null; });
+                  setState(() {
+                    _spec = null; _rating = null; _minExp = null;
+                    _maxDist = null; _queueOpenOnly = false;
+                  });
                   widget.onClear();
                 },
                 child: Container(
@@ -1443,7 +1505,9 @@ class _FilterSheetState extends State<_FilterSheet> {
                     final sel = _activePanel == i;
                     final hasBadge = (i == 0 && _spec != null) ||
                         (i == 1 && _rating != null) ||
-                        (i == 2 && _minExp != null);
+                        (i == 2 && _minExp != null) ||
+                        (i == 3 && _maxDist != null) ||
+                        (i == 4 && _queueOpenOnly);
                     return GestureDetector(
                       onTap: () => setState(() => _activePanel = i),
                       child: Container(
@@ -1504,7 +1568,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             height: 46,
             child: ElevatedButton(
               onPressed: () {
-                widget.onApply(_spec, _rating, _minExp, _maxDist);
+                widget.onApply(_spec, _rating, _minExp, _maxDist, _queueOpenOnly);
                 Navigator.pop(context);
               },
               style: ElevatedButton.styleFrom(
@@ -1532,6 +1596,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       case 1:  return _ratingPanel();
       case 2:  return _experiencePanel();
       case 3:  return _distancePanel();
+      case 4:  return _queuePanel();
       default: return const SizedBox();
     }
   }
@@ -1627,6 +1692,16 @@ class _FilterSheetState extends State<_FilterSheet> {
             child: _optionTile(o.label, _maxDist == o.val,
                 () => setState(() => _maxDist = o.val)),
           )),
+    ]);
+  }
+
+  Widget _queuePanel() {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _optionTile('Show all doctors', !_queueOpenOnly,
+          () => setState(() => _queueOpenOnly = false)),
+      const SizedBox(height: 6),
+      _optionTile('Queue open only', _queueOpenOnly,
+          () => setState(() => _queueOpenOnly = true)),
     ]);
   }
 

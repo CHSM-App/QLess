@@ -70,7 +70,7 @@ router.post('/insertFamilyMember', async (req, res) => {
 
 
 router.post('/appointment/book', async (req, res) => {
-  const { doctor_id, patient_id, appointment_date, start_time, user_type, slot_id,symptoms} = req.body;
+  const { doctor_id, patient_id, appointment_date, start_time, user_type, slot_id, symptoms, clinic_id } = req.body;
 
   try {
     // Hard-guard: reject booking if the doctor is on leave that date
@@ -88,15 +88,45 @@ router.post('/appointment/book', async (req, res) => {
       });
     }
 
+    // Hard-guard: reject booking if the doctor has manually closed today's
+    // queue (queueStop → doctor_queue.queue_status = 3). The patient's booking
+    // screen only checks the scheduled time window, so closing early (e.g. a
+    // 9-12 session stopped at 11:30) wouldn't otherwise block new bookings.
+    const queueRes = await db.request()
+      .input('doctor_id', doctor_id)
+      .input('appointment_date', appointment_date)
+      .input('slot_id', slot_id)
+      .query(`
+        SELECT TOP 1 queue_status, booking_closed FROM doctor_queue
+        WHERE doctor_id = @doctor_id AND queue_date = @appointment_date
+          AND (@slot_id IS NULL OR slot_id = @slot_id)
+        ORDER BY queue_id DESC
+      `);
+
+    const queueRow = queueRes.recordset?.[0];
+    if (queueRow?.queue_status === 3) {
+      return res.json({
+        success: false,
+        message: 'Doctor has closed the queue for today. Please try again later or pick another date.',
+      });
+    }
+    if (queueRow?.booking_closed === true) {
+      return res.json({
+        success: false,
+        message: 'Doctor has stopped accepting new bookings for today. Please try again later or pick another date.',
+      });
+    }
+
     const result = await db.request()
       .input('operation', 'BOOK')
-	  .input('user_type', user_type)
+      .input('user_type', user_type)
       .input('doctor_id', doctor_id)
       .input('patient_id', patient_id)
       .input('appointment_date', appointment_date)
       .input('start_time', start_time)
-	  .input('slot_id', slot_id)
-		  .input('symptoms', symptoms)
+      .input('slot_id', slot_id)
+      .input('symptoms', symptoms)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     const booked = result.recordset[0].success === 1;
@@ -164,7 +194,7 @@ router.post('/appointment/queueStatus', async (req, res) => {
 
 
 router.post('/favoriteDoctor/add', async (req, res) => {
-  const { patient_id, doctor_id } = req.body;
+  const { patient_id, doctor_id, clinic_id } = req.body;
 
   if (!patient_id || !doctor_id) {
     return res.status(400).json({ success: false, message: 'patient_id and doctor_id are required' });
@@ -175,6 +205,7 @@ router.post('/favoriteDoctor/add', async (req, res) => {
       .input('operation', 'Insert')
       .input('patient_id', patient_id)
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_favorite_doctors');
 
     res.status(200).json({
@@ -194,12 +225,12 @@ router.post('/favoriteDoctor/add', async (req, res) => {
 
 // ADD review
 router.post('/review/add', async (req, res) => {
-  const { appointment_id, doctor_id, patient_id, rating, comment,reviewed_by_user_id } = req.body;
+  const { appointment_id, doctor_id, patient_id, rating, comment, reviewed_by_user_id, clinic_id } = req.body;
 
-  if (!appointment_id || !doctor_id || !patient_id || !rating||!reviewed_by_user_id) {
+  if (!appointment_id || !doctor_id || !patient_id || !rating || !reviewed_by_user_id) {
     return res.status(400).json({
       success: false,
-      message: 'appointment_id, doctor_id, patient_id, rating,reviewed_by_user_id required'
+      message: 'appointment_id, doctor_id, patient_id, rating, reviewed_by_user_id required'
     });
   }
 
@@ -211,7 +242,8 @@ router.post('/review/add', async (req, res) => {
       .input('patient_id', patient_id)
       .input('rating', rating)
       .input('comment', comment || '')
-	 .input('reviewed_by_user_id', reviewed_by_user_id)
+      .input('reviewed_by_user_id', reviewed_by_user_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_review');
 
     res.status(200).json({
@@ -234,8 +266,8 @@ router.post('/rescheduleAppointment', async (req, res) => {
     doctor_id,
     appointment_date,
     start_time,
-	slot_id,
-	  symptoms
+    slot_id,
+    symptoms
   } = req.body;
 
   try {
@@ -245,9 +277,9 @@ router.post('/rescheduleAppointment', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('appointment_date', appointment_date)
       .input('start_time', start_time)
-	  .input('slot_id', slot_id)
-		  .input('symptoms', symptoms)
-	
+      .input('slot_id', slot_id)
+      .input('symptoms', symptoms)
+
       .execute('sp_appointment');
 
     emitQueueUpdate(req, 'rescheduled', doctor_id);
@@ -276,7 +308,7 @@ router.post('/cancelAppointment/:appointment_id', async (req, res) => {
         .input('appointment_id', appointment_id)
         .query('SELECT TOP 1 doctor_id FROM appointments WHERE appointment_id = @appointment_id');
       doctor_id = dr.recordset?.[0]?.doctor_id ?? null;
-    } catch (_) {}
+    } catch (_) { }
 
     const result = await db.request()
       .input('operation', 'CANCEL_APPOINTMENT')
@@ -299,10 +331,61 @@ router.post('/cancelAppointment/:appointment_id', async (req, res) => {
 });
 
 
+// PATIENT MARKS THEMSELVES ARRIVED AT CLINIC AFTER BEING SKIPPED —
+// doctor's queue screen highlights this patient so they get recalled first.
+router.post('/appointment/markArrived', async (req, res) => {
+  const { appointment_id, patient_id } = req.body;
+
+  if (!appointment_id || !patient_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'appointment_id and patient_id are required'
+    });
+  }
+
+  try {
+    const result = await db.request()
+      .input('appointment_id', appointment_id)
+      .input('patient_id', patient_id)
+      .query(`
+        UPDATE appointments
+        SET is_arrived = 1, arrived_at = GETDATE()
+        OUTPUT INSERTED.doctor_id
+        WHERE appointment_id = @appointment_id
+          AND patient_id = @patient_id
+          AND LOWER(status) = 'skipped'
+      `);
+
+    const doctorId = result.recordset?.[0]?.doctor_id;
+    if (!doctorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Appointment not found or not currently skipped'
+      });
+    }
+
+    emitQueueUpdate(req, 'patient_arrived', doctorId, { appointment_id });
+
+    res.status(200).json({
+      success: true,
+      message: 'Doctor has been notified that you are at the clinic'
+    });
+
+  } catch (error) {
+    log.error('markArrived error: ' + error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to notify the clinic',
+      error: error.message
+    });
+  }
+});
+
 router.post('/queueEstimate', async (req, res) => {
   const {
     appointment_id,
-    doctor_id
+    doctor_id,
+    clinic_id
   } = req.body;
 
   try {
@@ -310,6 +393,7 @@ router.post('/queueEstimate', async (req, res) => {
       .input('operation', 'QUEUE_ESTIMATE_SMART')
       .input('appointment_id', appointment_id)
       .input('doctor_id', doctor_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
     res.status(200).json(result.recordset[0]);
@@ -326,17 +410,39 @@ router.post('/queueEstimate', async (req, res) => {
 router.post('/queuePreviewEstimate', async (req, res) => {
   const {
     doctor_id,
-	  slot_id
+    slot_id,
+    clinic_id
   } = req.body;
 
   try {
     const result = await db.request()
       .input('operation', 'QUEUE_PREVIEW_ESTIMATE')
       .input('doctor_id', doctor_id)
-	  .input('slot_id', slot_id)
+      .input('slot_id', slot_id)
+      .input('clinic_id', clinic_id || null)
       .execute('sp_appointment');
 
-    res.status(200).json(result.recordset[0]);
+    const preview = result.recordset[0] || {};
+
+    // Reflect today's manual "stop new bookings" toggle so the patient sees it
+    // live on the booking screen, not just as a rejection after tapping Book.
+    try {
+      const bcRes = await db.request()
+        .input('doctor_id', doctor_id)
+        .input('slot_id', slot_id)
+        .query(`
+          SELECT TOP 1 queue_status, booking_closed FROM doctor_queue
+          WHERE doctor_id = @doctor_id AND queue_date = CAST(GETDATE() AS DATE)
+            AND (@slot_id IS NULL OR slot_id = @slot_id)
+          ORDER BY queue_id DESC
+        `);
+      const row = bcRes.recordset?.[0];
+      preview.booking_closed = row ? (row.booking_closed === true || row.queue_status === 3) : false;
+    } catch (e) {
+      preview.booking_closed = false;
+    }
+
+    res.status(200).json(preview);
 
   } catch (error) {
     res.status(500).json({
@@ -407,7 +513,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
     }
 
     res.status(200).json(
-     enrichedAppointments
+      enrichedAppointments
     );
 
   } catch (error) {

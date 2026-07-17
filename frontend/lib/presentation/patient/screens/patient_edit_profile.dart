@@ -14,6 +14,7 @@ import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -147,17 +148,17 @@ String? _networkImageUrl;   // ← add this
     if (!_didSubmit) return;
     if (next.isSuccess && !(prev?.isSuccess ?? false)) {
       _didSubmit = false;
+      _isSubmitting = false;
+      // Pop immediately — don't wait for checkPhonePatient before navigating.
+      // Profile screen's .then() already re-fetches the profile on return.
+      if (!mounted) return;
       _snack('Profile updated successfully', success: true);
       final mobile = next.mobileNo;
-      Future<void>(() async {
-        if (mobile != null && mobile.trim().isNotEmpty) {
-          await ref
-              .read(patientLoginViewModelProvider.notifier)
-              .checkPhonePatient(mobile);
-        }
-        if (!mounted) return;
-        Navigator.pop(context, true);
-      });
+      Navigator.pop(context, true);
+      // Refresh in background so profile screen has latest data.
+      if (mobile != null && mobile.trim().isNotEmpty) {
+        ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+      }
       return;
     }
     if (next.error != null && next.error != prev?.error) {
@@ -202,21 +203,168 @@ String? _networkImageUrl;   // ← add this
   // Actions
   // ---------------------------------------------------------------------------
 
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   Future<void> _pickDob() async {
-    final picked = await showDatePicker(
+    final now = DateTime.now();
+    final initial = _selectedDob ?? DateTime(now.year - 25, now.month, now.day);
+    int selDay   = initial.day;
+    int selMonth = initial.month;
+    int selYear  = initial.year;
+
+    final result = await showDialog<DateTime>(
       context: context,
-      initialDate: _selectedDob ?? DateTime(1992, 3, 12),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-              primary: kPrimary, onPrimary: Colors.white),
-        ),
-        child: child!,
-      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final maxYear = now.year;
+            final daysInMonth = DateTime(selYear, selMonth + 1, 0).day;
+            if (selDay > daysInMonth) selDay = daysInMonth;
+            final isFutureDate = DateTime(selYear, selMonth, selDay).isAfter(now);
+
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select Date of Birth',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DobDropdown(
+                            label: 'Day',
+                            value: selDay,
+                            items: List.generate(daysInMonth, (i) => i + 1),
+                            onChanged: (v) =>
+                                setDialogState(() => selDay = v),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: _DobDropdown(
+                            label: 'Month',
+                            value: selMonth,
+                            items: List.generate(12, (i) => i + 1),
+                            itemLabel: (m) => _monthNames[m - 1],
+                            onChanged: (v) =>
+                                setDialogState(() => selMonth = v),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _DobDropdown(
+                            label: 'Year',
+                            value: selYear,
+                            items: List.generate(
+                                maxYear - 1900 + 1, (i) => maxYear - i),
+                            onChanged: (v) =>
+                                setDialogState(() => selYear = v),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (isFutureDate) ...[
+                      const SizedBox(height: 10),
+                      const Row(
+                        children: [
+                          Icon(Icons.error_outline_rounded,
+                              size: 13, color: kError),
+                          SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              'Date of birth cannot be in the future',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: kError,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isFutureDate
+                                ? null
+                                : () => Navigator.pop(
+                                      ctx,
+                                      DateTime(selYear, selMonth, selDay),
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kPrimaryDark,
+                              disabledBackgroundColor: kBorder,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Confirm',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
-    if (picked != null) setState(() => _selectedDob = picked);
+
+    if (result != null) setState(() => _selectedDob = result);
   }
 
   String get _formattedDob {
@@ -294,7 +442,7 @@ String? _networkImageUrl;   // ← add this
       (v == null || v.trim().isEmpty) ? '$field is required' : null;
 
   String? _validateWeight(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Weight is required';
+    if (v == null || v.trim().isEmpty) return null;
     final w = double.tryParse(v.trim());
     if (w == null || w <= 0 || w > 500) return 'Enter valid weight in kg';
     return null;
@@ -310,7 +458,7 @@ String? _networkImageUrl;   // ← add this
     final isSaving = _isSubmitting || loginState.isLoading;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor:kPageBg,
       appBar: _buildAppBar(isSaving),
       body: Form(
         key: _formKey,
@@ -339,6 +487,7 @@ String? _networkImageUrl;   // ← add this
                       hint: 'Enter full name',
                       icon: Icons.person_outline_rounded,
                       iconColor: kPrimary,
+                      required: true,
                       validator: (v) => _required(v, 'Full name'),
                       capitalization: TextCapitalization.words,
                     ),
@@ -353,7 +502,7 @@ String? _networkImageUrl;   // ← add this
                     iconColor: kPurple,
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Email is required';
+                      if (v == null || v.trim().isEmpty) return null;
                       if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) {
                         return 'Enter a valid email';
                       }
@@ -368,7 +517,6 @@ String? _networkImageUrl;   // ← add this
                     icon: Icons.location_on_outlined,
                     iconColor: kWarning,
                     maxLines: 2,
-                    validator: (v) => _required(v, 'Address'),
                     capitalization: TextCapitalization.sentences,
                   ),
                 ],
@@ -383,7 +531,7 @@ String? _networkImageUrl;   // ← add this
                 title: 'Medical Information',
                 children: [
                   // Gender
-                  _fieldLabel('Gender'),
+                  _fieldLabel('Gender', required: true),
                   const SizedBox(height: 6),
                   _genderSelector(),
                   const SizedBox(height: 12),
@@ -414,6 +562,7 @@ String? _networkImageUrl;   // ← add this
                         side: const BorderSide(color: kBorder),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
+                            backgroundColor: Colors.white,
                         foregroundColor: kTextSecondary,
                       ),
                       child: const Text('Cancel',
@@ -921,14 +1070,27 @@ Widget _sourceOption({
     );
   }
 
-  Widget _fieldLabel(String label) => Padding(
+  Widget _fieldLabel(String label, {bool required = false}) => Padding(
         padding: const EdgeInsets.only(bottom: 0),
-        child: Text(label,
-            style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: kTextSecondary,
-                letterSpacing: 0.3)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: kTextSecondary,
+                    letterSpacing: 0.3)),
+            if (required) ...[
+              const SizedBox(width: 3),
+              const Text('*',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: kError,
+                      fontWeight: FontWeight.w800)),
+            ],
+          ],
+        ),
       );
 
   InputDecoration _dec({
@@ -975,11 +1137,12 @@ Widget _sourceOption({
     TextInputType keyboardType = TextInputType.text,
     TextCapitalization capitalization = TextCapitalization.none,
     String? Function(String?)? validator,
+    bool required = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel(label),
+        _fieldLabel(label, required: required),
         const SizedBox(height: 5),
         TextFormField(
           controller: controller,
@@ -998,7 +1161,7 @@ Widget _sourceOption({
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Mobile Number'),
+        _fieldLabel('Mobile Number', required: true),
         const SizedBox(height: 5),
         TextFormField(
           controller: _mobileController,
@@ -1102,7 +1265,7 @@ Widget _sourceOption({
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Date of Birth'),
+        _fieldLabel('Date of Birth', required: true),
         const SizedBox(height: 5),
         GestureDetector(
           onTap: _pickDob,
@@ -1232,6 +1395,74 @@ Widget _sourceOption({
             errorStyle: const TextStyle(fontSize: 9.5, color: kError),
           ),
           validator: _validateWeight,
+        ),
+      ],
+    );
+  }
+}
+
+class _DobDropdown extends StatelessWidget {
+  const _DobDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.itemLabel,
+  });
+
+  final String label;
+  final int value;
+  final List<int> items;
+  final ValueChanged<int> onChanged;
+  final String Function(int)? itemLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: kTextSecondary,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kBorder),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: value,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  color: kTextMuted, size: 20),
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+              ),
+              items: items
+                  .map((i) => DropdownMenuItem<int>(
+                        value: i,
+                        child: Text(itemLabel != null
+                            ? itemLabel!(i)
+                            : i.toString().padLeft(2, '0')),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
         ),
       ],
     );

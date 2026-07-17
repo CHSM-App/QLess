@@ -1,14 +1,16 @@
-﻿
-
-
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:qless/core/navigation/navigator_key.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
+import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
+import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — aligned with PatientListScreen
@@ -149,7 +151,8 @@ const _kDosageOpts = {
 //  MedicineEntry
 // ════════════════════════════════════════════════════════════════════
 class MedicineEntry {
-    final GlobalKey cardKey = GlobalKey(); 
+    final GlobalKey cardKey = GlobalKey();
+  bool hasError = false;
   MedicineType type;
   int?    medicineId;
   String? selectedName;
@@ -188,7 +191,7 @@ class MedicineEntry {
     medicineTypeId:   type.typeId,
     frequency:        frequency.isEmpty ? null : frequency,
     duration:         duration.isEmpty  ? null : duration,
-    timing:           timing.isEmpty    ? null : timing,
+    timing:           type == MedicineType.lotions ? null : (timing.isEmpty ? null : timing),
     tabletDosage:     type == MedicineType.tablet    ? (dosage.isEmpty ? null : dosage) : null,
     syrupDosageMl:    type == MedicineType.syrups     ? (dosage.isEmpty ? null : dosage) : null,
     injDosage:        type == MedicineType.injections ? (dosage.isEmpty ? null : dosage) : null,
@@ -591,6 +594,13 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
   final int?    queueNumber;
   final String  patientStatus;
   final String? symptoms;
+  final String? clinicId;
+  /// The session this patient belongs to. A doctor can have multiple queue
+  /// sessions running the same day (e.g. two slot blocks), each with its own
+  /// token numbering starting at 1 — without this, "Complete & Next" picks
+  /// the lowest token number across ALL sessions and can jump back to the
+  /// first patient of a different, unrelated session.
+  final int?    queueId;
 
   const PrescriptionScreen({
     super.key,
@@ -604,6 +614,8 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
     this.queueNumber,
     this.patientStatus = 'booked',
     this.symptoms,
+    this.clinicId,
+    this.queueId,
   });
 
   @override
@@ -615,10 +627,14 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final _diagCtrl = TextEditingController();
   final _clinCtrl = TextEditingController();
   final _advCtrl  = TextEditingController();
+  final _sympKey  = GlobalKey();
+  bool _symptomsError = false;
   DateTime? _followDate;
   final List<MedicineEntry> _meds = [];
   int _lastDoctorId = 0;
   late final ProviderSubscription<int?> _doctorIdSub;
+  bool _isSubmitting = false;
+  List<AppointmentList> _previousVisitsCache = const [];
 
   // @override
   // void initState() {
@@ -646,6 +662,49 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _maybeFetchMedicines(widget.doctorId);
     });
+    _fetchPreviousVisits();
+  }
+
+  // Doctor-wide, ALL-clinic history — deliberately bypasses the shared
+  // appointmentViewModelProvider list, which is scoped to whichever single
+  // clinic the doctor is currently active in. A patient's past visits with
+  // this doctor may have happened at a different clinic, so this hits the
+  // usecase directly with clinicId omitted instead of mutating the shared
+  // provider's "current clinic" state.
+  Future<void> _fetchPreviousVisits() async {
+    try {
+      final all = await ref.read(appointmentUsecaseProvider)
+          .fetchPatientAppointments(widget.doctorId);
+      if (!mounted) return;
+      final visits = all.where((a) =>
+          a.patientId == widget.patientId &&
+          a.appointmentId != widget.appointmentId &&
+          (a.status?.toLowerCase().trim() ?? '') == 'completed').toList();
+      visits.sort((a, b) {
+        final da = DateTime.tryParse(a.appointmentDate ?? '');
+        final db = DateTime.tryParse(b.appointmentDate ?? '');
+        if (da == null || db == null) return 0;
+        return db.compareTo(da);
+      });
+      setState(() => _previousVisitsCache = visits);
+    } catch (_) {
+      // Leave _previousVisitsCache as-is — card just won't show/refresh.
+    }
+  }
+
+  void _openPreviousHistory(List<AppointmentList> visits) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _PreviousHistoryPage(
+      patientName: widget.patientName,
+      visits: visits,
+      onSelect: (a) => Navigator.push(context, MaterialPageRoute(builder: (_) => DoctorPrescriptionDetailScreen(
+        appointmentId: a.appointmentId ?? 0,
+        patientId:     widget.patientId,
+        patientName:   widget.patientName,
+        patientAge:    widget.patientAge,
+        patientGender: widget.patientGender,
+        queueNumber:   a.queueNumber,
+      ))),
+    )));
   }
  
   @override
@@ -683,12 +742,28 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   String? _validate() {
-    if (_sympCtrl.text.trim().isEmpty) return 'Please enter symptoms';
-    for (int i = 0; i < _meds.length; i++) {
-      if (_meds[i].selectedName == null || _meds[i].medicineId == null)
-        return 'Please select medicine name for Medicine ${i + 1}';
+    final symptomsEmpty = _sympCtrl.text.trim().isEmpty;
+    MedicineEntry? badMed;
+    for (final m in _meds) {
+      m.hasError = m.selectedName == null || m.medicineId == null;
+      badMed ??= m.hasError ? m : null;
     }
-    return null;
+    _symptomsError = symptomsEmpty;
+
+    if (!symptomsEmpty && badMed == null) return null;
+
+    setState(() {});
+    final key = symptomsEmpty ? _sympKey : badMed!.cardKey;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = key.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250), alignment: 0.2);
+      }
+    });
+
+    return symptomsEmpty
+        ? 'Please enter symptoms'
+        : 'Please select medicine name for Medicine ${_meds.indexOf(badMed!) + 1}';
   }
 
   String _todayApi() {
@@ -722,22 +797,22 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     followUpDate:  _followUpStr(),
     advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
     medicines:     _meds.map((e) => e.toApiModel()).toList(),
+    clinicId:      widget.clinicId,
   );
 
   Future<AppointmentResponseModel?> _completeQueueAction() async {
     try {
+      final isOnline = ref.read(connectivityNotifierProvider).isOnline;
       final isSkipped = widget.patientStatus.toLowerCase().trim() == 'skipped';
       final AppointmentResponseModel result;
       if (isSkipped) {
-        // Doctor has now attended a previously-skipped patient — close that
-        // session. queueRecall re-queues a skipped patient as active and
-        // fails here because the patient is already in_progress.
         result = await ref.read(appointmentViewModelProvider.notifier)
             .endSession(AppointmentRequestModel(
               doctorId:      widget.doctorId,
               appointmentId: widget.appointmentId,
               patientId:     widget.patientId,
-            ));
+              clinicId:      widget.clinicId,
+            ), isOnline: isOnline);
       } else {
         result = await ref.read(appointmentViewModelProvider.notifier)
             .queueNext(AppointmentRequestModel(
@@ -746,51 +821,83 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
               appointmentId:   widget.appointmentId,
               patientId:       widget.patientId,
               appointmentDate: _todayApi(),
-            ));
+              clinicId:        widget.clinicId,
+              queueId:         widget.queueId,
+            ), isOnline: isOnline);
       }
       if (result.success == true) return result;
-      _showSnack(result.message ?? 'Queue action failed', isError: true);
+      // Show user-friendly message — never expose raw SQL errors
+      final raw = result.message ?? '';
+      final friendly = (raw.contains('PRIMARY KEY') || raw.contains('duplicate key') || raw.contains('Violation'))
+          ? 'Prescription saved. Queue could not advance — please refresh the home screen.'
+          : raw.isNotEmpty ? raw : 'Queue action failed';
+      _showSnack(friendly, isError: true);
       return null;
     } catch (e) {
-      _showSnack(e.toString().replaceFirst('Exception: ', ''), isError: true);
+      _showSnack('Prescription saved. Queue could not advance — please refresh.', isError: true);
       return null;
     }
   }
 
   Future<void> _handleNextPatient() async {
+    debugPrint('[RxDebug] _handleNextPatient: start');
     final result = await _completeQueueAction();
-    if (!mounted || result == null) return;
+    debugPrint('[RxDebug] _handleNextPatient: _completeQueueAction returned '
+        'success=${result?.success} message=${result?.message}');
+    // Deliberately NOT gated on `mounted` from here on — `State.mounted`
+    // stays true while this widget is merely deactivated (e.g. a Navigator
+    // transition already under way), so it can't be trusted to skip
+    // navigation. All Navigator calls below go through the app-root
+    // `navigatorKey` instead of `Navigator.of(context)`, so they work even
+    // if this screen's own context is no longer attached to the tree.
+    if (result == null) {
+      debugPrint('[RxDebug] _handleNextPatient: result null, popping');
+      // queueNext failed but prescription was already saved — navigate back
+      // so the user isn't stuck on the prescription screen.
+      await Future.delayed(const Duration(milliseconds: 600));
+      navigatorKey.currentState?.pop();
+      return;
+    }
 
     // API explicitly says no more queue patients — go back to patient list
     final msg = result.message?.trim() ?? '';
     if (msg.toLowerCase().contains('no patient left')) {
+      debugPrint('[RxDebug] _handleNextPatient: "no patient left", popping');
       _showSnack(msg, isError: false);
       await Future.delayed(const Duration(milliseconds: 300));
-      if (mounted) Navigator.pop(context);
+      navigatorKey.currentState?.pop();
       return;
     }
 
     final nextToken = result.data?.isNotEmpty == true ? result.data!.first.nextToken : null;
 
-    await ref.read(appointmentViewModelProvider.notifier)
-        .fetchPatientAppointments(widget.doctorId);
-    if (!mounted) return;
+    debugPrint('[RxDebug] _handleNextPatient: fetching patient appointments…');
+    await ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(
+        widget.doctorId,
+        isOnline: ref.read(connectivityNotifierProvider).isOnline,
+        clinicId: widget.clinicId);
+    debugPrint('[RxDebug] _handleNextPatient: fetch done');
 
     final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
         .maybeWhen(data: (l) => l, orElse: () => const <AppointmentList>[]);
+    debugPrint('[RxDebug] _handleNextPatient: fetched ${all.length} appointments: '
+        '${all.map((a) => '(id=${a.appointmentId},status=${a.status},queueId=${a.queueId},queueNum=${a.queueNumber})').join(', ')}');
+    debugPrint('[RxDebug] _handleNextPatient: widget.appointmentId=${widget.appointmentId} widget.queueId=${widget.queueId}');
 
     final next = _pickNextAppointment(all, preferredQueue: nextToken);
+    debugPrint('[RxDebug] _handleNextPatient: picked next = '
+        '${next == null ? 'NULL' : '(id=${next.appointmentId}, patient=${next.patientName}, status=${next.status})'}');
     if (next == null) {
       _showSnack('No next patient found', isError: true);
-      Navigator.pop(context);
+      navigatorKey.currentState?.pop();
       return;
     }
 
     _showSnack('Prescription saved. Opening next patient…', isError: false);
     await Future.delayed(const Duration(milliseconds: 300));
-    if (!mounted) return;
 
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PrescriptionScreen(
+    debugPrint('[RxDebug] _handleNextPatient: pushReplacement -> appointmentId=${next.appointmentId}');
+    navigatorKey.currentState?.pushReplacement(MaterialPageRoute(builder: (_) => PrescriptionScreen(
       patientId:     next.patientId     ?? 0,
       doctorId:      next.doctorId      ?? widget.doctorId,
       userTypeId:    next.userType      ?? widget.userTypeId,
@@ -801,6 +908,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       queueNumber:   next.queueNumber,
       patientStatus: next.status ?? 'booked',
       symptoms:      next.symptoms,
+      clinicId:      widget.clinicId,
+      queueId:       next.queueId ?? widget.queueId,
     )));
   }
 
@@ -810,7 +919,14 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       (a.bookingType == null && a.startTime != null && a.endTime != null);
 
   AppointmentList? _pickNextAppointment(List<AppointmentList> list, {int? preferredQueue}) {
-    final inProgress = list.where((a) {
+    // Scope to this patient's own session when we know it — a doctor can run
+    // multiple queue sessions the same day, each with its own token numbering
+    // starting at 1, so an unscoped pick can jump to a different session's
+    // first patient instead of this session's real next one.
+    final sameSession = widget.queueId == null
+        ? list
+        : list.where((a) => a.queueId == widget.queueId).toList();
+    final inProgress = sameSession.where((a) {
       final s = a.status?.toLowerCase().trim() ?? '';
       return s == 'in_progress' && a.appointmentId != widget.appointmentId
           && _isToday(_parseDate(a.appointmentDate))
@@ -820,7 +936,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       inProgress.sort((a, b) => _sortKey(a).compareTo(_sortKey(b)));
       return inProgress.first;
     }
-    final candidates = list.where((a) {
+    final candidates = sameSession.where((a) {
       final s = a.status?.toLowerCase().trim() ?? '';
       return s == 'booked' && _isToday(_parseDate(a.appointmentDate))
           && a.appointmentId != widget.appointmentId
@@ -850,39 +966,70 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   Future<void> _completePrescription() async {
+    debugPrint('[RxDebug] _completePrescription: tapped, _isSubmitting=$_isSubmitting');
+    if (_isSubmitting) { debugPrint('[RxDebug] _completePrescription: blocked, already submitting'); return; }
     final error = _validate();
-    if (error != null) { _showSnack(error, isError: true); return; }
-    await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
-    if (!mounted) return;
-    final state = ref.read(prescriptionViewModelProvider);
-    if (state.error != null) { _showSnack(state.error!, isError: true); return; }
-    await _handleNextPatient();
+    if (error != null) { debugPrint('[RxDebug] _completePrescription: validation failed: $error'); _showSnack(error, isError: true); return; }
+    setState(() => _isSubmitting = true);
+    try {
+      debugPrint('[RxDebug] _completePrescription: calling insertPrescription…');
+      await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
+      debugPrint('[RxDebug] _completePrescription: insertPrescription returned, mounted=$mounted');
+      if (!mounted) { debugPrint('[RxDebug] _completePrescription: unmounted, abort'); return; }
+      final state = ref.read(prescriptionViewModelProvider);
+      debugPrint('[RxDebug] _completePrescription: state.error=${state.error}');
+      if (state.error != null) { _showSnack(state.error!, isError: true); return; }
+      await _handleNextPatient();
+      debugPrint('[RxDebug] _completePrescription: _handleNextPatient returned');
+    } finally {
+      debugPrint('[RxDebug] _completePrescription: finally, mounted=$mounted');
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _completeAndBack() async {
+    debugPrint('[RxDebug] _completeAndBack: tapped, _isSubmitting=$_isSubmitting');
+    if (_isSubmitting) { debugPrint('[RxDebug] _completeAndBack: blocked, already submitting'); return; }
     final error = _validate();
-    if (error != null) { _showSnack(error, isError: true); return; }
-    await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
-    if (!mounted) return;
-    final state = ref.read(prescriptionViewModelProvider);
-    if (state.error != null) { _showSnack(state.error!, isError: true); return; }
+    if (error != null) { debugPrint('[RxDebug] _completeAndBack: validation failed: $error'); _showSnack(error, isError: true); return; }
+    setState(() => _isSubmitting = true);
     try {
-      await ref.read(appointmentViewModelProvider.notifier).endSession(
-        AppointmentRequestModel(doctorId: widget.doctorId,
-            appointmentId: widget.appointmentId, patientId: widget.patientId));
-    } catch (_) {}
-    if (!mounted) return;
-    _showSnack('Prescription saved', isError: false);
-    await Future.delayed(const Duration(milliseconds: 300));
-    if (mounted) Navigator.pop(context);
+      debugPrint('[RxDebug] _completeAndBack: calling insertPrescription…');
+      await ref.read(prescriptionViewModelProvider.notifier).insertPrescription(_buildPrescription());
+      debugPrint('[RxDebug] _completeAndBack: insertPrescription returned, mounted=$mounted');
+      if (!mounted) { debugPrint('[RxDebug] _completeAndBack: unmounted, abort'); return; }
+      final state = ref.read(prescriptionViewModelProvider);
+      debugPrint('[RxDebug] _completeAndBack: state.error=${state.error}');
+      if (state.error != null) { _showSnack(state.error!, isError: true); return; }
+      // Fire-and-forget — don't let endSession block or unmount the widget before pop
+      ref.read(appointmentViewModelProvider.notifier).endSession(
+        AppointmentRequestModel(
+          doctorId:      widget.doctorId,
+          appointmentId: widget.appointmentId,
+          patientId:     widget.patientId,
+          clinicId:      widget.clinicId,
+        ),
+        isOnline: ref.read(connectivityNotifierProvider).isOnline,
+      ).catchError((_) => AppointmentResponseModel(success: false));
+      _showSnack('Prescription saved', isError: false);
+      await Future.delayed(const Duration(milliseconds: 300));
+      debugPrint('[RxDebug] _completeAndBack: about to pop');
+      // Uses navigatorKey, not Navigator.of(context) — `mounted` alone can't
+      // be trusted to gate this (see _showSnack).
+      navigatorKey.currentState?.pop();
+    } finally {
+      debugPrint('[RxDebug] _completeAndBack: finally, mounted=$mounted');
+      if (mounted) setState(() => _isSubmitting = false);
+    }
   }
 
   Future<void> _onSkip() async {
     try {
+      final isOnline = ref.read(connectivityNotifierProvider).isOnline;
       final skipRes = await ref.read(appointmentViewModelProvider.notifier).queueSkip(
         AppointmentRequestModel(doctorId: widget.doctorId,
             appointmentId: widget.appointmentId, patientId: widget.patientId,
-            isNext: 1));
+            isNext: 1, queueId: widget.queueId), isOnline: isOnline);
       if (!mounted) return;
 
       // SP rejected the skip (queue not started, invalid state, …) —
@@ -897,12 +1044,12 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       if (skipMsg.toLowerCase().contains('last patient')) {
         _showSnack(skipMsg, isError: false);
         await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) Navigator.pop(context);
+        navigatorKey.currentState?.pop();
         return;
       }
 
-      await ref.read(appointmentViewModelProvider.notifier)
-          .fetchPatientAppointments(widget.doctorId);
+      await ref.read(appointmentViewModelProvider.notifier).fetchPatientAppointments(
+          widget.doctorId, isOnline: isOnline, clinicId: widget.clinicId);
       if (!mounted) return;
       final all = ref.read(appointmentViewModelProvider).patientAppointmentsList
           .maybeWhen(data: (l) => l, orElse: () => <AppointmentList>[]);
@@ -910,10 +1057,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       if (next == null) {
         _showSnack(skipRes.message ?? 'Patient skipped', isError: false);
         await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) Navigator.pop(context);
+        navigatorKey.currentState?.pop();
         return;
       }
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => PrescriptionScreen(
+      navigatorKey.currentState?.pushReplacement(MaterialPageRoute(builder: (_) => PrescriptionScreen(
         patientId:     next.patientId     ?? 0,
         doctorId:      next.doctorId      ?? widget.doctorId,
         userTypeId:    next.userType      ?? widget.userTypeId,
@@ -924,26 +1071,40 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         queueNumber:   next.queueNumber,
         patientStatus: next.status ?? 'booked',
         symptoms:      next.symptoms,
+        clinicId:      widget.clinicId,
+        queueId:       next.queueId ?? widget.queueId,
       )));
     } catch (e) { _showSnack('Skip failed: $e', isError: true); }
   }
 
+  // `State.mounted` can still read true while this widget is deactivated
+  // (mid-removal from the tree, e.g. a Navigator transition already in
+  // flight) — in that window `ScaffoldMessenger.of(context)` throws
+  // "Looking up a deactivated widget's ancestor is unsafe", which used to
+  // abort _handleNextPatient/_completeAndBack BEFORE they reached the
+  // Navigator call that actually opens the next patient / pops back. Use the
+  // app-root ScaffoldMessenger key instead of a context lookup so this can
+  // never throw on a deactivated context, and callers can rely on it.
   void _showSnack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Row(children: [
-        Icon(
-          isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
-          color: Colors.white, size: 14,
-        ),
-        const SizedBox(width: 7),
-        Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, color: Colors.white))),
-      ]),
-      backgroundColor: isError ? kError : kPrimary,
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-      duration: const Duration(seconds: 2),
-    ));
+    try {
+      rootScaffoldMessengerKey.currentState?.showSnackBar(SnackBar(
+        content: Row(children: [
+          Icon(
+            isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded,
+            color: Colors.white, size: 14,
+          ),
+          const SizedBox(width: 7),
+          Expanded(child: Text(msg, style: const TextStyle(fontSize: 13, color: Colors.white))),
+        ]),
+        backgroundColor: isError ? kError : kPrimary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+        duration: const Duration(seconds: 2),
+      ));
+    } catch (e) {
+      debugPrint('[RxDebug] _showSnack failed: $e');
+    }
   }
 
   double get _width => MediaQuery.of(context).size.width;
@@ -1034,6 +1195,7 @@ Widget build(BuildContext context) {
             ),
           ),
           const SizedBox(width: 10),
+          
           // Icon badge — same 34×34 style as PatientListScreen
           Container(
             width: 34, height: 34,
@@ -1073,7 +1235,8 @@ Widget build(BuildContext context) {
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
             children: [
               _patientCard(), _gap(12),
-              _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+              if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
+              _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
               _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'),
               // _gap(10),
               // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
@@ -1123,7 +1286,8 @@ Widget build(BuildContext context) {
               padding: const EdgeInsets.fromLTRB(16, 14, 10, 110),
               children: [
                 _patientCard(), _gap(12),
-                _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+                if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
+                _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
                 _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
                 // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
                 _followUpCard(),
@@ -1151,7 +1315,8 @@ Widget build(BuildContext context) {
         padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
         children: [
           _patientCard(), _gap(12),
-          _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…'), _gap(10),
+          if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
+          _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
           _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(12),
           // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
           _medicinesHeader(), _gap(10),
@@ -1194,15 +1359,39 @@ Widget build(BuildContext context) {
     ]));
   }
 
-  Widget _textSection(String label, TextEditingController ctrl, String hint) =>
-      _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+  // ── Previous History card — only if this patient has past completed visits with this doctor ──
+  Widget _previousHistoryCard() => GestureDetector(
+    onTap: () => _openPreviousHistory(_previousVisitsCache),
+    child: _card(child: Row(children: [
+      Container(
+        width: 38, height: 38,
+        decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(10)),
+        child: const Icon(Icons.history_rounded, color: kPurpleDark, size: 18),
+      ),
+      const SizedBox(width: 12),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Previous History', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+        const SizedBox(height: 2),
+        Text('${_previousVisitsCache.length} earlier visit${_previousVisitsCache.length == 1 ? '' : 's'} with this patient',
+            style: const TextStyle(fontSize: 11, color: kTextSecondary)),
+      ])),
+      const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
+    ])),
+  );
+
+  Widget _textSection(String label, TextEditingController ctrl, String hint, {bool hasError = false, Key? key}) =>
+      Container(key: key, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _secLabel(label), _gap(8),
         TextField(
           controller: ctrl, maxLines: 3,
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
-          decoration: _ideco(hint),
+          decoration: _ideco(hint, hasError: hasError),
         ),
-      ]));
+        if (hasError) ...[
+          _gap(4),
+          const Text('This field is required', style: TextStyle(fontSize: 11, color: kError, fontWeight: FontWeight.w600)),
+        ],
+      ])));
 
   Widget _medicinesHeader() => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1292,7 +1481,7 @@ List<Widget> _buildMedCards(List<Medicine> medicines) =>
 
   // ── Bottom Action Bar ────────────────────────────────────────────
   Widget _bottomBar() {
-    final isLoading = ref.watch(prescriptionViewModelProvider).isLoading;
+    final isLoading = ref.watch(prescriptionViewModelProvider).isLoading || _isSubmitting;
     return Positioned(
       bottom: 0, left: 0, right: 0,
       child: Container(
@@ -1365,14 +1554,14 @@ List<Widget> _buildMedCards(List<Medicine> medicines) =>
     child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
   );
 
-  InputDecoration _ideco(String hint) => InputDecoration(
+  InputDecoration _ideco(String hint, {bool hasError = false}) => InputDecoration(
     hintText: hint,
     hintStyle: const TextStyle(fontSize: 12, color: kTextMuted),
     filled: true, fillColor: kBg,
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+    border:        OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: hasError ? kError : kBorder)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: hasError ? kError : kBorder)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: hasError ? kError : kPrimary, width: 1.5)),
   );
 }
 
@@ -1399,6 +1588,7 @@ class _MedCardState extends State<_MedCard> {
   MedicineEntry get e => widget.entry;
   late TextEditingController _durCtrl;
   late TextEditingController _areaCtrl;
+  bool _showSuggestions = false;
 
   @override
   void initState() { super.initState(); _initControllers(); }
@@ -1481,7 +1671,7 @@ void _onTypeChange(MedicineType t) {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: tc.withOpacity(0.30), width: 1.2),
+        border: Border.all(color: e.hasError ? kError : tc.withOpacity(0.30), width: e.hasError ? 1.6 : 1.2),
         boxShadow: [BoxShadow(color: tc.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1613,11 +1803,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     _nameSearch(), _gap(10),
     _txtField('Apply Area / Body Part', 'e.g. Scalp, Face', _areaCtrl, onChanged: (v) => e.lotionApplyArea = v),
     _gap(10), _dosagePicker(label: 'Application per slot'), _gap(10),
-    _r2([
-      _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
-      _dropField('Timing', e.timing, ['Morning', 'Evening', 'Night', 'Morning & Night', 'As Directed'],
-          (v) => setState(() => e.timing = v!)),
-    ]),
+    _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
   ]);
 
   Widget _sprayBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1639,19 +1825,24 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
       _onTypeChange(newType);
     }
     setState(() {
-      e.selectedName = m.medicineName ?? '';
-      e.medicineId   = m.medicineId;
-      e.searchText   = '';
+      e.selectedName    = m.medicineName ?? '';
+      e.medicineId      = m.medicineId;
+      e.searchText      = '';
+      _showSuggestions  = false;
     });
   }
 
   Widget _nameSearch() {
     final all = widget.medicines;
     final filtered = e.searchText.isEmpty
-        ? <Medicine>[]
+        ? (List<Medicine>.from(all)
+            ..sort((a, b) => (a.medicineName ?? '').toLowerCase().compareTo((b.medicineName ?? '').toLowerCase())))
         : all.where((m) => (m.medicineName ?? '').toLowerCase().contains(e.searchText.toLowerCase())).toList();
+    final showDropdown = _showSuggestions || e.searchText.isNotEmpty;
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return TapRegion(
+      onTapOutside: (_) { if (_showSuggestions) setState(() => _showSuggestions = false); },
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _lbl('Medicine Name'), _gap(5),
       if (e.selectedName != null)
         Container(
@@ -1684,7 +1875,8 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
         )
       else ...[
         TextField(
-          onChanged: (v) => setState(() => e.searchText = v),
+          onTap: () => setState(() => _showSuggestions = true),
+          onChanged: (v) => setState(() { e.searchText = v; _showSuggestions = true; }),
           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
           decoration: _ideco('Search medicine name…').copyWith(
             prefixIcon: const Padding(padding: EdgeInsets.symmetric(horizontal: 11),
@@ -1692,7 +1884,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
             prefixIconConstraints: const BoxConstraints(minWidth: 40),
           ),
         ),
-        if (e.searchText.isNotEmpty) ...[
+        if (showDropdown) ...[
           _gap(4),
           if (filtered.isNotEmpty)
             Container(
@@ -1738,12 +1930,14 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
             Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
               const Icon(Icons.info_outline_rounded, size: 12, color: kTextMuted),
               const SizedBox(width: 5),
-              Expanded(child: Text('No medicine found for "${e.searchText}"',
+              Expanded(child: Text(e.searchText.isEmpty
+                      ? 'No medicines added yet'
+                      : 'No medicine found for "${e.searchText}"',
                   style: const TextStyle(fontSize: 11, color: kTextMuted))),
             ])),
         ],
       ],
-    ]);
+    ]));
   }
 
   Widget _txtField(String label, String hint, TextEditingController ctrl,
@@ -1788,5 +1982,122 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kBorder)),
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: kPrimary, width: 1.5)),
   );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  _PreviousHistorySheet — this patient's past visits with THIS doctor,
+//  newest first. Tap a date to open that visit's prescription.
+// ════════════════════════════════════════════════════════════════════
+class _PreviousHistoryPage extends StatelessWidget {
+  final String patientName;
+  final List<AppointmentList> visits;
+  final ValueChanged<AppointmentList> onSelect;
+
+  const _PreviousHistoryPage({
+    required this.patientName,
+    required this.visits,
+    required this.onSelect,
+  });
+
+  String _fmtDate(String? raw) {
+    final d = DateTime.tryParse(raw ?? '');
+    return d == null ? 'Unknown date' : DateFormat('EEEE, d MMMM yyyy').format(d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: kBg,
+      body: Column(children: [
+        Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 34, height: 34,
+                    decoration: BoxDecoration(
+                      color: kBg,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: kBorder),
+                    ),
+                    child: const Icon(Icons.arrow_back_ios_new_rounded, color: kTextPrimary, size: 15),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: kPurpleLight,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: kPurple.withOpacity(0.2)),
+                  ),
+                  child: const Icon(Icons.history_rounded, color: kPurpleDark, size: 16),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text('Previous History', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
+                  const SizedBox(height: 1),
+                  Text(patientName, style: const TextStyle(fontSize: 11, color: kTextSecondary), overflow: TextOverflow.ellipsis),
+                ])),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(20)),
+                  child: Text('${visits.length}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: kPurpleDark)),
+                ),
+              ]),
+            ),
+          ),
+        ),
+        Expanded(
+          child: visits.isEmpty
+              ? const Center(child: Text('No previous visits', style: TextStyle(color: kTextMuted, fontSize: 13)))
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                  itemCount: visits.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
+                    final v = visits[i];
+                    return GestureDetector(
+                      onTap: () => onSelect(v),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: kBorder),
+                          boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(10)),
+                            child: const Icon(Icons.event_note_rounded, color: kPurpleDark, size: 16),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            Text(_fmtDate(v.appointmentDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                            if (v.queueNumber != null) ...[
+                              const SizedBox(height: 3),
+                              Text('Queue #${v.queueNumber}', style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                            ],
+                          ])),
+                          const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
+        ),
+      ]),
+    );
+  }
 }
 

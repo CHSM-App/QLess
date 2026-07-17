@@ -9,7 +9,6 @@ import 'package:qless/presentation/patient/providers/patient_view_model_provider
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
-import 'package:qless/presentation/patient/screens/delete_account_page.dart';
 import 'package:qless/presentation/patient/screens/patient_help_center_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/patient_edit_profile.dart'
@@ -21,6 +20,7 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 const kPrimary      = Color(0xFF26C6B0);
 const kPrimaryDark  = Color(0xFF2BB5A0);
 const kPrimaryLight = Color(0xFFD9F5F1);
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -132,7 +132,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg,
       appBar: AppBar(
         backgroundColor: Colors.white,
         // Keep the header flat white when content scrolls under it — no M3
@@ -666,18 +666,6 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
             final uri = Uri.parse('https://qless.vengurlatech.com/login/privacy');
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           },
-        ),
-        _menuRow(
-          icon: Icons.delete_outline_rounded,
-          iconFg: kError, iconBg: kRedLight,
-          title: 'Delete Account',
-          subtitle: 'Permanently remove your account',
-          titleColor: kError,
-          chevronColor: kError.withOpacity(0.4),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DeleteAccountPage()),
-          ),
         ),
         _menuRow(
           icon: Icons.logout_rounded,

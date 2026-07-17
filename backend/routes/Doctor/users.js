@@ -67,7 +67,7 @@ router.get('/getAllMedicines/:doctor_id', async (req, res) => {
     const result = await request.execute('sp_Medicine_Master');
 
     res.status(200).json(
-        result.recordset
+      result.recordset
     );
 
   } catch (error) {
@@ -99,11 +99,11 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
       if (!grouped[row.day_of_week]) {
         grouped[row.day_of_week] = {
           day: row.day_of_week,
-          is_enabled: row.is_enabled ? 1:0,
+          is_enabled: row.is_enabled ? 1 : 0,
           slots: []
         };
       }
- 
+
 
 
       if (row.slot_id) {
@@ -113,7 +113,7 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
           end_time: row.end_time,
           booking_mode: row.booking_mode,
           slot_duration: row.slot_duration,
-		  max_queue_length: row.max_queue_length
+          max_queue_length: row.max_queue_length
         });
       }
     }
@@ -121,8 +121,8 @@ router.get('/getDoctorSchedule/:doctor_id', async (req, res) => {
     const schedule = Object.values(grouped);
 
     res.status(200).json({
-        doctor_id: parseInt(doctor_id),
-        schedule: schedule
+      doctor_id: parseInt(doctor_id),
+      schedule: schedule
     });
 
   } catch (error) {
@@ -150,10 +150,31 @@ router.get('/patientAppointmentList/:doctor_id', async (req, res) => {
     if (clinic_id) request.input('clinic_id', clinic_id);
 
     const result = await request.execute('sp_appointment');
+    const rows = result.recordset || [];
 
-    res.status(200).json(
-        result.recordset
-    );
+    // sp_appointment predates is_arrived — patch it in with a lookup instead
+    // of touching the stored procedure.
+    const skippedIds = rows
+      .filter(r => (r.status || '').toLowerCase() === 'skipped')
+      .map(r => r.appointment_id);
+    if (skippedIds.length > 0) {
+      const arrivedRes = await db.request()
+        .query(`
+          SELECT appointment_id, is_arrived, arrived_at
+          FROM appointments
+          WHERE appointment_id IN (${skippedIds.map(id => Number(id)).join(',')})
+        `);
+      const arrivedMap = new Map(
+        (arrivedRes.recordset || []).map(r => [r.appointment_id, r])
+      );
+      for (const r of rows) {
+        const a = arrivedMap.get(r.appointment_id);
+        r.is_arrived = a?.is_arrived ?? false;
+        r.arrived_at = a?.arrived_at ?? null;
+      }
+    }
+
+    res.status(200).json(rows);
 
   } catch (error) {
     res.status(500).json({
@@ -169,7 +190,7 @@ router.get('/appointmentWisePrescription/:appointment_id', async (req, res) => {
 
     const result = await db.request()
       .input('appointment_id', appointment_id)
-	  .input('operation', 'AppointmentWisePrescription')
+      .input('operation', 'AppointmentWisePrescription')
       .execute('sp_prescription');
 
     res.status(200).json(result.recordset);
@@ -216,6 +237,18 @@ router.get('/appointment/getTodayQueue/:doctor_id', async (req, res) => {
         success: false,
         message: statusRow || 'Failed to fetch queue'
       });
+    }
+
+    // Enrich with booking_closed (the "stop new bookings" toggle) — sp_appointment's
+    // GET_TODAY_QUEUE doesn't return it, so fetch it directly rather than touch the SP.
+    const queueIds = rows.map(r => r.queue_id).filter(id => id != null);
+    if (queueIds.length > 0) {
+      const bcRes = await db.request().query(`
+        SELECT queue_id, booking_closed FROM doctor_queue
+        WHERE queue_id IN (${queueIds.map(id => Number(id)).join(',')})
+      `);
+      const bcMap = new Map((bcRes.recordset || []).map(r => [r.queue_id, r.booking_closed]));
+      for (const r of rows) r.booking_closed = bcMap.get(r.queue_id) === true;
     }
 
     return res.json(rows);
@@ -272,15 +305,15 @@ router.get('/getDoctorsByClinic/:clinic_id', async (req, res) => {
 
 
 
-router.get('/fetchReceptionistList/:clinic_id', async (req, res) => {
-  const { clinic_id } = req.params;
-  console.log('[ReceptionistDebug] fetchReceptionistList clinic_id:', clinic_id);
+router.get('/fetchReceptionistList/:doctor_id', async (req, res) => {
+  const { doctor_id } = req.params;
+  console.log('[ReceptionistDebug] fetchReceptionistList doctor_id:', doctor_id);
 
   try {
     const request = db.request();
 
     request.input('operation', 'FetchReceptionistList');
-    request.input('clinic_id', clinic_id);
+    request.input('doctor_id', doctor_id);
 
     const result = await request.execute('sp_receptionist');
     console.log(

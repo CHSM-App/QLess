@@ -28,10 +28,13 @@ class AppointmentState {
   final AsyncValue<List<AppointmentList>>?  patientAppointmentsList;
   final int? doctorPatientCount;
   final Set<int> offlineDoctors; // doctor IDs whose network is currently down
-  // Live queue status per doctorId: 'queue_started' | 'queue_paused' | 'queue_paused_emergency' | 'queue_stopped'
-  final Map<int, String> doctorQueueEvents;
-  // Real current_serving per doctorId from socket events (overrides SP value for skipped patients).
-  final Map<int, int> doctorCurrentServing;
+  // Live queue status per "doctorId_queueId": 'queue_started' | 'queue_paused' |
+  // 'queue_paused_emergency' | 'queue_stopped'. Keyed by queue_id (not just
+  // doctorId) so a doctor running two simultaneous queues/sessions doesn't have
+  // one queue's "live" banner bleed onto the other queue's appointment card.
+  final Map<String, String> doctorQueueEvents;
+  // Real current_serving per "doctorId_clinicId" from socket events (overrides SP value).
+  final Map<String, int> doctorCurrentServing;
 
   const AppointmentState({
     this.isLoading = false,
@@ -70,8 +73,8 @@ class AppointmentState {
     int? doctorPatientCount,
     bool clearDoctorPatientCount = false,
     Set<int>? offlineDoctors,
-    Map<int, String>? doctorQueueEvents,
-    Map<int, int>? doctorCurrentServing,
+    Map<String, String>? doctorQueueEvents,
+    Map<String, int>? doctorCurrentServing,
   }) {
     return AppointmentState(
       isLoading: isLoading ?? this.isLoading,
@@ -120,9 +123,17 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
       final raw      = data['doctor_id'];
       final doctorId = raw is int ? raw : int.tryParse(raw.toString());
       final online   = data['online'] as bool? ?? true;
+      final reason   = data['reason'] as String?;
       if (doctorId == null) return;
       final updated = Set<int>.from(state.offlineDoctors);
-      if (online) { updated.remove(doctorId); } else { updated.add(doctorId); }
+      // Only show the "network problem" banner for a real disconnect. An
+      // explicit doctor logout/app-close is intentional, not a network
+      // issue, so it shouldn't scare the patient with a connectivity warning.
+      if (online || reason != 'disconnect') {
+        updated.remove(doctorId);
+      } else {
+        updated.add(doctorId);
+      }
       debugPrint('[SOCKET] offlineDoctors updated: $updated');
       state = state.copyWith(offlineDoctors: updated);
     });
@@ -134,20 +145,38 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
       final event = data['event'] as String?;
       final raw   = data['doctor_id'];
       final dId   = raw is int ? raw : int.tryParse(raw.toString());
+      // TEMP DEBUG — remove after diagnosing stuck current_serving.
+      debugPrint('[QN-DEBUG] queue_update recv: event=$event doctor_id=$raw '
+          'current_serving=${data['current_serving']} clinic_id=${data['clinic_id']} '
+          'queue_id=${data['queue_id']}');
       if (dId != null) {
-        // Capture real current_serving from socket (avoids SP bug where skipped
-        // patients receive their own token echoed back as current_serving).
+        // Capture real current_serving from socket, keyed by "doctorId_clinicId"
+        // so a CL001 event never pollutes CL002 patient's NOW circle.
         final rawCs = data['current_serving'];
         final cs = rawCs is int ? rawCs : int.tryParse(rawCs?.toString() ?? '');
-        if (cs != null && cs > 0) {
-          final csMap = Map<int, int>.from(state.doctorCurrentServing);
-          csMap[dId] = cs;
+        final rawCl = data['clinic_id'];
+        final clinicId = rawCl?.toString();
+        if (cs != null && cs > 0 && clinicId != null && clinicId.isNotEmpty) {
+          final key = '${dId}_$clinicId';
+          final csMap = Map<String, int>.from(state.doctorCurrentServing);
+          csMap[key] = cs;
           state = state.copyWith(doctorCurrentServing: csMap);
+          // TEMP DEBUG — override applied.
+          debugPrint('[QN-DEBUG] override APPLIED: key=$key -> $cs '
+              '| full map=$csMap');
+        } else {
+          // TEMP DEBUG — override DROPPED (missing/zero cs or missing clinic_id).
+          debugPrint('[QN-DEBUG] override DROPPED: cs=$cs clinicId=$clinicId '
+              '(event=$event) — NOW circle will fall back to SP current_serving');
         }
         if (event != null && bannerEvents.contains(event)) {
-          final evMap = Map<int, String>.from(state.doctorQueueEvents);
-          evMap[dId] = event;
-          state = state.copyWith(doctorQueueEvents: evMap);
+          final rawQ = data['queue_id'];
+          final qId  = rawQ is int ? rawQ : int.tryParse(rawQ?.toString() ?? '');
+          if (qId != null) {
+            final evMap = Map<String, String>.from(state.doctorQueueEvents);
+            evMap['${dId}_$qId'] = event;
+            state = state.copyWith(doctorQueueEvents: evMap);
+          }
         }
       }
       getPatientAppointments(patientId, silent: true);
@@ -173,21 +202,21 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     super.dispose();
   }
 
-  Future<void> getAppointmentAvailability(
-    AppointmentRequestModel appointmentRequest,
-  ) async {
-    state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
-    try {
-      final result = await usecase.getAppointmentAvailability(appointmentRequest);
-      state = state.copyWith(
-        isLoading: false,
-        isSuccess: true,
-        availabilityResponse: result,
-      );
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: _extractError(e));
-    }
-  }
+  // Future<void> getAppointmentAvailability(
+  //   AppointmentRequestModel appointmentRequest,
+  // ) async {
+  //   state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
+  //   try {
+  //     final result = await usecase.getAppointmentAvailability(appointmentRequest);
+  //     state = state.copyWith(
+  //       isLoading: false,
+  //       isSuccess: true,
+  //       availabilityResponse: result,
+  //     );
+  //   } catch (e) {
+  //     state = state.copyWith(isLoading: false, error: _extractError(e));
+  //   }
+  // }
 
 
   Future<void> getPatientAppointments(int familyId, {bool silent = false}) async {
@@ -282,6 +311,20 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     }
   }
 
+  Future<bool> markArrived(int appointmentId, int patientId, int familyId) async {
+    try {
+      final result = await usecase.markArrived(
+        AppointmentRequestModel(appointmentId: appointmentId, patientId: patientId),
+      );
+      if (result.success == true) {
+        await getPatientAppointments(familyId, silent: true);
+      }
+      return result.success == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   ) async {
@@ -298,21 +341,21 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
     }
   }
 
-  Future<void> getBookedSlots(int doctorId) async {
+  Future<void> getBookedSlots(int doctorId, String clinicId) async {
     try {
-      final result = await usecase.getBookedSlots(doctorId);
+      final result = await usecase.getBookedSlots(doctorId, clinicId);
       state = state.copyWith(bookedSlots: result);
     } catch (_) {
       // Non-critical — slots just won't be grayed out
     }
   }
 
-  Future<void> fetchDoctorPatientCount(int doctorId) async {
+  Future<void> fetchDoctorPatientCount(int doctorId, {String? clinicId}) async {
     // Reset so a new doctor's profile shows '--' instead of the previous
     // doctor's count until this fetch resolves.
     state = state.copyWith(clearDoctorPatientCount: true);
     try {
-      final result = await usecase.fetchPatientAppointments(doctorId);
+      final result = await usecase.fetchPatientAppointments(doctorId, clinicId: clinicId);
       final count = result
           .where((a) => a.status?.toLowerCase() == 'completed')
           .length;

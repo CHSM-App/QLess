@@ -1,16 +1,16 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/master_data.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
-import 'package:qless/presentation/patient/view_models/family_viewmodel.dart';
 import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
 const kPrimaryDark   = Color(0xFF2BB5A0);
 const kPrimaryLight  = Color(0xFFD9F5F1);
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -43,14 +43,14 @@ class AddFamilyMemberScreen extends ConsumerStatefulWidget {
       GenderModel(genderId: 3, gender: 'Other'),
     ],
     this.relationOptions = const [
-      RelationModel(relationId: 1, relation: 'Parent'),
-      RelationModel(relationId: 2, relation: 'Spouse'),
-      RelationModel(relationId: 3, relation: 'Child'),
-      RelationModel(relationId: 4, relation: 'Sibling'),
-      RelationModel(relationId: 5, relation: 'Parent-in-law'),
-      RelationModel(relationId: 6, relation: 'Partner'),
-      RelationModel(relationId: 7, relation: 'Grandparent'),
-      RelationModel(relationId: 8, relation: 'Other'),
+      RelationModel(relationId: 2, relation: 'Father'),
+      RelationModel(relationId: 3, relation: 'Mother'),
+      RelationModel(relationId: 4, relation: 'Spouse'),
+      RelationModel(relationId: 5, relation: 'Son'),
+      RelationModel(relationId: 6, relation: 'Daughter'),
+      RelationModel(relationId: 7, relation: 'Brother'),
+      RelationModel(relationId: 8, relation: 'Sister'),
+      RelationModel(relationId: 9, relation: 'Other'),
     ],
   });
 
@@ -70,7 +70,6 @@ class _AddFamilyMemberScreenState
   int?      _selectedRelationId;
   DateTime? _selectedDate;
   bool      _isConfirmed = false;
-  bool      _didSubmit   = false;
 
   bool get _isEditing => widget.existingMember != null;
 
@@ -136,28 +135,163 @@ class _AddFamilyMemberScreenState
   // Actions
   // ---------------------------------------------------------------------------
 
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(
+    final now = DateTime.now();
+    final initial = _selectedDate ?? DateTime(now.year - 25, now.month, now.day);
+    int selDay   = initial.day;
+    int selMonth = initial.month;
+    int selYear  = initial.year;
+
+    final result = await showDialog<DateTime>(
       context: context,
-      initialDate: _selectedDate ?? DateTime(1990, 1, 1),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(primary: kPrimary),
-        ),
-        child: child!,
-      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final maxYear = now.year;
+            final daysInMonth = DateTime(selYear, selMonth + 1, 0).day;
+            if (selDay > daysInMonth) selDay = daysInMonth;
+            final isFutureDate = DateTime(selYear, selMonth, selDay).isAfter(now);
+
+            return Dialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select Date of Birth',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DobDropdown(
+                            label: 'Day',
+                            value: selDay,
+                            items: List.generate(daysInMonth, (i) => i + 1),
+                            onChanged: (v) =>
+                                setDialogState(() => selDay = v),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: _DobDropdown(
+                            label: 'Month',
+                            value: selMonth,
+                            items: List.generate(12, (i) => i + 1),
+                            itemLabel: (m) => _monthNames[m - 1],
+                            onChanged: (v) =>
+                                setDialogState(() => selMonth = v),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _DobDropdown(
+                            label: 'Year',
+                            value: selYear,
+                            items: List.generate(
+                                maxYear - 1900 + 1, (i) => maxYear - i),
+                            onChanged: (v) =>
+                                setDialogState(() => selYear = v),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (isFutureDate) ...[
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Date of birth cannot be in the future',
+                        style: TextStyle(fontSize: 11.5, color: kError),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isFutureDate
+                                ? null
+                                : () => Navigator.pop(
+                                      ctx,
+                                      DateTime(selYear, selMonth, selDay),
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kPrimary,
+                              disabledBackgroundColor: kBorder,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Confirm',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
-    if (picked != null) {
+
+    if (result != null) {
       setState(() {
-        _selectedDate = picked;
-        _dobCtrl.text = _fmtDate(picked);
+        _selectedDate = result;
+        _dobCtrl.text = _fmtDate(result);
       });
     }
   }
 
-  void _onSave() {
+  Future<void> _onSave() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedGenderId == null)  { _snack('Please select a gender.');        return; }
     if (_selectedDate == null)       { _snack('Please select date of birth.');   return; }
@@ -184,8 +318,24 @@ class _AddFamilyMemberScreenState
           : _mobileCtrl.text.trim(),
     );
 
-    _didSubmit = true;
-    ref.read(familyViewModelProvider.notifier).addFamilyMember(member);
+    await ref.read(familyViewModelProvider.notifier).addFamilyMember(member);
+    if (!mounted) return;
+
+    final resultState = ref.read(familyViewModelProvider);
+    if (!resultState.isSuccess) {
+      _snack(
+        isConnectivityFailureMessage(resultState.error)
+            ? connectivityErrorMessage
+            : (resultState.error ?? 'Something went wrong. Please try again.'),
+        isError: true,
+      );
+      return;
+    }
+
+    _snack(_isEditing
+        ? 'Member updated successfully'
+        : 'Member added successfully');
+    Navigator.of(context).pop(member);
   }
 
   void _snack(String msg, {bool isError = false}) {
@@ -222,44 +372,10 @@ class _AddFamilyMemberScreenState
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<FamilyState>(familyViewModelProvider, (prev, next) {
-      if (_didSubmit && next.isSuccess && !(prev?.isSuccess ?? false)) {
-        _snack(_isEditing
-            ? 'Member updated successfully'
-            : 'Member added successfully');
-        final result = FamilyMember(
-          familyId:     ref.read(patientLoginViewModelProvider).patientId!,
-          memberId:     widget.existingMember?.memberId,
-          memberName:   _nameCtrl.text.trim(),
-          genderId:     _selectedGenderId,
-          genderName:   _selGender?.gender,
-          dob:          _selectedDate,
-          relationId:   _selectedRelationId,
-          relationName: _selRelation?.relation,
-          mobileNo:     _mobileCtrl.text.trim().isEmpty
-              ? null
-              : _mobileCtrl.text.trim(),
-        );
-        Future.delayed(const Duration(milliseconds: 300), () {
-          if (!mounted) return;
-          Navigator.of(context).pop(result);
-        });
-      }
-      if (next.error != null && next.error != prev?.error) {
-        // Show a friendly offline message instead of a raw Dio exception.
-        _snack(
-          isConnectivityFailureMessage(next.error)
-              ? connectivityErrorMessage
-              : next.error!,
-          isError: true,
-        );
-      }
-    });
-
     final state = ref.watch(familyViewModelProvider);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg,
       body: SafeArea(
         child: Column(
           children: [
@@ -736,3 +852,76 @@ class _ProgStep extends StatelessWidget {
     );
   }
 }
+
+// =============================================================================
+// DOB Dropdown (Day / Month / Year) — matches patient_registration.dart
+// =============================================================================
+
+class _DobDropdown extends StatelessWidget {
+  const _DobDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.itemLabel,
+  });
+
+  final String label;
+  final int value;
+  final List<int> items;
+  final ValueChanged<int> onChanged;
+  final String Function(int)? itemLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: kTextSecondary,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kBorder),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: value,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  color: kTextMuted, size: 20),
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+              ),
+              items: items
+                  .map((i) => DropdownMenuItem<int>(
+                        value: i,
+                        child: Text(itemLabel != null
+                            ? itemLabel!(i)
+                            : i.toString().padLeft(2, '0')),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+

@@ -148,8 +148,23 @@ app.set('io', io);
 
 // doctorSockets: doctorId → Set<socketId>  (active connections)
 // doctorStatus:  doctorId → true/false       (last known online state)
+// doctorStatusAt: doctorId → timestamp of the last doctorStatus change
 const doctorSockets = new Map();
 const doctorStatus  = new Map();
+const doctorStatusAt = new Map();
+// doctorStatusReason: doctorId → 'disconnect' | 'logout'  (why the last offline happened,
+// so patients can tell a real network problem apart from an intentional logout)
+const doctorStatusReason = new Map();
+// doctorOfflineTimers: doctorId → Timeout  (pending offline broadcast, cancelled on reconnect)
+const doctorOfflineTimers = new Map();
+// Grace period before telling patients a doctor is offline. Covers brief
+// app-background/screen-lock/network-blip disconnects that Socket.IO
+// normally reconnects from within a couple seconds.
+const DOCTOR_OFFLINE_GRACE_MS = 8000;
+// How long a stale "offline" reading stays worth telling a freshly-opened
+// patient app about. Past this, it's not a live network issue anymore —
+// the doctor just hasn't started today's session yet — so stop replaying it.
+const DOCTOR_OFFLINE_STALE_MS = 30 * 60 * 1000;
 
 // SOCKET EVENTS
 io.on('connection', (socket) => {
@@ -164,7 +179,15 @@ io.on('connection', (socket) => {
   socket.on('joinClinic', async (clinicId) => {
     socket.join(`clinic_${clinicId}`);
     if (doctorStatus.has(clinicId)) {
-      socket.emit('doctor_status', { doctor_id: clinicId, online: doctorStatus.get(clinicId) });
+      const isOnline = doctorStatus.get(clinicId);
+      const age = Date.now() - (doctorStatusAt.get(clinicId) || 0);
+      if (isOnline || age < DOCTOR_OFFLINE_STALE_MS) {
+        socket.emit('doctor_status', {
+          doctor_id: clinicId,
+          online: isOnline,
+          reason: isOnline ? undefined : doctorStatusReason.get(clinicId),
+        });
+      }
     }
     // Fetch today's furthest-served token for this doctor and push it so the
     // Flutter app's doctorCurrentServing map is populated on cold start.
@@ -194,13 +217,44 @@ io.on('connection', (socket) => {
     doctorSockets.get(doctorId).add(socket.id);
     socket._doctorRooms = socket._doctorRooms || new Set();
     socket._doctorRooms.add(doctorId);
+
+    // Reconnected before the grace period elapsed — cancel the pending offline broadcast.
+    const pendingTimer = doctorOfflineTimers.get(doctorId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      doctorOfflineTimers.delete(doctorId);
+    }
+
     doctorStatus.set(doctorId, true);
+    doctorStatusAt.set(doctorId, Date.now());
+    doctorStatusReason.delete(doctorId);
     io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: true });
     console.log(`[DOCTOR] emitted online=true to clinic_${doctorId}`);
   });
 
   socket.on('leaveClinic', (clinicId) => {
     socket.leave(`clinic_${clinicId}`);
+  });
+
+  // Explicit doctor logout — skip the reconnect grace period and tell
+  // patients immediately, since this isn't a network blip.
+  socket.on('doctorLogout', (doctorId) => {
+    console.log(`[DOCTOR] doctorLogout doctorId=${doctorId} socket=${socket.id}`);
+    const pendingTimer = doctorOfflineTimers.get(doctorId);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      doctorOfflineTimers.delete(doctorId);
+    }
+    const sockets = doctorSockets.get(doctorId);
+    if (sockets) {
+      sockets.delete(socket.id);
+      if (sockets.size === 0) doctorSockets.delete(doctorId);
+    }
+    doctorStatus.set(doctorId, false);
+    doctorStatusAt.set(doctorId, Date.now());
+    doctorStatusReason.set(doctorId, 'logout');
+    io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false, reason: 'logout' });
+    console.log(`[DOCTOR] emitted online=false to clinic_${doctorId} (explicit logout)`);
   });
 
   socket.on('disconnect', () => {
@@ -212,9 +266,21 @@ io.on('connection', (socket) => {
           sockets.delete(socket.id);
           if (sockets.size === 0) {
             doctorSockets.delete(doctorId);
-            doctorStatus.set(doctorId, false); // remember offline state
-            io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false });
-            console.log(`[DOCTOR] emitted online=false to clinic_${doctorId}`);
+            // Don't broadcast offline immediately — give the doctor's app a
+            // grace period to reconnect (background/lock/network blip).
+            const existingTimer = doctorOfflineTimers.get(doctorId);
+            if (existingTimer) clearTimeout(existingTimer);
+            const timer = setTimeout(() => {
+              doctorOfflineTimers.delete(doctorId);
+              const stillConnected = doctorSockets.get(doctorId);
+              if (stillConnected && stillConnected.size > 0) return; // reconnected in the meantime
+              doctorStatus.set(doctorId, false); // remember offline state
+              doctorStatusAt.set(doctorId, Date.now());
+              doctorStatusReason.set(doctorId, 'disconnect');
+              io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false, reason: 'disconnect' });
+              console.log(`[DOCTOR] emitted online=false to clinic_${doctorId} (after grace period)`);
+            }, DOCTOR_OFFLINE_GRACE_MS);
+            doctorOfflineTimers.set(doctorId, timer);
           }
         }
       }

@@ -100,6 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
 
     setState(() => _isLoading = true);
+    bool navigated = false;
 
     try {
       if (isDoctor) {
@@ -169,9 +170,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               : 'Unable to send OTP. Please try again.');
           return;
         }
-        _snack('OTP sent successfully');
       }
 
+      if (!mounted) return;
+      navigated = true;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -185,7 +187,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     } catch (_) {
       if (mounted) _snack('Something went wrong. Try again.');
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (!navigated && mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -435,7 +437,7 @@ class _LandscapeLayout extends StatelessWidget {
                         _BrandLogo(size: 84),
                         const SizedBox(height: 22),
                         const Text(
-                          'HealthConnect',
+                          'QLess',
                           style: TextStyle(
                             fontSize: 29,
                             fontWeight: FontWeight.w800,
@@ -1255,7 +1257,7 @@ class _RegisterCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'New to HealthConnect?',
+                      'New to QLess?',
                       style: TextStyle(
                         fontSize: 12,
                         color: kTextSecondary,

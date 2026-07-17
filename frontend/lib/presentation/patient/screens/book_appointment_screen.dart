@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
@@ -231,15 +232,19 @@ class _BookAppointmentScreenState
 
   String? _estimatedWaitTime;
   bool    _isEstimateLoading = false;
+  // Doctor manually stopped new bookings for today (independent of the
+  // scheduled time window) — reflected live via the queue estimate call.
+  bool    _bookingClosedByDoctor = false;
   final TextEditingController _symptomsController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     final did    = widget.doctor.doctorId;
-    final cached = did == null
+    final favKey = did == null ? null : '${did}_${widget.doctor.clinicId ?? ''}';
+    final cached = favKey == null
         ? null
-        : ref.read(favoriteViewModelProvider).doctorFavorites[did];
+        : ref.read(favoriteViewModelProvider).doctorFavorites[favKey];
     _isFavorite       = cached ?? widget.initialFavorite;
     _selectedMemberId = widget.bookingForMemberId;
 
@@ -258,13 +263,13 @@ class _BookAppointmentScreenState
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (did != null) {
-        ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did);
-        ref.read(doctorsViewModelProvider.notifier).getDoctorLeaveDates(did);
-        ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did);
+        ref.read(doctorsViewModelProvider.notifier).getDoctorAvailability(did, widget.doctor.clinicId ?? '');
+        ref.read(doctorsViewModelProvider.notifier).getDoctorLeaveDates(did, widget.doctor.clinicId ?? '');
+        ref.read(appointmentViewModelProvider.notifier).getBookedSlots(did, widget.doctor.clinicId ?? '');
         ref.read(appointmentViewModelProvider.notifier).fetchDoctorPatientCount(did);
         // Fetch this doctor's reviews so the rating/review-count shows on first
         // open instead of only after visiting the profile page and back.
-        ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did);
+        ref.read(reviewViewModelProvider.notifier).fetchDoctorReviews(did, widget.doctor.clinicId ?? '');
       }
       final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
       if (pid > 0) {
@@ -366,10 +371,11 @@ void dispose() {
     setState(() { _isEstimateLoading = true; _estimatedWaitTime = null; });
 
     await ref.read(appointmentViewModelProvider.notifier)
-        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did,slotId: _selectedSlotId));
+        .queuePreviewEstimate(AppointmentRequestModel(doctorId: did, slotId: _selectedSlotId, clinicId: widget.doctor.clinicId));
     if (!mounted) return;
 
     final qd = ref.read(appointmentViewModelProvider).queuePreviewEstimateResponse;
+    _bookingClosedByDoctor = qd?.bookingClosed == true;
     String? label;
     if (qd != null) {
       final mins    = qd.estimatedMinutes;
@@ -402,6 +408,7 @@ void dispose() {
       _selectedTime      = null;
       _estimatedWaitTime = null;
       _isEstimateLoading = false;
+      _bookingClosedByDoctor = false;
     });
 
     // if (widget.doctor.doctorId != null) {
@@ -425,6 +432,7 @@ void dispose() {
       _selectedTime      = null;
       _estimatedWaitTime = null;
       _isEstimateLoading = false;
+      _bookingClosedByDoctor = false;
     });
     if (slotId == null) return;
     final picked = enabled.firstWhere(
@@ -445,10 +453,11 @@ void dispose() {
     final members   = famState.allfamilyMembers.maybeWhen(
         data: (m) => m, orElse: () => <FamilyMember>[]);
 
-    final did    = widget.doctor.doctorId;
-    final cached = did == null
+    final did      = widget.doctor.doctorId;
+    final watchKey = did == null ? null : '${did}_${widget.doctor.clinicId ?? ''}';
+    final cached   = watchKey == null
         ? null
-        : ref.watch(favoriteViewModelProvider).doctorFavorites[did];
+        : ref.watch(favoriteViewModelProvider).doctorFavorites[watchKey];
     if (cached != null && cached != _isFavorite) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) setState(() => _isFavorite = cached);
@@ -502,8 +511,9 @@ void dispose() {
     ref.listen<FavoriteState>(favoriteViewModelProvider, (prev, next) {
       final did = widget.doctor.doctorId;
       if (did == null) return;
-      final nextFav = next.doctorFavorites[did];
-      if (nextFav != null && nextFav != prev?.doctorFavorites[did] && mounted) {
+      final listenKey = '${did}_${widget.doctor.clinicId ?? ''}';
+      final nextFav = next.doctorFavorites[listenKey];
+      if (nextFav != null && nextFav != prev?.doctorFavorites[listenKey] && mounted) {
         setState(() => _isFavorite = nextFav);
       }
       if (next.error != null && next.error != prev?.error && mounted) {
@@ -571,6 +581,11 @@ void dispose() {
       }
     }
 
+    // Doctor manually stopped bookings for today — overrides the time window.
+    if (isQueue && dayIsToday && _bookingClosedByDoctor) {
+      isQueueOpen = false;
+    }
+
     // Slot session end-time check (today only)
     bool isSlotSessionEnded = false;
     if (!isQueue && dayIsToday && selAvail != null) {
@@ -580,7 +595,11 @@ void dispose() {
       isSlotSessionEnded = nowMin >= endMin;
     }
 
-    final canConfirm = selAvail != null &&
+    final isSelectedDateOnLeave = _selectedDate != null &&
+        leaveRanges.any((r) => r.contains(_selectedDate!));
+
+    final canConfirm = !isSelectedDateOnLeave &&
+        selAvail != null &&
         _bookable(mode, dayIsToday) &&
         (isQueue || (_selectedTime != null && !isSlotSessionEnded)) &&
         (!isQueue || !dayIsToday || isQueueOpen);
@@ -632,6 +651,7 @@ void dispose() {
                 bookedTimes:       bookedTimes,
                 queueOpenTimeStr:  queueOpenTimeStr,
                 isQueueOpen:       isQueueOpen,
+                bookingClosedByDoctor: _bookingClosedByDoctor,
                 estimatedWaitTime: _estimatedWaitTime,
                 isEstimateLoading: _isEstimateLoading,
                 onPickDate:        _pickDate,
@@ -696,7 +716,7 @@ void dispose() {
   void _showFavSnack(bool added) {
     _snack(
       added
-          ? 'Dr. ${widget.doctor.name ?? ''} added to favourites'
+          ? '${doctorDisplayName(widget.doctor.name)} added to favourites'
           : 'Removed from favourites',
       isError: false,
     );
@@ -709,7 +729,7 @@ void dispose() {
     if (_favFetchedDoctorId == did && _favFetchedPatientId == pid) return;
     _favFetchedDoctorId  = did;
     _favFetchedPatientId = pid;
-    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did);
+    ref.read(favoriteViewModelProvider.notifier).fetchFavoriteStatus(pid, did, widget.doctor.clinicId ?? '');
   }
 
   Future<void> _handleFavoriteToggle(bool v) async {
@@ -717,6 +737,7 @@ void dispose() {
     setState(() => _isFavorite = v);
     final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
     final did = widget.doctor.doctorId ?? 0;
+    final cid=widget.doctor.clinicId ?? '';
     if (pid <= 0 || did <= 0) {
       setState(() => _isFavorite = prev);
       _snack('Please login to use favourites', isError: true);
@@ -724,8 +745,8 @@ void dispose() {
     }
     final notifier = ref.read(favoriteViewModelProvider.notifier);
     final ok = v
-        ? await notifier.addFavoriteDoctor(pid, did)
-        : await notifier.deleteFavoriteDoctor(pid, did);
+        ? await notifier.addFavoriteDoctor(pid, did, clinicId: widget.doctor.clinicId)
+        : await notifier.deleteFavoriteDoctor(pid, did,cid);
     if (!ok) {
       setState(() => _isFavorite = prev);
       _snack(ref.read(favoriteViewModelProvider).error ??
@@ -774,7 +795,8 @@ void dispose() {
           startTime:       start,
           userType:        isForMember ? 2 : 1,
           slotId:          _selectedSlotId,
-            symptoms:        _symptomsController.text.trim().isEmpty
+          clinicId:        widget.doctor.clinicId,
+          symptoms:        _symptomsController.text.trim().isEmpty
                        ? null : _symptomsController.text.trim(),
         ),
       );
@@ -952,7 +974,7 @@ class _AppBar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Dr. ${doctor.name ?? 'Unknown'}',
+            doctorDisplayName(doctor.name, fallback: 'Unknown'),
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -1335,6 +1357,7 @@ class _Body extends StatelessWidget {
   final Set<String>  bookedTimes;
   final String?      queueOpenTimeStr;
   final bool         isQueueOpen;
+  final bool         bookingClosedByDoctor;
   final String?      estimatedWaitTime;
   final bool         isEstimateLoading;
   final bool         isSlotSessionEnded;
@@ -1356,6 +1379,7 @@ class _Body extends StatelessWidget {
     required this.onPickTime, required this.buildSlots, required this.fmtTime,
       required this.symptomsController,
     this.queueOpenTimeStr, this.isQueueOpen = true,
+    this.bookingClosedByDoctor = false,
     this.estimatedWaitTime, this.isEstimateLoading = false,
     this.isSlotSessionEnded = false,
   });
@@ -1373,6 +1397,9 @@ class _Body extends StatelessWidget {
             .where((s) => _bookable(s.bookingMode, dayIsToday))
             .toList();
 
+    final isSelectedOnLeave = selectedDate != null &&
+        leaveRanges.any((r) => r.contains(selectedDate!));
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 100),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1387,6 +1414,34 @@ class _Body extends StatelessWidget {
           const SizedBox(height: 12),
           _DateBadge(date: selectedDate!),
         ],
+        if (isSelectedOnLeave) ...[
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: kRedLight.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: kError.withOpacity(0.35)),
+            ),
+            child: const Row(children: [
+              Icon(Icons.event_busy_rounded, size: 20, color: kError),
+              SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Doctor is on leave',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: kError)),
+                  SizedBox(height: 3),
+                  Text('Appointment cannot be booked on this date',
+                      style: TextStyle(fontSize: 12, color: kError)),
+                ]),
+              ),
+            ]),
+          ),
+        ] else ...[
         if (sessions.length > 1) ...[
           const SizedBox(height: 18),
           _sectionLabel('Select Session'),
@@ -1407,6 +1462,7 @@ class _Body extends StatelessWidget {
                 symptomsController: symptomsController,   
               queueOpenTimeStr:  queueOpenTimeStr,
               isQueueOpen:       isQueueOpen,
+              bookingClosedByDoctor: bookingClosedByDoctor,
               estimatedWaitTime: estimatedWaitTime,
               isEstimateLoading: isEstimateLoading,
             )
@@ -1444,6 +1500,7 @@ class _Body extends StatelessWidget {
             _SymptomsField(controller: symptomsController),
           ],
         ],
+        ], // else (not on leave)
       ]),
     );
   }
@@ -1507,10 +1564,11 @@ class _CalendarStripState extends State<_CalendarStrip> {
       widget.leaveRanges.any((r) => r.contains(dt));
 
   bool _avail(DateTime dt) {
-    if (_onLeave(dt)) return false; // doctor on leave — not bookable
     const n = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
     final s = widget.grouped[n[(dt.weekday - 1).clamp(0, 6)]];
-    return s?.any((a) => _bookable(a.bookingMode, _isToday(dt))) == true;
+    // Leave dates are selectable but show a message (not blocked here)
+    return s?.any((a) => _bookable(a.bookingMode, _isToday(dt))) == true ||
+        (_onLeave(dt) && s?.isNotEmpty == true);
   }
 
   Color? _dot(DateTime dt) {
@@ -1561,10 +1619,11 @@ class _CalendarStripState extends State<_CalendarStrip> {
                         color: kTextMuted)),
               );
             }
-            final dt    = item.dt!;
-            final avail = _avail(dt);
-            final dot   = _dot(dt);
-            final isSel = widget.selectedDate?.year == dt.year &&
+            final dt      = item.dt!;
+            final avail   = _avail(dt);
+            final onLeave = _onLeave(dt);
+            final dot     = onLeave ? kError : _dot(dt);
+            final isSel   = widget.selectedDate?.year == dt.year &&
                 widget.selectedDate?.month == dt.month &&
                 widget.selectedDate?.day == dt.day;
 
@@ -1577,15 +1636,24 @@ class _CalendarStripState extends State<_CalendarStrip> {
                   width: _cw,
                   decoration: BoxDecoration(
                     color: isSel
-                        ? kPrimary
-                        : (avail ? Colors.white : Colors.transparent),
+                        ? (onLeave ? kError : kPrimary)
+                        : (avail
+                            ? (onLeave
+                                ? kRedLight.withOpacity(0.5)
+                                : Colors.white)
+                            : Colors.transparent),
                     borderRadius: BorderRadius.circular(12),
                     border: isSel
                         ? null
-                        : (avail ? Border.all(color: kBorder) : null),
+                        : (avail
+                            ? Border.all(
+                                color: onLeave
+                                    ? kError.withOpacity(0.35)
+                                    : kBorder)
+                            : null),
                     boxShadow: isSel
                         ? [BoxShadow(
-                            color: kPrimary.withOpacity(0.3),
+                            color: (onLeave ? kError : kPrimary).withOpacity(0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 3))]
                         : null,
@@ -1600,9 +1668,11 @@ class _CalendarStripState extends State<_CalendarStrip> {
                               color: isSel
                                   ? Colors.white.withOpacity(0.8)
                                   : (avail
-                                      ? (dt.weekday >= 6
-                                          ? kPrimary
-                                          : kTextMuted)
+                                      ? (onLeave
+                                          ? kError.withOpacity(0.7)
+                                          : (dt.weekday >= 6
+                                              ? kPrimary
+                                              : kTextMuted))
                                       : kTextMuted.withOpacity(0.3)))),
                       const SizedBox(height: 4),
                       Text('${dt.day}',
@@ -1612,7 +1682,7 @@ class _CalendarStripState extends State<_CalendarStrip> {
                               color: isSel
                                   ? Colors.white
                                   : (avail
-                                      ? kTextPrimary
+                                      ? (onLeave ? kError : kTextPrimary)
                                       : kTextMuted.withOpacity(0.3)))),
                       const SizedBox(height: 4),
                       Container(
@@ -1753,6 +1823,7 @@ class _QueueCard extends StatelessWidget {
   final DoctorAvailabilityModel avail;
   final String?                 queueOpenTimeStr;
   final bool                    isQueueOpen;
+  final bool                    bookingClosedByDoctor;
   final String?                 estimatedWaitTime;
   final bool                    isEstimateLoading;
   final TextEditingController   symptomsController;   // ← NEW
@@ -1762,6 +1833,7 @@ class _QueueCard extends StatelessWidget {
     required this.symptomsController,                 // ← NEW
     this.queueOpenTimeStr,
     this.isQueueOpen       = true,
+    this.bookingClosedByDoctor = false,
     this.estimatedWaitTime,
     this.isEstimateLoading = false,
   });
@@ -1774,12 +1846,14 @@ class _QueueCard extends StatelessWidget {
         : kRedLight.withOpacity(0.4);
     final noteIcon  = isQueueOpen
         ? Icons.check_circle_rounded
-        : Icons.access_time_rounded;
+        : (bookingClosedByDoctor ? Icons.event_busy_rounded : Icons.access_time_rounded);
     final noteText = isQueueOpen
         ? 'Queue booking is open'
-        : (queueOpenTimeStr != null
-            ? 'Queue opens at $queueOpenTimeStr'
-            : 'Queue booking has ended');
+        : (bookingClosedByDoctor
+            ? 'Doctor has stopped new bookings for today'
+            : (queueOpenTimeStr != null
+                ? 'Queue opens at $queueOpenTimeStr'
+                : 'Queue booking has ended'));
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _sectionLabel('Queue Booking'),
@@ -2326,6 +2400,7 @@ class _SymptomsField extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: kPrimary, width: 1.5),
               ),
+              
             ),
           ),
         ]),

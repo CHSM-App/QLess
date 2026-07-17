@@ -40,6 +40,12 @@ class AppointmentRequestModel {
   @JsonKey(name: 'symptoms')
   String? symptoms;
 
+  @JsonKey(name: 'clinic_id')
+  String? clinicId;
+
+  @JsonKey(name: 'booking_closed')
+  bool? bookingClosed;
+
   AppointmentRequestModel({
     this.operation,
     this.doctorId,
@@ -52,6 +58,8 @@ class AppointmentRequestModel {
     this.queueId,
     this.isNext,
     this.symptoms,
+    this.clinicId,
+    this.bookingClosed,
   });
 
   factory AppointmentRequestModel.fromJson(Map<String, dynamic> json) =>

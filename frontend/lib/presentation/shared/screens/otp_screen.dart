@@ -86,7 +86,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   String get _maskedNumber {
     final n = widget.mobileNumber;
     if (n.length < 10) return n;
-    return '${n.substring(0, 2)}******${n.substring(n.length - 2)}';
+    return '${n.substring(0, 4)}***${n.substring(n.length - 3)}';
   }
 
   @override
@@ -228,7 +228,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     }
 
     await _printFcmToken();
-    await _storeFcmToken();
+    await _storeFcmToken(effectiveRole);
 
     final roleId = ref.read(tokenProvider).roleId ?? 0;
 
@@ -238,12 +238,21 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
           .read(doctorLoginViewModelProvider.notifier)
           .checkPhoneDoctor(widget.mobileNumber);
       if (!mounted) return;
-      final doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
-      if (doctorId != null) {
-        await ref
-            .read(doctorLoginViewModelProvider.notifier)
-            .getDoctorClinics(doctorId);
+      final doctorState = ref.read(doctorLoginViewModelProvider);
+      final doctorId = doctorState.doctorId;
+      if (doctorId == null || doctorId <= 0) {
+        // Only treat this as "no such doctor" when the lookup actually
+        // succeeded and came back empty — a network/server error here must
+        // not wipe out the token we just received.
+        if (!doctorState.phoneCheckResult.hasError) {
+          await ref.read(tokenProvider.notifier).clearTokens();
+        }
+        _triggerError();
+        return;
       }
+      await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .getDoctorClinics(doctorId);
     } else if (roleId == 3) {
       // Receptionist table has no clinic_id — load doctor profile first,
       // then override clinic from picker selection (same as doctor login flow).
@@ -291,6 +300,18 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       await ref
           .read(patientLoginViewModelProvider.notifier)
           .checkPhonePatient(widget.mobileNumber);
+      if (!mounted) return;
+      final patientState = ref.read(patientLoginViewModelProvider);
+      final patientId = patientState.patientId ?? 0;
+      if (patientId <= 0) {
+        // Only clear tokens when the lookup succeeded and found no record —
+        // a network/server error must not wipe out the token we just got.
+        if (!patientState.patientPhoneCheck.hasError) {
+          await ref.read(tokenProvider.notifier).clearTokens();
+        }
+        _triggerError();
+        return;
+      }
     }
 
     if (!mounted) return;
@@ -346,14 +367,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     }
   }
 
-  Future<void> _storeFcmToken() async {
+  Future<void> _storeFcmToken(String role) async {
     try {
       await _ensureFirebaseInitialized();
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) return;
       final body = TokenResponse(
         firebaseToken: token,
-        role: widget.role,
+        role: role,
         mobile: widget.mobileNumber,
       );
       await ref.read(authViewModelProvider.notifier).saveFirebaseToken(body);
@@ -697,16 +718,78 @@ class _PortraitLayout extends StatelessWidget {
     final isSmall = size.height < 700;
     final isVerySmall = size.height < 600;
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, isVerySmall ? 12 : 22, 20, 32),
-      child: Column(
+    return Column(
+      children: [
+        // ── Phone number + edit — fixed, always visible above keyboard ──
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, isVerySmall ? 6 : 10, 20, 0),
+          child: Column(
+            children: [
+              RichText(
+                textAlign: TextAlign.center,
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: kTextSecondary,
+                    fontWeight: FontWeight.w500,
+                    height: 1.5,
+                  ),
+                  children: [
+                    TextSpan(text: "We've sent a verification code to"),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    '+91 $maskedNumber',
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w800,
+                      color: kTextPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  GestureDetector(
+                    onTap: () => Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => LoginScreen(
+                                        role: isDoctor ? 'doctor' : 'patient',
+                                        initialMobile: mobileNumber,
+                                      ),
+                                    ),
+                                  ),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.edit_outlined,
+                        size: 16,
+                        color: kPrimaryDarker,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // ── Scrollable content ────────────────────────────────────────
+        Expanded(
+          child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, isVerySmall ? 10 : 16, 20, 32),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // ── Hero icon ────────────────────────────────────────
           _OtpHeroIcon(small: isVerySmall),
           SizedBox(height: isVerySmall ? 14 : 20),
 
-          // ── Title + subtitle ─────────────────────────────────
+          // ── Title ─────────────────────────────────────────────
           Text(
             'Enter the 6-digit code',
             style: TextStyle(
@@ -715,53 +798,6 @@ class _PortraitLayout extends StatelessWidget {
               color: kTextPrimary,
               letterSpacing: -0.4,
             ),
-          ),
-          const SizedBox(height: 8),
-          RichText(
-            textAlign: TextAlign.center,
-            text: TextSpan(
-              style: const TextStyle(
-                fontSize: 13.5,
-                color: kTextSecondary,
-                fontWeight: FontWeight.w500,
-                height: 1.5,
-              ),
-              children: const [
-                TextSpan(text: "We've sent a verification code to"),
-              ],
-            ),
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Text(
-                '+91 $maskedNumber',
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary,
-                ),
-              ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => LoginScreen(
-                                    role: isDoctor ? 'doctor' : 'patient',
-                                    initialMobile: mobileNumber,
-                                  ),
-                                ),
-                              ),
-                child: const Icon(
-                  Icons.edit_outlined,
-                  size: 16,
-                  color: kPrimaryDarker,
-                ),
-              ),
-            ],
           ),
           SizedBox(height: isVerySmall ? 18 : 26),
 
@@ -805,6 +841,9 @@ class _PortraitLayout extends StatelessWidget {
           // const _SecureFooter(),
         ],
       ),
+    ),
+        ),
+      ],
     );
   }
 }

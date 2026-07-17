@@ -6,7 +6,7 @@ import 'package:qless/domain/models/receptionist_model.dart';
 abstract class ReceptionistRepository {
   Future<dynamic> addReceptionist(ReceptionistApiModel receptionist, {File? image});
 
-  Future<List<ReceptionistApiModel>> fetchReceptionistList(String clinicId);
+  Future<List<ReceptionistApiModel>> fetchReceptionistList(int doctorId);
 
   Future<List<ReceptionistApiModel>> checkPhoneReceptionist(String mobile);
 

@@ -13,6 +13,7 @@ const kPrimary       = Color(0xFF26C6B0);
 const kPrimaryDark   = Color(0xFF2BB5A0);
 const kPrimaryLight  = Color(0xFFD9F5F1);
 const kBgLight       = Colors.white;
+const kPageBg = Color(0xFFF8F9FB);
 
 const kTextPrimary   = Color(0xFF2D3748);
 const kTextSecondary = Color(0xFF718096);
@@ -356,7 +357,7 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
     final isOffline   = ref.watch(connectivityNotifierProvider).isOffline;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg,
       body: SafeArea(
         child: Column(
           children: [

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:qless/core/database/local_database.dart';
@@ -9,6 +10,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/firebase_options.dart';
@@ -136,6 +138,10 @@ void main() async {
   // ffi-web factory so getDatabasesPath()/openDatabase() work in the browser.
   if (kIsWeb) {
     databaseFactory = databaseFactoryFfiWeb;
+  } else if (Platform.isWindows || Platform.isLinux) {
+    // Desktop targets have no native sqflite plugin — use sqflite_common_ffi.
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
   }
 
   // Warm up the SQLite database so the first offline read is instant.
@@ -170,7 +176,7 @@ class HealthcareApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'HealthConnect',
+      title: 'QLess',
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
       scaffoldMessengerKey: rootScaffoldMessengerKey,

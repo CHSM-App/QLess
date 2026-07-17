@@ -52,6 +52,7 @@ class PatientRegistrationScreen extends ConsumerStatefulWidget {
 class _PatientRegistrationScreenState
     extends ConsumerState<PatientRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _scrollController = ScrollController();
 
   final _fullNameController = TextEditingController();
   final _mobileController   = TextEditingController();
@@ -59,6 +60,14 @@ class _PatientRegistrationScreenState
   final _addressController  = TextEditingController();
   final _dobController      = TextEditingController();
   final _weightController   = TextEditingController();
+
+  final _fullNameFocus = FocusNode();
+  final _mobileFocus   = FocusNode();
+
+  final _fullNameKey = GlobalKey();
+  final _mobileKey   = GlobalKey();
+  final _genderKey   = GlobalKey();
+  final _dobKey      = GlobalKey();
 
   String?   _selectedGender;
   int?      _selectedGenderId;
@@ -106,6 +115,9 @@ class _PatientRegistrationScreenState
     _addressController.dispose();
     _dobController.dispose();
     _weightController.dispose();
+    _fullNameFocus.dispose();
+    _mobileFocus.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -258,7 +270,7 @@ class _PatientRegistrationScreenState
   }
 
   String? _validateEmail(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Email is required';
+    if (v == null || v.trim().isEmpty) return null;
     if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v.trim())) {
       return 'Enter a valid email address';
     }
@@ -266,63 +278,227 @@ class _PatientRegistrationScreenState
   }
 
   String? _validateWeight(String? v) {
-    if (v == null || v.trim().isEmpty) return 'Weight is required';
+    if (v == null || v.trim().isEmpty) return null;
     final w = double.tryParse(v.trim());
     if (w == null || w <= 0 || w > 500) return 'Enter a valid weight in kg';
     return null;
   }
 
   // ── Date picker ─────────────────────────────────────────────────────────
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
   Future<void> _selectDob() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
+    final initial = _selectedDob ?? DateTime(now.year - 25, now.month, now.day);
+    int selDay   = initial.day;
+    int selMonth = initial.month;
+    int selYear  = initial.year;
+
+    final result = await showDialog<DateTime>(
       context: context,
-      initialDate: _selectedDob ?? DateTime(now.year - 25),
-      firstDate: DateTime(1900),
-      lastDate: now,
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: const ColorScheme.light(
-            primary: kPrimary,
-            onPrimary: Colors.white,
-            onSurface: kTextPrimary,
-          ),
-          dialogBackgroundColor: kSurface,
-        ),
-        child: child!,
-      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final maxYear = now.year;
+            final daysInMonth = DateTime(selYear, selMonth + 1, 0).day;
+            if (selDay > daysInMonth) selDay = daysInMonth;
+            final isFutureDate = DateTime(selYear, selMonth, selDay).isAfter(now);
+
+            return Dialog(
+              backgroundColor: kSurface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select Date of Birth',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: kTextPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _DobDropdown(
+                            label: 'Day',
+                            value: selDay,
+                            items: List.generate(daysInMonth, (i) => i + 1),
+                            onChanged: (v) =>
+                                setDialogState(() => selDay = v),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: _DobDropdown(
+                            label: 'Month',
+                            value: selMonth,
+                            items: List.generate(12, (i) => i + 1),
+                            itemLabel: (m) => _monthNames[m - 1],
+                            onChanged: (v) =>
+                                setDialogState(() => selMonth = v),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _DobDropdown(
+                            label: 'Year',
+                            value: selYear,
+                            items: List.generate(
+                                maxYear - 1900 + 1, (i) => maxYear - i),
+                            onChanged: (v) =>
+                                setDialogState(() => selYear = v),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (isFutureDate) ...[
+                      const SizedBox(height: 10),
+                      const _FieldHint(
+                        text: 'Date of birth cannot be in the future',
+                        icon: Icons.error_outline_rounded,
+                        color: kError,
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: kTextSecondary,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isFutureDate
+                                ? null
+                                : () => Navigator.pop(
+                                      ctx,
+                                      DateTime(selYear, selMonth, selDay),
+                                    ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kPrimaryDark,
+                              disabledBackgroundColor: kBorderStrong,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Confirm',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
-    if (picked != null) {
+
+    if (result != null) {
       setState(() {
-        _selectedDob = picked;
+        _selectedDob = result;
         _dobController.text =
-            '${picked.day.toString().padLeft(2, '0')}/'
-            '${picked.month.toString().padLeft(2, '0')}/'
-            '${picked.year}';
+            '${result.day.toString().padLeft(2, '0')}/'
+            '${result.month.toString().padLeft(2, '0')}/'
+            '${result.year}';
       });
+    }
+  }
+
+  // ── Scroll to & focus a required field that failed validation ───────────
+  void _scrollToAndFocus(GlobalKey key, {FocusNode? focusNode}) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+        alignment: 0.15,
+      );
+    }
+    if (focusNode != null) {
+      Future.delayed(
+        const Duration(milliseconds: 350),
+        () => focusNode.requestFocus(),
+      );
     }
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────
   void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    // Run the form validator first so every invalid field shows its red
+    // border / "required" error text, then focus/scroll to the first
+    // offending one below.
+    final formValid = _formKey.currentState?.validate() ?? false;
 
+    if (_fullNameController.text.trim().isEmpty) {
+      _scrollToAndFocus(_fullNameKey, focusNode: _fullNameFocus);
+      _snack('Please enter your full name', isError: true);
+      return;
+    }
+    if (_validateMobile(_mobileController.text) != null) {
+      _scrollToAndFocus(_mobileKey, focusNode: _mobileFocus);
+      _snack('Please enter a valid mobile number', isError: true);
+      return;
+    }
     if (_mobileExistsError != null) {
+      _scrollToAndFocus(_mobileKey, focusNode: _mobileFocus);
       _snack(_mobileExistsError!, isError: true);
       return;
     }
     if (_selectedGenderId == null) {
+      _scrollToAndFocus(_genderKey);
       _snack('Please select your gender', isError: true);
       return;
     }
     if (_selectedDob == null) {
+      _scrollToAndFocus(_dobKey);
       _snack('Please select your date of birth', isError: true);
       return;
     }
-    if (_selectedBloodGroupId == null) {
-      _snack('Please select your blood group', isError: true);
-      return;
-    }
+
+    if (!formValid) return;
+
     if (ref.read(connectivityNotifierProvider).isOffline) {
       _snack(connectivityErrorMessage, isError: true);
       return;
@@ -418,6 +594,7 @@ class _PatientRegistrationScreenState
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
+            controller: _scrollController,
             padding: const EdgeInsets.fromLTRB(20, 18, 20, 32),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,10 +612,15 @@ class _PatientRegistrationScreenState
                           title: 'Personal Information',
                           subtitle: 'Your basic contact details',
                           children: [
-                            const _FieldLabel(label: 'Full Name', required: true),
+                            Container(
+                              key: _fullNameKey,
+                              child: const _FieldLabel(
+                                  label: 'Full Name', required: true),
+                            ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _fullNameController,
+                              focusNode: _fullNameFocus,
                               textCapitalization: TextCapitalization.words,
                               style: _inputStyle,
                               decoration: _decor(
@@ -448,11 +630,15 @@ class _PatientRegistrationScreenState
                             ),
                             const SizedBox(height: 16),
 
-                            const _FieldLabel(
-                                label: 'Mobile Number', required: true),
+                            Container(
+                              key: _mobileKey,
+                              child: const _FieldLabel(
+                                  label: 'Mobile Number', required: true),
+                            ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _mobileController,
+                              focusNode: _mobileFocus,
                               keyboardType: TextInputType.phone,
                               maxLength: 10,
                               inputFormatters: [
@@ -479,7 +665,7 @@ class _PatientRegistrationScreenState
                             const SizedBox(height: 16),
 
                             const _FieldLabel(
-                                label: 'Email Address', required: true),
+                                label: 'Email Address'),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _emailController,
@@ -493,7 +679,7 @@ class _PatientRegistrationScreenState
                             const SizedBox(height: 16),
 
                             const _FieldLabel(
-                                label: 'Address', required: true),
+                                label: 'Address'),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _addressController,
@@ -505,7 +691,7 @@ class _PatientRegistrationScreenState
                                   hint: 'Enter your full address',
                                   icon: Icons.location_on_outlined,
                                   multiline: true),
-                              validator: (v) => _required(v, 'Address'),
+                              validator: null,
                             ),
                           ],
                         ),
@@ -519,7 +705,11 @@ class _PatientRegistrationScreenState
                           title: 'Medical Information',
                           subtitle: 'Helps us provide better care',
                           children: [
-                            const _FieldLabel(label: 'Gender', required: true),
+                            Container(
+                              key: _genderKey,
+                              child: const _FieldLabel(
+                                  label: 'Gender', required: true),
+                            ),
                             const SizedBox(height: 10),
                             _GenderSelector(
                               options: _genderOptions,
@@ -531,8 +721,11 @@ class _PatientRegistrationScreenState
                             ),
                             const SizedBox(height: 18),
 
-                            const _FieldLabel(
-                                label: 'Date of Birth', required: true),
+                            Container(
+                              key: _dobKey,
+                              child: const _FieldLabel(
+                                  label: 'Date of Birth', required: true),
+                            ),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _dobController,
@@ -557,7 +750,7 @@ class _PatientRegistrationScreenState
                             const SizedBox(height: 18),
 
                             const _FieldLabel(
-                                label: 'Blood Group', required: true),
+                                label: 'Blood Group'),
                             const SizedBox(height: 10),
                             _BloodGroupPicker(
                               groups: _bloodGroupOptions,
@@ -569,8 +762,7 @@ class _PatientRegistrationScreenState
                             ),
                             const SizedBox(height: 18),
 
-                            const _FieldLabel(
-                                label: 'Weight (kg)', required: true),
+                            const _FieldLabel(label: 'Weight (kg)'),
                             const SizedBox(height: 8),
                             TextFormField(
                               controller: _weightController,
@@ -1325,6 +1517,74 @@ class _Option {
   final int id;
   final String label;
   const _Option({required this.id, required this.label});
+}
+
+class _DobDropdown extends StatelessWidget {
+  const _DobDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.itemLabel,
+  });
+
+  final String label;
+  final int value;
+  final List<int> items;
+  final ValueChanged<int> onChanged;
+  final String Function(int)? itemLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: kTextSecondary,
+            letterSpacing: 0.2,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          decoration: BoxDecoration(
+            color: kBgSoft,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: kBorderStrong),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              value: value,
+              isExpanded: true,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  color: kTextMuted, size: 20),
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: kTextPrimary,
+              ),
+              items: items
+                  .map((i) => DropdownMenuItem<int>(
+                        value: i,
+                        child: Text(itemLabel != null
+                            ? itemLabel!(i)
+                            : i.toString().padLeft(2, '0')),
+                      ))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _GenderSelector extends StatelessWidget {

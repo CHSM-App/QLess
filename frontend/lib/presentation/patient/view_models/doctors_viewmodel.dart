@@ -51,13 +51,13 @@ class DoctorsViewmodel extends StateNotifier<DoctorsState> {
     }
   }
 
-  Future<void> getDoctorAvailability(int doctorId) async {
+  Future<void> getDoctorAvailability(int doctorId, String clinicId) async {
     if (state.isLoading) return;
     // Clear the previous doctor's schedule so a new profile doesn't briefly
     // render stale availability while this fetch is in flight.
     state = state.copyWith(isLoading: true, doctorAvailabilities: const []);
     try {
-      final availability = await doctorsUseCase.getDoctorAvailability(doctorId);
+      final availability = await doctorsUseCase.getDoctorAvailability(doctorId, clinicId);
       state = state.copyWith(
         doctorAvailabilities: availability,
         isLoading: false,
@@ -70,9 +70,9 @@ class DoctorsViewmodel extends StateNotifier<DoctorsState> {
   /// Active future leave ranges for the doctor — used to grey out
   /// unavailable dates in the booking calendar. Runs independently of
   /// [isLoading] so it doesn't race with availability loading.
-  Future<void> getDoctorLeaveDates(int doctorId) async {
+  Future<void> getDoctorLeaveDates(int doctorId, String? clinicId) async {
     try {
-      final ranges = await doctorsUseCase.getDoctorLeaveDates(doctorId);
+      final ranges = await doctorsUseCase.getDoctorLeaveDates(doctorId, clinicId!);
       state = state.copyWith(leaveRanges: ranges);
     } catch (e) {
       // non-fatal: server-side guard still blocks booking on leave dates

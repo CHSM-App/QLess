@@ -33,14 +33,20 @@ class AppointmentUsecase {
     return appointmentRepository.cancelAppointment(appointmentId);
   }
 
+  Future<AppointmentResponseModel> markArrived(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.markArrived(appointmentRequest);
+  }
+
   Future<AppointmentResponseModel> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   ) {
     return appointmentRepository.updateQueueStatus(appointmentRequest);
   }
 
-  Future<List<MonthSlotData>> getBookedSlots(int doctorId) {
-    return appointmentRepository.getBookedSlots(doctorId);
+  Future<List<MonthSlotData>> getBookedSlots(int doctorId, String clinicId) {
+    return appointmentRepository.getBookedSlots(doctorId, clinicId);
   }
 
   Future<List<AppointmentList>> fetchPatientAppointments(int doctorId, {String? clinicId}) {
@@ -73,6 +79,12 @@ class AppointmentUsecase {
     AppointmentRequestModel appointmentRequest,
   ) {
     return appointmentRepository.queueStop(appointmentRequest);
+  }
+
+  Future<AppointmentResponseModel> stopBooking(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return appointmentRepository.stopBooking(appointmentRequest);
   }
 
   Future<AppointmentResponseModel> queueSkip(

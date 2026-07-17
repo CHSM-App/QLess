@@ -188,13 +188,13 @@ class ReceptionistLoginViewmodel
     return usecase.mobileExistReceptionist(mobileNo);
   }
 
-  Future<List<ReceptionistApiModel>> fetchReceptionistList(String clinicId) async {
+  Future<List<ReceptionistApiModel>> fetchReceptionistList(int doctorId) async {
     state = state.copyWith(
       receptionistList: const AsyncValue.loading(),
       clearError: true,
     );
     try {
-      final result = await usecase.fetchReceptionistList(clinicId);
+      final result = await usecase.fetchReceptionistList(doctorId);
       state = state.copyWith(receptionistList: AsyncValue.data(result));
       return result;
     } catch (e, st) {

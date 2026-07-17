@@ -609,34 +609,7 @@ class _DoctorAvailabilityPageState
           Text('Set your weekly schedule',
               style: const TextStyle(fontSize: 11, color: kTextMuted)),
         ]),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: TextButton.icon(
-              onPressed: isLoading
-                  ? null
-                  : () {
-                      final doctorId = ref
-                              .read(doctorLoginViewModelProvider)
-                              .doctorId ??
-                          0;
-                      showDoctorLeaveSheet(context, doctorId);
-                    },
-              style: TextButton.styleFrom(
-                foregroundColor: kPrimary,
-                backgroundColor: kPrimaryLight,
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 12, vertical: 8),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              icon: const Icon(Icons.beach_access_rounded, size: 16),
-              label: const Text('Leave',
-                  style: TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
-            ),
-          ),
-        ],
+        actions: const [],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(isLoading ? 3.0 : 1.0),
           child: isLoading
@@ -990,46 +963,27 @@ class _TimeSlotCardState extends State<_TimeSlotCard> {
       ),
     );
     if (picked == null) return;
-    final newStart = isStart ? picked : _local.startTime;
-    final newEnd   = isStart ? _local.endTime : picked;
-    if (_toMin(newEnd) <= _toMin(newStart)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Row(children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.white, size: 15),
-            SizedBox(width: 8),
-            Expanded(child: Text('End time must be later than start time.',
-                style: TextStyle(fontSize: 13, color: Colors.white))),
-          ]),
-          backgroundColor: kError,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-        ));
-      }
-      return;
-    }
-    if (_overlaps(newStart, newEnd)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Row(children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.white, size: 15),
-            SizedBox(width: 8),
-            Expanded(child: Text('This time overlaps with another slot.',
-                style: TextStyle(fontSize: 13, color: Colors.white))),
-          ]),
-          backgroundColor: kError,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 3),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-        ));
-      }
-      return;
-    }
+    // Apply the pick immediately rather than blocking on transient conflicts
+    // with the other field of this same slot, or with another slot that
+    // hasn't been edited yet — full ordering + overlap validation happens
+    // on Save (see _save()), so mid-edit intermediate states are fine.
     setState(() => isStart ? _local.startTime = picked : _local.endTime = picked);
     _update();
+    if (mounted && _overlaps(_local.startTime, _local.endTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Row(children: [
+          Icon(Icons.warning_amber_rounded, color: Colors.white, size: 15),
+          SizedBox(width: 8),
+          Expanded(child: Text('This time overlaps with another slot.',
+              style: TextStyle(fontSize: 13, color: Colors.white))),
+        ]),
+        backgroundColor: kError,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
+      ));
+    }
   }
 
   String _fmtTime(TimeOfDay t) {

@@ -8,7 +8,7 @@ publish_to: 'none'
 # not strictly greater than the previous build, so always bump N — even
 # for a hotfix that keeps the same X.Y.Z.
 # Bump via: scripts/bump-version.ps1 -Type patch (or minor/major).
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -66,6 +66,8 @@ dependencies:
   sqflite: ^2.4.2
   # Web support for sqflite (Chrome) — provides databaseFactoryFfiWeb
   sqflite_common_ffi_web: ^0.4.5+1
+  # Desktop (Windows/Linux) support for sqflite — provides databaseFactoryFfi
+  sqflite_common_ffi: 2.3.7+1
 
   # PDF generation (prescription printout — print_prescription_screen.dart)
   printing: ^5.12.0

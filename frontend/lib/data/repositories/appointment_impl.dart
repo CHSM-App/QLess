@@ -39,6 +39,13 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
+  Future<AppointmentResponseModel> markArrived(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.markArrived(appointmentRequest);
+  }
+
+  @override
   Future<AppointmentResponseModel> updateQueueStatus(
     AppointmentRequestModel appointmentRequest,
   ) {
@@ -46,8 +53,8 @@ class AppointmentImpl implements AppointmentRepository {
   }
 
   @override
-  Future<List<MonthSlotData>> getBookedSlots(int doctorId) {
-    return apiService.getBookedSlots(doctorId);
+  Future<List<MonthSlotData>> getBookedSlots(int doctorId,String clinicId) {
+    return apiService.getBookedSlots(doctorId, clinicId);
   }
 
   @override
@@ -86,6 +93,13 @@ class AppointmentImpl implements AppointmentRepository {
     AppointmentRequestModel appointmentRequest,
   ) {
     return apiService.queueStop(appointmentRequest);
+  }
+
+  @override
+  Future<AppointmentResponseModel> stopBooking(
+    AppointmentRequestModel appointmentRequest,
+  ) {
+    return apiService.stopBooking(appointmentRequest);
   }
 
   @override

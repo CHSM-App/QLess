@@ -19,6 +19,7 @@ const kTextMid = Color(0xFF6B7280);
 const kBorder = Color(0xFFE5E7EB);
 const kGreen = Color(0xFF34A853);
 const kRed = Color(0xFFEA4335);
+const kPageBg = Color(0xFFF8F9FB);
 
 class PatientPrescriptionPdfScreen extends StatefulWidget {
   final PatientPrescription prescription;
@@ -394,7 +395,7 @@ Future<void> _printPdf() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBg,
+      backgroundColor: kPageBg,
       body: Column(
         children: [
           _buildHeader(),

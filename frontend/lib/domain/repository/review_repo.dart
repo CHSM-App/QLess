@@ -8,5 +8,5 @@ abstract class ReviewRepository {
 
   Future<List<ReviewModel>> getAppointmentReviews(int appointmentId);
 
-  Future<List<ReviewModel>> getDoctorReviews(int doctorId);
+  Future<List<ReviewModel>> getDoctorReviews(int doctorId, String clinicId);
 }

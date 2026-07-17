@@ -15,6 +15,7 @@ ReviewRequestModel _$ReviewRequestModelFromJson(Map<String, dynamic> json) =>
       comment: json['comment'] as String?,
       patientName: json['patient_name'] as String?,
       reviewedByUserId: (json['reviewed_by_user_id'] as num?)?.toInt(),
+      clinicId: json['clinic_id'] as String?,
     );
 
 Map<String, dynamic> _$ReviewRequestModelToJson(ReviewRequestModel instance) =>
@@ -26,4 +27,5 @@ Map<String, dynamic> _$ReviewRequestModelToJson(ReviewRequestModel instance) =>
       'comment': instance.comment,
       'patient_name': instance.patientName,
       'reviewed_by_user_id': instance.reviewedByUserId,
+      'clinic_id': instance.clinicId,
     };

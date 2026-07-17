@@ -231,6 +231,10 @@ class PrescriptionModel {
 
   @JsonKey(name: 'appointment_id')
   final int? appointmentId;
+
+  @JsonKey(name: 'clinic_id')
+  final String? clinicId;
+
   // List of medicines — sent together in one request
   final List<PrescriptionMedicineModel>? medicines;
 
@@ -279,7 +283,8 @@ class PrescriptionModel {
     this.createdAt,
     this.medicines,
     this.userType,
-      this.appointmentId,
+    this.appointmentId,
+    this.clinicId,
   });
 
   factory PrescriptionModel.fromJson(Map<String, dynamic> json) =>

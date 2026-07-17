@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:qless/presentation/patient/screens/delete_account_page.dart';
 
 const _primary = Color(0xFF26C6B0);
 const _primaryDark = Color(0xFF2BB5A0);
@@ -94,6 +95,9 @@ class _PatientHelpCenterPageState extends State<PatientHelpCenterPage> {
                       _ContactStrip(onOpenPrivacy: _openPrivacyPolicy),
                       const SizedBox(height: 14),
                       ...sections.map(_HelpSectionCard.new),
+                      const SizedBox(height: 4),
+                      _DeleteAccountCard(context: context),
+                      const SizedBox(height: 4),
                     ],
                   ),
           ),
@@ -568,6 +572,80 @@ class _EmptyHelpSearch extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DeleteAccountCard extends StatelessWidget {
+  const _DeleteAccountCard({required this.context});
+
+  final BuildContext context;
+
+  @override
+  Widget build(BuildContext _) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _redLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.delete_outline_rounded, color: _error, size: 18),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Delete Account',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _error,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Permanently remove your account and all data',
+                  style: TextStyle(fontSize: 11, color: _textSecondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DeleteAccountPage()),
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _error,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: const Text(
+                'Delete',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

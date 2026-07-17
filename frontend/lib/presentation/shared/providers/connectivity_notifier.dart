@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// The connectivity state exposed to the UI.
@@ -46,14 +47,43 @@ class ConnectivityState {
 /// * Transitions to [ConnectivityStatus.backOnline] for 2 seconds when
 ///   connectivity is restored, then to [ConnectivityStatus.online].
 /// * Uses an actual DNS lookup (like [NetworkService]) to confirm real internet.
-class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
+class ConnectivityNotifier extends StateNotifier<ConnectivityState>
+    with WidgetsBindingObserver {
   ConnectivityNotifier() : super(const ConnectivityState()) {
     _init();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   StreamSubscription<List<ConnectivityResult>>? _sub;
   Timer? _bannerTimer;
   Timer? _pollTimer;
+
+  // Background execution limits (Android Doze, backgrounded isolates) can
+  // freeze the poll timer or fail the DNS lookup while the app is not in
+  // the foreground, leaving state stuck on `offline`. Re-check immediately
+  // whenever the app is resumed (e.g. reopened from recents) instead of
+  // waiting for the next 10s poll.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _recheckOnResume();
+    }
+  }
+
+  Future<void> _recheckOnResume() async {
+    if (!mounted) return;
+    final hasInternet = await _checkInternet();
+    if (!mounted) return;
+    if (hasInternet && state.isOffline) {
+      await _onCameOnline();
+    } else if (!hasInternet && state.isOnline) {
+      _bannerTimer?.cancel();
+      state = state.copyWith(
+        status: ConnectivityStatus.offline,
+        showBackOnlineBanner: false,
+      );
+    }
+  }
 
   Future<void> _init() async {
     // Determine initial status immediately
@@ -138,6 +168,15 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
   }
 
   Future<bool> _checkInternet() async {
+    if (await _lookupOnce()) return true;
+    // Radio can still be waking from doze right after the app resumes from
+    // background — retry once before declaring offline to avoid a false
+    // offline->online flicker.
+    await Future.delayed(const Duration(milliseconds: 800));
+    return _lookupOnce();
+  }
+
+  Future<bool> _lookupOnce() async {
     try {
       final result = await InternetAddress.lookup('google.com')
           .timeout(const Duration(seconds: 5));
@@ -149,6 +188,7 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _sub?.cancel();
     _bannerTimer?.cancel();
     _pollTimer?.cancel();

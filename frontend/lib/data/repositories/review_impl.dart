@@ -21,8 +21,8 @@ class ReviewImpl implements ReviewRepository {
   }
 
   @override
-  Future<List<ReviewModel>> getDoctorReviews(int doctorId) {
-    return apiService.getDoctorReviews(doctorId);
+  Future<List<ReviewModel>> getDoctorReviews(int doctorId, String clinicId) {
+    return apiService.getDoctorReviews(doctorId, clinicId);
   }
 
   Map<String, dynamic> _asMap(dynamic value) {

@@ -12,6 +12,14 @@ class TodayQueueModel {
   final int? completedCount;
   final String? startedAt;
   final String? stoppedAt;
+  final bool bookingClosed;
+  /// Which clinic this session belongs to. The server already scopes the
+  /// GET_TODAY_QUEUE response by clinic_id when asked, so this is normally
+  /// just carried through — but the offline cache mixes ALL of a multi-clinic
+  /// doctor's sessions under one doctor_id with nothing else to tell them
+  /// apart, so callers caching this model MUST stamp the request's clinicId
+  /// here even if the row itself doesn't carry one.
+  final String? clinicId;
 
   TodayQueueModel({
     this.queueId,
@@ -27,6 +35,8 @@ class TodayQueueModel {
     this.completedCount,
     this.startedAt,
     this.stoppedAt,
+    this.bookingClosed = false,
+    this.clinicId,
   });
 
   TodayQueueModel copyWith({
@@ -43,6 +53,8 @@ class TodayQueueModel {
     int? completedCount,
     String? startedAt,
     String? stoppedAt,
+    bool? bookingClosed,
+    String? clinicId,
   }) =>
       TodayQueueModel(
         queueId: queueId ?? this.queueId,
@@ -58,6 +70,8 @@ class TodayQueueModel {
         completedCount: completedCount ?? this.completedCount,
         startedAt: startedAt ?? this.startedAt,
         stoppedAt: stoppedAt ?? this.stoppedAt,
+        bookingClosed: bookingClosed ?? this.bookingClosed,
+        clinicId: clinicId ?? this.clinicId,
       );
 
   factory TodayQueueModel.fromJson(Map<String, dynamic> json) => TodayQueueModel(
@@ -74,6 +88,8 @@ class TodayQueueModel {
         completedCount: json['completed_count'] as int?,
         startedAt: json['started_at'] as String?,
         stoppedAt: json['stopped_at'] as String?,
+        bookingClosed: json['booking_closed'] as bool? ?? false,
+        clinicId: json['clinic_id'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -90,5 +106,7 @@ class TodayQueueModel {
         'completed_count': completedCount,
         'started_at': startedAt,
         'stopped_at': stoppedAt,
+        'booking_closed': bookingClosed,
+        'clinic_id': clinicId,
       };
 }

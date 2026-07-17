@@ -212,9 +212,10 @@ abstract class ApiService {
     @Body() Map<String, dynamic> body,
   );
 
-  @GET("patient/users/getDoctorLeaveDates/{doctor_id}")
+  @GET("patient/users/getDoctorLeaveDates/{doctor_id}/{clinic_id}")
   Future<dynamic> getDoctorLeaveDates(
     @Path("doctor_id") int doctorId,
+    @Path("clinic_id") String clinicId,
   );
 
   @POST("doctor/insert/appointment/queueNext")
@@ -234,6 +235,11 @@ abstract class ApiService {
 
   @POST("doctor/insert/appointment/queueStop")
   Future<AppointmentResponseModel> queueStop(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
+  @POST("doctor/insert/appointment/stopBooking")
+  Future<AppointmentResponseModel> stopBooking(
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
@@ -302,9 +308,10 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   @GET("patient/users/getDoctors/{patient_id}")
   Future<List<DoctorDetails>> fetchDoctors(@Path("patient_id") int patientId);
 
-  @GET("patient/users/getDoctorAvailability/{doctor_id}")
+  @GET("patient/users/getDoctorAvailability/{doctor_id}/{clinic_id}")
   Future<List<DoctorAvailabilityModel>> getDoctorAvailability(
     @Path("doctor_id") int doctorId,
+    @Path("clinic_id") String clinicId,
   );
 
   @GET("patient/users/getPatientAppointments/{family_id}")
@@ -312,10 +319,16 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Path("family_id") int familyId,
   );
 
-  @GET("patient/users/favoriteDoctor/{patient_id}/{doctor_id}")
+  @GET("patient/users/favoriteDoctors/{patient_id}")
+  Future<dynamic> getFavoriteDoctors(
+    @Path("patient_id") int patientId,
+  );
+
+  @GET("patient/users/favoriteDoctor/{patient_id}/{doctor_id}/{clinic_id}")
   Future<dynamic> getFavoriteDoctor(
     @Path("patient_id") int patientId,
     @Path("doctor_id") int doctorId,
+    @Path("clinic_id") String clinicId,
   );
 
   @GET("patient/users/patientPrescriptionDetails/{prescription_id}")
@@ -337,16 +350,21 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
-  @GET("patient/users/appointment/getBookedSlots/{doctor_id}")
-  Future<List<MonthSlotData>> getBookedSlots(@Path("doctor_id") int doctorId);
+
+ @GET("patient/users/review/doctor/{doctor_id}/{clinic_id}")
+  Future<List<ReviewModel>> getDoctorReviews(@Path("doctor_id") int doctorId, @Path("clinic_id") String clinicId);
+
+  @GET("patient/users/appointment/getBookedSlots/{doctor_id}/{clinic_id}")
+  Future<List<MonthSlotData>> getBookedSlots(
+    @Path("doctor_id") int doctorId,
+    @Path("clinic_id") String clinicId,
+  );
 
   @GET("patient/users/review/appointment/{appointment_id}")
   Future<List<ReviewModel>> getAppointmentReviews(
     @Path("appointment_id") int appointmentId,
   );
 
-  @GET("patient/users/review/doctor/{doctor_id}")
-  Future<List<ReviewModel>> getDoctorReviews(@Path("doctor_id") int doctorId);
 
   // ── Notifications inbox ─────────────────────────────────────────────────
   // Return type kept as Future<dynamic> (caller casts to List). Two avoided
@@ -398,6 +416,11 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Body() AppointmentRequestModel appointmentRequest,
   );
 
+  @POST("patient/insert/appointment/markArrived")
+  Future<AppointmentResponseModel> markArrived(
+    @Body() AppointmentRequestModel appointmentRequest,
+  );
+
   @POST("patient/insert/cancelAppointment/{appointment_id}")
   Future<AppointmentResponseModel> cancelAppointment(
     @Path("appointment_id") int appointmentId,
@@ -431,10 +454,11 @@ Future<AppointmentResponseModel> queuePauseEmergency(
   @DELETE("patient/index/deleteFamilyMember/{member_id}")
   Future<FamilyMember> deleteFamilyMember(@Path("member_id") int memberId);
 
-  @DELETE("patient/index/favoriteDoctor/{patient_id}/{doctor_id}")
+  @DELETE("patient/index/favoriteDoctor/{patient_id}/{doctor_id}/{clinic_id}")
   Future<dynamic> deleteFavoriteDoctor(
     @Path("patient_id") int patientId,
     @Path("doctor_id") int doctorId,
+    @Path("clinic_id") String clinicId,
   );
 
   //------------------------------------------------------------------------------------------------------------------------------------//
@@ -467,9 +491,9 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Path("clinic_id") String clinicId,
   );
 
-  @GET("doctor/users/fetchReceptionistList/{clinic_id}")
+  @GET("doctor/users/fetchReceptionistList/{doctor_id}")
   Future<List<ReceptionistApiModel>> fetchReceptionistList(
-    @Path("clinic_id") String clinicId,
+    @Path("doctor_id") int doctorId,
   );
 
   @MultiPart()

@@ -35,6 +35,9 @@ class QueuePreviewResponseModel {
   @JsonKey(name: 'status')
   String? status;
 
+  @JsonKey(name: 'booking_closed', fromJson: _toBool)
+  bool? bookingClosed;
+
   QueuePreviewResponseModel({
     this.success,
     this.predictedQueueNumber,
@@ -46,6 +49,7 @@ class QueuePreviewResponseModel {
     this.queueStarted,
     this.isMyTurn,
     this.status,
+    this.bookingClosed,
   });
 
   factory QueuePreviewResponseModel.fromJson(Map<String, dynamic> json) =>

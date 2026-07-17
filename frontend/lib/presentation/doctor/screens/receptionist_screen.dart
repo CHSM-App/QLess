@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -85,16 +86,16 @@ class _ReceptionistPageState extends ConsumerState<ReceptionistPage> {
   }
 
   Future<void> _loadList() async {
-    String? clinicId = _clinicId;
-    if (clinicId == null) {
+    int? doctorId = ref.read(doctorLoginViewModelProvider).doctorId;
+    if (doctorId == null) {
       // State may not yet be loaded — fall back to TokenStorage directly.
-      final stored = await TokenStorage.getValue('clinic_id');
-      clinicId = _parseClinicId(stored);
+      final stored = await TokenStorage.getValue('doctor_id');
+      doctorId = int.tryParse(stored ?? '');
     }
-    if (clinicId == null) return;
+    if (doctorId == null) return;
     await ref
         .read(receptionistLoginViewModelProvider.notifier)
-        .fetchReceptionistList(clinicId);
+        .fetchReceptionistList(doctorId);
   }
 
   void _goAdd() async {
@@ -428,6 +429,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
   bool   _saving = false;
   bool   _mobileChecking = false;
   bool?  _mobileExists;          // null=unchecked, true=exists, false=free
+  Timer? _mobileDebounce;
 
   final _picker = ImagePicker();
 
@@ -448,6 +450,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
 
   @override
   void dispose() {
+    _mobileDebounce?.cancel();
     _nameCtrl.dispose();
     _mobileCtrl.dispose();
     _emailCtrl.dispose();
@@ -459,35 +462,39 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
   // ── Mobile exist check ───────────────────────────────────────────────────
   String? _mobileExistMsg;
 
-  Future<void> _checkMobile(String val) async {
+  void _checkMobile(String val) {
+    _mobileDebounce?.cancel();
     if (_isEdit || val.length != 10) {
       if (_mobileExists != null || _mobileExistMsg != null) {
         setState(() { _mobileExists = null; _mobileExistMsg = null; });
       }
       return;
     }
-    setState(() { _mobileChecking = true; _mobileExists = null; _mobileExistMsg = null; });
-    try {
-      final results = await Future.wait([
-        ref.read(receptionistLoginViewModelProvider.notifier).mobileExistReceptionist(val),
-        ref.read(doctorLoginViewModelProvider.notifier).mobileExistDoctor(val),
-      ]);
+    _mobileDebounce = Timer(const Duration(milliseconds: 800), () async {
       if (!mounted) return;
-      final recepExists  = results[0].isNotEmpty;
-      final doctorExists = results[1].isNotEmpty;
-      setState(() {
-        _mobileChecking = false;
-        _mobileExists   = recepExists || doctorExists;
-        _mobileExistMsg = doctorExists
-            ? 'Mobile number registered as Doctor'
-            : recepExists
-                ? 'Mobile number already registered'
-                : null;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() { _mobileChecking = false; _mobileExists = null; _mobileExistMsg = null; });
-    }
+      setState(() { _mobileChecking = true; _mobileExists = null; _mobileExistMsg = null; });
+      try {
+        final results = await Future.wait([
+          ref.read(receptionistLoginViewModelProvider.notifier).mobileExistReceptionist(val),
+          ref.read(doctorLoginViewModelProvider.notifier).mobileExistDoctor(val),
+        ]);
+        if (!mounted) return;
+        final recepExists  = results[0].isNotEmpty;
+        final doctorExists = results[1].isNotEmpty;
+        setState(() {
+          _mobileChecking = false;
+          _mobileExists   = recepExists || doctorExists;
+          _mobileExistMsg = doctorExists
+              ? 'Mobile number registered as Doctor'
+              : recepExists
+                  ? 'Mobile number already registered'
+                  : null;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() { _mobileChecking = false; _mobileExists = null; _mobileExistMsg = null; });
+      }
+    });
   }
 
   // ── Photo picker ─────────────────────────────────────────────────────────

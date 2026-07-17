@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as geocoding;
@@ -7,20 +6,23 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:qless/core/utils/name_utils.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/presentation/patient/providers/patient_usecase_provider.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctors_search_screen.dart';
+import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/screens/family_members_screen.dart';
 import 'package:qless/presentation/patient/screens/location_services.dart';
 import 'package:qless/presentation/patient/screens/location_storage.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_notification.dart';
-import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 
 // ── Colour Palette ─────────────────────────────────────────────────
+const kPageBg = Color(0xFFF8F9FB);
 const kPrimary = Color(0xFF26C6B0);
 const kPrimaryDark = Color(0xFF1EA898);
 const kPrimaryLight = Color(0xFFD9F5F1);
@@ -82,6 +84,37 @@ List<Map<String, dynamic>> _buildSpecialtyList(List<DoctorDetails> doctors) {
     }
   }
   return result;
+}
+
+// ── Flat card helper ────────────────────────────────────────────────
+// Replaces the old neomorphic (soft-UI) surface with a clean flat card:
+// white surface, a hairline border, and only a whisper of shadow so cards
+// still separate from the page without the heavy embossed look. Every call
+// site that used to ask for a "pressed" (inset) look now gets a subtly
+// tinted flat surface instead — same call signature, flatter result.
+const _kCardBorder = Color(0xFFEDF1F5);
+const _kCardShadow = Color(0x0F1A202C);
+
+BoxDecoration _neoBox({
+  double radius = 14,
+  Color color = Colors.white,
+  bool pressed = false,
+  Border? border,
+}) {
+  return BoxDecoration(
+    color: pressed ? kPrimaryLight.withOpacity(0.55) : color,
+    borderRadius: BorderRadius.circular(radius),
+    border: border ??
+        Border.all(
+          color: pressed ? kPrimary.withOpacity(0.18) : _kCardBorder,
+          width: 1,
+        ),
+    boxShadow: pressed
+        ? const []
+        : const [
+            BoxShadow(color: _kCardShadow, offset: Offset(0, 2), blurRadius: 8),
+          ],
+  );
 }
 
 // ── Doctor avatar helper ───────────────────────────────────────────
@@ -195,12 +228,14 @@ class HomeScreen extends ConsumerStatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
   final Function(int) onTabChange;
+  final VoidCallback? onSeeAllAppointments;
 
   const HomeScreen({
     super.key,
     required this.onToggleTheme,
     required this.themeMode,
     required this.onTabChange,
+    this.onSeeAllAppointments,
   });
 
   @override
@@ -220,6 +255,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   List<Map<String, dynamic>> _cachedSpecialties = [];
   bool _popupShown = false;
+  final Map<int, double> _clinicRatings = {};
 
   @override
   void initState() {
@@ -237,6 +273,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
       ),
     );
+    
     _animCtrl.forward();
     _initLocation();
     Future.microtask(_ensurePatientIdAndFetch);
@@ -270,6 +307,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ref.read(doctorsViewModelProvider.notifier).fetchDoctors(pid),
       ]);
       if (!mounted) return;
+      _loadTopRatings(ref.read(doctorsViewModelProvider).doctors);
       final appts = ref.read(appointmentViewModelProvider).patientAppointmentsList?.value ?? [];
       final now = DateTime.now();
       final liveDocIds = appts.where((a) {
@@ -285,6 +323,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     } finally {
       _isFetching = false;
     }
+  }
+
+  Future<void> _loadTopRatings(List<DoctorDetails> doctors) async {
+    final rated = doctors
+        .where((d) => d.doctorId != null && (d.rating ?? 0) >= 3.5 && (d.reviewCount ?? 0) >= 3)
+        .toList()
+      ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+    final toFetch = rated
+        .take(3)
+        .where((d) => !_clinicRatings.containsKey(d.doctorId))
+        .toList();
+    if (toFetch.isEmpty) return;
+    final reviewUsecase = ref.read(reviewUsecaseProvider);
+    final apptUsecase   = ref.read(appointmentUsecaseProvider);
+    final results = await Future.wait(
+      toFetch.map((d) async {
+        final id       = d.doctorId!;
+        final clinicId = d.clinicId;
+        try {
+          final allReviews = await reviewUsecase.getDoctorReviews(id, clinicId ?? '');
+          if (allReviews.isEmpty) return MapEntry(id, d.rating ?? 0.0);
+          var reviews = allReviews;
+          if (clinicId != null && clinicId.isNotEmpty) {
+            try {
+              final appts   = await apptUsecase.fetchPatientAppointments(id, clinicId: clinicId);
+              final apptIds = appts.map((a) => a.appointmentId).whereType<int>().toSet();
+              if (apptIds.isNotEmpty) {
+                final filtered = allReviews
+                    .where((r) => r.appointmentId != null && apptIds.contains(r.appointmentId))
+                    .toList();
+                if (filtered.isNotEmpty) reviews = filtered;
+              }
+            } catch (_) {
+              // appointment fetch failed — keep all reviews
+            }
+          }
+          final avg = reviews.fold<double>(0, (a, r) => a + (r.rating?.toDouble() ?? 0)) / reviews.length;
+          return MapEntry(id, avg);
+        } catch (_) {
+          return MapEntry(id, d.rating ?? 0.0);
+        }
+      }),
+    );
+    if (!mounted) return;
+    setState(() {
+      for (final e in results) { _clinicRatings[e.key] = e.value; }
+    });
   }
 
   /// Runs once per cold start. A previously saved location — whether picked
@@ -314,7 +399,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Future<void> _ensureLocationPermission() async {
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
-      perm = await Geolocator.requestPermission();
+      perm = await LocationService.requestPermissionOnce();
     }
     if (perm == LocationPermission.deniedForever) {
       if (mounted) _showLocationSnack();
@@ -329,7 +414,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// "Use Current Location" instead.
   Future<void> _detectLocation() async {
     final pos = await LocationService.getCurrentPosition();
-    final current = await LocationService.getCurrentAddress();
+    // Reuse the fix we already have instead of asking Geolocator for a second,
+    // independent GPS fix — on a first-time cold start the extra fix often
+    // pushes the total wait past the timeout and the header falls back to an
+    // error string instead of the real location.
+    final current = pos != null
+        ? await LocationService.addressFromPosition(pos)
+        : await LocationService.getCurrentAddress();
     if (mounted) {
       setState(() {
         _location = current;
@@ -566,7 +657,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             _SectionTitle('Upcoming Appointments',
                 action:   hasMore ? 'See All' : null,
-                onAction: () => widget.onTabChange(2)),
+                onAction: () => widget.onSeeAllAppointments != null
+                    ? widget.onSeeAllAppointments!()
+                    : widget.onTabChange(2)),
             const SizedBox(height: 10),
             if (shown.isEmpty)
               _EmptyNote('No upcoming appointments')
@@ -579,8 +672,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     isToday: _isToday(e.value),
                     isNext: e.key == 0,
                     doctorOffline: offline.contains(e.value.doctorId),
-                    queueEvent: vmState.doctorQueueEvents[e.value.doctorId],
-                    currentServingOverride: vmState.doctorCurrentServing[e.value.doctorId],
+                    queueEvent: vmState.doctorQueueEvents['${e.value.doctorId}_${e.value.queueId}'],
+                    currentServingOverride: vmState.doctorCurrentServing['${e.value.doctorId}_${e.value.clinicId}'],
+                    onMarkArrived: () {
+                      final familyId = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+                      final patientId = e.value.patientId ?? 0;
+                      final appointmentId = e.value.appointmentId ?? 0;
+                      if (familyId == 0 || patientId == 0 || appointmentId == 0) {
+                        return Future.value(false);
+                      }
+                      return ref.read(appointmentViewModelProvider.notifier)
+                          .markArrived(appointmentId, patientId, familyId);
+                    },
                   ),
                 ),
               ),
@@ -612,100 +715,196 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     ],
   );
 
+  // Widget _buildSpecialtiesSection(List<DoctorDetails> doctors, bool isLoading) {
+  //   if (doctors.isNotEmpty) {
+  //     _cachedSpecialties = _buildSpecialtyList(doctors);
+  //   }
+  //   final specList = _cachedSpecialties;
+
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       _SectionTitle('Most Searched Specialties'),
+  //       const SizedBox(height: 10),
+  //       if (isLoading && specList.isEmpty)
+  //         SizedBox(
+  //           height: 98,
+  //           child: ListView.separated(
+  //             scrollDirection: Axis.horizontal,
+  //             physics: const BouncingScrollPhysics(),
+  //             itemCount: 6,
+  //             separatorBuilder: (_, __) => const SizedBox(width: 10),
+  //             itemBuilder: (_, __) => _SpecialtyChipSkeleton(),
+  //           ),
+  //         )
+  //       else if (specList.isEmpty)
+  //         const SizedBox.shrink()
+  //       else
+  //         SizedBox(
+  //           height: 98,
+  //           child: ListView.separated(
+  //             scrollDirection: Axis.horizontal,
+  //             physics: const BouncingScrollPhysics(),
+  //             itemCount: specList.length,
+  //             separatorBuilder: (_, __) => const SizedBox(width: 10),
+  //             itemBuilder: (_, i) {
+  //               final s = specList[i];
+  //               return _SpecialtyChip(
+  //                 icon:  s['icon']  as IconData,
+  //                 label: s['name']  as String,
+  //                 color: s['color'] as Color,
+  //                 onTap: () => _goToSearch(specialty: s['name'] as String),
+  //               );
+  //             },
+  //           ),
+  //         ),
+  //     ],
+  //   );
+  // }
   Widget _buildSpecialtiesSection(List<DoctorDetails> doctors, bool isLoading) {
-    if (doctors.isNotEmpty) {
-      _cachedSpecialties = _buildSpecialtyList(doctors);
-    }
-    final specList = _cachedSpecialties;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionTitle('Most Searched Specialties'),
-        const SizedBox(height: 10),
-        if (isLoading && specList.isEmpty)
-          SizedBox(
-            height: 96,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: 6,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, __) => _SpecialtyChipSkeleton(),
-            ),
-          )
-        else if (specList.isEmpty)
-          const SizedBox.shrink()
-        else
-          SizedBox(
-            height: 96,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              physics: const BouncingScrollPhysics(),
-              itemCount: specList.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final s = specList[i];
-                return _SpecialtyChip(
-                  icon:  s['icon']  as IconData,
-                  label: s['name']  as String,
-                  color: s['color'] as Color,
-                  onTap: () => _goToSearch(specialty: s['name'] as String),
-                );
-              },
-            ),
-          ),
-      ],
-    );
+  if (doctors.isNotEmpty) {
+    _cachedSpecialties = _buildSpecialtyList(doctors);
   }
+  final specList = _cachedSpecialties;
+  final shown    = specList.take(4).toList();
+  final hasMore  = specList.length > 4;
 
-  Widget _buildTopRatedDoctorsSection(
-      List<DoctorDetails> doctors, bool isLoading) {
-    // Top rated = avg rating >= 3.5 AND at least 3 reviews, so a single stray
-    // review can't push a doctor to the top. Both fields come straight from the
-    // getDoctors response (server-aggregated) — no per-doctor review fetch.
-    final rated = doctors
-        .where((d) =>
-            d.doctorId != null &&
-            (d.rating ?? 0) >= 3.5 &&
-            (d.reviewCount ?? 0) >= 3)
-        .toList()
-      ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
-
-    final hasMore = rated.length > 3;
-    final shownDoctors = rated.take(3).toList();
-    final stillLoading = isLoading;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionTitle(
-          'Top Rated Doctors',
-          action: hasMore ? 'Show all' : null,
-          onAction: hasMore ? () => _goToSearch() : null,
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _SectionTitle('Specialties',
+          action: hasMore ? 'View all' : null,
+          onAction: hasMore ? () => requestDoctorExploreSpecialty() : null),
+      const SizedBox(height: 10),
+      if (isLoading && specList.isEmpty)
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.6,
+          children: List.generate(4, (_) => _SpecialtyPillSkeleton()),
+        )
+      else if (specList.isEmpty)
+        const SizedBox.shrink()
+      else ...[
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 2.6,
+          children: shown
+              .map((s) => _SpecialtyPillCard(
+                    icon:  s['icon']  as IconData,
+                    label: s['name']  as String,
+                    color: s['color'] as Color,
+                    onTap: () => _goToSearch(specialty: s['name'] as String),
+                  ))
+              .toList(),
         ),
-        const SizedBox(height: 10),
-        if (stillLoading && shownDoctors.isEmpty) ...[
-          const _TopDoctorSkeletonCard(),
-          const SizedBox(height: 8),
-          const _TopDoctorSkeletonCard(),
-        ] else if (shownDoctors.isEmpty)
-          const _EmptyNote('No top rated doctors available')
-        else
-          ...shownDoctors.map(
-            (doctor) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _TopDoctorCard(
-                doctor: doctor,
-                cardRating: doctor.rating,
-                onTap: () => _goToBook(doctor),
-              ),
-            ),
-          ),
       ],
-    );
-  }
+    ],
+  );
+}
 
+
+
+  // Widget _buildTopRatedDoctorsSection(
+  //     List<DoctorDetails> doctors, bool isLoading) {
+  //   // Top rated = avg rating >= 3.5 AND at least 3 reviews, so a single stray
+  //   // review can't push a doctor to the top. Both fields come straight from the
+  //   // getDoctors response (server-aggregated) — no per-doctor review fetch.
+  //   final rated = doctors
+  //       .where((d) =>
+  //           d.doctorId != null &&
+  //           (d.rating ?? 0) >= 3.5 &&
+  //           (d.reviewCount ?? 0) >= 3)
+  //       .toList()
+  //     ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+
+  //   final hasMore = rated.length > 3;
+  //   final shownDoctors = rated.take(3).toList();
+  //   final stillLoading = isLoading;
+
+  //   return Column(
+  //     crossAxisAlignment: CrossAxisAlignment.start,
+  //     children: [
+  //       _SectionTitle(
+  //         'Top Rated Doctors',
+  //         action: hasMore ? 'Show all' : null,
+  //         onAction: hasMore ? () => _goToSearch() : null,
+  //       ),
+  //       const SizedBox(height: 10),
+  //       if (stillLoading && shownDoctors.isEmpty) ...[
+  //         const _TopDoctorSkeletonCard(),
+  //         const SizedBox(height: 8),
+  //         const _TopDoctorSkeletonCard(),
+  //       ] else if (shownDoctors.isEmpty)
+  //         const _EmptyNote('No top rated doctors available')
+  //       else
+  //         ...shownDoctors.map(
+  //           (doctor) => Padding(
+  //             padding: const EdgeInsets.only(bottom: 8),
+  //             child: _TopDoctorCard(
+  //               doctor: doctor,
+  //               cardRating: _clinicRatings[doctor.doctorId] ?? doctor.rating,
+  //               onTap: () => _goToBook(doctor),
+  //             ),
+  //           ),
+  //         ),
+  //     ],
+  //   );
+  // }
+Widget _buildTopRatedDoctorsSection(List<DoctorDetails> doctors, bool isLoading) {
+  final rated = doctors
+      .where((d) => d.doctorId != null && (d.rating ?? 0) >= 3.5 && (d.reviewCount ?? 0) >= 3)
+      .toList()
+    ..sort((a, b) => (b.rating ?? 0).compareTo(a.rating ?? 0));
+
+  final hasMore      = rated.length > 6;
+  final shownDoctors = rated.take(6).toList();
+  final stillLoading = isLoading;
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      _SectionTitle('Top Rated Doctors',
+          action: hasMore ? 'Show all' : null,
+          onAction: hasMore ? () => _goToSearch() : null),
+      const SizedBox(height: 10),
+      SizedBox(
+        height: 150,
+        child: stillLoading && shownDoctors.isEmpty
+            ? ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                itemCount: 3,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (_, __) => const _TopDoctorSkeletonCard(),
+              )
+            : shownDoctors.isEmpty
+                ? const _EmptyNote('No top rated doctors available')
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: shownDoctors.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 10),
+                    itemBuilder: (_, i) {
+                      final doctor = shownDoctors[i];
+                      return _TopDoctorCard(
+                        doctor: doctor,
+                        cardRating: _clinicRatings[doctor.doctorId] ?? doctor.rating,
+                        onTap: () => _goToBook(doctor),
+                      );
+                    },
+                  ),
+      ),
+    ],
+  );
+}
   @override
   Widget build(BuildContext context) {
     final loginState    = ref.watch(patientLoginViewModelProvider);
@@ -729,7 +928,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: kPageBg,
       body: RefreshIndicator(
         color: kPrimary,
         strokeWidth: 2,
@@ -742,15 +941,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           slivers: [
             SliverToBoxAdapter(
               child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  border: Border(
-                      bottom: BorderSide(color: Color(0xFFEDF2F7), width: 1)),
-                ),
+                decoration: const BoxDecoration(color: kPageBg),
                 child: SafeArea(
                   bottom: false,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -780,12 +975,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                           const BoxConstraints(maxWidth: 140),
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: kPrimaryLight,
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                            color: kPrimary.withOpacity(0.2)),
-                                      ),
+                                      decoration: _neoBox(
+                                          radius: 20, pressed: true),
                                       child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
@@ -839,9 +1030,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
 
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(14, 16, 14, 90),
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 90),
               sliver: SliverList(
                 delegate: SliverChildListDelegate([
+
+                  // ── Hero booking card ─────────────────────────────
+                  _fade(1, _HeroBookCard(
+                    onTap: () => widget.onTabChange(1),
+                  )),
+                  const SizedBox(height: 18),
 
                   _fade(2, Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,47 +1046,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       _SectionTitle('Quick Actions'),
                       const SizedBox(height: 10),
                       Row(children: [
-                        _QuickAction(
-                          icon: Icons.calendar_month_rounded,
-                          label: 'Book Appointment',
-                          subtitle: 'Find & reserve',
-                          color: kPrimary,
-                          highlighted: true,
-                          onTap: () => widget.onTabChange(1),
+                        Expanded(
+                          child: _QuickTile(
+                            icon: Icons.calendar_month_rounded,
+                            label: 'Appointments',
+                            color: kPrimary,
+                            onTap: () => widget.onTabChange(2),
+                          ),
                         ),
                         const SizedBox(width: 8),
-                        _QuickAction(
-                          icon: Icons.history_rounded,
-                          label: 'My Appointments',
-                          subtitle: 'History & upcoming',
-                          color: kPrimary,
-                          onTap: () => widget.onTabChange(2),
-                        ),
-                      ]),
-                      const SizedBox(height: 8),
-                      Row(children: [
-                        _QuickAction(
-                          icon: Icons.group_add_rounded,
-                          label: 'Family',
-                          subtitle: 'Manage members',
-                          color: kPurple,
-                          onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) =>
-                                      const FamilyMembersScreen())),
+                        Expanded(
+                          child: _QuickTile(
+                            icon: Icons.group_add_rounded,
+                            label: 'Family',
+                            color: kPurple,
+                            onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (_) =>
+                                        const FamilyMembersScreen())),
+                          ),
                         ),
                         const SizedBox(width: 8),
-                        _QuickAction(
-                          icon: Icons.medical_information_rounded,
-                          label: 'Records',
-                          subtitle: 'Prescriptions',
-                          color: kWarning,
-                          onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (s_) =>
-                                      const PatientPrescriptionListScreen())),
+                        Expanded(
+                          child: _QuickTile(
+                            icon: Icons.medical_information_rounded,
+                            label: 'Records',
+                            color: kWarning,
+                            onTap: () => widget.onTabChange(3),
+                          ),
                         ),
                       ]),
                     ],
@@ -897,11 +1082,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   const SizedBox(height: 22),
 
                   _fade(3, _buildAppointmentsSection()),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 10),
 
                   _fade(4, _buildSpecialtiesSection(
                       doctorsState.doctors, doctorsState.isLoading)),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 4),
 
                   _fade(5, _buildTopRatedDoctorsSection(
                       doctorsState.doctors, doctorsState.isLoading)),
@@ -1425,6 +1610,101 @@ class _LocationSheetState extends State<_LocationSheet> {
   }
 }
 // ════════════════════════════════════════════════════════════════════
+//  HERO BOOK CARD
+//  Flat teal banner that replaces the old "highlighted quick action" tile.
+//  Two soft decorative circles give it depth without shadows/gradients.
+// ════════════════════════════════════════════════════════════════════
+class _HeroBookCard extends StatelessWidget {
+  final VoidCallback onTap;
+  const _HeroBookCard({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: kPrimary,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            right: -20,
+            top: -26,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.10),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 26,
+            bottom: -34,
+            child: Container(
+              width: 76,
+              height: 76,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.08),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Feeling unwell?',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: 210,
+                child: Text('Book a doctor and skip the waiting room queue.',
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                        height: 1.3)),
+              ),
+              const SizedBox(height: 14),
+              GestureDetector(
+                onTap: onTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text('Book appointment',
+                          style: TextStyle(
+                              color: kPrimaryDark,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700)),
+                      SizedBox(width: 6),
+                      Icon(Icons.arrow_forward_rounded,
+                          color: kPrimaryDark, size: 14),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  HEADER BUTTON
 // ════════════════════════════════════════════════════════════════════
 // When `badge: true`, the button watches `notificationProvider` and shows the
@@ -1501,11 +1781,7 @@ class _HeaderBtnState extends ConsumerState<_HeaderBtn>
         Container(
           width: 36,
           height: 36,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kBorder),
-          ),
+          decoration: _neoBox(radius: 10),
           alignment: Alignment.center,
           child: AnimatedBuilder(
             animation: _shake,
@@ -1515,7 +1791,7 @@ class _HeaderBtnState extends ConsumerState<_HeaderBtn>
               alignment: Alignment.topCenter,
               child: child,
             ),
-            child: Icon(widget.icon, color: kTextPrimary, size: 17),
+            child: Icon(widget.icon, color: const Color(0xFFE53935), size: 20),
           ),
         ),
         if (unread > 0)
@@ -1560,11 +1836,24 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: kTextPrimary)),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 3,
+                height: 15,
+                decoration: BoxDecoration(
+                    color: kPrimary,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+              const SizedBox(width: 7),
+              Text(title,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: kTextPrimary)),
+            ],
+          ),
           if (action != null)
             GestureDetector(
               onTap: onAction,
@@ -1579,212 +1868,53 @@ class _SectionTitle extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  QUICK ACTION
+//  QUICK TILE
+//  Simple flat icon + label tile — replaces the old animated "highlighted"
+//  quick action card now that booking has its own hero banner above.
 // ════════════════════════════════════════════════════════════════════
-class _QuickAction extends StatefulWidget {
+class _QuickTile extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String subtitle;
   final Color color;
   final VoidCallback onTap;
-  final bool highlighted;
-
-  const _QuickAction({
+  const _QuickTile({
     required this.icon,
     required this.label,
-    required this.subtitle,
     required this.color,
     required this.onTap,
-    this.highlighted = false,
   });
 
   @override
-  State<_QuickAction> createState() => _QuickActionState();
-}
-
-class _QuickActionState extends State<_QuickAction>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _ctrl;
-  late Animation<double> _ripple;
-  late Animation<double> _shimmer;
-  late Animation<double> _bounce;
-
-  @override
-  void initState() {
-    super.initState();
-    if (!widget.highlighted) return;
-    _ctrl = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2400))
-      ..repeat();
-    _ripple  = Tween<double>(begin: 0, end: 1)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
-    _shimmer = Tween<double>(begin: -1.5, end: 2.0).animate(CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.1, 0.7, curve: Curves.easeInOut)));
-    _bounce  = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(
-        parent: _ctrl,
-        curve: const Interval(0.0, 0.5, curve: Curves.elasticOut)));
-  }
-
-  @override
-  void dispose() {
-    if (widget.highlighted) _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: widget.highlighted ? _buildHighlighted() : _buildPlain(),
-      ),
-    );
-  }
-
-  Widget _buildHighlighted() {
-    return AnimatedBuilder(
-      animation: _ctrl,
-      builder: (context, child) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: kPrimary,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: kPrimaryDark),
-            boxShadow: [
-              BoxShadow(
-                  color: kPrimary.withOpacity(0.35),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4))
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(9),
-            child: Stack(children: [
-              Positioned.fill(child: _buildRipple(0.0)),
-              Positioned.fill(child: _buildRipple(0.33)),
-              Positioned.fill(child: _buildRipple(0.66)),
-              Positioned.fill(
-                child: Transform.translate(
-                  offset: Offset(_shimmer.value * 120, 0),
-                  child: Container(
-                    width: 60,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          Colors.white.withOpacity(0.15),
-                          Colors.transparent
-                        ],
-                        stops: const [0.0, 0.5, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+        decoration: _neoBox(radius: 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
               ),
-              Row(children: [
-                Transform.translate(
-                  offset: Offset(
-                      0, -3 * (0.5 - (_bounce.value - 0.5).abs()) * 2),
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.22),
-                      borderRadius: BorderRadius.circular(9),
-                    ),
-                    child: Icon(widget.icon, color: Colors.white, size: 15),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(widget.label,
-                            style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1),
-                        const SizedBox(height: 2),
-                        Text(widget.subtitle,
-                            style: TextStyle(
-                                fontSize: 9,
-                                color: Colors.white.withOpacity(0.85)),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1),
-                      ]),
-                ),
-              ]),
-            ]),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildRipple(double phaseOffset) {
-    final phase   = (_ctrl.value + phaseOffset) % 1.0;
-    final size    = 52.0 + phase * 60.0;
-    final opacity = (1.0 - phase) * 0.35;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(left: 7),
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-                color: Colors.white.withOpacity(opacity), width: 1.5),
-          ),
+              child: Icon(icon, color: color, size: 17),
+            ),
+            const SizedBox(height: 7),
+            Text(label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: kTextPrimary)),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildPlain() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: widget.color.withOpacity(0.2)),
-      ),
-      child: Row(children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-              color: widget.color,
-              borderRadius: BorderRadius.circular(10)),
-          child: Icon(widget.icon, color: Colors.white, size: 15),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.label,
-                    style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: kTextPrimary),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1),
-                const SizedBox(height: 2),
-                Text(widget.subtitle,
-                    style: const TextStyle(
-                        fontSize: 9, color: kTextSecondary),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1),
-              ]),
-        ),
-      ]),
     );
   }
 }
@@ -1813,9 +1943,133 @@ class _EmptyNote extends StatelessWidget {
       );
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  TOP DOCTOR CARD
-// ════════════════════════════════════════════════════════════════════
+// // ════════════════════════════════════════════════════════════════════
+// //  TOP DOCTOR CARD
+// // ════════════════════════════════════════════════════════════════════
+// class _TopDoctorCard extends StatelessWidget {
+//   final DoctorDetails doctor;
+//   final double? cardRating;
+//   final VoidCallback onTap;
+//   const _TopDoctorCard({required this.doctor, required this.onTap, this.cardRating});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final name = doctor.name?.trim();
+//     final spec = doctor.specialization?.trim();
+//     final clinic = doctor.clinicName?.trim();
+//     final rating = (cardRating != null && cardRating! > 0) ? cardRating : null;
+
+//     return GestureDetector(
+//       onTap: onTap,
+//       child: Container(
+//         padding: const EdgeInsets.all(12),
+//         decoration: _neoBox(radius: 12),
+//         child: Row(
+//           children: [
+//             _doctorAvatar(spec, size: 42),
+//             const SizedBox(width: 10),
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Dr. ${name?.isNotEmpty == true ? name : 'Doctor'}',
+//                     maxLines: 1,
+//                     overflow: TextOverflow.ellipsis,
+//                     style: const TextStyle(
+//                       fontSize: 13,
+//                       fontWeight: FontWeight.w700,
+//                       color: kTextPrimary,
+//                     ),
+//                   ),
+//                   if (spec != null && spec.isNotEmpty) ...[
+//                     const SizedBox(height: 2),
+//                     Text(
+//                       spec,
+//                       maxLines: 1,
+//                       overflow: TextOverflow.ellipsis,
+//                       style: const TextStyle(
+//                         fontSize: 11,
+//                         color: kTextSecondary,
+//                       ),
+//                     ),
+//                   ],
+//                   if (clinic != null && clinic.isNotEmpty) ...[
+//                     const SizedBox(height: 2),
+//                     Text(
+//                       clinic,
+//                       maxLines: 1,
+//                       overflow: TextOverflow.ellipsis,
+//                       style: const TextStyle(
+//                         fontSize: 10,
+//                         color: kTextMuted,
+//                       ),
+//                     ),
+//                   ],
+//                 ],
+//               ),
+//             ),
+//             if (rating != null)
+//               Container(
+//                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+//                 decoration: BoxDecoration(
+//                   color: kAmberLight,
+//                   borderRadius: BorderRadius.circular(8),
+//                   border: Border.all(color: kWarning.withValues(alpha: 0.25)),
+//                 ),
+//                 child: Row(
+//                   mainAxisSize: MainAxisSize.min,
+//                   children: [
+//                     const Icon(Icons.star_rounded, size: 12, color: kWarning),
+//                     const SizedBox(width: 4),
+//                     Text(
+//                       rating.toStringAsFixed(1),
+//                       style: const TextStyle(
+//                         fontSize: 10,
+//                         fontWeight: FontWeight.w700,
+//                         color: kWarning,
+//                       ),
+//                     ),
+//                   ],
+//                 ),
+//               ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// class _TopDoctorSkeletonCard extends StatelessWidget {
+//   const _TopDoctorSkeletonCard();
+
+//   @override
+//   Widget build(BuildContext context) => Container(
+//         padding: const EdgeInsets.all(12),
+//         decoration: _neoBox(radius: 12),
+//         child: Row(
+//           children: const [
+//             _Shimmer(width: 42, height: 42),
+//             SizedBox(width: 10),
+//             Expanded(
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   _Shimmer(width: 140, height: 11),
+//                   SizedBox(height: 5),
+//                   _Shimmer(width: 100, height: 10),
+//                   SizedBox(height: 5),
+//                   _Shimmer(width: 120, height: 9),
+//                 ],
+//               ),
+//             ),
+//             SizedBox(width: 8),
+//             _Shimmer(width: 32, height: 22),
+//           ],
+//         ),
+//       );
+// }
+
 class _TopDoctorCard extends StatelessWidget {
   final DoctorDetails doctor;
   final double? cardRating;
@@ -1824,96 +2078,59 @@ class _TopDoctorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = doctor.name?.trim();
-    final spec = doctor.specialization?.trim();
-    final clinic = doctor.clinicName?.trim();
+    final name   = doctor.name?.trim();
+    final spec   = doctor.specialization?.trim();
     final rating = (cardRating != null && cardRating! > 0) ? cardRating : null;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kBorder),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.03),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
+        width: 132,
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
+        decoration: _neoBox(radius: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            _doctorAvatar(spec, size: 42),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Dr. ${name?.isNotEmpty == true ? name : 'Doctor'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: kTextPrimary,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _doctorAvatar(spec, size: 56),
+                if (rating != null)
+                  Positioned(
+                    right: -8,
+                    top: -8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: kWarning,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.star_rounded, size: 10, color: Colors.white),
+                        const SizedBox(width: 2),
+                        Text(rating.toStringAsFixed(1),
+                            style: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w800, color: Colors.white)),
+                      ]),
                     ),
                   ),
-                  if (spec != null && spec.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      spec,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: kTextSecondary,
-                      ),
-                    ),
-                  ],
-                  if (clinic != null && clinic.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      clinic,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: kTextMuted,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              ],
             ),
-            if (rating != null)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: kAmberLight,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: kWarning.withValues(alpha: 0.25)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star_rounded, size: 12, color: kWarning),
-                    const SizedBox(width: 4),
-                    Text(
-                      rating.toStringAsFixed(1),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: kWarning,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            const SizedBox(height: 10),
+            Text(doctorDisplayName(name),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: kTextPrimary)),
+            if (spec != null && spec.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(spec,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: kPrimaryDark)),
+            ],
           ],
         ),
       ),
@@ -1926,40 +2143,24 @@ class _TopDoctorSkeletonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kBorder),
-        ),
-        child: Row(
-          children: const [
-            _Shimmer(width: 42, height: 42),
-            SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _Shimmer(width: 140, height: 11),
-                  SizedBox(height: 5),
-                  _Shimmer(width: 100, height: 10),
-                  SizedBox(height: 5),
-                  _Shimmer(width: 120, height: 9),
-                ],
-              ),
-            ),
-            SizedBox(width: 8),
-            _Shimmer(width: 32, height: 22),
+        width: 132,
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
+        decoration: _neoBox(radius: 16),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(child: _Shimmer(width: 56, height: 56)),
+            SizedBox(height: 10),
+            _Shimmer(width: 90, height: 11),
+            SizedBox(height: 6),
+            _Shimmer(width: 70, height: 9),
           ],
         ),
       );
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  APPOINTMENT CARD  ← FULLY REDESIGNED
-//  - Queue number chip moved to TOP row (alongside Today badge)
-//  - Compact single-section layout (no bottom divider row)
-//  - NOW badge stays on the right side of main row
+//  APPOINTMENT CARD
 // ════════════════════════════════════════════════════════════════════
 class _ApptCard extends StatefulWidget {
   final AppointmentList appointment;
@@ -1970,6 +2171,9 @@ class _ApptCard extends StatefulWidget {
   /// Real current_serving from socket events — used for skipped patients where
   /// the SP echoes their own token instead of the actual serving number.
   final int? currentServingOverride;
+  /// Called when the patient taps "I've Arrived at Clinic" after being
+  /// skipped. Returns true on success so the card can show a confirmation.
+  final Future<bool> Function()? onMarkArrived;
   const _ApptCard({
     required this.appointment,
     this.isToday = false,
@@ -1977,6 +2181,7 @@ class _ApptCard extends StatefulWidget {
     this.doctorOffline = false,
     this.queueEvent,
     this.currentServingOverride,
+    this.onMarkArrived,
   });
   @override
   State<_ApptCard> createState() => _ApptCardState();
@@ -1989,6 +2194,9 @@ class _ApptCardState extends State<_ApptCard>
 
   late AnimationController _bounceCtrl;
   late Animation<double> _bounceScale;
+
+  bool _arrivedSending = false;
+  bool _arrivedSent = false;
 
   @override
   void initState() {
@@ -2007,6 +2215,23 @@ class _ApptCardState extends State<_ApptCard>
       TweenSequenceItem(tween: Tween(begin: 1.28, end: 0.92), weight: 30),
       TweenSequenceItem(tween: Tween(begin: 0.92, end: 1.0),  weight: 35),
     ]).animate(CurvedAnimation(parent: _bounceCtrl, curve: Curves.easeOut));
+  }
+
+  Future<void> _handleMarkArrived() async {
+    if (widget.onMarkArrived == null || _arrivedSending || _arrivedSent) return;
+    setState(() => _arrivedSending = true);
+    final ok = await widget.onMarkArrived!();
+    if (!mounted) return;
+    setState(() {
+      _arrivedSending = false;
+      if (ok) _arrivedSent = true;
+    });
+    if (!ok) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Could not notify the clinic. Please try again.'),
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   @override
@@ -2133,18 +2358,11 @@ String _fmtClockTime(String? raw) {
       animation: _ctrl,
       builder: (context, _) {
         return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: borderColor, width: borderWidth),
-            boxShadow: [
-              BoxShadow(
-                  color: (isMyTurn || queueEvent == 'queue_started' || widget.isNext)
-                      ? kPrimary.withOpacity(0.20)
-                      : Colors.black.withOpacity(0.05),
-                  blurRadius: widget.isNext ? 16 : 10,
-                  offset: const Offset(0, 3))
-            ],
+          decoration: _neoBox(
+            radius: 14,
+            border: borderWidth > 1
+                ? Border.all(color: borderColor, width: borderWidth)
+                : null,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2171,7 +2389,7 @@ String _fmtClockTime(String? raw) {
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Dr. ${appt.doctorName ?? 'Doctor'} has a network connection issue. Please come at your estimated time.',
+                          '${doctorDisplayName(appt.doctorName)} has a network connection issue. Please come at your estimated time.',
                           style: const TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
@@ -2298,7 +2516,7 @@ String _fmtClockTime(String? raw) {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(name,
+                          Text(doctorDisplayName(name),
                               style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,
@@ -2310,6 +2528,22 @@ String _fmtClockTime(String? raw) {
                                 style: const TextStyle(
                                     fontSize: 11,
                                     color: kTextSecondary)),
+                          ],
+                          if ((appt.clinicName ?? '').isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              const Icon(Icons.location_on_outlined,
+                                  size: 10, color: kTextMuted),
+                              const SizedBox(width: 3),
+                              Flexible(
+                                child: Text(appt.clinicName ?? '',
+                                    style: const TextStyle(
+                                        fontSize: 10,
+                                        color: kTextMuted,
+                                        fontWeight: FontWeight.w500),
+                                    overflow: TextOverflow.ellipsis),
+                              ),
+                            ]),
                           ],
                           if ((appt.patientName ?? '').isNotEmpty) ...[
                             const SizedBox(height: 2),
@@ -2385,11 +2619,7 @@ String _fmtClockTime(String? raw) {
                                   height: 38,
                                   decoration: const BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: [kPrimary, kPrimaryDark],
-                                    ),
+                                    color: kPrimary,
                                   ),
                                   child: Column(
                                     mainAxisAlignment:
@@ -2443,6 +2673,61 @@ String _fmtClockTime(String? raw) {
                   ],
                 ),
               ),
+
+              // ── "I've Arrived at Clinic" — only for skipped patients ────
+              if (isSkipped && widget.onMarkArrived != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                  child: (appt.isArrived == true || _arrivedSent)
+                      ? Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 9),
+                          decoration: BoxDecoration(
+                            color: kPrimary.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: kPrimary.withOpacity(0.25)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.check_circle_rounded, color: kPrimary, size: 14),
+                              SizedBox(width: 6),
+                              Text('Doctor notified — you are marked as arrived',
+                                  style: TextStyle(
+                                      color: kPrimary, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                            ],
+                          ),
+                        )
+                      : GestureDetector(
+                          onTap: _arrivedSending ? null : _handleMarkArrived,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: kError,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: _arrivedSending
+                                ? const SizedBox(
+                                    height: 16, width: 16,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.location_on_rounded, color: Colors.white, size: 15),
+                                      SizedBox(width: 6),
+                                      Text("I've Arrived at Clinic",
+                                          style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w700)),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                ),
             ],
           ),
         );
@@ -2453,6 +2738,8 @@ String _fmtClockTime(String? raw) {
 
 // ════════════════════════════════════════════════════════════════════
 //  SPECIALTY CHIP
+//  Flat icon tile + label — no bordered wrapper, matches the mockup's
+//  larger, simpler icon tiles.
 // ════════════════════════════════════════════════════════════════════
 class _SpecialtyChip extends StatelessWidget {
   final IconData icon;
@@ -2470,32 +2757,31 @@ class _SpecialtyChip extends StatelessWidget {
         onTap: onTap,
         child: Container(
           width: 76,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withOpacity(0.15)),
-          ),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                  color: color.withOpacity(0.15), shape: BoxShape.circle),
-              child: Icon(icon, color: color, size: 18),
-            ),
-            const SizedBox(height: 4),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(label,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+          decoration: _neoBox(radius: 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: Icon(icon, color: color, size: 19),
+              ),
+              const SizedBox(height: 6),
+              Text(label,
                   textAlign: TextAlign.center,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 9.5,
                       fontWeight: FontWeight.w700,
                       color: kTextPrimary)),
-            ),
-          ]),
+            ],
+          ),
         ),
       );
 }
@@ -2530,24 +2816,37 @@ class _SpecialtyChipSkeletonState extends State<_SpecialtyChipSkeleton>
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-        animation: _anim,
-        builder: (_, __) => Container(
-          width: 76,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              begin: Alignment(_anim.value - 1, 0),
-              end: Alignment(_anim.value + 1, 0),
-              colors: const [
-                Color(0xFFEDF2F7),
-                Color(0xFFE2E8F0),
-                Color(0xFFCBD5E0),
-                Color(0xFFE2E8F0),
-                Color(0xFFEDF2F7),
-              ],
+  Widget build(BuildContext context) => Container(
+        width: 76,
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+        decoration: _neoBox(radius: 14),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedBuilder(
+              animation: _anim,
+              builder: (_, __) => Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(13),
+                  gradient: LinearGradient(
+                    begin: Alignment(_anim.value - 1, 0),
+                    end: Alignment(_anim.value + 1, 0),
+                    colors: const [
+                      Color(0xFFEDF2F7),
+                      Color(0xFFE2E8F0),
+                      Color(0xFFCBD5E0),
+                      Color(0xFFE2E8F0),
+                      Color(0xFFEDF2F7),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(height: 6),
+            _Shimmer(width: 40, height: 8),
+          ],
         ),
       );
 }
@@ -2610,17 +2909,7 @@ class _ApptSkeletonCardState extends State<_ApptSkeletonCard>
         animation: _anim,
         builder: (_, __) => Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: kBorder),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3))
-            ],
-          ),
+          decoration: _neoBox(radius: 14),
           child: Row(children: [
             Container(
               width: 44,
@@ -2690,7 +2979,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appt = appointment;
-    final doctorName = appt.doctorName ?? 'Doctor';
+    final doctorName = doctorDisplayName(appt.doctorName);
     final spec = appt.specialization ?? '';
     final clinic = appt.clinicName ?? '';
     final isQueue =
@@ -2706,7 +2995,6 @@ class _TodayAppointmentPopup extends StatelessWidget {
     final isSkipped = appt.queueState?.toLowerCase() == 'skipped';
     final typeLabel = _bookingLabel(appt.bookingType);
     final typeColor = _bookingColor(appt.bookingType);
-    final doctorID = appt.appointmentId ?? 'general';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -2722,11 +3010,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.fromLTRB(16, 20, 48, 16),
                 decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [kPrimary, kPrimaryDark],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  color: kPrimary,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
                 ),
                 child: Row(
@@ -2785,7 +3069,7 @@ class _TodayAppointmentPopup extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '$doctorName ($doctorID)',
+                                doctorName,
                                 style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w700,
@@ -3054,4 +3338,142 @@ class _InfoChip extends StatelessWidget {
       ),
     ),
   );
+}
+
+// class _SpecialtyPillCard extends StatelessWidget {
+//   final IconData icon;
+//   final String label;
+//   final Color color;
+//   final VoidCallback onTap;
+//   const _SpecialtyPillCard({
+//     required this.icon,
+//     required this.label,
+//     required this.color,
+//     required this.onTap,
+//   });
+
+//   @override
+//   Widget build(BuildContext context) => GestureDetector(
+//         onTap: onTap,
+//         child: Container(
+//           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+//           decoration: BoxDecoration(
+//             color: color.withOpacity(0.14),
+//             borderRadius: BorderRadius.circular(16),
+//           ),
+//           child: Row(
+//             children: [
+//               Container(
+//                 width: 34,
+//                 height: 34,
+//                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+//                 child: Icon(icon, color: Colors.white, size: 17),
+//               ),
+//               const SizedBox(width: 10),
+//               Expanded(
+//                 child: Text(label,
+//                     maxLines: 1,
+//                     overflow: TextOverflow.ellipsis,
+//                     style: TextStyle(
+//                         fontSize: 12.5,
+//                         fontWeight: FontWeight.w700,
+//                         color: color)),
+//               ),
+//             ],
+//           ),
+//         ),
+//       );
+// }
+
+
+class _SpecialtyPillCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _SpecialtyPillCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: _neoBox(radius: 16),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 17),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: kTextPrimary)),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+class _SpecialtyPillSkeleton extends StatefulWidget {
+  @override
+  State<_SpecialtyPillSkeleton> createState() => _SpecialtyPillSkeletonState();
+}
+
+class _SpecialtyPillSkeletonState extends State<_SpecialtyPillSkeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  late Animation<double> _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))..repeat();
+    _anim = Tween<double>(begin: -2.0, end: 2.0)
+        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut));
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+ Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: _neoBox(radius: 16),
+        child: Row(children: [
+          AnimatedBuilder(
+            animation: _anim,
+            builder: (_, __) => Container(
+              width: 34, height: 34,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment(_anim.value - 1, 0),
+                  end: Alignment(_anim.value + 1, 0),
+                  colors: const [Color(0xFFEDF2F7), Color(0xFFE2E8F0), Color(0xFFCBD5E0), Color(0xFFE2E8F0), Color(0xFFEDF2F7)],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: _Shimmer(width: 60, height: 10)),
+        ]),
+      );
 }
