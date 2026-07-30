@@ -1,5 +1,6 @@
-import { Activity, Mail, Phone, MapPin } from 'lucide-react';
+import { Mail, Phone, MapPin } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import qlessLogo from '../assets/qless_logo.png';
 
 export default function Footer() {
   return (
@@ -9,8 +10,8 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 bg-gradient-to-br from-sky-500 to-cyan-400 rounded-xl flex items-center justify-center">
-                <Activity size={18} className="text-white" />
+              <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center p-1.5">
+                <img src={qlessLogo} alt="QLess" className="w-full h-full object-contain" />
               </div>
               <span className="text-xl font-bold text-white">Q<span className="text-sky-400">Less</span></span>
             </div>
@@ -71,7 +72,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-          <p>© {new Date().getFullYear()} QLess by VengUrlaTech. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} QLess by VengurlaTech. All rights reserved.</p>
           <p className="text-slate-600">Made with ❤️ in Maharashtra, India</p>
         </div>
       </div>

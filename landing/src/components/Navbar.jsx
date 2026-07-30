@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Menu, X, Activity } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import qlessLogo from '../assets/qless_logo.png';
 
 const navLinks = [
   { label: 'Features', href: '#features' },
@@ -28,8 +29,8 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <a href="#" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 bg-gradient-to-br from-sky-500 to-cyan-400 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-sky-300 transition-shadow">
-              <Activity size={18} className="text-white" />
+            <div className="w-9 h-9 bg-white rounded-xl flex items-center justify-center shadow-lg p-1.5">
+              <img src={qlessLogo} alt="QLess" className="w-full h-full object-contain" />
             </div>
             <span className={`text-xl font-bold ${scrolled ? 'text-gray-900' : 'text-white'}`}>
               Q<span className="text-sky-400">Less</span>
