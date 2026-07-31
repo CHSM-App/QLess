@@ -189,20 +189,40 @@ String _cap(String? s) {
   return '${s[0].toUpperCase()}${s.substring(1)}';
 }
 
-// Start time as minutes-of-day for ordering same-date appointments
-// (earliest time first). Appointments without a time sort to the end.
+/// Sentinel for rows we cannot order at all — they sort last in either
+/// direction so an unpositioned row never jumps to the top of a day.
+const _noStartTime = 1 << 30;
+
+// Start time as minutes-of-day, used to order appointments within the same
+// date. Slot bookings carry a real start_time; queue bookings often send
+// '--' or null instead, so they fall back to queue_number (the clinic's
+// booking order for that day) — without it every queue row collapsed onto
+// the sentinel, tied, and kept whatever order the API returned. That is why
+// the Today tab, which is mostly queue bookings, looked unsorted.
 int _startMinutes(AppointmentList a) {
-  final t = a.startTime;
-  if (t == null || t.trim().isEmpty) return 1 << 30;
-  final parsed = DateTime.tryParse(t.trim());
+  final direct = _minutesOfDay(a.startTime);
+  if (direct != _noStartTime) return direct;
+  // Keep queue rows below every timed row (offset past the last minute of
+  // the day) while still ordering them among themselves.
+  final q = a.myQueueNumber ?? a.queueNumber;
+  if (q != null) return 24 * 60 + q;
+  return _noStartTime;
+}
+
+int _minutesOfDay(String? raw) {
+  final t = raw?.trim();
+  if (t == null || t.isEmpty) return _noStartTime;
+  // API placeholders meaning "no time on this row" — same set _fmtTime skips.
+  if (t == '--' || t.toLowerCase() == 'null') return _noStartTime;
+  final parsed = DateTime.tryParse(t);
   if (parsed != null) return parsed.hour * 60 + parsed.minute;
-  final parts = t.trim().split(':');
+  final parts = t.split(':');
   if (parts.length >= 2) {
-    final h = int.tryParse(parts[0]) ?? 0;
-    final m = int.tryParse(parts[1]) ?? 0;
-    return h * 60 + m;
+    final h = int.tryParse(parts[0]);
+    final m = int.tryParse(parts[1]);
+    if (h != null && m != null) return h * 60 + m;
   }
-  return 1 << 30;
+  return _noStartTime;
 }
 
 Future<void> openMap(double lat, double lng, String? label) async {
@@ -1077,8 +1097,11 @@ Widget _filterChip({
         var list = applyFilter(
             appointments, f.key, _search, _dateFilter, _customFrom, _customTo);
 
-        // Apply sort order: by date (direction per _sortNewest), then within
-        // the same day always by earliest appointment time first.
+        // Apply sort order to every tab: by date, then within the same day by
+        // appointment time — both following _sortNewest. Newest-first means
+        // the latest booking of the day sits on top (11 AM above 10 AM);
+        // oldest-first flips both levels. See _startMinutes for how queue
+        // bookings (no start_time) are positioned.
         list = List<AppointmentList>.from(list)..sort((a, b) {
           final da = DateTime.tryParse(a.appointmentDate ?? '') ?? DateTime(0);
           final db = DateTime.tryParse(b.appointmentDate ?? '') ?? DateTime(0);
@@ -1086,7 +1109,22 @@ Widget _filterChip({
           final dayB = DateTime(db.year, db.month, db.day);
           final dateCmp = _sortNewest ? dayB.compareTo(dayA) : dayA.compareTo(dayB);
           if (dateCmp != 0) return dateCmp;
-          return _startMinutes(a).compareTo(_startMinutes(b));
+          final ma = _startMinutes(a);
+          final mb = _startMinutes(b);
+          // Unpositionable rows sink to the bottom regardless of direction.
+          if (ma == _noStartTime || mb == _noStartTime) {
+            if (ma != mb) return ma.compareTo(mb);
+          } else {
+            final timeCmp =
+                _sortNewest ? mb.compareTo(ma) : ma.compareTo(mb);
+            if (timeCmp != 0) return timeCmp;
+          }
+          // Same day and same time (or both unpositionable): fall back to
+          // appointment id, which increments with booking order, so the list
+          // has a stable order instead of whatever the API happened to send.
+          final ia = a.appointmentId ?? 0;
+          final ib = b.appointmentId ?? 0;
+          return _sortNewest ? ib.compareTo(ia) : ia.compareTo(ib);
         });
 
         Future<void> onRefresh() async {

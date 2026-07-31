@@ -148,6 +148,23 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
   void _onOtpChanged(int index, String value) {
     if (_hasError) setState(() => _hasError = false);
+
+    // Pasting a full code (e.g. copied from a WhatsApp message) lands the
+    // whole string in whichever box was focused — split it across all boxes.
+    if (value.length > 1) {
+      final digits = value.replaceAll(RegExp(r'\D'), '');
+      if (digits.isNotEmpty) {
+        for (var i = 0; i < _otpLength; i++) {
+          _controllers[i].text = i < digits.length ? digits[i] : '';
+        }
+        final nextIndex =
+            digits.length >= _otpLength ? _otpLength - 1 : digits.length;
+        _focusNodes[nextIndex].requestFocus();
+      }
+      setState(() {});
+      return;
+    }
+
     if (value.length == 1 && index < _otpLength - 1) {
       _focusNodes[index + 1].requestFocus();
     }
@@ -1622,7 +1639,8 @@ class _OtpBoxState extends State<_OtpBox> {
           focusNode: widget.focusNode,
           keyboardType: TextInputType.number,
           textAlign: TextAlign.center,
-          maxLength: 1,
+          // No maxLength here: a paste of the full code must reach
+          // onChanged in one piece so it can be split across all boxes.
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           style: const TextStyle(
             fontSize: 14,

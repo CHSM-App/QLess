@@ -25,7 +25,12 @@ const kSuccess  = Color(0xFF68D391);
 //  ADD MEDICINE PAGE
 // ════════════════════════════════════════════════════════════════════
 class AddMedicinePage extends ConsumerStatefulWidget {
-  const AddMedicinePage({super.key});
+  const AddMedicinePage({super.key, this.onSaved});
+
+  // Optional: called with the newly saved Medicine right after a
+  // successful save, so callers (e.g. a dialog) can react without
+  // this page needing to know how it's being presented.
+  final ValueChanged<Medicine>? onSaved;
 
   @override
   ConsumerState<AddMedicinePage> createState() => _AddMedicinePageState();
@@ -113,6 +118,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       _nameCtrl.clear();
       setState(() => _selectedType = null);
       _snack('Medicine added successfully');
+      widget.onSaved?.call(medicine);
     } else {
       final message = response['message']?.toString();
       _snack(

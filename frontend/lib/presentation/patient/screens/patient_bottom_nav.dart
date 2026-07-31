@@ -50,6 +50,14 @@ void requestAppointmentsRatingDialog(int appointmentId) {
   }
 }
 
+/// Send the patient back to the Home tab of the shell. Used after a booking
+/// is confirmed — the booking screen pops itself and everything pushed on top
+/// of the shell, then lands the patient on Home. No-op if the shell isn't
+/// mounted (e.g. booking reached from a standalone route before login).
+void requestPatientHomeTab() {
+  patientShellKey.currentState?.openHomeTab();
+}
+
 // "View all specialties" on Home switches to the Doctors tab (index 1) and
 // scrolls it to the Browse by Specialty section — the tab is kept alive in
 // an IndexedStack, so this must drive the existing instance rather than
@@ -166,6 +174,9 @@ static const _regularNavHeight = 64.0;
       _appointmentsKey.currentState?.applyRatingDeepLink(appointmentId);
     });
   }
+
+  // Booking confirmed: bring the patient back to the Home tab (index 0).
+  void openHomeTab() => _setTab(0);
 
   // 'View all specialties' on Home: switch to the Doctors tab (index 1) and
   // scroll it to the Browse by Specialty section.

@@ -10,6 +10,7 @@ import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
+import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 
 // ════════════════════════════════════════════════════════════════════
@@ -46,6 +47,18 @@ const kWarning    = Color(0xFFF6AD55);
 const kPurple      = Color(0xFF9F7AEA);
 const kPurpleLight = Color(0xFFEDE9FE);
 const kPurpleDark  = Color(0xFF6B46C1);
+
+// ════════════════════════════════════════════════════════════════════
+//  DEFAULT SYMPTOMS LIST
+// ════════════════════════════════════════════════════════════════════
+const List<String> kDefaultSymptoms = [
+  'Fever', 'Cough', 'Cold', 'Headache', 'Body ache', 'Sore throat',
+  'Vomiting', 'Nausea', 'Diarrhea', 'Constipation', 'Abdominal pain',
+  'Chest pain', 'Breathlessness', 'Fatigue', 'Weakness', 'Dizziness',
+  'Loss of appetite', 'Joint pain', 'Back pain', 'Skin rash', 'Itching',
+  'Burning urination', 'Weight loss', 'Weight gain', 'Anxiety',
+  'Insomnia', 'Ear pain', 'Eye redness', 'Runny nose', 'Sneezing',
+];
 
 const kInfo      = Color(0xFF3B82F6);
 const kInfoLight = Color(0xFFDBEAFE);
@@ -629,6 +642,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final _advCtrl  = TextEditingController();
   final _sympKey  = GlobalKey();
   bool _symptomsError = false;
+  bool _showSymptomSuggestions = false;
   DateTime? _followDate;
   final List<MedicineEntry> _meds = [];
   int _lastDoctorId = 0;
@@ -1236,7 +1250,7 @@ Widget build(BuildContext context) {
             children: [
               _patientCard(), _gap(12),
               if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
-              _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
+              _symptomsSection(), _gap(10),
               _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'),
               // _gap(10),
               // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
@@ -1287,7 +1301,7 @@ Widget build(BuildContext context) {
               children: [
                 _patientCard(), _gap(12),
                 if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
-                _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
+                _symptomsSection(), _gap(10),
                 _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
                 // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
                 _followUpCard(),
@@ -1316,7 +1330,7 @@ Widget build(BuildContext context) {
         children: [
           _patientCard(), _gap(12),
           if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
-          _textSection('Symptoms *', _sympCtrl, 'Enter patient symptoms…', hasError: _symptomsError, key: _sympKey), _gap(10),
+          _symptomsSection(), _gap(10),
           _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(12),
           // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
           _medicinesHeader(), _gap(10),
@@ -1393,6 +1407,96 @@ Widget build(BuildContext context) {
         ],
       ])));
 
+  void _addSymptom(String symptom) {
+    final text = _sympCtrl.text;
+    final lastComma = text.lastIndexOf(',');
+    final before = (lastComma == -1 ? '' : text.substring(0, lastComma + 1).trim());
+
+    final already = before.split(',').map((s) => s.trim().toLowerCase())
+        .where((s) => s.isNotEmpty).toSet();
+    if (already.contains(symptom.toLowerCase())) {
+      setState(() => _showSymptomSuggestions = false);
+      return;
+    }
+
+    _sympCtrl.text = before.isEmpty ? symptom : '$before $symptom';
+    _sympCtrl.selection = TextSelection.collapsed(offset: _sympCtrl.text.length);
+    setState(() => _showSymptomSuggestions = false);
+  }
+
+  String get _symptomSearchText {
+    final text = _sympCtrl.text;
+    final lastComma = text.lastIndexOf(',');
+    return (lastComma == -1 ? text : text.substring(lastComma + 1)).trim();
+  }
+
+  Widget _symptomsSection() {
+    final query = _symptomSearchText;
+    final filtered = query.isEmpty
+        ? kDefaultSymptoms
+        : kDefaultSymptoms.where((s) => s.toLowerCase().contains(query.toLowerCase())).toList();
+    final showDropdown = _showSymptomSuggestions;
+
+    return TapRegion(
+      onTapOutside: (_) { if (_showSymptomSuggestions) setState(() => _showSymptomSuggestions = false); },
+      child: Container(key: _sympKey, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _secLabel('Symptoms *'), _gap(8),
+        TextField(
+          controller: _sympCtrl, maxLines: 3,
+          onTap: () => setState(() => _showSymptomSuggestions = true),
+          onChanged: (_) => setState(() {}),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+          decoration: _ideco('Enter patient symptoms…', hasError: _symptomsError),
+        ),
+        if (_symptomsError) ...[
+          _gap(4),
+          const Text('This field is required', style: TextStyle(fontSize: 11, color: kError, fontWeight: FontWeight.w600)),
+        ],
+        if (showDropdown) ...[
+          _gap(6),
+          if (filtered.isNotEmpty)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kBorder),
+                boxShadow: const [BoxShadow(color: Color(0x10000000), blurRadius: 8, offset: Offset(0, 3))],
+              ),
+              child: ListView.separated(
+                shrinkWrap: true, padding: EdgeInsets.zero,
+                itemCount: filtered.length,
+                separatorBuilder: (_, __) => const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
+                itemBuilder: (_, i) {
+                  final s = filtered[i];
+                  return InkWell(
+                    onTap: () => _addSymptom(s),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      child: Row(children: [
+                        const Icon(Icons.sick_outlined, color: kPrimary, size: 13),
+                        const SizedBox(width: 9),
+                        Expanded(child: Text(s,
+                            style: const TextStyle(fontSize: 12, color: kTextPrimary),
+                            overflow: TextOverflow.ellipsis)),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            )
+          else
+            Padding(padding: const EdgeInsets.only(top: 5), child: Row(children: [
+              const Icon(Icons.info_outline_rounded, size: 12, color: kTextMuted),
+              const SizedBox(width: 5),
+              Expanded(child: Text('No matching symptom — you can type your own',
+                  style: const TextStyle(fontSize: 11, color: kTextMuted))),
+            ])),
+        ],
+      ]))),
+    );
+  }
+
   Widget _medicinesHeader() => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -1425,9 +1529,36 @@ List<Widget> _buildMedCards(List<Medicine> medicines) =>
         entry: _meds[i], medicines: medicines,
         onDelete: () => _delMed(i),
         rebuild: () => setState(() {}),
+        onMedicineAdded: (m) => _onNewMedicineAdded(_meds[i], m),
       ),
     ),
   );
+
+  Future<void> _onNewMedicineAdded(MedicineEntry entry, Medicine created) async {
+    await ref.read(doctorLoginViewModelProvider.notifier)
+        .fetchAllMedicines(widget.doctorId);
+    if (!mounted) return;
+
+    final refreshed = ref.read(doctorLoginViewModelProvider).medicines?.valueOrNull
+        ?? const <Medicine>[];
+    final createdName = (created.medicineName ?? '').trim().toLowerCase();
+    final match = refreshed.where((m) =>
+        (m.medicineName ?? '').trim().toLowerCase() == createdName &&
+        m.medTypeId == created.medTypeId,
+    ).toList();
+    final saved = match.isNotEmpty ? match.last : created;
+
+    final newType = MedicineType.values.firstWhere(
+      (t) => t.typeId == (saved.medTypeId ?? 1),
+      orElse: () => MedicineType.tablet,
+    );
+    setState(() {
+      entry.type         = newType;
+      entry.medicineId   = saved.medicineId;
+      entry.selectedName = saved.medicineName ?? '';
+      entry.searchText   = '';
+    });
+  }
   Widget _emptyMeds() => _card(child: Center(child: Padding(
     padding: const EdgeInsets.symmetric(vertical: 22),
     child: Column(children: [
@@ -1574,10 +1705,12 @@ class _MedCard extends StatefulWidget {
   final List<Medicine> medicines;
   final VoidCallback onDelete;
   final VoidCallback rebuild;
+  final ValueChanged<Medicine> onMedicineAdded;
 
   const _MedCard({
     required this.index, required this.entry, required this.medicines,
     required this.onDelete, required this.rebuild,
+    required this.onMedicineAdded,
   });
 
   @override
@@ -1935,9 +2068,54 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
                       : 'No medicine found for "${e.searchText}"',
                   style: const TextStyle(fontSize: 11, color: kTextMuted))),
             ])),
+          _gap(6),
+          InkWell(
+            onTap: _openAddMedicinePopup,
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: kPrimaryLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: kPrimary.withOpacity(0.3)),
+              ),
+              child: const Row(children: [
+                Icon(Icons.add_circle_outline_rounded, color: kPrimary, size: 15),
+                SizedBox(width: 8),
+                Text('Add New Medicine', style: TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w700, color: kPrimary)),
+              ]),
+            ),
+          ),
         ],
       ],
     ]));
+  }
+
+  void _openAddMedicinePopup() {
+    setState(() => _showSuggestions = false);
+    final dialogNavigator = Navigator.of(context);
+    showDialog(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480, maxHeight: 640),
+          child: AddMedicinePage(
+            onSaved: (created) {
+              // Defer past AddMedicinePage's own _save() completion (it keeps
+              // using `ref`/`context` right after this callback returns) so
+              // popping the dialog here doesn't dispose it mid-call.
+              Future.microtask(() {
+                if (dialogNavigator.mounted) dialogNavigator.pop();
+                if (mounted) widget.onMedicineAdded(created);
+              });
+            },
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _txtField(String label, String hint, TextEditingController ctrl,

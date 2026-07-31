@@ -11,6 +11,7 @@ import 'package:qless/domain/models/doctor_leave_model.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
+import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
@@ -483,8 +484,21 @@ void dispose() {
           next.bookingResponse != null &&
           !next.isLoading) {
         setState(() => _isBooking = false);
-        Navigator.pop(context, true);
-        _snack(next.bookingResponse!.message ?? 'Appointment booked!');
+        // Booking confirmed → land the patient on Home. Pop every route
+        // stacked above the shell (this screen, plus the doctor detail /
+        // search screens it was reached through) instead of a plain pop,
+        // which would only reveal the doctor page again.
+        //
+        // Grab the messenger before popping: _snack resolves it from this
+        // screen's context, which is defunct once the route is gone, so the
+        // confirmation would never show.
+        final messenger = ScaffoldMessenger.of(context);
+        Navigator.of(context).popUntil((r) => r.isFirst);
+        requestPatientHomeTab();
+        messenger
+          ..clearSnackBars()
+          ..showSnackBar(_bookedSnackBar(
+              next.bookingResponse!.message ?? 'Appointment booked!'));
         return;
       }
       if (widget.isReschedule &&
@@ -685,9 +699,16 @@ void dispose() {
   // ---------------------------------------------------------------------------
 
   void _snack(String msg, {bool isError = false}) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(_buildSnackBar(msg, isError: isError));
+  }
+
+  /// Success snack shown after booking, built separately so it can be handed
+  /// to a messenger captured before this route is popped.
+  SnackBar _bookedSnackBar(String msg) => _buildSnackBar(msg);
+
+  SnackBar _buildSnackBar(String msg, {bool isError = false}) => SnackBar(
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.fromLTRB(14, 0, 14, 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -709,9 +730,7 @@ void dispose() {
                     color: Colors.white)),
           ),
         ]),
-      ),
-    );
-  }
+      );
 
   void _showFavSnack(bool added) {
     _snack(
