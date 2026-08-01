@@ -1329,14 +1329,39 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> with WidgetsBindi
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      isReceptionist ? doctorName : doctorDisplayName(doctorName),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w700,
-                        color: kTextPrimary, letterSpacing: -0.3, height: 1.15,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            isReceptionist ? doctorName : doctorDisplayName(doctorName),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700,
+                              color: kTextPrimary, letterSpacing: -0.3, height: 1.15,
+                            ),
+                          ),
+                        ),
+                        if (isReceptionist) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: kPurpleLight,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: kPurpleBorder),
+                            ),
+                            child: const Text(
+                              'Receptionist',
+                              style: TextStyle(
+                                fontSize: 9.5, fontWeight: FontWeight.w700,
+                                color: kPurpleDark, letterSpacing: 0.2,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     if (clinicName.isNotEmpty) ...[
                       const SizedBox(height: 3),

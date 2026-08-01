@@ -485,13 +485,17 @@ router.post('/doctor', uploadHandler(upload.fields([{
 
 		const result = await request.execute("sp_doctor_login");
 
-		const returnedDoctorId = result.recordset?.[0]?.doctor_id;
-		const returnedClinicId = result.recordset?.[0]?.clinic_id;
+		const row = result.recordset?.[0];
+		const returnedDoctorId = row?.doctor_id;
+		const returnedClinicId = row?.clinic_id;
 
 		if (!returnedDoctorId) {
-			return res.status(500).json({
+			// row.success === 0 means the SP rejected it (duplicate mobile, etc.)
+			// — surface its message as a 400 so the app can show it to the user.
+			const isRejection = row?.success === 0;
+			return res.status(isRejection ? 400 : 500).json({
 				success: false,
-				message: result
+				message: row?.message || 'Failed to save doctor'
 			});
 		}
 

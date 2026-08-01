@@ -884,6 +884,7 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
       customFrom: _customFrom,
       customTo: _customTo,
       sortNewest: _sortNewest,
+      hideTomorrow: _onCompletedTab,
       onApply: (f, from, to, newest) => setState(() {
         _dateFilter = f;
         _customFrom = from;
@@ -2979,11 +2980,13 @@ class _PatientDateFilterSheet extends StatefulWidget {
   final _DateFilter current;
   final DateTime? customFrom, customTo;
   final bool sortNewest;
+  final bool hideTomorrow;
   final void Function(_DateFilter, DateTime?, DateTime?, bool) onApply;
 
   const _PatientDateFilterSheet({
     required this.current, required this.customFrom,
     required this.customTo, required this.sortNewest, required this.onApply,
+    this.hideTomorrow = false,
   });
 
   @override
@@ -3049,7 +3052,10 @@ class _PatientDateFilterSheetState extends State<_PatientDateFilterSheet> {
         const SizedBox(height: 8),
         Wrap(
           spacing: 7, runSpacing: 7,
-          children: _DateFilter.values.where((f) => f != _DateFilter.custom).map((f) {
+          children: _DateFilter.values
+              .where((f) => f != _DateFilter.custom &&
+                  !(widget.hideTomorrow && f == _DateFilter.tomorrow))
+              .map((f) {
             final sel = _sel == f;
             return GestureDetector(
               onTap: () => setState(() => _sel = f),

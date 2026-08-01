@@ -164,7 +164,7 @@ class _QueueStatus {
             isVisible: true, canBook: true, tintCard: false,
             label: hasMax ? '$cur/$max in queue' : '$cur in queue',
             btnLabel: 'Book',
-            color: cur > 5 ? kError : kWarning,
+            color: kError,
             icon: Icons.people_alt_rounded,
             progress: hasMax ? (cur / max).clamp(0.0, 1.0) : null);
     }

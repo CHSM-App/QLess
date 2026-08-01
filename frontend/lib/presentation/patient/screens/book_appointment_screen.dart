@@ -10,6 +10,7 @@ import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/doctor_leave_model.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/add_family_member_screen.dart';
 import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
@@ -1235,7 +1236,9 @@ class _StatBox extends StatelessWidget {
 // ════════════════════════════════════════════════════════════════════
 //  BOOKING FOR DROPDOWN
 // ════════════════════════════════════════════════════════════════════
-class _BookingFor extends StatelessWidget {
+const int _kAddMemberValue = -1;
+
+class _BookingFor extends ConsumerWidget {
   final PatientLoginState  patState;
   final List<FamilyMember> members;
   final int?               selectedMemberId;
@@ -1246,8 +1249,45 @@ class _BookingFor extends StatelessWidget {
     required this.selectedMemberId, required this.onSelected,
   });
 
+  Future<void> _openAddMemberDialog(BuildContext context, WidgetRef ref) async {
+    final result = await showDialog<FamilyMember>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            width: double.infinity,
+            height: MediaQuery.of(context).size.height * 0.85,
+            child: const AddFamilyMemberScreen(),
+          ),
+        ),
+      ),
+    );
+    if (result == null) return;
+    final pid = ref.read(patientLoginViewModelProvider).patientId ?? 0;
+    if (pid > 0) {
+      await ref.read(familyViewModelProvider.notifier).fetchAllFamilyMembers(pid);
+    }
+
+    int? newId = result.memberId;
+    if (newId == null) {
+      // Newly added members aren't returned with an id by the API, so match
+      // the freshly fetched list by name/relation to find the one just saved.
+      final refreshed = ref.read(familyViewModelProvider).allfamilyMembers
+          .maybeWhen(data: (m) => m, orElse: () => <FamilyMember>[]);
+      final match = refreshed.where((m) =>
+          m.memberName == result.memberName &&
+          m.relationId == result.relationId);
+      if (match.isNotEmpty) newId = match.last.memberId;
+    }
+    if (newId != null) onSelected(newId);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final items = <DropdownMenuItem<int?>>[
       DropdownMenuItem<int?>(
         value: null,
@@ -1311,6 +1351,26 @@ class _BookingFor extends StatelessWidget {
               ),
             ]),
           )),
+      DropdownMenuItem<int?>(
+        value: _kAddMemberValue,
+        child: Row(children: [
+          Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: kPrimary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.add_rounded, size: 16, color: kPrimary),
+          ),
+          const SizedBox(width: 10),
+          const Text('Add Family Member',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: kPrimary)),
+        ]),
+      ),
     ];
 
     return Container(
@@ -1338,11 +1398,18 @@ class _BookingFor extends StatelessWidget {
               dropdownColor: Colors.white,
               borderRadius: BorderRadius.circular(12),
               items: items,
-              onChanged: onSelected,
+              onChanged: (val) {
+                if (val == _kAddMemberValue) {
+                  _openAddMemberDialog(context, ref);
+                  return;
+                }
+                onSelected(val);
+              },
               selectedItemBuilder: (_) => [
                 _dropSel(patState.name ?? 'Me'),
                 ...members.map(
                     (m) => _dropSel(m.memberName ?? 'Member')),
+                _dropSel('Add Family Member'),
               ],
             ),
           ),
