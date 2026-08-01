@@ -139,8 +139,13 @@ const server = http.createServer(app);
 // SOCKET.IO INIT
 const io = new Server(server, {
   cors: {
-    origin: '*', // restrict in production
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowed.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS: origin ${origin} not allowed`));
+    },
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
