@@ -200,7 +200,14 @@ io.on('connection', (socket) => {
           JOIN   doctor_queue dq ON dq.queue_id = a.queue_id
           WHERE  dq.doctor_id = @doctor_id
             AND  CAST(dq.queue_date AS DATE) = CAST(GETDATE() AS DATE)
-            AND  a.status IN ('in_progress', 'completed')
+            AND  a.status IN ('in_progress', 'completed', 'cancelled', 'cancled', 'skipped')
+            AND  NOT EXISTS (
+                   SELECT 1 FROM appointments b
+                   WHERE  b.queue_id = a.queue_id
+                     AND  b.booking_type = 1
+                     AND  b.queue_number < a.queue_number
+                     AND  b.status NOT IN ('completed', 'cancelled', 'cancled', 'skipped')
+                 )
         `);
       const cs = res.recordset[0]?.current_serving;
       if (cs != null && cs > 0) {

@@ -29,7 +29,14 @@ async function fetchCurrentServing(appointment_id) {
         SELECT MAX(a.queue_number) AS current_serving
         FROM   appointments a
         WHERE  a.queue_id = (SELECT queue_id FROM appointments WHERE appointment_id = @appointment_id)
-          AND  a.status   IN ('in_progress', 'completed')
+          AND  a.status   IN ('in_progress', 'completed', 'cancelled', 'cancled', 'skipped')
+          AND  NOT EXISTS (
+                 SELECT 1 FROM appointments b
+                 WHERE  b.queue_id = a.queue_id
+                   AND  b.booking_type = 1
+                   AND  b.queue_number < a.queue_number
+                   AND  b.status NOT IN ('completed', 'cancelled', 'cancled', 'skipped')
+               )
       `);
     return res.recordset[0]?.current_serving ?? null;
   } catch (_) {

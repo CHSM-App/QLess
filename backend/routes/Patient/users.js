@@ -7,10 +7,16 @@ const log = require('../middleware/logger');
 const path = require("path");
 const fs = require("fs-extra");
 
-// The furthest token the queue has actually reached — MAX(queue_number) among
-// in_progress + completed only (skipped tokens are handled outside the main
-// queue and must not count). This is the SAME rule the doctor's GET_TODAY_QUEUE
-// and the socket `fetchCurrentServing` use, so every surface shows one value.
+// The furthest token the queue has actually reached — the largest
+// queue_number N such that every token from 1..N-1 is fully resolved
+// (completed, cancelled, or skipped) and token N itself is in_progress,
+// completed, cancelled, or skipped. An in_progress token is NOT yet
+// resolved, so nothing after it (even a cancelled token) can count as
+// "reached" until it finishes. Cancelled/skipped tokens are bypassed as
+// soon as they're marked; a skipped patient who is later recalled and
+// served does not pull current_serving back to their number.
+// This is the SAME rule the doctor's GET_TODAY_QUEUE and the socket
+// `fetchCurrentServing` use, so every surface shows one value.
 // We compute it here to override sp_appointment's QUEUE_ESTIMATE_SMART, whose
 // current_serving lags/miscounts for the patient list.
 async function correctCurrentServing(appointment_id) {
@@ -21,7 +27,16 @@ async function correctCurrentServing(appointment_id) {
         SELECT MAX(a.queue_number) AS current_serving
         FROM   appointments a
         WHERE  a.queue_id = (SELECT queue_id FROM appointments WHERE appointment_id = @appointment_id)
-          AND  a.status   IN ('in_progress', 'completed')
+          AND  a.status   IN ('in_progress', 'completed', 'cancelled', 'cancled', 'skipped')
+          AND  NOT EXISTS (
+                 -- any strictly-earlier token still not resolved (booked or
+                 -- itself in_progress) blocks this one from counting
+                 SELECT 1 FROM appointments b
+                 WHERE  b.queue_id = a.queue_id
+                   AND  b.booking_type = 1
+                   AND  b.queue_number < a.queue_number
+                   AND  b.status NOT IN ('completed', 'cancelled', 'cancled', 'skipped')
+               )
       `);
     return res.recordset[0]?.current_serving ?? null;
   } catch (_) {
