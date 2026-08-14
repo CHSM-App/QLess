@@ -122,7 +122,10 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             _didFetchProfile = true;
             ref
                 .read(doctorLoginViewModelProvider.notifier)
-                .checkPhoneDoctor(mobile);
+                .checkPhoneDoctor(
+                  mobile,
+                  saveIdentity: ref.read(tokenProvider).roleId != 3,
+                );
           }
         }
         final roleId = ref.read(tokenProvider).roleId;
@@ -143,7 +146,10 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         _didFetchProfile = true;
         ref
             .read(doctorLoginViewModelProvider.notifier)
-            .checkPhoneDoctor(mobile);
+            .checkPhoneDoctor(
+              mobile,
+              saveIdentity: ref.read(tokenProvider).roleId != 3,
+            );
       }
       // For receptionist login, use their linked doctorId to fetch reviews/appointments
       final roleId = ref.read(tokenProvider).roleId;
@@ -210,7 +216,10 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     if (mobile != null && mobile.trim().isNotEmpty) {
       ref
           .read(doctorLoginViewModelProvider.notifier)
-          .checkPhoneDoctor(mobile);
+          .checkPhoneDoctor(
+            mobile,
+            saveIdentity: ref.read(tokenProvider).roleId != 3,
+          );
     }
     final s = ref.read(doctorLoginViewModelProvider);
     final doctorId = s.doctorId;

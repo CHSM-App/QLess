@@ -17,11 +17,17 @@ class OtpResponse {
   @JsonKey(name: 'message')
   final String? message;
 
+  /// Short-lived proof that this mobile passed OTP. Handed straight back to
+  /// /Createlogin, which refuses to issue a session without it.
+  @JsonKey(name: 'loginTicket')
+  final String? loginTicket;
+
   OtpResponse({
     this.otp,
     this.mobileNo,
     this.status,
     this.message,
+    this.loginTicket,
   });
 
   /// 🔹 From JSON

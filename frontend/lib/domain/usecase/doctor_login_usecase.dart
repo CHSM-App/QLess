@@ -22,8 +22,14 @@ class DoctorLoginUsecase {
     );
   }
 
-  Future<List<DoctorDetails>> checkPhoneDoctor(String mobile) {
-    return doctorLoginRepository.checkPhoneDoctor(mobile);
+  Future<List<DoctorDetails>> checkPhoneDoctor(
+    String mobile, {
+    bool saveIdentity = true,
+  }) {
+    return doctorLoginRepository.checkPhoneDoctor(
+      mobile,
+      saveIdentity: saveIdentity,
+    );
   }
 
     Future<dynamic> addMedicine(Medicine medicine) {

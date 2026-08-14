@@ -250,7 +250,10 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     }
   }
 
-  Future<void> checkPhoneDoctor(String mobile) async {
+  /// [saveIdentity] must be false in a receptionist session: the mobile passed
+  /// in is the linked DOCTOR's, so persisting it as the logged-in identity
+  /// would overwrite the receptionist's own stored profile.
+  Future<void> checkPhoneDoctor(String mobile, {bool saveIdentity = true}) async {
     // Offline-first: keep previously-loaded details visible while refreshing.
     // A failed/offline refresh must not blank out the profile & edit screens.
     final hadData = state.phoneCheckResult.maybeWhen(
@@ -263,7 +266,10 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       error: null,
     );
     try {
-      final result = await usecase.checkPhoneDoctor(mobile);
+      final result = await usecase.checkPhoneDoctor(
+        mobile,
+        saveIdentity: saveIdentity,
+      );
       if (result.isEmpty) {
         // Genuinely no doctor record for this mobile — distinct from a
         // network/server failure below, which must not be treated the same.
@@ -322,7 +328,9 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           leadTimeMinutes: d.leadTime,
           phoneCheckResult: AsyncValue.data(updatedList),
         );
-        if (d.name != null) await TokenStorage.saveValue('name', d.name!);
+        if (saveIdentity && d.name != null) {
+          await TokenStorage.saveValue('name', d.name!);
+        }
       } else {
         final d = result.first;
         state = state.copyWith(
@@ -337,7 +345,9 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           leadTimeMinutes: d.leadTime,
           phoneCheckResult: AsyncValue.data(result),
         );
-        if (d.name != null) await TokenStorage.saveValue('name', d.name!);
+        if (saveIdentity && d.name != null) {
+          await TokenStorage.saveValue('name', d.name!);
+        }
         if (d.clinicName != null) {
           await TokenStorage.saveValue('clinic_name', d.clinicName!);
         }
@@ -725,7 +735,8 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           : doctors.first;
       final doctorMobile = doctor.mobile;
       if (doctorMobile == null || doctorMobile.trim().isEmpty) return;
-      await checkPhoneDoctor(doctorMobile.trim());
+      // Receptionist-only path — never persist the doctor as the identity.
+      await checkPhoneDoctor(doctorMobile.trim(), saveIdentity: false);
     } catch (_) {}
   }
 }

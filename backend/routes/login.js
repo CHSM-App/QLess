@@ -3,6 +3,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 const auth = require('./middleware/auth');
+const authorize = require('./middleware/authorize');
+const { ROLE, ROLE_ID_BY_NAME, ROLE_NAME_BY_ID, resolveRoleId } = require('./middleware/roles');
 const db = require('./db'); // your mssql pool wrapper
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
@@ -26,6 +28,32 @@ if (!PUBLIC_BASE_URL) {
 const REFRESH_TOKEN_TTL_DAYS = parseInt(process.env.REFRESH_TOKEN_TTL_DAYS, 10) || 30;
 const REFRESH_TOKEN_TTL_MS = REFRESH_TOKEN_TTL_DAYS * 24 * 3600 * 1000;
 
+// Login tickets prove "this mobile just passed OTP". Short-lived on purpose:
+// long enough to finish the login call, too short to be worth stealing.
+const LOGIN_TICKET_TTL = process.env.LOGIN_TICKET_TTL || '5m';
+
+// Review/QA accounts skip the SMS OTP (mirrors frontend/lib/core/demo_accounts.dart).
+// They still have to present the fixed demo OTP — the ranges alone are not a
+// password. Keep both lists in sync when either side changes.
+const DEMO_OTP = process.env.DEMO_OTP || '123456';
+const DEMO_RANGES = [
+	[9876000001, 9876000030], // doctors
+	[9877000001, 9877000030], // receptionists
+	[9878000001, 9878000050], // patients
+];
+
+function isDemoMobile(mobile) {
+	const n = Number(String(mobile || '').replace(/\D/g, ''));
+	if (!n) return false;
+	return DEMO_RANGES.some(([from, to]) => n >= from && n <= to);
+}
+
+/** Digits only, last 10 — so "+91 98…", "098…" and "98…" compare equal. */
+function normalizeMobile(value) {
+	const digits = String(value || '').replace(/\D/g, '');
+	return digits.length > 10 ? digits.slice(-10) : digits;
+}
+
 function generateRefreshToken() {
 	return crypto.randomBytes(64).toString('hex');
 }
@@ -35,6 +63,69 @@ function createAccessToken(payload) {
 	return jwt.sign(payload, process.env.JWT_SECRET_KEY, {
 		expiresIn: process.env.JWT_ACCESS_TTL || '15m',
 	});
+}
+
+/**
+ * Looks the mobile up in the doctor / patient / receptionist tables and returns
+ * { roleId, uid } — or null when the number holds no account at all.
+ *
+ * The client's `requestedRole` is only a preference, never the answer: one
+ * mobile can legitimately be both a doctor and a patient, so the caller picks
+ * which of their OWN roles to use, but can never claim one they do not hold.
+ * Previously the role arrived in the request body and was written to the
+ * session as-is, so posting role:"doctor" with a receptionist's number was
+ * enough to get a doctor session.
+ */
+async function resolveAccountRole(mobile, requestedRole) {
+	const wanted = ROLE_ID_BY_NAME[String(requestedRole || '').trim().toLowerCase()] || null;
+
+	const firstRow = (result) => (result.recordset && result.recordset[0]) || null;
+	const idOf = (row, ...keys) => {
+		for (const key of keys) {
+			const value = row && row[key];
+			if (value !== undefined && value !== null && Number(value) > 0) return Number(value);
+		}
+		return null;
+	};
+
+	const lookups = {
+		[ROLE.DOCTOR]: async () => {
+			const row = firstRow(await db.request()
+				.input('operation', 'doctor_mobile_exist')
+				.input('mobile', mobile)
+				.execute('sp_doctor_login'));
+			return row ? { roleId: ROLE.DOCTOR, uid: idOf(row, 'doctor_id', 'id') } : null;
+		},
+		[ROLE.PATIENT]: async () => {
+			const row = firstRow(await db.request()
+				.input('operation', 'patient_mobile_exist')
+				.input('mobile_no', mobile)
+				.execute('sp_patients'));
+			return row ? { roleId: ROLE.PATIENT, uid: idOf(row, 'patient_id', 'id') } : null;
+		},
+		[ROLE.RECEPTIONIST]: async () => {
+			const row = firstRow(await db.request()
+				.input('operation', 'check_phone_receptionist')
+				.input('mobile_no', mobile)
+				.execute('sp_receptionist'));
+			return row ? { roleId: ROLE.RECEPTIONIST, uid: idOf(row, 'recep_id', 'id') } : null;
+		},
+	};
+
+	// "Doctor" on the role picker covers clinic staff too, so a doctor login
+	// that finds no doctor falls through to receptionist — that is how a
+	// receptionist signs in today. Patient never falls through to staff.
+	const order = wanted === ROLE.PATIENT
+		? [ROLE.PATIENT]
+		: wanted === ROLE.RECEPTIONIST
+			? [ROLE.RECEPTIONIST, ROLE.DOCTOR]
+			: [ROLE.DOCTOR, ROLE.RECEPTIONIST];
+
+	for (const roleId of order) {
+		const found = await lookups[roleId]();
+		if (found) return found;
+	}
+	return null;
 }
 
 function createRefreshTokenPayload(mobile) {
@@ -47,15 +138,53 @@ router.post('/Createlogin', authLimiter, async (req, res) => {
 		const {
 			mobile,
 			deviceDetails,
-			role
-		} = req.body; // ✅ add role
+			role,
+			loginTicket,
+			otp
+		} = req.body;
 
 		if (!mobile) return res.status(400).json({
 			error: 'Mobile number required'
 		});
 		if (!role) return res.status(400).json({
 			error: 'Role required'
-		}); // optional but recommended
+		});
+
+		const normalizedMobile = normalizeMobile(mobile);
+
+		// ── Proof of OTP ────────────────────────────────────────────────
+		// Issuing tokens for any mobile that was merely POSTed here meant a
+		// phone number was the only thing standing between an attacker and a
+		// full session. /verify-otp now hands out a signed, short-lived ticket
+		// and this route refuses to mint a session without one.
+		if (isDemoMobile(normalizedMobile)) {
+			if (String(otp || '') !== DEMO_OTP) {
+				return res.status(401).json({ error: 'Invalid OTP' });
+			}
+		} else {
+			if (!loginTicket) {
+				return res.status(401).json({ error: 'OTP verification required' });
+			}
+			try {
+				const ticket = jwt.verify(loginTicket, process.env.JWT_SECRET_KEY);
+				if (ticket.purpose !== 'login' || normalizeMobile(ticket.mobile) !== normalizedMobile) {
+					return res.status(401).json({ error: 'OTP verification required' });
+				}
+			} catch (err) {
+				log.error('Createlogin: bad login ticket for ' + normalizedMobile + ' (' + err.message + ')');
+				return res.status(401).json({ error: 'OTP verification expired. Please try again.' });
+			}
+		}
+
+		// ── Role comes from the database, not from the request body ──────
+		const account = await resolveAccountRole(normalizedMobile, role);
+		if (!account) {
+			return res.status(404).json({
+				error: 'No account found for this mobile number'
+			});
+		}
+		const roleId = account.roleId;
+		const roleName = ROLE_NAME_BY_ID[roleId];
 
 		await db.request()
 			.input('operation', 'revoke')
@@ -65,21 +194,21 @@ router.post('/Createlogin', authLimiter, async (req, res) => {
 		const refreshToken = createRefreshTokenPayload(mobile);
 		const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_MS);
 
-		const result = await db.request()
+		await db.request()
 			.input('operation', 'insert')
 			.input('user_mobile', mobile)
 			.input('refresh_token', refreshToken)
 			.input('device_info', deviceDetails)
 			.input('expires_at', expiresAt)
-			.input('role', role) // 'doctor' or 'patient'
+			.input('role', roleName)
 			.execute('ManageRefreshToken');
 
-
-		const spRoleId = result.recordset?.[0]?.role_id;
-		const roleId = spRoleId ?? (role === 'receptionist' ? 3 : role === 'patient' ? 2 : role === 'doctor' ? 1 : null);
-
+		// role_id travels inside the token so every route can authorize on it
+		// instead of trusting whatever the caller sends.
 		const accessToken = createAccessToken({
-			mobile
+			mobile,
+			role_id: roleId,
+			uid: account.uid,
 		});
 
 		return res.json({
@@ -124,7 +253,27 @@ router.post('/refreshAccessToken', authLimiter, async (req, res) => {
 
 		const row = rows[0];
 		const mobile = row.user_mobile;
-		const roleId = row.role_id;
+
+		// Columns only (never the token values) — tells us at a glance whether
+		// ManageRefreshToken's `get` actually projects role_id.
+		log.debug('refreshAccessToken row columns: ' + Object.keys(row).join(','));
+
+		// The SP does not always project role_id on `get` — that is why
+		// /Createlogin already needed a fallback. Returning that raw value
+		// handed the client roleId null → the app stored 0, which turned a
+		// receptionist session into a doctor-looking one and wiped the session
+		// on the next launch. Resolve it defensively instead, and refuse to
+		// answer rather than reply with an unknown role.
+		const roleId = resolveRoleId(row.role_id, row.role);
+		if (!roleId) {
+			log.error(
+				'refreshAccessToken: cannot resolve role for ' + mobile +
+				' (role_id=' + row.role_id + ' role=' + row.role + ')'
+			);
+			return res.status(500).json({
+				error: 'Could not resolve account role. Please try again.'
+			});
+		}
 
 		// revoke old
 		await db.request()
@@ -132,9 +281,13 @@ router.post('/refreshAccessToken', authLimiter, async (req, res) => {
 			.input('user_mobile', mobile)
 			.execute('ManageRefreshToken');
 
-		// create new
+		// create new — same role as the stored session, re-resolving only the
+		// account id so the token keeps carrying who this is.
+		const account = await resolveAccountRole(normalizeMobile(mobile), ROLE_NAME_BY_ID[roleId]);
 		const newAccessToken = createAccessToken({
-			mobile
+			mobile,
+			role_id: roleId,
+			uid: account && account.roleId === roleId ? account.uid : null,
 		});
 
 		const newRefreshToken = createRefreshTokenPayload(mobile);
@@ -146,7 +299,7 @@ router.post('/refreshAccessToken', authLimiter, async (req, res) => {
 			.input('refresh_token', newRefreshToken)
 			.input('device_info', row.device_info)
 			.input('expires_at', newExpiresAt)
-			.input('role', row.role_id === 1 ? 'doctor' : row.role_id === 2 ? 'patient' : 'receptionist')
+			.input('role', ROLE_NAME_BY_ID[roleId])
 
 			.execute('ManageRefreshToken');
 
@@ -455,6 +608,28 @@ router.post('/doctor', uploadHandler(upload.fields([{
 		} = req.body;
 
 		const operation = doctor_id && doctor_id > 0 ? "Update" : "Insert";
+
+		// Registration must stay open — a new doctor has no token yet. Editing
+		// an existing record must not: without this, any signed-in user (a
+		// receptionist, a patient) could POST a doctor_id and rewrite that
+		// doctor's profile. Updates therefore require a doctor's own token.
+		if (operation === "Update") {
+			// auth() is synchronous: it either calls next() or answers 401 itself.
+			let authenticated = false;
+			auth(req, res, () => { authenticated = true; });
+			if (!authenticated) return;
+
+			if (Number(req.user.role_id) !== ROLE.DOCTOR) {
+				return res.status(403).json({
+					error: 'Only the doctor can update this profile.'
+				});
+			}
+			if (req.user.uid && Number(req.user.uid) !== Number(doctor_id)) {
+				return res.status(403).json({
+					error: 'You can only update your own profile.'
+				});
+			}
+		}
 
 		// =========================
 		// 1️⃣ INSERT / UPDATE
@@ -803,9 +978,19 @@ router.post('/verify-otp', async (req, res) => {
 			.input('mobile_no', mobile_no)
 			.execute('sp_otp');
 
+		// Proof that this mobile passed OTP, to be handed straight back to
+		// /Createlogin. Without it that route would keep issuing sessions to
+		// anyone who knows a phone number.
+		const loginTicket = jwt.sign(
+			{ mobile: normalizeMobile(mobile_no), purpose: 'login' },
+			process.env.JWT_SECRET_KEY,
+			{ expiresIn: LOGIN_TICKET_TTL }
+		);
+
 		res.json({
 			status: 1,
-			message: 'OTP verified successfully'
+			message: 'OTP verified successfully',
+			loginTicket
 		});
 
 	} catch (err) {
@@ -845,7 +1030,7 @@ router.get('/getClinicsForDoctor/:doctor_id', async (req, res) => {
 	}
 });
 
-router.post('/addClinic', uploadHandler(upload.fields([{ name: 'clinic_images', maxCount: 5 }])), async (req, res) => {
+router.post('/addClinic', auth, authorize(ROLE.DOCTOR), uploadHandler(upload.fields([{ name: 'clinic_images', maxCount: 5 }])), async (req, res) => {
 	try {
 		if (!(await verifyImageFiles(req, res))) return;
 
@@ -906,7 +1091,7 @@ router.post('/addClinic', uploadHandler(upload.fields([{ name: 'clinic_images', 
 	}
 });
 
-router.put('/updateClinic', uploadHandler(upload.fields([{ name: 'clinic_images', maxCount: 5 }])), async (req, res) => {
+router.put('/updateClinic', auth, authorize(ROLE.DOCTOR), uploadHandler(upload.fields([{ name: 'clinic_images', maxCount: 5 }])), async (req, res) => {
 	try {
 		if (!(await verifyImageFiles(req, res))) return;
 
@@ -958,7 +1143,7 @@ router.put('/updateClinic', uploadHandler(upload.fields([{ name: 'clinic_images'
 	}
 });
 
-router.delete('/deleteClinic/:clinic_id/:doctor_id', async (req, res) => {
+router.delete('/deleteClinic/:clinic_id/:doctor_id', auth, authorize(ROLE.DOCTOR), async (req, res) => {
 	try {
 		const { clinic_id, doctor_id } = req.params;
 		if (!clinic_id || !doctor_id) return res.status(400).json({ success: false, error: 'clinic_id and doctor_id required' });
@@ -984,9 +1169,22 @@ router.delete('/deleteClinic/:clinic_id/:doctor_id', async (req, res) => {
 
 //  RECEPTIONIST — CREATE / UPDATE  (same pattern as /patient)
 // ════════════════════════════════════════════════════════════════════
-router.post('/receptionist', uploadHandler(upload.single("image")), async (req, res) => {
+router.post('/receptionist', auth, authorize(ROLE.DOCTOR, ROLE.RECEPTIONIST), uploadHandler(upload.single("image")), async (req, res) => {
 	try {
 		if (!(await verifyImageFiles(req, res))) return;
+
+		// Doctors manage their staff; a receptionist may only edit their own
+		// record (the app shows them this screen as "Personal Information").
+		if (Number(req.user.role_id) === ROLE.RECEPTIONIST) {
+			const ownId = Number(req.user.uid);
+			const targetId = Number(req.body.recep_id);
+			if (!ownId || !targetId || ownId !== targetId) {
+				return res.status(403).json({
+					success: false,
+					message: 'You can only edit your own profile.'
+				});
+			}
+		}
 
 		const {
 			recep_id,

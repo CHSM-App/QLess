@@ -3,9 +3,11 @@ var router = express.Router();
 var db = require('../db');
 var sql = require('mssql');
 const log = require('../middleware/logger');
+const authorize = require('../middleware/authorize');
+const { ROLE } = require('../middleware/roles');
 
 // DELETE Medicine (per-doctor link unlink)
-router.delete("/deleteMedicine/:doctor_id/:medicine_id", async (req, res) => {
+router.delete("/deleteMedicine/:doctor_id/:medicine_id", authorize(ROLE.DOCTOR), async (req, res) => {
   try {
     const { doctor_id, medicine_id } = req.params;
 
@@ -50,7 +52,7 @@ router.delete("/deleteMedicine/:doctor_id/:medicine_id", async (req, res) => {
 // Clinic gallery — soft-remove selected gallery images for a clinic.
 // Mounted at /doctor/index → DELETE /doctor/index/delete/clinicGallery
 // Body: { clinic_id, image_urls: [..] }. SP splits @image_url on ','.
-router.delete("/delete/clinicGallery", async (req, res) => {
+router.delete("/delete/clinicGallery", authorize(ROLE.DOCTOR), async (req, res) => {
   try {
     const { clinic_id, image_urls } = req.body;
     const urls = Array.isArray(image_urls)
@@ -88,7 +90,7 @@ router.delete("/delete/clinicGallery", async (req, res) => {
 
 
 // DELETE Receptionist
-router.delete("/deletereceptionist/:recep_id", async (req, res) => {
+router.delete("/deletereceptionist/:recep_id", authorize(ROLE.DOCTOR), async (req, res) => {
   try {
     const { recep_id } = req.params;
 

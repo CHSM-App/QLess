@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/navigation/navigator_key.dart';
+import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/token_response.dart';
 
 import '../../data/repositories/auth_impl.dart';
@@ -37,10 +38,16 @@ class TokenInterceptor extends Interceptor {
     final sanitizedErr = _sanitizeError(err);
 
     final statusCode = err.response?.statusCode;
-    final isAuthError = statusCode == 401 || statusCode == 403;
     final isRefreshCall = err.requestOptions.path.contains(
       'login/refreshAccessToken',
     );
+
+    // 401 = "your token is stale, refresh it". 403 = "this account may not do
+    // that" — refreshing cannot fix it, and retrying into a second 403 used to
+    // log the user out over what is really a permissions message. The refresh
+    // endpoint is the exception: it answers 403 for a dead refresh token.
+    final isAuthError =
+        statusCode == 401 || (isRefreshCall && statusCode == 403);
 
     if (!isAuthError) {
       return handler.next(sanitizedErr);
@@ -79,6 +86,22 @@ class TokenInterceptor extends Interceptor {
       }
       return handler.next(sanitizedErr);
     }
+  }
+
+  /// Compares two mobile numbers on their last 10 digits so a country-code or
+  /// formatting difference ("+91 98…" vs "98…") isn't read as a different
+  /// person. Unknown on either side → treated as a match, so an older stored
+  /// session without a saved login mobile is never logged out by this check.
+  bool _isSameUser(String? loginMobile, String? serverMobile) {
+    String digits(String? s) {
+      final only = (s ?? '').replaceAll(RegExp(r'\D'), '');
+      return only.length > 10 ? only.substring(only.length - 10) : only;
+    }
+
+    final a = digits(loginMobile);
+    final b = digits(serverMobile);
+    if (a.isEmpty || b.isEmpty) return true;
+    return a == b;
   }
 
   /// True only for a real auth rejection (invalid/expired refresh token),
@@ -155,12 +178,50 @@ class TokenInterceptor extends Interceptor {
         TokenResponse(refreshToken: refreshToken),
       );
 
+      // A refresh renews tokens for the SAME account — never a different one.
+      // The response carries the mobile the server resolved from the refresh
+      // token; if that isn't the mobile we logged in with, the server handed
+      // us somebody else's session (e.g. the receptionist's refresh token
+      // resolving to their doctor). Adopting it silently would turn a
+      // receptionist into that doctor, so end the session instead.
+      final loginMobile = await TokenStorage.getValue('login_mobile');
+      if (!_isSameUser(loginMobile, tokenResponse.mobile)) {
+        debugPrint(
+          'Refresh identity mismatch: logged in as "$loginMobile" but server '
+          'returned "${tokenResponse.mobile}" — ending session.',
+        );
+        await _forceLogout();
+        throw StateError('Refresh returned a different account');
+      }
+
+      // If the server omits roleId (or sends 0/null), keep the role we logged
+      // in with. Overwriting it with 0 silently downgraded a receptionist
+      // session (roleId 3) into a doctor-looking one, and the next app start
+      // saw roleId 0 and wiped the whole session.
+      final currentRoleId = ref.read(tokenProvider).roleId ?? 0;
+      final serverRoleId = tokenResponse.roleId ?? 0;
+      final effectiveRoleId = serverRoleId > 0 ? serverRoleId : currentRoleId;
+      if (serverRoleId != currentRoleId) {
+        debugPrint(
+          'Refresh roleId mismatch: server=$serverRoleId '
+          'current=$currentRoleId → using $effectiveRoleId',
+        );
+      }
+      // Neither side knows the role (an already-corrupted session from before
+      // this guard existed). Storing 0 again would leave the user in the
+      // half-broken state that started this bug — end the session cleanly.
+      if (effectiveRoleId <= 0) {
+        debugPrint('Refresh produced no usable role — ending session.');
+        await _forceLogout();
+        throw StateError('Refresh produced no usable role');
+      }
+
       await ref
           .read(tokenProvider.notifier)
           .saveTokens(
             tokenResponse.accessToken!,
             tokenResponse.refreshToken!,
-            tokenResponse.roleId ?? 0,
+            effectiveRoleId,
           );
     }();
 
@@ -199,8 +260,11 @@ class TokenInterceptor extends Interceptor {
         if (statusCode == 400) {
           return "Invalid request. Please try again.";
         }
-        if (statusCode == 401 || statusCode == 403) {
+        if (statusCode == 401) {
           return "Session expired. Please sign in again.";
+        }
+        if (statusCode == 403) {
+          return "Your account does not have access to this action.";
         }
         if (statusCode == 404) {
           return "Requested resource not found.";

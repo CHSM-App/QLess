@@ -11,7 +11,13 @@ abstract class DoctorLoginRepository {
     File? doctorImage,
     List<File>? clinicImages,
   });
-   Future<List<DoctorDetails>> checkPhoneDoctor(String mobile);
+   /// [saveIdentity] false when a receptionist is loading their linked
+   /// doctor — the doctor's name/mobile/role_id must not overwrite the
+   /// logged-in receptionist's own values in storage.
+   Future<List<DoctorDetails>> checkPhoneDoctor(
+     String mobile, {
+     bool saveIdentity = true,
+   });
 
    Future<dynamic> addMedicine(Medicine medicine);
 

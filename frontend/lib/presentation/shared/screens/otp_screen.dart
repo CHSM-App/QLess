@@ -197,8 +197,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
     setState(() => _isLoading = true);
 
-    // Real users: verify the OTP with the backend before logging in.
-    // Demo users already passed the local check above.
+    // Real users: verify the OTP with the backend before logging in. The
+    // verify call returns a short-lived ticket that /Createlogin requires —
+    // without it the server refuses to issue a session, so a phone number
+    // alone can no longer buy one. Demo users passed the local check above
+    // and present the fixed demo OTP to the server instead.
+    String? loginTicket;
     if (widget.demoOtp == null) {
       final verify = await ref
           .read(doctorLoginViewModelProvider.notifier)
@@ -209,6 +213,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
         _triggerError();
         return;
       }
+      loginTicket = verify.loginTicket;
     }
 
     // Detect receptionist before login so the correct role string reaches
@@ -232,9 +237,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
       }
     }
 
-    final result = await ref
-        .read(authViewModelProvider.notifier)
-        .login(TokenResponse(mobile: widget.mobileNumber, role: effectiveRole));
+    final result = await ref.read(authViewModelProvider.notifier).login(
+          TokenResponse(
+            mobile: widget.mobileNumber,
+            role: effectiveRole,
+            loginTicket: loginTicket,
+            otp: widget.demoOtp != null ? _otpValue : null,
+          ),
+        );
 
     if (!mounted) return;
     setState(() => _isLoading = false);

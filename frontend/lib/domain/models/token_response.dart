@@ -12,6 +12,13 @@ class TokenResponse {
   final String? role;
   final String? firebaseToken;
 
+  /// Proof of OTP from /verify-otp — required by /Createlogin for real users.
+  final String? loginTicket;
+
+  /// Demo/review accounts skip the SMS OTP and present the fixed demo code
+  /// instead; the server checks it against its own demo-number ranges.
+  final String? otp;
+
   TokenResponse({
      this.accessToken,
      this.refreshToken,
@@ -19,8 +26,9 @@ class TokenResponse {
     this.deviceDetails,
      this.roleId,
      this.role,
-     this.firebaseToken
-
+     this.firebaseToken,
+     this.loginTicket,
+     this.otp,
   });
 
   factory TokenResponse.fromJson(Map<String, dynamic> json) =>

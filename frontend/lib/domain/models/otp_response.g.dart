@@ -11,6 +11,7 @@ OtpResponse _$OtpResponseFromJson(Map<String, dynamic> json) => OtpResponse(
   mobileNo: json['mobile_no'] as String?,
   status: (json['status'] as num?)?.toInt(),
   message: json['message'] as String?,
+  loginTicket: json['loginTicket'] as String?,
 );
 
 Map<String, dynamic> _$OtpResponseToJson(OtpResponse instance) =>
@@ -19,4 +20,5 @@ Map<String, dynamic> _$OtpResponseToJson(OtpResponse instance) =>
       'mobile_no': ?instance.mobileNo,
       'status': ?instance.status,
       'message': ?instance.message,
+      'loginTicket': ?instance.loginTicket,
     };

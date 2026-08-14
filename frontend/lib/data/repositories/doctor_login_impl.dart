@@ -66,15 +66,25 @@ class DoctorLoginImpl implements DoctorLoginRepository {
   }
 
   @override
-  Future<List<DoctorDetails>> checkPhoneDoctor(String mobile) async {
+  Future<List<DoctorDetails>> checkPhoneDoctor(
+    String mobile, {
+    bool saveIdentity = true,
+  }) async {
     final response = await apiService.checkPhoneDoctor(mobile);
 
     if (response.isNotEmpty) {
       await TokenStorage.saveValue('doctor_id', response[0].doctorId.toString());
-      await TokenStorage.saveValue('name', response[0].name.toString());
-      await TokenStorage.saveValue('mobile', response[0].mobile.toString());
-      await TokenStorage.saveValue('email', response[0].email.toString());
-      await TokenStorage.saveValue('role_id', response[0].roleId.toString());
+      await TokenStorage.saveValue('doctor_name', response[0].name.toString());
+      // A receptionist session calls this with the LINKED DOCTOR's mobile, so
+      // the generic identity keys must stay untouched — writing them there
+      // replaced the receptionist's own name/mobile/role_id with the doctor's,
+      // and after a restart the app came back up wearing the doctor's profile.
+      if (saveIdentity) {
+        await TokenStorage.saveValue('name', response[0].name.toString());
+        await TokenStorage.saveValue('mobile', response[0].mobile.toString());
+        await TokenStorage.saveValue('email', response[0].email.toString());
+        await TokenStorage.saveValue('role_id', response[0].roleId.toString());
+      }
       await TokenStorage.saveValue('clinic_name', response[0].clinicName.toString());
       await TokenStorage.saveValue('token', response[0].Token.toString());
       final clinicId = response[0].clinicId;

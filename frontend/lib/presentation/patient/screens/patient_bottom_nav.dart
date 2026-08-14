@@ -305,19 +305,21 @@ Widget build(BuildContext context) {
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(_navItems.length, (i) {
               final selected = _tab == i;
-              return GestureDetector(
+              final tab = GestureDetector(
                 onTap: () => _setTab(i),
                 behavior: HitTestBehavior.opaque,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: selected ? 12 : 10,
+                    vertical: 10,
+                  ),
                   decoration: BoxDecoration(
                     color: selected ? _iconChipInactive : Colors.transparent,
                     borderRadius: BorderRadius.circular(24),
@@ -338,12 +340,17 @@ Widget build(BuildContext context) {
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const SizedBox(width: 6),
-                                  Text(
-                                    _navItems[i].label,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: _accentDark,
+                                  Flexible(
+                                    child: Text(
+                                      _navItems[i].label,
+                                      maxLines: 1,
+                                      softWrap: false,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: _accentDark,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -354,6 +361,13 @@ Widget build(BuildContext context) {
                   ),
                 ),
               );
+
+              // Only the selected tab renders a label, so only it needs to
+              // flex: it takes whatever width is left after the four
+              // icon-only tabs. Making every tab Flexible would split the row
+              // five ways and ellipsize the long labels ("Appointments") down
+              // to nothing; leaving none flexible overflows on narrow phones.
+              return selected ? Flexible(fit: FlexFit.loose, child: tab) : tab;
             }),
           ),
         ),
