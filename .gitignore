@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Secrets — NEVER commit these. Rotate any previously-committed value.
+.env
+.env.local
+.env.*.local
+ServiceAccount.json
+serviceAccountKey.json
+routes/serviceAccountKey.json
+routes/**/qless-firebase-adminsdk*.json
+routes/**/*-adminsdk*.json
+secrets/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / IDE
+.DS_Store
+.vscode/
+.idea/
+*.iml
+
+# Server-local
+.user.ini
+uploads/temp/
