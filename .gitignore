@@ -57,3 +57,10 @@ app.*.map.json
 **/*.keystore
 **/keystore/
 .claude/
+APP_STORE_PUBLISHING_PLAYBOOK.md
+
+# iOS signing + Firebase config — injected via CI secrets, never committed.
+ios_distribution.*
+*.mobileprovision
+*_base64.txt
+**/ios/Runner/GoogleService-Info.plist
