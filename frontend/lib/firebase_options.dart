@@ -6,6 +6,13 @@ import 'package:flutter/foundation.dart';
 /// NOTE: This file was generated manually from android/app/google-services.json.
 /// If you add iOS/web support later, update this file accordingly.
 class DefaultFirebaseOptions {
+  /// Options to pass to `Firebase.initializeApp`. On iOS this is null so the
+  /// SDK reads ios/Runner/GoogleService-Info.plist instead.
+  static FirebaseOptions? get options =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS
+          ? null
+          : currentPlatform;
+
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
       throw UnsupportedError(

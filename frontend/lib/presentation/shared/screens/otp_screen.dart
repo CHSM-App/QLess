@@ -414,7 +414,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     if (Firebase.apps.isNotEmpty) return;
     try {
       await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
+        options: DefaultFirebaseOptions.options,
       );
     } catch (e) {
       debugPrint('Firebase init failed (OTP verify): $e');

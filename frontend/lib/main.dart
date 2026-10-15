@@ -28,7 +28,7 @@ export 'package:qless/core/navigation/navigator_key.dart';
 // Step 1 — Background / terminated message handler (must be top-level)
 @pragma('vm:entry-point')
 Future<void> _firebaseBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.options);
 }
 
 // Step 2 — Notification tap router (FCM tray tap, foreground or background)
@@ -123,7 +123,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+      options: DefaultFirebaseOptions.options,
     );
   } catch (e) {
     debugPrint('Firebase init failed: $e');
