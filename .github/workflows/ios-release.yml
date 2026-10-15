@@ -68,13 +68,13 @@ jobs:
 
       - name: Upload to App Store Connect
         env:
-          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
           set -euo pipefail
           mkdir -p ~/private_keys
-          echo "$APP_STORE_CONNECT_API_KEY" > "$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
+          echo -n "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 --decode -o "$HOME/private_keys/AuthKey_${APP_STORE_CONNECT_KEY_ID}.p8"
           IPA_PATH=$(find "${{ env.FLUTTER_DIR }}/build/ios/ipa" -name "*.ipa" | head -n1)
           xcrun altool --upload-app --type ios --file "$IPA_PATH" \
             --apiKey "$APP_STORE_CONNECT_KEY_ID" --apiIssuer "$APP_STORE_CONNECT_ISSUER_ID"
