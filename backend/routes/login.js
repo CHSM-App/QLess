@@ -37,6 +37,7 @@ const LOGIN_TICKET_TTL = process.env.LOGIN_TICKET_TTL || '5m';
 // password. Keep both lists in sync when either side changes.
 const DEMO_OTP = process.env.DEMO_OTP || '123456';
 const DEMO_RANGES = [
+	[9000000001, 9000000001], // Dr. Manoj Swant (doctor)
 	[9876000001, 9876000030], // doctors
 	[9877000001, 9877000030], // receptionists
 	[9878000001, 9878000050], // patients

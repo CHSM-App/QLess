@@ -22,7 +22,9 @@ bool isDemoNumber(String mobile) {
   const patientEnd = 9878000050;
   const receptionistStart = 9877000001;
   const receptionistEnd = 9877000030;
-  return (n >= doctorStart && n <= doctorEnd) ||
+  const manojDoctor = 9000000001; // Dr. Manoj Swant
+  return n == manojDoctor ||
+      (n >= doctorStart && n <= doctorEnd) ||
       (n >= patientStart && n <= patientEnd) ||
       (n >= receptionistStart && n <= receptionistEnd);
 }

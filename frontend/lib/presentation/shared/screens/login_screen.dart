@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/demo_accounts.dart';
+import 'package:qless/core/feature_flags.dart';
 import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
@@ -371,6 +372,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 }
 
+/// Back arrow for the login hero (iOS has no hardware/system back button).
+class _LoginBackButton extends StatelessWidget {
+  const _LoginBackButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withOpacity(0.18),
+      shape: CircleBorder(
+        side: BorderSide(color: Colors.white.withOpacity(0.30)),
+      ),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => Navigator.maybePop(context),
+        child: const SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Colors.white, size: 18),
+        ),
+      ),
+    );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // LANDSCAPE LAYOUT — Split panel, premium look
 // ─────────────────────────────────────────────────────────────────────────────
@@ -426,6 +452,16 @@ class _LandscapeLayout extends StatelessWidget {
               ),
               // Dotted pattern overlay
               const Positioned.fill(child: _DotPattern()),
+              if (Navigator.of(context).canPop())
+                const SafeArea(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 0, 0),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      child: _LoginBackButton(),
+                    ),
+                  ),
+                ),
               // Content
               SafeArea(
                 child: Center(
@@ -607,10 +643,12 @@ class _LandscapeLayout extends StatelessWidget {
                           onPressed: onContinue,
                           height: 56,
                         ),
-                        const SizedBox(height: 22),
-                        const _OrDivider(),
-                        const SizedBox(height: 22),
-                        _RegisterCard(onTap: onRegister, isDoctor: isDoctor),
+                        if (!isDoctor || canShowDoctorRegister) ...[
+                          const SizedBox(height: 22),
+                          const _OrDivider(),
+                          const SizedBox(height: 22),
+                          _RegisterCard(onTap: onRegister, isDoctor: isDoctor),
+                        ],
                         const SizedBox(height: 18),
                         // const _SecureFooter(),
                       ],
@@ -712,6 +750,10 @@ class _PortraitLayout extends StatelessWidget {
                             // Role badge top
                             Row(
                               children: [
+                                if (Navigator.of(context).canPop()) ...[
+                                  const _LoginBackButton(),
+                                  const SizedBox(width: 12),
+                                ],
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
@@ -950,10 +992,12 @@ class _PortraitLayout extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        const _OrDivider(),
-                        const SizedBox(height: 20),
-                        _RegisterCard(onTap: onRegister, isDoctor: isDoctor),
+                        if (!isDoctor || canShowDoctorRegister) ...[
+                          const SizedBox(height: 20),
+                          const _OrDivider(),
+                          const SizedBox(height: 20),
+                          _RegisterCard(onTap: onRegister, isDoctor: isDoctor),
+                        ],
                         const SizedBox(height: 24),
                         // const _SecureFooter(),
                       ],
