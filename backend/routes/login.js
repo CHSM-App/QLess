@@ -1006,6 +1006,11 @@ router.get('/privacy', (req, res) => {
 });
 
 
+router.get('/terms', (req, res) => {
+	res.sendFile(path.join(__dirname, 'terms.html'));
+});
+
+
 router.get('/delete-account', (req, res) => {
 	res.sendFile(path.join(__dirname, 'delete-account.html'));
 });

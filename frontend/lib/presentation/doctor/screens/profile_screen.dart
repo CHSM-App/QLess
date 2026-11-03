@@ -1594,6 +1594,12 @@ Widget _buildAvailabilityCard() => Container(
               Uri.parse('https://qless.vengurlatech.com/login/privacy');
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         }),
+        _Item(Icons.description_outlined, 'Terms of Service', null,
+            onTap: () async {
+          final uri =
+              Uri.parse('https://qless.vengurlatech.com/login/terms');
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }),
 
       ]);
   // ── Logout Button ─────────────────────────────────────────────────────────

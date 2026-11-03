@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/constant.dart';
 import 'package:qless/core/network/token_provider.dart';
-import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart'
     hide appointmentViewModelProvider;
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
@@ -26,11 +25,11 @@ const _kOtpLength     = 6;
 const _kResendSeconds = 30;
 
 const _consequences = [
-  'Your account and profile will be permanently deleted',
-  'All booking history and tokens will be removed',
-  'Your prescriptions will no longer be accessible',
-  'Family member profiles linked to your account will be deleted',
-  'This action cannot be undone',
+  'Your account will be scheduled for deletion, with a 30-day grace period before it is final',
+  'You can cancel the request any time during those 30 days by contacting support',
+  'Once the grace period ends, your profile, booking history and prescriptions are permanently removed',
+  'Family member profiles linked to your account will also be deleted',
+  'After the grace period, this action cannot be undone',
 ];
 
 const _reasons = [
@@ -106,43 +105,46 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
 
   void _clearError() => setState(() => _error = '');
 
-  // ── Step 2: Send OTP ─────────────────────────────────────────────────────
+  // ── Step 1 → 2: Send OTP via the delete-account flow ─────────────────────
+  // Must hit /delete-account/request (not the generic /login OTP endpoints):
+  // both share the same otp_verification row keyed by phone, so sending via
+  // the generic login flow here would be overwritten by the OTP that
+  // /delete-account/confirm later re-sends/re-checks, and the two flows
+  // would stomp on each other's OTP row.
   Future<void> _sendOtp() async {
     _clearError();
     setState(() => _loading = true);
-    final res = await ref
-        .read(doctorLoginViewModelProvider.notifier)
-        .sendOtp(OtpResponse(mobileNo: _phone));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    if ((res.status ?? 0) != 1) {
-      setState(() => _error = res.message ?? 'Failed to send OTP');
-      return;
+    try {
+      final dio = Dio(BaseOptions(baseUrl: baseUrl));
+      await dio.post(
+        'delete-account/request',
+        data: {'phone': _phone, 'role_id': _roleId},
+      );
+      if (!mounted) return;
+      setState(() { _loading = false; _step = 2; _otpError = false; });
+      _startTimer();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_otpFocus.isNotEmpty) _otpFocus[0].requestFocus();
+      });
+    } on DioException catch (e) {
+      if (!mounted) return;
+      final msg = e.response?.data?['message'] ?? 'Failed to send OTP';
+      setState(() { _loading = false; _error = msg; });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() { _loading = false; _error = 'Something went wrong.'; });
     }
-    setState(() { _step = 2; _otpError = false; });
-    _startTimer();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_otpFocus.isNotEmpty) _otpFocus[0].requestFocus();
-    });
   }
 
-  // ── Step 3: Verify OTP ───────────────────────────────────────────────────
+  // ── Step 2 → 3: Local-only check ─────────────────────────────────────────
+  // The delete-account backend verifies the OTP and schedules deletion in a
+  // single call (/delete-account/confirm) — there's no separate verify-only
+  // endpoint, so real verification happens in _submitDeletion. This step
+  // just confirms the user finished entering the code before moving on.
   Future<void> _verifyOtp() async {
     if (!_otpFilled) return;
     _clearError();
-    setState(() { _loading = true; _otpError = false; });
-    final res = await ref
-        .read(doctorLoginViewModelProvider.notifier)
-        .verifyOtp(OtpResponse(mobileNo: _phone, otp: _otpValue));
-    if (!mounted) return;
-    setState(() => _loading = false);
-    if ((res.status ?? 0) != 1) {
-      setState(() => _otpError = true);
-      for (final c in _otpCtrl) c.clear();
-      if (_otpFocus.isNotEmpty) _otpFocus[0].requestFocus();
-      return;
-    }
-    setState(() => _step = 3);
+    setState(() { _otpError = false; _step = 3; });
   }
 
   // ── Step 3: Submit deletion ───────────────────────────────────────────────
@@ -151,13 +153,31 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
     setState(() => _loading = true);
     try {
       final dio = Dio(BaseOptions(baseUrl: baseUrl));
-      await dio.post(
-        'delete-account/request',
+      final res = await dio.post(
+        'delete-account/confirm',
         data: {
           'phone':   _phone,
           'role_id': _roleId,
+          'otp':     _otpValue,
           'reason':  _reason.isEmpty ? null : _reason,
         },
+      );
+      if (!mounted) return;
+      final message = (res.data?['message'] as String?) ??
+          'Your account has been scheduled for deletion.';
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Deletion scheduled'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
       );
       if (!mounted) return;
       await _logout();
@@ -165,6 +185,13 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
       if (!mounted) return;
       final msg = e.response?.data?['message'] ?? 'Network error. Please try again.';
       setState(() { _loading = false; _error = msg; });
+      // Invalid/expired OTP — send the user back to re-enter it rather than
+      // leaving them stuck resubmitting the same rejected code.
+      if (e.response?.statusCode == 400) {
+        setState(() { _step = 2; _otpError = true; });
+        for (final c in _otpCtrl) c.clear();
+        if (_otpFocus.isNotEmpty) _otpFocus[0].requestFocus();
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() { _loading = false; _error = 'Something went wrong.'; });
@@ -270,8 +297,10 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
     setState(() => _otpError = false);
     if (_otpFocus.isNotEmpty) _otpFocus[0].requestFocus();
     _startTimer();
-    ref.read(doctorLoginViewModelProvider.notifier)
-        .sendOtp(OtpResponse(mobileNo: _phone));
+    Dio(BaseOptions(baseUrl: baseUrl)).post(
+      'delete-account/request',
+      data: {'phone': _phone, 'role_id': _roleId},
+    );
   }
 }
 
@@ -502,7 +531,7 @@ class _Step1 extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.only(top: 12),
               child: Text(
-                'I understand that deleting my account is permanent and all my data will be lost.',
+                'I understand my account will be scheduled for deletion and permanently removed after a 30-day grace period, during which I can cancel the request.',
                 style: TextStyle(fontSize: 13, color: _kTextSecondary, height: 1.4),
               ),
             ),
@@ -778,7 +807,10 @@ class _Step3 extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: Color(0xFFC53030))),
           const SizedBox(height: 6),
-          Text('Deleting account for +91 $phone. This cannot be undone.',
+          Text(
+              'Deleting account for +91 $phone. Your account will be scheduled '
+              'for deletion with a 30-day grace period, during which you can '
+              'cancel the request by contacting support.',
               style: const TextStyle(
                   fontSize: 13, color: Color(0xFF9B2C2C), height: 1.4)),
         ]),

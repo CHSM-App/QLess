@@ -47,6 +47,8 @@
 	<string>QLess needs camera access so you can take a profile photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>QLess needs photo library access so you can choose a profile photo or document.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>QLess needs permission to save prescriptions and documents to your photo library.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

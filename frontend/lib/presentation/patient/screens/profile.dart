@@ -668,6 +668,16 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
           },
         ),
         _menuRow(
+          icon: Icons.description_outlined,
+          iconFg: kInfo, iconBg: kInfoLight,
+          title: 'Terms of Service',
+          subtitle: 'Read our terms of service',
+          onTap: () async {
+            final uri = Uri.parse('https://qless.vengurlatech.com/login/terms');
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          },
+        ),
+        _menuRow(
           icon: Icons.logout_rounded,
           iconFg: kError, iconBg: kRedLight,
           title: 'Log Out',

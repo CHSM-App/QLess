@@ -1,7 +1,16 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+const _kTermsUrl = 'https://qless.vengurlatech.com/login/terms';
+const _kPrivacyUrl = 'https://qless.vengurlatech.com/login/privacy';
+
+Future<void> _openLegalUrl(String url) async {
+  await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+}
 
 // ── Colour Palette ─────────────────────────────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -651,28 +660,34 @@ class _LegalText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RichText(
         textAlign: TextAlign.center,
-        text: const TextSpan(
-          style: TextStyle(
+        text: TextSpan(
+          style: const TextStyle(
             fontSize: 12,
             color: kTextMuted,
             height: 1.55,
           ),
           children: [
-            TextSpan(text: 'By continuing, you agree to our '),
+            const TextSpan(text: 'By continuing, you agree to our '),
             TextSpan(
               text: 'Terms of Service',
-              style: TextStyle(
+              style: const TextStyle(
                 color: kPrimaryDark,
                 fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
               ),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () => _openLegalUrl(_kTermsUrl),
             ),
-            TextSpan(text: ' and '),
+            const TextSpan(text: ' and '),
             TextSpan(
               text: 'Privacy Policy',
-              style: TextStyle(
+              style: const TextStyle(
                 color: kPrimaryDark,
                 fontWeight: FontWeight.w600,
+                decoration: TextDecoration.underline,
               ),
+              recognizer: TapGestureRecognizer()
+                ..onTap = () => _openLegalUrl(_kPrivacyUrl),
             ),
           ],
         ),
