@@ -82,9 +82,14 @@ const patientInsertRouter = require('./routes/Patient/insert');
 const patientIndexRouter = require('./routes/Patient/index');
 
 const deleteAccountRouter = require('./routes/delete-account');
+const adminRouter = require('./routes/admin');
 
 // Public — login + token refresh must be reachable without a valid token.
 app.use('/login', loginRouter);
+
+// Admin panel — auth happens inside the router itself (its own /login route
+// issues the token; everything else there requires it).
+app.use('/admin', adminRouter);
 
 // Account deletion — OTP-verified, no JWT required.
 app.use('/delete-account', deleteAccountRouter);

@@ -52,26 +52,43 @@ const sqlConfig = {
   },
 };
 
+// GO is an sqlcmd/SSMS batch separator, not real T-SQL — the engine itself
+// rejects it ("Incorrect syntax near 'GO'") if sent as part of a batch. Split
+// on lines that are only "GO" (optionally with a repeat count, which we
+// ignore) and run each piece as its own .batch() call, same as sqlcmd would.
+function splitBatches(sqlText) {
+  return sqlText
+    .split(/^\s*GO\s*(?:\d+)?\s*$/im)
+    .map((b) => b.trim())
+    .filter(Boolean);
+}
+
 (async () => {
   const sqlText = fs.readFileSync(resolved, 'utf8');
+  const batches = splitBatches(sqlText);
   console.log(`Connecting to ${sqlConfig.server}/${sqlConfig.database} as ${sqlConfig.user}...`);
   const pool = await sql.connect(sqlConfig);
   try {
-    console.log(`Running ${path.basename(resolved)} ...`);
-    const result = await pool.request().batch(sqlText);
+    console.log(`Running ${path.basename(resolved)} (${batches.length} batch${batches.length === 1 ? '' : 'es'}) ...`);
+    let anyResults = false;
 
-    const recordsets = result.recordsets && result.recordsets.length
-      ? result.recordsets
-      : (result.recordset ? [result.recordset] : []);
+    for (let i = 0; i < batches.length; i++) {
+      const result = await pool.request().batch(batches[i]);
 
-    if (recordsets.length === 0) {
-      console.log('Done — no rows returned.');
-    } else {
-      recordsets.forEach((rs, i) => {
-        if (recordsets.length > 1) console.log(`-- recordset ${i} --`);
-        console.table(rs);
-      });
+      const recordsets = result.recordsets && result.recordsets.length
+        ? result.recordsets
+        : (result.recordset ? [result.recordset] : []);
+
+      if (recordsets.length) {
+        anyResults = true;
+        recordsets.forEach((rs, j) => {
+          console.log(`-- batch ${i + 1}/${batches.length}, recordset ${j} --`);
+          console.table(rs);
+        });
+      }
     }
+
+    if (!anyResults) console.log('Done — no rows returned.');
   } finally {
     await pool.close();
   }

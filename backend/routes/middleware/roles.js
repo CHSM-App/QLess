@@ -5,18 +5,24 @@ const ROLE = {
 	DOCTOR: 1,
 	PATIENT: 2,
 	RECEPTIONIST: 3,
+	// Not a DB row — there's no multi-admin table, just a single shared
+	// credential (backend/.env ADMIN_USERNAME/ADMIN_PASSWORD) that mints a
+	// token carrying this role_id. See backend/routes/admin.js.
+	ADMIN: 4,
 };
 
 const ROLE_ID_BY_NAME = {
 	doctor: ROLE.DOCTOR,
 	patient: ROLE.PATIENT,
 	receptionist: ROLE.RECEPTIONIST,
+	admin: ROLE.ADMIN,
 };
 
 const ROLE_NAME_BY_ID = {
 	[ROLE.DOCTOR]: 'doctor',
 	[ROLE.PATIENT]: 'patient',
 	[ROLE.RECEPTIONIST]: 'receptionist',
+	[ROLE.ADMIN]: 'admin',
 };
 
 /**

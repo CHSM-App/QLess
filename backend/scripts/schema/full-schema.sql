@@ -4126,7 +4126,7 @@ WHERE queue_id = @queue_id
 
             --------------------------------------------------
             -- AVG CONSULT TIME (Practo-style)
-            --   measured avg, clamped to a sane 3–30 min band.
+            --   measured avg, clamped to a sane 3ï¿½30 min band.
             --   NO artificial queue-size scaling.
             --------------------------------------------------
             IF @base_avg < 3  SET @base_avg = 3;
@@ -4305,7 +4305,7 @@ END
                     SET @arrival_time = @slot_start_dt;
 
                 -- Round UP to next 5-min mark (clean display, like Practo)
-                -- NOTE: use a midnight DATETIME (not DATE) — DATEADD(MINUTE,..)
+                -- NOTE: use a midnight DATETIME (not DATE) ï¿½ DATEADD(MINUTE,..)
                 --       is not allowed on the DATE type.
                 SET @mins_from_mid = DATEDIFF(MINUTE,
                                               DATEADD(DAY, DATEDIFF(DAY, 0, @arrival_time), 0),
@@ -4424,7 +4424,7 @@ END
 
             --------------------------------------------------
             -- AVG CONSULT TIME (Practo-style)
-            --   measured avg, clamped to a sane 3–30 min band.
+            --   measured avg, clamped to a sane 3ï¿½30 min band.
             --   NO artificial queue-size scaling.
             --------------------------------------------------
             IF @base_avg < 3  SET @base_avg = 3;
@@ -4519,7 +4519,7 @@ END
                     SET @arrival_time = @slot_start_dt;
 
                 -- Round UP to next 5-min mark (clean display, like Practo)
-                -- NOTE: use a midnight DATETIME (not DATE) — DATEADD(MINUTE,..)
+                -- NOTE: use a midnight DATETIME (not DATE) ï¿½ DATEADD(MINUTE,..)
                 --       is not allowed on the DATE type.
                 SET @mins_from_mid = DATEDIFF(MINUTE,
                                               DATEADD(DAY, DATEDIFF(DAY, 0, @arrival_time), 0),
@@ -4951,7 +4951,7 @@ AVG CONSULTATION TIME
 DOCTOR_AVG_TIME:
 ------------------------------------------------------------
 Priority:
-1. Today’s completed appointments
+1. Todayï¿½s completed appointments
 2. Last 7 days
 3. Default value
 
@@ -5134,7 +5134,7 @@ GO
 --        RETURN;
 --    END
 
---    -- @from_date kontya active leave madhe yeto ka — booking hard-guard
+--    -- @from_date kontya active leave madhe yeto ka ï¿½ booking hard-guard
 --    IF @operation = 'IS_BLOCKED'
 --    BEGIN
 --        SELECT CASE WHEN EXISTS (
@@ -5783,6 +5783,8 @@ END
              @consultation_fee, @website_name, @clinic_email, @clinic_contact,
              @image_url, 0, 1);
 
+        -- is_verified = 0: a freshly-registered doctor is PENDING admin
+        -- review until someone approves them via /admin (VerifyDoctor below).
         INSERT INTO dbo.doctor_login
             (name, email, mobile, qualification, license_no, experience,
              specialization, created_at, role_id, clinic_id,
@@ -5790,7 +5792,7 @@ END
         VALUES
             (@name, @email, @mobile, @qualification, @license_no, @experience,
              @specialization, GETDATE(), @role_id, @clinic_id,
-             0, 1, @gender_id, @image);
+             0, 0, @gender_id, @image);
 
         SET @doctor_id = SCOPE_IDENTITY();
 
@@ -5888,6 +5890,30 @@ IF @operation = 'DeleteDoctor'
 BEGIN
     UPDATE dbo.doctor_login SET active_status = 1 WHERE doctor_id = @doctor_id;
     SELECT 1 AS success, 'Doctor deleted successfully' AS message;
+    RETURN;
+END
+
+---------------------------------------------------------
+-- ListPendingDoctors â€” admin approval queue
+---------------------------------------------------------
+IF @operation = 'ListPendingDoctors'
+BEGIN
+    SELECT doctor_id, name, email, mobile, qualification, license_no,
+           experience, specialization, clinic_id, clinic_name,
+           clinic_address, clinic_contact, clinic_email, doc_created_at
+    FROM dbo.doctor_login_vw
+    WHERE doc_active_status = 0 AND doc_is_verified = 0
+    ORDER BY doc_created_at ASC;
+    RETURN;
+END
+
+---------------------------------------------------------
+-- VerifyDoctor â€” admin approval
+---------------------------------------------------------
+IF @operation = 'VerifyDoctor'
+BEGIN
+    UPDATE dbo.doctor_login SET is_verified = 1 WHERE doctor_id = @doctor_id;
+    SELECT 1 AS success, 'Doctor verified' AS message;
     RETURN;
 END
 
@@ -6467,7 +6493,7 @@ BEGIN
 
     -- (UPSERT_SLOT, DELETE_SLOT, COUNT_FUTURE_APPTS_FOR_SLOT,
     --  CANCEL_FUTURE_APPTS_FOR_SLOT, RESCHEDULE_FUTURE_APPTS_FOR_SLOT
-    --  — no change needed, they work by availability_id/slot_id directly)
+    --  ï¿½ no change needed, they work by availability_id/slot_id directly)
 
     IF @operation = 'UPSERT_SLOT'
     BEGIN
@@ -6986,7 +7012,7 @@ BEGIN
     END
 
     -- ---------------------------------------------------------
-    -- GET SUGGESTIONS (NEW — global library madhun typing veli)
+    -- GET SUGGESTIONS (NEW ï¿½ global library madhun typing veli)
     -- ---------------------------------------------------------
     IF @operation = 'getSuggestions'
     BEGIN

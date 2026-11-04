@@ -740,6 +740,21 @@ router.post('/doctor', uploadHandler(upload.fields([{
 			}
 		}
 
+		// A freshly-registered doctor has never been through /send-otp +
+		// /verify-otp, so /Createlogin would 401 them for lacking a loginTicket.
+		// This request itself is the proof of ownership here (new row, caller's
+		// own mobile) — mint the same ticket /verify-otp would, so the app can
+		// sign the doctor in immediately after registration without a second
+		// OTP round trip.
+		let loginTicket;
+		if (operation === "Insert" && mobile) {
+			loginTicket = jwt.sign(
+				{ mobile: normalizeMobile(mobile), purpose: 'login' },
+				process.env.JWT_SECRET_KEY,
+				{ expiresIn: LOGIN_TICKET_TTL }
+			);
+		}
+
 		return res.json({
 			success: true,
 			doctor_id: returnedDoctorId,
@@ -747,7 +762,8 @@ router.post('/doctor', uploadHandler(upload.fields([{
 			doctor_image: doctorImageUrl,
 			clinic_images: clinicImageUrls,
 			clinic_image: clinicImageUrls[0] || null,
-			message: operation === "Update" ? "Updated" : "Created"
+			message: operation === "Update" ? "Updated" : "Created",
+			...(loginTicket ? { loginTicket } : {})
 		});
 
 	} catch (err) {

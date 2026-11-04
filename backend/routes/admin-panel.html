@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<title>QLess Admin — Doctor Approvals</title>
+<style>
+  :root {
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --text: #1a1d21;
+    --muted: #6b7280;
+    --border: #e2e5e9;
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --danger: #dc2626;
+    --danger-dark: #b91c1c;
+    --success: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+  #loginCard {
+    max-width: 360px; margin: 80px auto; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px; padding: 28px;
+  }
+  #loginCard h1 { text-align: center; margin-bottom: 20px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 4px; }
+  input[type="text"], input[type="password"] {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-size: 14px;
+  }
+  button {
+    cursor: pointer; border: none; border-radius: 8px; font-size: 14px;
+    font-weight: 600; padding: 10px 16px;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-danger { background: #fff; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-danger:hover { background: #fef2f2; }
+  .btn-primary:disabled, .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+  #loginCard button { width: 100%; margin-top: 16px; }
+  #loginError { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 16px; }
+
+  #app { display: none; }
+  .topbar { display: flex; justify-content: space-between; align-items: baseline; }
+  .logout { background: none; color: var(--muted); font-weight: 400; font-size: 13px; text-decoration: underline; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 14px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .meta { font-size: 13px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+  .meta b { color: var(--text); }
+  .actions { display: flex; gap: 10px; }
+  #empty { color: var(--muted); text-align: center; padding: 40px 0; }
+  #globalError { color: var(--danger); font-size: 13px; margin-bottom: 12px; }
+  .pill {
+    display: inline-block; font-size: 11px; font-weight: 600; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 2px 8px; margin-left: 8px;
+  }
+</style>
+</head>
+<body>
+
+<div id="loginCard">
+  <h1>QLess Admin</h1>
+  <form id="loginForm">
+    <label for="username">Username</label>
+    <input type="text" id="username" autocomplete="username" required />
+    <label for="password">Password</label>
+    <input type="password" id="password" autocomplete="current-password" required />
+    <button type="submit" class="btn-primary" id="loginBtn">Sign in</button>
+    <div id="loginError"></div>
+  </form>
+</div>
+
+<div id="app" class="wrap">
+  <div class="topbar">
+    <div>
+      <h1>Pending Doctor Approvals</h1>
+      <div class="sub">New registrations wait here until approved.</div>
+    </div>
+    <button class="logout" id="logoutBtn">Sign out</button>
+  </div>
+  <div id="globalError"></div>
+  <div id="list"></div>
+  <div id="empty" style="display:none;">No pending doctors right now.</div>
+</div>
+
+<script>
+(function () {
+  var TOKEN_KEY = 'qless_admin_token';
+
+  var loginCard = document.getElementById('loginCard');
+  var app = document.getElementById('app');
+  var loginForm = document.getElementById('loginForm');
+  var loginBtn = document.getElementById('loginBtn');
+  var loginError = document.getElementById('loginError');
+  var globalError = document.getElementById('globalError');
+  var listEl = document.getElementById('list');
+  var emptyEl = document.getElementById('empty');
+  var logoutBtn = document.getElementById('logoutBtn');
+
+  function token() { return localStorage.getItem(TOKEN_KEY); }
+  function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
+  function clearToken() { localStorage.removeItem(TOKEN_KEY); }
+
+  function showApp() {
+    loginCard.style.display = 'none';
+    app.style.display = 'block';
+    loadPending();
+  }
+  function showLogin() {
+    clearToken();
+    app.style.display = 'none';
+    loginCard.style.display = 'block';
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers, {
+      'Authorization': 'Bearer ' + token(),
+      'Content-Type': 'application/json',
+    });
+    return fetch('/admin' + path, opts).then(function (res) {
+      if (res.status === 401 || res.status === 403) {
+        showLogin();
+        throw new Error('Session expired. Please sign in again.');
+      }
+      return res.json().then(function (body) {
+        if (!res.ok) throw new Error(body.error || body.message || 'Request failed');
+        return body;
+      });
+    });
+  }
+
+  function loadPending() {
+    globalError.textContent = '';
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'none';
+    api('/doctors/pending').then(function (doctors) {
+      if (!doctors.length) {
+        emptyEl.style.display = 'block';
+        return;
+      }
+      doctors.forEach(function (d) { listEl.appendChild(renderCard(d)); });
+    }).catch(function (err) {
+      globalError.textContent = err.message;
+    });
+  }
+
+  function renderCard(d) {
+    var card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML =
+      '<h3>' + escapeHtml(d.name || 'Unnamed doctor') +
+      '<span class="pill">#' + escapeHtml(d.doctor_id) + '</span></h3>' +
+      '<div class="meta">' +
+        '<div><b>Mobile:</b> ' + escapeHtml(d.mobile) + (d.email ? ' &middot; <b>Email:</b> ' + escapeHtml(d.email) : '') + '</div>' +
+        '<div><b>Specialization:</b> ' + escapeHtml(d.specialization || '—') +
+          (d.qualification ? ' &middot; ' + escapeHtml(d.qualification) : '') + '</div>' +
+        '<div><b>License No:</b> ' + escapeHtml(d.license_no || '—') + '</div>' +
+        '<div><b>Clinic:</b> ' + escapeHtml(d.clinic_name || '—') +
+          (d.clinic_address ? ' — ' + escapeHtml(d.clinic_address) : '') + '</div>' +
+      '</div>' +
+      '<div class="actions">' +
+        '<button class="btn-primary" data-action="verify">Approve</button>' +
+        '<button class="btn-danger" data-action="reject">Reject</button>' +
+      '</div>';
+
+    card.querySelectorAll('button').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var action = btn.getAttribute('data-action');
+        if (action === 'reject' && !confirm('Reject and remove ' + (d.name || 'this doctor') + '?')) return;
+
+        card.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+        api('/doctors/' + d.doctor_id + '/' + action, { method: 'POST' })
+          .then(function () { card.remove(); if (!listEl.children.length) emptyEl.style.display = 'block'; })
+          .catch(function (err) {
+            globalError.textContent = err.message;
+            card.querySelectorAll('button').forEach(function (b) { b.disabled = false; });
+          });
+      });
+    });
+
+    return card;
+  }
+
+  loginForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    loginError.textContent = '';
+    loginBtn.disabled = true;
+    fetch('/admin/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: document.getElementById('username').value.trim(),
+        password: document.getElementById('password').value,
+      }),
+    }).then(function (res) {
+      return res.json().then(function (body) { return { ok: res.ok, body: body }; });
+    }).then(function (r) {
+      if (!r.ok) throw new Error(r.body.error || 'Login failed');
+      setToken(r.body.accessToken);
+      showApp();
+    }).catch(function (err) {
+      loginError.textContent = err.message;
+    }).finally(function () {
+      loginBtn.disabled = false;
+    });
+  });
+
+  logoutBtn.addEventListener('click', showLogin);
+
+  if (token()) { showApp(); } else { showLogin(); }
+})();
+</script>
+</body>
+</html>

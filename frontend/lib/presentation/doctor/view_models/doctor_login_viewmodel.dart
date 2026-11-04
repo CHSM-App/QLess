@@ -21,6 +21,7 @@ class DoctorLoginState {
   final String? token;
   final String? clinic_name;
   final String? clinic_id;
+  final String? loginTicket;
   final int? leadTimeMinutes;
   final AsyncValue<List<DoctorDetails>> phoneCheckResult;
   final AsyncValue<List<Medicine>>? medicines;
@@ -37,6 +38,7 @@ class DoctorLoginState {
     this.token,
     this.doctorId,
     this.clinic_id,
+    this.loginTicket,
     this.clinic_name,
     this.leadTimeMinutes,
     this.phoneCheckResult = const AsyncValue.data([]),
@@ -55,6 +57,7 @@ class DoctorLoginState {
     String? token,
     int? doctorId,
     String? clinicId,
+    String? loginTicket,
     String? clinic_name,
     int? leadTimeMinutes,
     bool clearError = false,
@@ -73,6 +76,7 @@ class DoctorLoginState {
       roleId: roleId ?? this.roleId,
       token: token ?? this.token,
       clinic_id: clinicId ?? this.clinic_id,
+      loginTicket: loginTicket ?? this.loginTicket,
       leadTimeMinutes: leadTimeMinutes ?? this.leadTimeMinutes,
       clinic_name: clinic_name ?? this.clinic_name,
       phoneCheckResult: phoneCheckResult ?? this.phoneCheckResult,
@@ -182,6 +186,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           ? rawDoctorId
           : int.tryParse(rawDoctorId?.toString() ?? '');
       final String? clinicId = rawClinicId?.toString();
+      final String? loginTicket = result['loginTicket']?.toString();
       if (clinicId != null &&
           clinicId.trim().isNotEmpty &&
           clinicId.trim().toLowerCase() != 'null') {
@@ -191,6 +196,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         isLoading: false,
         doctorId: doctorId, // stored on state for the screen to read
         clinicId: clinicId,
+        loginTicket: loginTicket,
         clearError: true,
       );
     } catch (e) {

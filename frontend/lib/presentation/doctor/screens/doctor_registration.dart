@@ -735,11 +735,15 @@ class _DoctorProfileSetupScreenState
       // Doctor + clinic now exist, but the app holds no JWT yet (registration
       // runs before login). Step 3's protected endpoints (saveDoctorSchedule /
       // addQueueStartTime) would 401 without it — so authenticate the new
-      // doctor now and persist the token before continuing.
-      final authResult = await ref
-          .read(authViewModelProvider.notifier)
-          .login(TokenResponse(
-              mobile: _contactController.text.trim(), role: 'doctor'));
+      // doctor now and persist the token before continuing. The backend hands
+      // back a loginTicket on the Insert response (same ticket /verify-otp
+      // mints) so this doesn't need a second OTP round trip.
+      final loginTicket = ref.read(doctorLoginViewModelProvider).loginTicket;
+      final authResult = await ref.read(authViewModelProvider.notifier).login(
+          TokenResponse(
+              mobile: _contactController.text.trim(),
+              role: 'doctor',
+              loginTicket: loginTicket));
       if (authResult == null) {
         _showError(
             'Account created, but sign-in failed. Please log in to set your schedule.');

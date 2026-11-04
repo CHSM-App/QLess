@@ -28,6 +28,11 @@ val hasReleaseKeystore = keystorePropertiesFile.exists() &&
     !keystoreProperties.getProperty("keyAlias").isNullOrBlank() &&
     !keystoreProperties.getProperty("keyPassword").isNullOrBlank()
 
+// Google Maps API key, read from the gitignored key.properties (mapsApiKey=...)
+// so it never lands in source control. Falls back to empty string for CI/dev
+// builds that don't need live map tiles.
+val mapsApiKey = keystoreProperties.getProperty("mapsApiKey") ?: ""
+
 android {
     namespace = "com.vengurlatech.qless"
     compileSdk = flutter.compileSdkVersion
@@ -53,6 +58,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["mapsApiKey"] = mapsApiKey
     }
 
     signingConfigs {
