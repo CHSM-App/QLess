@@ -1,0 +1,89 @@
+name: Android Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play Console track to release to'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+env:
+  FLUTTER_VERSION: '3.35.2'
+  FLUTTER_DIR: frontend
+
+jobs:
+  build-and-deploy:
+    name: Build, sign, and upload to Play Console
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Cache pub dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        working-directory: ${{ env.FLUTTER_DIR }}
+        run: flutter pub get
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ env.FLUTTER_DIR }}/android/app/upload-keystore.jks
+
+      - name: Create key.properties
+        run: |
+          cat > ${{ env.FLUTTER_DIR }}/android/key.properties << EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=app/upload-keystore.jks
+          EOF
+
+      - name: Build AAB (release)
+        working-directory: ${{ env.FLUTTER_DIR }}
+        run: flutter build appbundle --release --no-tree-shake-icons
+
+      - name: Decode Play Store service account key
+        run: echo "${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 }}" | base64 --decode > service-account.json
+
+      - name: Upload AAB to Play Console
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJson: service-account.json
+          packageName: com.vengurlatech.qless
+          releaseFiles: ${{ env.FLUTTER_DIR }}/build/app/outputs/bundle/release/app-release.aab
+          track: ${{ inputs.track }}
+          status: completed
+          generate_release_notes: true
