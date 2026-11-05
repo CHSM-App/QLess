@@ -819,19 +819,34 @@ class _DoctorProfileSetupScreenState
     final schedState = ref.watch(doctorSettingsViewModelProvider);
     final isLoading  = state.isLoading || schedState.isLoading;
 
-    return Scaffold(
+    // Once the doctor + clinic are saved (step 3), going back would let the
+    // user re-submit step 2 and create a duplicate doctor/clinic. Lock back.
+    final backLocked = _step == 3;
+
+    return PopScope(
+      canPop: !backLocked,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (backLocked) {
+          _showError(
+              'Your clinic is registered. Please complete the schedule to finish setup.');
+        }
+      },
+      child: Scaffold(
       backgroundColor: kBg,
       appBar: _SimpleTitleBar(
         title: 'Doctor Profile Setup',
         subtitle: 'Step $_step of 3',
-        onBack: () {
-          if (_step > 1) {
-            setState(() => _step -= 1);
-            _animateStep();
-          } else {
-            Navigator.pop(context);
-          }
-        },
+        onBack: backLocked
+            ? null
+            : () {
+                if (_step > 1) {
+                  setState(() => _step -= 1);
+                  _animateStep();
+                } else {
+                  Navigator.pop(context);
+                }
+              },
       ),
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: const SystemUiOverlayStyle(
@@ -894,6 +909,7 @@ class _DoctorProfileSetupScreenState
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -2011,12 +2027,13 @@ class _DoctorProfileSetupScreenState
 class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final String subtitle;
-  final VoidCallback onBack;
+  /// When null the back button is hidden (e.g. once the clinic is registered).
+  final VoidCallback? onBack;
 
   const _SimpleTitleBar({
     required this.title,
     required this.subtitle,
-    required this.onBack,
+    this.onBack,
   });
 
   @override
@@ -2038,27 +2055,29 @@ class _SimpleTitleBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           child: Row(
             children: [
-              Material(
-                color: kBgSoft,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(11),
-                  side: const BorderSide(color: kBorderStrong, width: 0.5),
-                ),
-                child: InkWell(
-                  onTap: onBack,
-                  borderRadius: BorderRadius.circular(11),
-                  child: const SizedBox(
-                    width: 38,
-                    height: 38,
-                    child: Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      size: 16,
-                      color: kTextPrimary,
+              if (onBack != null) ...[
+                Material(
+                  color: kBgSoft,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                    side: const BorderSide(color: kBorderStrong, width: 0.5),
+                  ),
+                  child: InkWell(
+                    onTap: onBack,
+                    borderRadius: BorderRadius.circular(11),
+                    child: const SizedBox(
+                      width: 38,
+                      height: 38,
+                      child: Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        size: 16,
+                        color: kTextPrimary,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
