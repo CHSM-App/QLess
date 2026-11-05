@@ -132,7 +132,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           // backend/scripts/migrate-doctor-verification.sql).
           if (!isDemoNumber(mobile)) {
             final doctor = doctorResult.first;
-            final isNotVerified = (doctor.isverified ?? 0) != 1;
+            final isNotVerified = (doctor.isverified) == 1;
             if (isNotVerified) {
               _showStatusDialog(
                 icon: Icons.hourglass_top_rounded,
