@@ -205,6 +205,5 @@ jobs:
           serviceAccountJson: service-account.json
           packageName: com.vengurlatech.qless
           releaseFiles: aab/qless-${{ github.ref_name }}.aab
-          track: internal
+          tracks: internal
           status: completed
-          generate_release_notes: true
