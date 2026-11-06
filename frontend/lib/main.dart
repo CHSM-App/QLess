@@ -279,6 +279,13 @@ Future<void> _setupNotifications() async {
   if (defaultTargetPlatform == TargetPlatform.android) {
     final status = await Permission.notification.request();
     debugPrint('Notification permission status: $status');
+  } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+    final settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    debugPrint('iOS notification permission status: ${settings.authorizationStatus}');
   }
 
   // Step 2b — app was terminated, user tapped the notification to open it
