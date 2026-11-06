@@ -68,7 +68,7 @@ jobs:
           storePassword=${{ secrets.STORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=app/upload-keystore.jks
+          storeFile=upload-keystore.jks
           EOF
 
       - name: Build AAB (release)
@@ -84,6 +84,5 @@ jobs:
           serviceAccountJson: service-account.json
           packageName: com.vengurlatech.qless
           releaseFiles: ${{ env.FLUTTER_DIR }}/build/app/outputs/bundle/release/app-release.aab
-          track: ${{ inputs.track }}
+          tracks: ${{ inputs.track }}
           status: completed
-          generate_release_notes: true
