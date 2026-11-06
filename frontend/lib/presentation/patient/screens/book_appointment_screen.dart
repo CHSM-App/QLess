@@ -90,6 +90,25 @@ bool _bookable(int? mode, bool isToday) {
   return switch (mode) { 1 => isToday, 2 => true, 3 => true, _ => false };
 }
 
+/// True when [isToday] and the session's end time has already passed.
+bool _sessionEnded(DoctorAvailabilityModel s, bool isToday) {
+  if (!isToday) return false;
+  final iso = s.endTime;
+  if (iso == null || iso.isEmpty) return false;
+  int? h, m;
+  final dt = DateTime.tryParse(iso);
+  if (dt != null) {
+    h = dt.hour; m = dt.minute;
+  } else {
+    final p = iso.split(':');
+    h = int.tryParse(p[0]);
+    m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
+  }
+  if (h == null || m == null) return false;
+  final now = DateTime.now();
+  return now.hour * 60 + now.minute >= h * 60 + m;
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  FAVORITE BUTTON
 // ════════════════════════════════════════════════════════════════════
@@ -403,7 +422,9 @@ void dispose() {
 
   void _pickDate(DateTime date, List<DoctorAvailabilityModel> sessions) {
     final isToday  = _isToday(date);
-    final bookable = sessions.where((s) => _bookable(s.bookingMode, isToday)).toList();
+    final bookable = sessions
+        .where((s) => _bookable(s.bookingMode, isToday) && !_sessionEnded(s, isToday))
+        .toList();
     setState(() {
       _selectedDate      = date;
       _selectedSlotId    = bookable.length == 1 ? bookable.first.slotId : null;
@@ -630,6 +651,14 @@ void dispose() {
             onBack:       () => Navigator.pop(context),
             onFavToggle:  _handleFavoriteToggle,
           ),
+          _AppBar(
+            doctor:       widget.doctor,
+            isFavorite:   _isFavorite,
+            isReschedule: widget.isReschedule,
+            onBack:       () => Navigator.pop(context),
+            onFavToggle:  _handleFavoriteToggle,
+            infoOnly:     true,
+          ),
           // SliverToBoxAdapter(
           //   child: _StatsRow(doctor: widget.doctor),
           // ),
@@ -832,12 +861,14 @@ class _AppBar extends StatelessWidget {
   final bool                isFavorite;
   final bool                isReschedule;
   final VoidCallback        onBack;
+  final bool                infoOnly;
   final void Function(bool) onFavToggle;
 
   const _AppBar({
     required this.doctor,    required this.isFavorite,
     required this.onBack,    required this.onFavToggle,
     this.isReschedule = false,
+    this.infoOnly = false,
   });
 
   // ─── Google Maps Helper ──────────────────────────────────────────────────
@@ -896,8 +927,7 @@ class _AppBar extends StatelessWidget {
     final initial = (doctor.name?.isNotEmpty ?? false)
         ? doctor.name![0].toUpperCase() : 'D';
 
-    return SliverAppBar(
-      expandedHeight:   185,
+    final bar = SliverAppBar(
       pinned:           true,
       backgroundColor:  Colors.white,
       surfaceTintColor: Colors.transparent,
@@ -931,11 +961,11 @@ class _AppBar extends StatelessWidget {
         preferredSize: const Size.fromHeight(1),
         child: Container(height: 1, color: kBorder),
       ),
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.pin,
-        background: Container(
+    );
+    final info = SliverToBoxAdapter(
+      child: Container(
           color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
           alignment: Alignment.bottomLeft,
           child: Row(
   children: [
@@ -1115,8 +1145,8 @@ class _AppBar extends StatelessWidget {
   ],
 ),
         ),
-      ),
-    );
+      );
+    return infoOnly ? info : bar;
   }
 }
 
@@ -1537,6 +1567,7 @@ class _Body extends StatelessWidget {
             selectedSlotId: selectedSlotId,
             onSelected:     onPickSession,
             fmtTime:        fmtTime,
+            isToday:        dayIsToday,
           ),
         ],
         if (selectedAvail != null) ...[
@@ -1835,9 +1866,12 @@ class _SessionRow extends StatelessWidget {
   final ValueChanged<int?>            onSelected;
   final String Function(String?)      fmtTime;
 
+  final bool                          isToday;
+
   const _SessionRow({
     required this.sessions, required this.selectedSlotId,
     required this.onSelected, required this.fmtTime,
+    this.isToday = false,
   });
 
   Color _modeColor(int? m) => switch (m) {
@@ -1851,17 +1885,20 @@ class _SessionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
         children: sessions.map((s) {
-          final sel   = selectedSlotId == s.slotId;
+          final ended = _sessionEnded(s, isToday);
+          final sel   = !ended && selectedSlotId == s.slotId;
           final color = _modeColor(s.bookingMode);
           return GestureDetector(
-            onTap: () => onSelected(s.slotId),
-            child: AnimatedContainer(
+            onTap: ended ? null : () => onSelected(s.slotId),
+            child: Opacity(
+             opacity: ended ? 0.45 : 1,
+             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(
                   horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: sel ? kPrimary : Colors.white,
+                color: sel ? kPrimary : (ended ? Colors.grey.shade200 : Colors.white),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                     color: sel ? kPrimary : kBorder,
@@ -1891,7 +1928,7 @@ class _SessionRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    _modeLabel(s.bookingMode),
+                    ended ? 'Ended' : _modeLabel(s.bookingMode),
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -1899,6 +1936,7 @@ class _SessionRow extends StatelessWidget {
                   ),
                 ),
               ]),
+            ),
             ),
           );
         }).toList(),

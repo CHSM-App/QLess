@@ -226,12 +226,13 @@ String? _networkImageUrl;   // ← add this
             final isFutureDate = DateTime(selYear, selMonth, selDay).isAfter(now);
 
             return Dialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
               backgroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(22, 24, 22, 20),
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -249,6 +250,7 @@ String? _networkImageUrl;   // ← add this
                     Row(
                       children: [
                         Expanded(
+                          flex: 2,
                           child: _DobDropdown(
                             label: 'Day',
                             value: selDay,
@@ -259,7 +261,7 @@ String? _networkImageUrl;   // ← add this
                         ),
                         const SizedBox(width: 10),
                         Expanded(
-                          flex: 2,
+                          flex: 3,
                           child: _DobDropdown(
                             label: 'Month',
                             value: selMonth,
@@ -271,6 +273,7 @@ String? _networkImageUrl;   // ← add this
                         ),
                         const SizedBox(width: 10),
                         Expanded(
+                          flex: 3,
                           child: _DobDropdown(
                             label: 'Year',
                             value: selYear,
@@ -1433,7 +1436,7 @@ class _DobDropdown extends StatelessWidget {
         const SizedBox(height: 6),
         Container(
           height: 48,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -1442,20 +1445,33 @@ class _DobDropdown extends StatelessWidget {
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int>(
               value: value,
+              dropdownColor: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              menuMaxHeight: 240,
+              elevation: 6,
               isExpanded: true,
               icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                  color: kTextMuted, size: 20),
+                  color: kTextMuted, size: 18),
               style: const TextStyle(
-                fontSize: 13.5,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: kTextPrimary,
               ),
               items: items
                   .map((i) => DropdownMenuItem<int>(
                         value: i,
-                        child: Text(itemLabel != null
-                            ? itemLabel!(i)
-                            : i.toString().padLeft(2, '0')),
+                        child: Text(
+                          itemLabel != null
+                              ? itemLabel!(i)
+                              : i.toString().padLeft(2, '0'),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: i == value
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: i == value ? kPrimaryDark : kTextPrimary,
+                          ),
+                        ),
                       ))
                   .toList(),
               onChanged: (v) {

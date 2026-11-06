@@ -173,8 +173,6 @@ class _PatientPrescriptionPdfScreenState
                 style: s(size: 9),
               ),
               pw.SizedBox(height: 4),
-              pw.Text('Rx #${rx.prescriptionId}', style: s(bold: true, size: 11)),
-              pw.SizedBox(height: 2),
               pw.Text(_fmtDate(rx.prescriptionDate), style: s(size: 9)),
             ],
           ),
@@ -444,7 +442,7 @@ Future<void> _printPdf() async {
                         ),
                       ),
                       Text(
-                        'Rx #${_rx.prescriptionId}  ·  ${_rx.patientName}',
+                        _rx.patientName,
                         style: const TextStyle(
                             color: kTextMid, fontSize: 11),
                       ),

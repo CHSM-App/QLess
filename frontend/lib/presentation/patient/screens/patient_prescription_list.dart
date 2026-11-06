@@ -720,21 +720,6 @@ class _PrescriptionCard extends StatelessWidget {
                   const BorderRadius.vertical(top: Radius.circular(11)),
             ),
             child: Row(children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                    color: kPrimaryLight,
-                    borderRadius: BorderRadius.circular(5)),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  const Icon(Icons.receipt_rounded, color: kPrimary, size: 9),
-                  const SizedBox(width: 3),
-                  Text('Rx #${prescription.prescriptionId}',
-                      style: const TextStyle(
-                          color: kPrimary, fontSize: 10,
-                          fontWeight: FontWeight.w700)),
-                ]),
-              ),
-              const SizedBox(width: 6),
               const Icon(Icons.calendar_today_rounded,
                   color: kTextMuted, size: 9),
               const SizedBox(width: 2),
@@ -1622,18 +1607,6 @@ class _PatientPrescriptionViewScreenState
                             color: Colors.white.withOpacity(0.65), fontSize: 10)),
                 ],
               )),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.35)),
-                ),
-                child: Text('Rx #${_rx.prescriptionId}',
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 12,
-                        fontWeight: FontWeight.w700)),
-              ),
             ]),
           ),
         ]),

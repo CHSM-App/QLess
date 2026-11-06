@@ -106,7 +106,7 @@ extension MedTypeX on MedicineType {
     MedicineType.tablet:    Color(0xFF26C6B0),
     MedicineType.syrups:     Color(0xFF9F7AEA),
         MedicineType.drops:     Color(0xFF3B82F6),
-    MedicineType.injections: Color(0xFFFC8181),
+    MedicineType.injections: Color(0xFF06B6D4),
 
     MedicineType.lotions:    Color(0xFF68D391),
         MedicineType.inhalers:  Color(0xFF1E40AF),
@@ -119,7 +119,7 @@ extension MedTypeX on MedicineType {
     MedicineType.tablet:    Color(0xFFD9F5F1),
     MedicineType.syrups:     Color(0xFFEDE9FE),
      MedicineType.drops:     Color(0xFFDBEAFE),
-    MedicineType.injections: Color(0xFFFEE2E2),
+    MedicineType.injections: Color(0xFFCFFAFE),
    
     MedicineType.lotions:    Color(0xFFDCFCE7),
         MedicineType.inhalers:  Color(0xFFEBF8FF),
@@ -132,7 +132,7 @@ extension MedTypeX on MedicineType {
     MedicineType.tablet:    Color(0xFF2BB5A0),
     MedicineType.syrups:     Color(0xFF6B46C1),
         MedicineType.drops:     Color(0xFF1E40AF),
-    MedicineType.injections: Color(0xFFC53030),
+    MedicineType.injections: Color(0xFF0E7490),
 
     MedicineType.lotions:    Color(0xFF276749),
       MedicineType.inhalers:  Color(0xFF2D3748),
@@ -643,7 +643,22 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final _sympKey  = GlobalKey();
   bool _symptomsError = false;
   bool _showSymptomSuggestions = false;
+  final List<String> _symptomChips = [];
   DateTime? _followDate;
+
+  /// Chips + any text still being typed, joined as "a, b, c".
+  String get _symptomsText => [
+        ..._symptomChips,
+        if (_sympCtrl.text.trim().isNotEmpty) _sympCtrl.text.trim(),
+      ].join(', ');
+
+  void _commitSymptomText() {
+    final parts = _sympCtrl.text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty);
+    for (final p in parts) {
+      if (!_symptomChips.any((c) => c.toLowerCase() == p.toLowerCase())) _symptomChips.add(p);
+    }
+    _sympCtrl.clear();
+  }
   final List<MedicineEntry> _meds = [];
   int _lastDoctorId = 0;
   late final ProviderSubscription<int?> _doctorIdSub;
@@ -667,6 +682,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     super.initState();
     if (widget.symptoms != null && widget.symptoms!.trim().isNotEmpty) {
       _sympCtrl.text = widget.symptoms!.trim();
+      _commitSymptomText();
     }
  
     _doctorIdSub = ref.listenManual<int?>(
@@ -717,6 +733,11 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         patientAge:    widget.patientAge,
         patientGender: widget.patientGender,
         queueNumber:   a.queueNumber,
+        visits: [
+          for (final v in visits)
+            (appointmentId: v.appointmentId ?? 0, queueNumber: v.queueNumber),
+        ],
+        initialIndex: visits.indexOf(a).clamp(0, visits.length - 1),
       ))),
     )));
   }
@@ -756,7 +777,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   }
 
   String? _validate() {
-    final symptomsEmpty = _sympCtrl.text.trim().isEmpty;
+    _commitSymptomText();
+    final symptomsEmpty = _symptomChips.isEmpty;
     MedicineEntry? badMed;
     for (final m in _meds) {
       m.hasError = m.selectedName == null || m.medicineId == null;
@@ -803,7 +825,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   PrescriptionModel _buildPrescription() => PrescriptionModel(
     patientId:     widget.patientId,
     doctorId:      widget.doctorId,
-    symptoms:      _sympCtrl.text.trim(),
+    symptoms:      _symptomsText,
     diagnosis:     _diagCtrl.text.trim(),
     clinicalNotes: _clinCtrl.text.trim().isEmpty ? null : _clinCtrl.text.trim(),
     userType:      widget.userTypeId,
@@ -1408,45 +1430,96 @@ Widget build(BuildContext context) {
       ])));
 
   void _addSymptom(String symptom) {
-    final text = _sympCtrl.text;
-    final lastComma = text.lastIndexOf(',');
-    final before = (lastComma == -1 ? '' : text.substring(0, lastComma + 1).trim());
-
-    final already = before.split(',').map((s) => s.trim().toLowerCase())
-        .where((s) => s.isNotEmpty).toSet();
-    if (already.contains(symptom.toLowerCase())) {
-      setState(() => _showSymptomSuggestions = false);
-      return;
-    }
-
-    _sympCtrl.text = before.isEmpty ? symptom : '$before $symptom';
-    _sympCtrl.selection = TextSelection.collapsed(offset: _sympCtrl.text.length);
-    setState(() => _showSymptomSuggestions = false);
+    setState(() {
+      if (!_symptomChips.any((c) => c.toLowerCase() == symptom.toLowerCase())) {
+        _symptomChips.add(symptom);
+      }
+      _sympCtrl.clear();
+      _symptomsError = false;
+      _showSymptomSuggestions = true; // keep dropdown open to add the next one
+    });
   }
 
-  String get _symptomSearchText {
-    final text = _sympCtrl.text;
-    final lastComma = text.lastIndexOf(',');
-    return (lastComma == -1 ? text : text.substring(lastComma + 1)).trim();
+  void _onSymptomChanged(String v) {
+    if (v.contains(',') || (v.trim().isNotEmpty && v.endsWith(' '))) {
+      setState(() {
+        _commitSymptomText();
+        _symptomsError = false;
+        _showSymptomSuggestions = true;
+      });
+      return;
+    }
+    setState(() => _showSymptomSuggestions = true);
   }
 
   Widget _symptomsSection() {
-    final query = _symptomSearchText;
-    final filtered = query.isEmpty
-        ? kDefaultSymptoms
-        : kDefaultSymptoms.where((s) => s.toLowerCase().contains(query.toLowerCase())).toList();
+    final query = _sympCtrl.text.trim();
+    final available = kDefaultSymptoms
+        .where((s) => !_symptomChips.any((c) => c.toLowerCase() == s.toLowerCase()));
+    final filtered = (query.isEmpty
+            ? available
+            : available.where((s) => s.toLowerCase().contains(query.toLowerCase())))
+        .toList();
     final showDropdown = _showSymptomSuggestions;
+    final canAddCustom = query.isNotEmpty &&
+        !_symptomChips.any((c) => c.toLowerCase() == query.toLowerCase()) &&
+        !kDefaultSymptoms.any((s) => s.toLowerCase() == query.toLowerCase());
 
     return TapRegion(
-      onTapOutside: (_) { if (_showSymptomSuggestions) setState(() => _showSymptomSuggestions = false); },
+      onTapOutside: (_) {
+        if (_showSymptomSuggestions || _sympCtrl.text.trim().isNotEmpty) {
+          setState(() {
+            _commitSymptomText();
+            if (_symptomChips.isNotEmpty) _symptomsError = false;
+            _showSymptomSuggestions = false;
+          });
+        }
+      },
       child: Container(key: _sympKey, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _secLabel('Symptoms *'), _gap(8),
-        TextField(
-          controller: _sympCtrl, maxLines: 3,
+        // One box: pills + typing area together
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _showSymptomSuggestions = true),
-          onChanged: (_) => setState(() {}),
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
-          decoration: _ideco('Enter patient symptoms…', hasError: _symptomsError),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: kBg, borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _symptomsError ? kError : (_showSymptomSuggestions ? kPrimary : kBorder),
+                width: _showSymptomSuggestions ? 1.5 : 1),
+            ),
+            child: Wrap(spacing: 6, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+              for (final s in _symptomChips)
+                Chip(
+                  label: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black)),
+                  backgroundColor: kPrimary.withOpacity(0.08),
+                  side: BorderSide(color: kPrimary.withOpacity(0.3)),
+                  visualDensity: VisualDensity.compact,
+                  deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Colors.black),
+                  onDeleted: () => setState(() => _symptomChips.remove(s)),
+                ),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 140, maxWidth: 260),
+                child: IntrinsicWidth(
+                  child: TextField(
+                    controller: _sympCtrl, maxLines: 1,
+                    onTap: () => setState(() => _showSymptomSuggestions = true),
+                    onChanged: _onSymptomChanged,
+                    onSubmitted: (_) => setState(() { _commitSymptomText(); _symptomsError = false; }),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+                    decoration: InputDecoration(
+                      isDense: true, border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      hintText: _symptomChips.isEmpty ? 'Enter patient symptoms…' : 'Add another…',
+                      hintStyle: const TextStyle(fontSize: 12, color: kTextMuted),
+                    ),
+                  ),
+                ),
+              ),
+            ]),
+          ),
         ),
         if (_symptomsError) ...[
           _gap(4),
@@ -1454,9 +1527,9 @@ Widget build(BuildContext context) {
         ],
         if (showDropdown) ...[
           _gap(6),
-          if (filtered.isNotEmpty)
+          if (filtered.isNotEmpty || canAddCustom)
             Container(
-              constraints: const BoxConstraints(maxHeight: 200),
+              constraints: const BoxConstraints(maxHeight: 220),
               decoration: BoxDecoration(
                 color: Colors.white, borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: kBorder),
@@ -1464,10 +1537,26 @@ Widget build(BuildContext context) {
               ),
               child: ListView.separated(
                 shrinkWrap: true, padding: EdgeInsets.zero,
-                itemCount: filtered.length,
+                itemCount: filtered.length + (canAddCustom ? 1 : 0),
                 separatorBuilder: (_, __) => const Divider(height: 1, color: kBorder, indent: 12, endIndent: 12),
                 itemBuilder: (_, i) {
-                  final s = filtered[i];
+                  if (canAddCustom && i == 0) {
+                    return InkWell(
+                      onTap: () => _addSymptom(query),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Row(children: [
+                          const Icon(Icons.add_circle_outline_rounded, color: kPrimary, size: 15),
+                          const SizedBox(width: 9),
+                          Expanded(child: Text('Add "$query"',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: kPrimary),
+                              overflow: TextOverflow.ellipsis)),
+                        ]),
+                      ),
+                    );
+                  }
+                  final s = filtered[i - (canAddCustom ? 1 : 0)];
                   return InkWell(
                     onTap: () => _addSymptom(s),
                     borderRadius: BorderRadius.circular(10),

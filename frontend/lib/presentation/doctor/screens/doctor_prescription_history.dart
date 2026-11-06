@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/domain/models/appointment_list.dart';
+import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/print_prescription_screen.dart';
@@ -89,6 +91,11 @@ class DoctorPrescriptionDetailScreen extends ConsumerStatefulWidget {
   final String? patientGender;
   final int?    queueNumber;
 
+  /// Optional ordered list of visits (newest first) to enable up/down
+  /// navigation between prescriptions. [initialIndex] is the opened one.
+  final List<({int appointmentId, int? queueNumber})>? visits;
+  final int initialIndex;
+
   const DoctorPrescriptionDetailScreen({
     super.key,
     required this.appointmentId,
@@ -97,6 +104,8 @@ class DoctorPrescriptionDetailScreen extends ConsumerStatefulWidget {
     this.patientAge,
     this.patientGender,
     this.queueNumber,
+    this.visits,
+    this.initialIndex = 0,
   });
 
   @override
@@ -109,11 +118,102 @@ class _DoctorPrescriptionDetailScreenState
   PatientPrescription? _rx;
   bool    _loading = true;
   String? _error;
+  late int _index = widget.initialIndex;
+
+  // Visits for up/down navigation: passed by the caller, or (when null)
+  // loaded here = this patient's completed visits, newest first.
+  late List<({int appointmentId, int? queueNumber})>? _visits = widget.visits;
+
+  bool get _hasNav => (_visits?.length ?? 0) > 1;
+  bool get _canGoUp => _hasNav && _index > 0;
+  bool get _canGoDown => _hasNav && _index < _visits!.length - 1;
+  int get _appointmentId =>
+      _hasNav ? _visits![_index].appointmentId : widget.appointmentId;
+  int? get _queueNumber =>
+      _hasNav ? _visits![_index].queueNumber : widget.queueNumber;
+
+  int _dir = 1; // +1 = moving down (older), -1 = moving up (newer)
+
+  void _go(int delta) {
+    _dir = delta;
+    setState(() { _index += delta; _loading = true; _error = null; });
+    _fetchDetails();
+  }
+
+  // appointmentId -> this doctor's running patient number (1, 2, 3 ...
+  // across all days, completed visits only, all clinics).
+  Map<int, int> _doctorVisitNo = {};
+
+  Future<void> _loadDoctorVisitNumbers() async {
+    try {
+      final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
+      if (doctorId == 0) return;
+      final all = await ref
+          .read(appointmentUsecaseProvider)
+          .fetchPatientAppointments(doctorId); // no clinicId → all clinics
+      final done = all.where((a) =>
+          a.appointmentId != null &&
+          (a.status?.toLowerCase().trim() ?? '') == 'completed').toList()
+        ..sort((a, b) {
+          final da = DateTime.tryParse(a.appointmentDate ?? '');
+          final db = DateTime.tryParse(b.appointmentDate ?? '');
+          final c = (da != null && db != null) ? da.compareTo(db) : 0;
+          return c != 0 ? c : a.appointmentId!.compareTo(b.appointmentId!);
+        });
+      if (!mounted) return;
+
+      // Build this patient's visit list (newest first) if caller gave none.
+      List<({int appointmentId, int? queueNumber})>? built;
+      var builtIndex = 0;
+      if (_visits == null) {
+        // Newest date first; same date keeps the list's own order so the
+        // arrows match what the doctor sees in the Completed tab.
+        final indexed = <(int, AppointmentList)>[
+          for (var k = 0; k < all.length; k++)
+            if (all[k].appointmentId != null &&
+                all[k].patientId == widget.patientId &&
+                (all[k].status?.toLowerCase().trim() ?? '') == 'completed')
+              (k, all[k]),
+        ];
+        indexed.sort((x, y) {
+          final dx = DateTime.tryParse(x.$2.appointmentDate ?? '');
+          final dy = DateTime.tryParse(y.$2.appointmentDate ?? '');
+          final c = (dx != null && dy != null) ? dy.compareTo(dx) : 0;
+          return c != 0 ? c : x.$1.compareTo(y.$1);
+        });
+        final mine = [for (final e in indexed) e.$2];
+        final i = mine.indexWhere((a) => a.appointmentId == widget.appointmentId);
+        if (mine.length > 1 && i >= 0) {
+          built = [
+            for (final a in mine)
+              (appointmentId: a.appointmentId!, queueNumber: a.queueNumber),
+          ];
+          builtIndex = i;
+        }
+      }
+
+      setState(() {
+        _doctorVisitNo = {
+          for (var i = 0; i < done.length; i++) done[i].appointmentId!: i + 1,
+        };
+        if (built != null) {
+          _visits = built;
+          _index = builtIndex;
+        }
+      });
+    } catch (_) {
+      // Number just won't show; screen still works.
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() { if (mounted) _fetchDetails(); });
+    Future.microtask(() {
+      if (!mounted) return;
+      _fetchDetails();
+      _loadDoctorVisitNumbers();
+    });
   }
 
   Future<void> _fetchDetails() async {
@@ -121,7 +221,7 @@ class _DoctorPrescriptionDetailScreenState
     try {
       await ref
           .read(prescriptionViewModelProvider.notifier)
-          .appointmentWisePrescription(widget.appointmentId);
+          .appointmentWisePrescription(_appointmentId);
       if (!mounted) return;
       final details = ref.read(prescriptionViewModelProvider).appointmentWisePrescriptions;
       if (details != null && details.isNotEmpty) {
@@ -164,7 +264,28 @@ class _DoctorPrescriptionDetailScreenState
     backgroundColor: kBg,
     body: Column(children: [
       _buildHeader(),
-      Expanded(child: _buildBody()),
+      if (_hasNav) _visitBar(),
+      Expanded(
+        child: ClipRect(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 350),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            layoutBuilder: (current, previous) => Stack(
+              children: [...previous, if (current != null) current],
+            ),
+            transitionBuilder: (child, anim) {
+              final incoming = child.key == ValueKey(_index);
+              final begin = Offset(0, incoming ? _dir.toDouble() : -_dir.toDouble());
+              return SlideTransition(
+                position: Tween(begin: begin, end: Offset.zero).animate(anim),
+                child: child,
+              );
+            },
+            child: KeyedSubtree(key: ValueKey(_index), child: _buildBody()),
+          ),
+        ),
+      ),
     ]),
   );
 
@@ -311,6 +432,40 @@ Widget _buildHeader() => Container(
     ),
   ),
 );
+  // ── Visit navigation bar (below header) ───────────────────────────
+  Widget _visitBar() => Container(
+    color: Colors.white,
+    padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+    decoration: null,
+    child: Row(children: [
+      Expanded(
+        child: Text(
+          'Visit ${_index + 1} of ${_visits!.length}',
+          style: const TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w600, color: kTextSecondary),
+        ),
+      ),
+      IconButton(
+        tooltip: 'Newer visit',
+        onPressed: _canGoUp ? () => _go(-1) : null,
+        icon: const Icon(Icons.arrow_upward_rounded),
+        color: kPrimary,
+        disabledColor: kTextMuted.withOpacity(0.5),
+        iconSize: 22,
+        visualDensity: VisualDensity.compact,
+      ),
+      IconButton(
+        tooltip: 'Older visit',
+        onPressed: _canGoDown ? () => _go(1) : null,
+        icon: const Icon(Icons.arrow_downward_rounded),
+        color: kPrimary,
+        disabledColor: kTextMuted.withOpacity(0.5),
+        iconSize: 22,
+        visualDensity: VisualDensity.compact,
+      ),
+    ]),
+  );
+
   // ── Body ──────────────────────────────────────────────────────────
   Widget _buildBody() {
     if (_loading) return const Center(
@@ -426,7 +581,7 @@ Widget _buildHeader() => Container(
     final meta = [
       if (widget.patientAge != null)    widget.patientAge!,
       if (widget.patientGender != null) widget.patientGender!,
-      if (widget.queueNumber != null)   'Queue #${widget.queueNumber}',
+      if (_queueNumber != null)   'Queue #$_queueNumber',
     ].join(' · ');
 
     return Container(
@@ -473,19 +628,11 @@ Widget _buildHeader() => Container(
   // ── Appointment info card ─────────────────────────────────────────
   Widget _appointmentCard(PatientPrescription rx) => _card(
     child: Column(children: [
-      _infoRow('Appointment', '#${widget.appointmentId}'),
-      _divider(),
+      if (_doctorVisitNo[_appointmentId] != null) ...[
+        _infoRow('Appointment','#${_doctorVisitNo[_appointmentId]}'),
+        _divider(),
+      ],
       _infoRow('Date', _fmtDate(rx.prescriptionDate)),
-      _divider(),
-      _infoRow('Doctor', rx.doctorName),
-      if (rx.specialization.isNotEmpty && rx.specialization != '-') ...[
-        _divider(),
-        _infoRow('Specialization', rx.specialization),
-      ],
-      if (rx.clinicName.isNotEmpty && rx.clinicName != 'Clinic') ...[
-        _divider(),
-        _infoRow('Clinic', rx.clinicName),
-      ],
     ]),
   );
 

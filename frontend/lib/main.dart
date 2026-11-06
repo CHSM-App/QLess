@@ -14,6 +14,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/firebase_options.dart';
+import 'package:qless/core/remote_config_service.dart';
+import 'package:qless/core/update_checker.dart';
 import 'package:qless/presentation/patient/providers/notification_provider.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
@@ -129,6 +131,9 @@ void main() async {
     debugPrint('Firebase init failed: $e');
   }
 
+  // Remote Config: never block startup for long; falls back to defaults.
+  await RemoteConfigService.instance.init();
+
   // Step 1 — register background handler before any other FCM setup
   FirebaseMessaging.onBackgroundMessage(_firebaseBackgroundHandler);
 
@@ -157,6 +162,8 @@ void main() async {
   await container.read(tokenProvider.notifier).loadTokens();
   // Grab the notifier so foreground FCM messages can be appended to it
   _notificationNotifier = container.read(notificationProvider.notifier);
+  // Show force/soft update dialog once the first frame (navigator) exists.
+  WidgetsBinding.instance.addPostFrameCallback((_) => UpdateChecker.check());
   runApp(
     UncontrolledProviderScope(
       container: container,
