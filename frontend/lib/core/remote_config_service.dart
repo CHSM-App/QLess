@@ -10,7 +10,6 @@ class RemoteConfigService {
   static final RemoteConfigService instance = RemoteConfigService._();
 
   // Keys
-  static const kAllowDoctorRegisterIos = 'allow_doctor_register_ios';
   static const kMinAppVersion = 'min_app_version';
   static const kMaintenanceMode = 'maintenance_mode';
 
@@ -30,7 +29,6 @@ class RemoteConfigService {
     kMinSupportedVersion: '0.0.0',
     kUpdateTitle: 'Update Available',
     kUpdateMessage: 'A new version of QLess is available.',
-    kAllowDoctorRegisterIos: false,
     kMinAppVersion: '1.0.0',
     kMaintenanceMode: false,
   };
