@@ -1,6 +1,8 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:qless/presentation/patient/screens/delete_account_page.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/appointment_list.dart';
@@ -594,6 +596,30 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           _sectionLabel('Support'),
           _buildSupportCard(),
           const SizedBox(height: 12),
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const DeleteAccountPage()),
+                ),
+                icon: const Icon(Icons.delete_forever_rounded, size: 16),
+                label: const Text('Delete Account',
+                    style: TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: kError,
+                  side: BorderSide(color: kError.withOpacity(0.5)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           _buildLogoutButton(),
         ],
       ),

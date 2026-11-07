@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:qless/presentation/patient/screens/delete_account_page.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:qless/core/network/auth_image_url.dart';
@@ -677,6 +679,19 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
             await launchUrl(uri, mode: LaunchMode.externalApplication);
           },
         ),
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS)
+          _menuRow(
+            icon: Icons.delete_forever_rounded,
+            iconFg: kError, iconBg: kRedLight,
+            title: 'Delete Account',
+            subtitle: 'Permanently delete your account and data',
+            titleColor: kError,
+            chevronColor: kError.withOpacity(0.4),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DeleteAccountPage()),
+            ),
+          ),
         _menuRow(
           icon: Icons.logout_rounded,
           iconFg: kError, iconBg: kRedLight,

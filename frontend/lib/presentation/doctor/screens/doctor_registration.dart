@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:qless/core/fcm_token.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -677,7 +677,7 @@ class _DoctorProfileSetupScreenState
 
       if (_fcmToken == null) {
         try {
-          _fcmToken = await FirebaseMessaging.instance.getToken();
+          _fcmToken = await getFcmTokenSafe();
         } catch (e) {
           debugPrint('FCM token error: $e');
         }

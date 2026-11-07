@@ -13,6 +13,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:qless/core/network/token_provider.dart';
+import 'package:qless/core/storage/token_storage.dart';
+import 'package:qless/domain/models/token_response.dart';
+import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/core/remote_config_service.dart';
 import 'package:qless/core/update_checker.dart';
@@ -159,6 +162,7 @@ void main() async {
   }
 
   final container = ProviderContainer();
+  _appContainer = container;
   await container.read(tokenProvider.notifier).loadTokens();
   // Grab the notifier so foreground FCM messages can be appended to it
   _notificationNotifier = container.read(notificationProvider.notifier);
@@ -251,6 +255,35 @@ class HealthcareApp extends StatelessWidget {
 // Global reference to the notification notifier set after ProviderScope mounts
 NotificationNotifier? _notificationNotifier;
 
+// Set once the app's ProviderContainer exists, so the FCM token-refresh
+// callback (registered before the container is created) can reach providers.
+ProviderContainer? _appContainer;
+
+/// Re-saves a rotated FCM token to the backend for the logged-in user.
+/// Does nothing when nobody is logged in; the OTP login flow saves the
+/// token itself in that case.
+Future<void> _saveRefreshedFcmToken(String newToken) async {
+  try {
+    final container = _appContainer;
+    if (container == null) return;
+    final tokens = await TokenStorage.getTokens();
+    final mobile = await TokenStorage.getValue('login_mobile');
+    if (tokens == null || mobile == null || mobile.isEmpty) return;
+    final role = switch (int.tryParse(tokens['roleId'] ?? '')) {
+      1 => 'doctor',
+      2 => 'patient',
+      3 => 'receptionist',
+      _ => null,
+    };
+    if (role == null) return;
+    await container.read(authViewModelProvider.notifier).saveFirebaseToken(
+          TokenResponse(firebaseToken: newToken, role: role, mobile: mobile),
+        );
+  } catch (e) {
+    debugPrint('FCM token refresh save failed: $e');
+  }
+}
+
 Future<void> _setupNotifications() async {
   if (kIsWeb) return;
   if (defaultTargetPlatform != TargetPlatform.android &&
@@ -259,7 +292,14 @@ Future<void> _setupNotifications() async {
   }
 
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initSettings = InitializationSettings(android: androidInit);
+  // iOS permission is requested via FirebaseMessaging below, not here.
+  const iosInit = DarwinInitializationSettings(
+    requestAlertPermission: false,
+    requestBadgePermission: false,
+    requestSoundPermission: false,
+  );
+  const initSettings =
+      InitializationSettings(android: androidInit, iOS: iosInit);
 
   // Step 2a — local notification tap handler (foreground)
   await _localNotifications.initialize(
@@ -279,6 +319,21 @@ Future<void> _setupNotifications() async {
   if (defaultTargetPlatform == TargetPlatform.android) {
     final status = await Permission.notification.request();
     debugPrint('Notification permission status: $status');
+  } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+    final settings = await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    debugPrint('iOS notification permission: ${settings.authorizationStatus}');
+    // We show our own local notification in the foreground; stop iOS from
+    // also showing the system banner (otherwise the user sees two).
+    await FirebaseMessaging.instance
+        .setForegroundNotificationPresentationOptions(
+      alert: false,
+      badge: false,
+      sound: false,
+    );
   }
 
   // Step 2b — app was terminated, user tapped the notification to open it
@@ -294,7 +349,7 @@ Future<void> _setupNotifications() async {
   // Step 4 — token refresh: re-save to backend when FCM rotates the token
   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
     debugPrint('FCM token refreshed: $newToken');
-    // TODO: call your saveFirebaseToken API with newToken if user is logged in
+    _saveRefreshedFcmToken(newToken);
   });
 
   // Foreground messages — show banner + add to in-app list
@@ -319,6 +374,11 @@ Future<void> _setupNotifications() async {
           importance: Importance.high,
           priority: Priority.high,
           icon: notification?.android?.smallIcon ?? '@mipmap/ic_launcher',
+        ),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
         ),
       ),
       payload: jsonEncode(data),

@@ -43,8 +43,6 @@
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>QLess uses your location to show nearby doctors and clinics and their distance from you.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>QLess uses your location to show nearby doctors and clinics and their distance from you.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>QLess needs camera access so you can take a profile photo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

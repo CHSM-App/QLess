@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/fcm_token.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
@@ -387,7 +387,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   Future<void> _printFcmToken() async {
     try {
       await _ensureFirebaseInitialized();
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await getFcmTokenSafe();
       debugPrint('FCM token (OTP verify): $token');
     } catch (e) {
       debugPrint('FCM token fetch failed (OTP verify): $e');
@@ -397,7 +397,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   Future<void> _storeFcmToken(String role) async {
     try {
       await _ensureFirebaseInitialized();
-      final token = await FirebaseMessaging.instance.getToken();
+      final token = await getFcmTokenSafe();
       if (token == null) return;
       final body = TokenResponse(
         firebaseToken: token,

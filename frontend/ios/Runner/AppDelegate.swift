@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 import GoogleMaps
 
 @main
@@ -8,7 +9,10 @@ import GoogleMaps
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
-    GMSServices.provideAPIKey("AIzaSyDTRL5VzQ9UAwsCB9uCbSNj5wZasYHjFKA")
+    GMSServices.provideAPIKey("AIzaSyDnUjSBytgnF5bUBkL7I-JQd987Ha7i9AE")
+    // Needed so flutter_local_notifications can show banners while the app
+    // is in the foreground on iOS.
+    UNUserNotificationCenter.current().delegate = self as UNUserNotificationCenterDelegate
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }

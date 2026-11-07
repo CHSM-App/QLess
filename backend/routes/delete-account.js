@@ -37,6 +37,22 @@ const DELETION_DELAY_DAYS = 30;
 
 const VALID_ROLE_IDS = [1, 2, 3]; // 1=Doctor, 2=Patient, 3=Receptionist
 
+// Review/QA demo accounts (mirrors DEMO_RANGES in routes/login.js — keep in
+// sync). They have no real phone, so no OTP is sent: the fixed demo OTP is
+// accepted instead, and confirming deletion is a harmless no-op so the account
+// stays usable for the next reviewer.
+const DEMO_OTP = process.env.DEMO_OTP || '123456';
+const DEMO_RANGES = [
+  [9000000001, 9000000001],
+  [9876000001, 9876000030],
+  [9877000001, 9877000030],
+  [9878000001, 9878000050],
+];
+function isDemoPhone(phone) {
+  const n = Number(phone);
+  return !!n && DEMO_RANGES.some(([from, to]) => n >= from && n <= to);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,6 +141,13 @@ router.post('/request', deletionLimiter, async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid role_id.' });
   }
 
+  if (isDemoPhone(phone)) {
+    return res.json({
+      success: true,
+      message: 'If an account exists for this number, an OTP has been sent via WhatsApp.',
+    });
+  }
+
   try {
     const devOtp = await sendWhatsAppOtp(phone);
     log.info(`[DELETE-ACCOUNT] OTP sent phone=${phone} role_id=${roleId}`);
@@ -164,13 +187,26 @@ router.post('/confirm', deletionLimiter, async (req, res) => {
     return res.status(400).json({ success: false, message: 'OTP must be a 6-digit number.' });
   }
 
+  if (isDemoPhone(phone)) {
+    if (otp !== DEMO_OTP) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });
+    }
+    const demoDate = new Date(Date.now() + DELETION_DELAY_DAYS * 24 * 60 * 60 * 1000);
+    log.info(`[DELETE-ACCOUNT] demo account confirm (no-op) phone=${phone} role_id=${roleId}`);
+    return res.json({
+      success: true,
+      message: `Your account is scheduled for deletion on ${demoDate.toDateString()}. You can cancel before that date.`,
+      scheduled_for: demoDate,
+    });
+  }
+
   try {
     const otpValid = await verifyOtp(phone, otp);
     if (!otpValid) {
       return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });
     }
 
-    const now          = new Date();
+    const now         = new Date();
     const scheduledFor = new Date(now.getTime() + DELETION_DELAY_DAYS * 24 * 60 * 60 * 1000);
 
     // Check for existing pending request
@@ -235,6 +271,16 @@ router.post('/cancel', deletionLimiter, async (req, res) => {
   }
   if (!/^\d{6}$/.test(otp)) {
     return res.status(400).json({ success: false, message: 'OTP must be a 6-digit number.' });
+  }
+
+  if (isDemoPhone(phone)) {
+    if (otp !== DEMO_OTP) {
+      return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });
+    }
+    return res.json({
+      success: true,
+      message: 'Your account deletion request has been cancelled. Your account is safe.',
+    });
   }
 
   try {
