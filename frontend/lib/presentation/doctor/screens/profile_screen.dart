@@ -1,3 +1,4 @@
+import 'package:qless/core/update/app_version_section.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -621,6 +622,8 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
             const SizedBox(height: 10),
           ],
           _buildLogoutButton(),
+          const SizedBox(height: 8),
+          const Center(child: AppVersionSection()),
         ],
       ),
     );

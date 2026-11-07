@@ -1,3 +1,4 @@
+import 'package:qless/core/update/app_version_section.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:qless/presentation/patient/screens/delete_account_page.dart';
@@ -211,6 +212,8 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                     _buildSectionLabel('ACCOUNT', 'Settings & information'),
                     const SizedBox(height: 10),
                     _buildAccountCard(context, ref, state, details),
+                    const SizedBox(height: 12),
+                    const Center(child: AppVersionSection()),
                     const SizedBox(height: 24),
                   ],
                 ),

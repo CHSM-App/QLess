@@ -1,0 +1,12 @@
+{
+  "name": "qless-deploy",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Uploads the QLess release AAB to Google Play",
+  "scripts": {
+    "deploy": "node deploy.js"
+  },
+  "dependencies": {
+    "googleapis": "^144.0.0"
+  }
+}

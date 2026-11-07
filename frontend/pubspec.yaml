@@ -8,7 +8,7 @@ publish_to: 'none'
 # not strictly greater than the previous build, so always bump N — even
 # for a hotfix that keeps the same X.Y.Z.
 # Bump via: scripts/bump-version.ps1 -Type patch (or minor/major).
-version: 1.0.6+10
+version: 1.0.7+10
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -114,6 +114,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    - assets/icon/qless_logo_512.png
   # assets:
   #   - asset/sound/success.mp3
 

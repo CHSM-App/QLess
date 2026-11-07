@@ -17,42 +17,59 @@ class RemoteConfigService {
   static const kForceUpdate = 'force_update';
   static const kForceUpdateBelowVersion = 'force_update_below_version';
   static const kLatestVersion = 'latest_version';
-  static const kMinSupportedVersion = 'min_supported_version';
+  static const kMinSupportedVersion = 'minimum_supported_version';
   static const kUpdateTitle = 'update_title';
   static const kUpdateMessage = 'update_message';
 
   // In-app defaults, used until the first successful fetch (or offline).
+  // Empty version strings mean "not configured" -> no update prompt.
   static const Map<String, Object> _defaults = {
     kForceUpdate: false,
-    kForceUpdateBelowVersion: '0.0.0',
-    kLatestVersion: '0.0.0',
-    kMinSupportedVersion: '0.0.0',
-    kUpdateTitle: 'Update Available',
-    kUpdateMessage: 'A new version of QLess is available.',
+    kForceUpdateBelowVersion: '',
+    kLatestVersion: '',
+    kMinSupportedVersion: '',
+    kUpdateTitle: '',
+    kUpdateMessage: '',
     kMinAppVersion: '1.0.0',
     kMaintenanceMode: false,
   };
 
   FirebaseRemoteConfig? _rc;
 
-  Future<void> init() async {
+  Future<void>? _initFuture;
+
+  /// Idempotent and never throws; safe to call without awaiting.
+  Future<void> init() => _initFuture ??= _init();
+
+  Future<void> _init() async {
     try {
       final rc = FirebaseRemoteConfig.instance;
       await rc.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
-        // Short interval in debug so changes show quickly; Firebase throttles
-        // fetches, so keep this long in release.
+        // No throttling in debug so console changes show immediately;
+        // Firebase throttles fetches, so keep it at 1 hour in release.
         minimumFetchInterval:
-            kDebugMode ? const Duration(minutes: 1) : const Duration(hours: 12),
+            kDebugMode ? Duration.zero : const Duration(hours: 1),
       ));
       await rc.setDefaults(_defaults);
-      await rc.fetchAndActivate();
       _rc = rc;
     } catch (e) {
       debugPrint('RemoteConfig init failed (using defaults): $e');
-      try {
-        _rc = FirebaseRemoteConfig.instance;
-      } catch (_) {}
+    }
+    await fetchAndActivate();
+  }
+
+  /// Fetches and activates the latest values. Never throws; returns false
+  /// when the fetch failed or nothing new was activated.
+  Future<bool> fetchAndActivate() async {
+    try {
+      final rc = _rc ?? FirebaseRemoteConfig.instance;
+      final activated = await rc.fetchAndActivate();
+      _rc = rc;
+      return activated;
+    } catch (e) {
+      debugPrint('RemoteConfig fetch failed (using cached/defaults): $e');
+      return false;
     }
   }
 

@@ -1,0 +1,144 @@
+name: Release to Google Play
+
+# a) Manual run: pick track / priority / fraction / dry-run.
+# b) Push of a v* tag: build and upload to the internal track automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Play track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - production
+      priority:
+        description: 'In-app update priority (0-5)'
+        required: true
+        default: '0'
+        type: string
+      fraction:
+        description: 'Production staged rollout fraction (0.1 = 10%, 1 = 100%)'
+        required: true
+        default: '0.1'
+        type: string
+      dry_run:
+        description: 'Validate only, do not publish'
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  FLUTTER_VERSION: '3.35.2'
+  FLUTTER_DIR: frontend
+
+jobs:
+  release:
+    name: Build signed AAB and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Flutter pub get
+        working-directory: ${{ env.FLUTTER_DIR }}
+        run: flutter pub get
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 --decode > "$FLUTTER_DIR/android/app/upload-keystore.jks"
+
+      - name: Create key.properties
+        env:
+          STOREPASSWORD: ${{ secrets.STOREPASSWORD }}
+          KEYPASSWORD: ${{ secrets.KEYPASSWORD }}
+          KEYALIAS: ${{ secrets.KEYALIAS }}
+        run: |
+          {
+            echo "storePassword=$STOREPASSWORD"
+            echo "keyPassword=$KEYPASSWORD"
+            echo "keyAlias=$KEYALIAS"
+            echo "storeFile=upload-keystore.jks"
+          } > "$FLUTTER_DIR/android/key.properties"
+
+      - name: Create google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > "$FLUTTER_DIR/android/app/google-services.json"
+
+      - name: Build AAB
+        working-directory: ${{ env.FLUTTER_DIR }}
+        run: flutter build appbundle --release --no-tree-shake-icons
+
+      - name: Write Play service account
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > deploy/service-account.json
+
+      - name: Install deploy dependencies
+        working-directory: deploy
+        run: npm install --no-audit --no-fund
+
+      - name: Publish to Google Play
+        working-directory: deploy
+        env:
+          TRACK: ${{ inputs.track || 'internal' }}
+          PRIORITY: ${{ inputs.priority || '0' }}
+          FRACTION: ${{ inputs.fraction || '0.1' }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: |
+          ARGS="--yes --track=$TRACK --priority=$PRIORITY"
+          if [ "$TRACK" = "production" ]; then
+            if [ "$FRACTION" = "1" ] || [ "$FRACTION" = "1.0" ]; then
+              ARGS="$ARGS --force"
+            else
+              ARGS="$ARGS --fraction=$FRACTION"
+            fi
+          fi
+          if [ "$DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          echo "node deploy.js $ARGS"
+          node deploy.js $ARGS
+
+      - name: Rename AAB with tag version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: cp "$FLUTTER_DIR/build/app/outputs/bundle/release/app-release.aab" "$FLUTTER_DIR/build/app/outputs/bundle/release/qless-${{ github.ref_name }}.aab"
+
+      - name: Attach AAB to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.FLUTTER_DIR }}/build/app/outputs/bundle/release/qless-${{ github.ref_name }}.aab
+
+      - name: Delete secret files
+        if: always()
+        run: |
+          rm -f "$FLUTTER_DIR/android/app/upload-keystore.jks" \
+                "$FLUTTER_DIR/android/key.properties" \
+                "$FLUTTER_DIR/android/app/google-services.json" \
+                deploy/service-account.json
