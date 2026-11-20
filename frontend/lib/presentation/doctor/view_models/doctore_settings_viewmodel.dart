@@ -4,6 +4,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/database/offline_queue_store.dart';
 import 'package:qless/domain/models/doctor_leave_model.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/usecase/doctor_settings_usecase.dart';
@@ -85,8 +86,9 @@ class DoctorSettingsState {
 
 class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
   final DoctorSettingsUsecase doctorSettingsUsecase;
+  final OfflineQueueStore offlineStore;
 
-  DoctorSettingsViewModel(this.doctorSettingsUsecase)
+  DoctorSettingsViewModel(this.doctorSettingsUsecase, this.offlineStore)
       : super(const DoctorSettingsState());
 
   /// Returns true when save completed; false when a 409 conflict was raised
@@ -155,12 +157,19 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
 
   Future<void> getDoctorSchedule(int doctorId, {String? clinicId}) async {
     state = state.copyWith(isLoading: true, errorMessage: '');
+    // Cached so the walk-in sheet and home session cards still work after an
+    // offline app restart (in-memory state alone is lost on restart).
+    final cacheKey = 'schedule:$doctorId:${clinicId ?? ''}';
     try {
       final schedule = await doctorSettingsUsecase.getDoctorSchedule(doctorId, clinicId: clinicId);
       state = state.copyWith(doctorSchedule: schedule);
+      try { await offlineStore.cacheJson(cacheKey, schedule.toJson()); } catch (_) {}
     } catch (e) {
       debugPrint('Error fetching doctor schedule: $e');
-      state = state.copyWith(errorMessage: e.toString());
+      final cached = await _cachedSchedule(cacheKey);
+      state = cached != null
+          ? state.copyWith(doctorSchedule: cached)
+          : state.copyWith(errorMessage: e.toString());
     } finally {
       state = state.copyWith(isLoading: false);
     }
@@ -170,14 +179,35 @@ class DoctorSettingsViewModel extends StateNotifier<DoctorSettingsState> {
 
   Future<void> getDoctorLeaves(int doctorId) async {
     state = state.copyWith(isLeaveBusy: true);
+    final cacheKey = 'leaves:$doctorId';
     try {
       final leaves = await doctorSettingsUsecase.getDoctorLeaves(doctorId);
       state = state.copyWith(leaves: leaves);
+      try {
+        await offlineStore.cacheJson(cacheKey, leaves.map((l) => l.toJson()).toList());
+      } catch (_) {}
     } catch (e) {
       debugPrint('Error fetching doctor leaves: $e');
+      try {
+        final cached = await offlineStore.getCachedJson(cacheKey);
+        if (cached is List) {
+          state = state.copyWith(
+              leaves: cached
+                  .map((e) => DoctorLeaveModel.fromJson(e as Map<String, dynamic>))
+                  .toList());
+        }
+      } catch (_) {}
     } finally {
       state = state.copyWith(isLeaveBusy: false);
     }
+  }
+
+  Future<DoctorScheduleModel?> _cachedSchedule(String cacheKey) async {
+    try {
+      final cached = await offlineStore.getCachedJson(cacheKey);
+      if (cached is Map<String, dynamic>) return DoctorScheduleModel.fromJson(cached);
+    } catch (_) {}
+    return null;
   }
 
   /// Returns the result plus the count of appointments that exist in the

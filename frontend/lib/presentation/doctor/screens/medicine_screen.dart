@@ -207,6 +207,8 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
       final searchMatch =
           q.isEmpty ||
           (m.medicineName?.toLowerCase().contains(q) ?? false) ||
+          (m.brandName?.toLowerCase().contains(q) ?? false) ||
+          (m.components?.toLowerCase().contains(q) ?? false) ||
           (m.medTypeName?.toLowerCase().contains(q) ?? false);
       return typeMatch && searchMatch;
     }).toList();
@@ -615,7 +617,7 @@ class _MedicineCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  medicine.medicineName ?? '—',
+                  medicine.displayName.isEmpty ? '—' : medicine.displayName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -626,6 +628,19 @@ class _MedicineCard extends StatelessWidget {
                     height: 1.15,
                   ),
                 ),
+                if (medicine.components?.isNotEmpty ?? false) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    medicine.components!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: kTextSecondary,
+                      height: 1.15,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(

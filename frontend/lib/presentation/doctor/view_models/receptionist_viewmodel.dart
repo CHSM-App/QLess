@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/database/offline_queue_store.dart';
+import 'package:qless/core/network/network_errors.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
@@ -281,7 +281,7 @@ class ReceptionistLoginViewmodel
         state = state.copyWith(isLoading: false);
         return result;
       } catch (e) {
-        if (!_isNetworkError(e)) {
+        if (!isNetworkError(e)) {
           state = state.copyWith(
             isLoading: false,
             error: e.toString().replaceFirst('Exception: ', ''),
@@ -308,36 +308,8 @@ class ReceptionistLoginViewmodel
   }
 
   /// Call this when connectivity is restored to flush queued walk-in bookings.
-  Future<int> syncPendingWalkIns() async {
-    return offlineStore.flushPendingWalkIns((body) async {
-      await usecase.walkInBook(body);
-    });
-  }
-
-  bool _isNetworkError(Object e) {
-    if (e is SocketException || e is TimeoutException) return true;
-    if (e is DioException) {
-      switch (e.type) {
-        case DioExceptionType.connectionError:
-        case DioExceptionType.connectionTimeout:
-        case DioExceptionType.sendTimeout:
-        case DioExceptionType.receiveTimeout:
-          return true;
-        case DioExceptionType.unknown:
-          if (e.error is SocketException) return true;
-          break;
-        default:
-          return false;
-      }
-    }
-    final s = e.toString().toLowerCase();
-    return s.contains('socketexception') ||
-        s.contains('failed host lookup') ||
-        s.contains('network is unreachable') ||
-        s.contains('connection refused') ||
-        s.contains('connection timed out') ||
-        s.contains('network error') ||
-        s.contains('check your connection');
+  Future<int> syncPendingWalkIns({int? doctorId}) async {
+    return offlineStore.flushPendingWalkIns(usecase.walkInBook, doctorId: doctorId);
   }
 
   Future<void> logout() async {

@@ -1,4 +1,5 @@
 import 'package:qless/core/update/app_version_section.dart';
+import 'dart:convert';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -8,6 +9,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/core/database/local_database.dart';
+import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
 import 'package:qless/presentation/doctor/screens/doctor_leave_sheet.dart';
@@ -593,6 +596,9 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           const SizedBox(height: 10),
           _sectionLabel('Availability'),
           _buildAvailabilityCard(),
+          const SizedBox(height: 10),
+          _sectionLabel('Offline Sync'),
+          _buildSyncCard(),
           const SizedBox(height: 10),
           _sectionLabel('Support'),
           _buildSupportCard(),
@@ -1633,6 +1639,38 @@ Widget _buildAvailabilityCard() => Container(
       ]);
   // ── Logout Button ─────────────────────────────────────────────────────────
 
+  // ── Offline Sync Card ─────────────────────────────────────────────────────
+
+  Widget _buildSyncCard() {
+    final s = ref.watch(appointmentViewModelProvider);
+    final subtitle = s.failedSyncCount > 0
+        ? '${s.failedSyncCount} couldn\'t sync — tap to review'
+        : s.pendingOpsCount > 0
+            ? '${s.pendingOpsCount} waiting to sync'
+            : 'Everything is synced';
+    return _tileCard([
+      _Item(Icons.sync_rounded, 'Offline changes', subtitle, onTap: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.white,
+          shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+          builder: (_) => const _SyncSheet(),
+        );
+      }),
+    ]);
+  }
+
+  Future<int> _unsyncedCount() async {
+    try {
+      final store = ref.read(offlineQueueStoreProvider);
+      return await store.pendingOpsCount() + await store.failedCount();
+    } catch (_) {
+      return 0;
+    }
+  }
+
   Widget _buildLogoutButton() => SizedBox(
         width: double.infinity,
         height: 44,
@@ -1664,13 +1702,26 @@ Widget _buildAvailabilityCard() => Container(
                               fontWeight: FontWeight.w800,
                               color: kTextPrimary)),
                       const SizedBox(height: 6),
-                      const Text(
-                        'You will be signed out and returned to the start screen.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: kTextSecondary,
-                            height: 1.5),
+                      // Logging out wipes this phone's offline data, including
+                      // work not yet synced — warn when there is some.
+                      FutureBuilder<int>(
+                        future: _unsyncedCount(),
+                        builder: (_, snap) {
+                          final n = snap.data ?? 0;
+                          return Text(
+                            n > 0
+                                ? '$n change${n == 1 ? '' : 's'} made offline '
+                                    "${n == 1 ? 'hasn\'t' : 'haven\'t'} synced yet. "
+                                    'Logging out now deletes ${n == 1 ? 'it' : 'them'}. '
+                                    'Connect to the internet first to keep ${n == 1 ? 'it' : 'them'}.'
+                                : 'You will be signed out and returned to the start screen.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                fontSize: 13,
+                                color: n > 0 ? kError : kTextSecondary,
+                                height: 1.5),
+                          );
+                        },
                       ),
                       const SizedBox(height: 20),
                       Row(children: [
@@ -1709,6 +1760,11 @@ Widget _buildAvailabilityCard() => Container(
                               await ref
                                   .read(tokenProvider.notifier)
                                   .clearTokens();
+                              // Voluntary logout: drop everything, unsynced
+                              // work included (the dialog warned about it).
+                              try {
+                                await LocalDatabase.instance.clearAll();
+                              } catch (_) {}
                               await ref
                                   .read(doctorLoginViewModelProvider.notifier)
                                   .logout();
@@ -2850,4 +2906,120 @@ class _SkeletonSettingsBody extends StatelessWidget {
           _SkeletonTileCard(rows: 5),
         ],
       );
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  OFFLINE SYNC SHEET — items the server refused when replayed
+// ════════════════════════════════════════════════════════════════════
+class _SyncSheet extends ConsumerStatefulWidget {
+  const _SyncSheet();
+
+  @override
+  ConsumerState<_SyncSheet> createState() => _SyncSheetState();
+}
+
+class _SyncSheetState extends ConsumerState<_SyncSheet> {
+  late Future<List<Map<String, dynamic>>> _items = _load();
+
+  static const _labels = {
+    'queueStart': 'Start queue',
+    'queuePause': 'Pause queue',
+    'queueStop': 'Close queue',
+    'queueNext': 'Complete patient',
+    'queueSkip': 'Skip patient',
+    'queueRecall': 'Recall patient',
+    'queuePauseEmergency': 'Emergency pause',
+    'startSession': 'Start consultation',
+    'endSession': 'End consultation',
+    'walkInBook': 'Walk-in booking',
+    'prescription': 'Prescription',
+  };
+
+  Future<List<Map<String, dynamic>>> _load() async {
+    await ref.read(appointmentViewModelProvider.notifier).refreshSyncCounts();
+    return ref.read(offlineQueueStoreProvider).getFailedItems();
+  }
+
+  Future<void> _act(Future<void> Function() action) async {
+    await action();
+    if (mounted) setState(() => _items = _load());
+  }
+
+  String _title(Map<String, dynamic> item) {
+    final label = _labels[item['operation']] ?? '${item['operation']}';
+    try {
+      final name = (jsonDecode(item['payload_json'] as String) as Map)['name'];
+      if (name != null) return '$label · $name';
+    } catch (_) {}
+    final appt = item['appointment_id'];
+    return appt != null ? '$label · appointment #$appt' : label;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final store = ref.read(offlineQueueStoreProvider);
+    final pending = ref.watch(appointmentViewModelProvider).pendingOpsCount;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        child: FutureBuilder<List<Map<String, dynamic>>>(
+          future: _items,
+          builder: (context, snap) {
+            final items = snap.data ?? const [];
+            return Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Offline changes',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
+              const SizedBox(height: 4),
+              Text(
+                pending > 0
+                    ? '$pending waiting — they sync automatically when you\'re online.'
+                    : 'Nothing waiting to sync.',
+                style: const TextStyle(fontSize: 12.5, color: kTextSecondary),
+              ),
+              if (items.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                const Text('Couldn\'t sync',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kError)),
+                const SizedBox(height: 6),
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final it = items[i];
+                      final kind = it['kind'] as String;
+                      final id = it['id'] as int;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text(_title(it),
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary)),
+                          const SizedBox(height: 2),
+                          Text('${it['last_error'] ?? 'Unknown error'}',
+                              style: const TextStyle(fontSize: 12, color: kTextSecondary)),
+                          Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                            TextButton(
+                              onPressed: () => _act(() => store.retryFailed(kind, id)),
+                              child: const Text('Retry'),
+                            ),
+                            TextButton(
+                              onPressed: () => _act(() => store.discardFailed(kind, id)),
+                              style: TextButton.styleFrom(foregroundColor: kError),
+                              child: const Text('Discard'),
+                            ),
+                          ]),
+                        ]),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ]);
+          },
+        ),
+      ),
+    );
+  }
 }

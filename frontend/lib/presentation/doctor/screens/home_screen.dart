@@ -916,6 +916,17 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> with WidgetsBindi
                       child: _buildStandaloneSlotSection(todaySlotPts),
                     ),
                   )
+                // Offline and today's sessions were never downloaded (first
+                // open of the day without internet) — say so, instead of a
+                // misleading "No Schedule for Today".
+                else if (ref.watch(connectivityNotifierProvider).isOffline &&
+                    !allSessions.any((s) => _isTodayStr(s.queueDate)))
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                      child: _buildOfflineNoTodayData(),
+                    ),
+                  )
                 else if (_todayScheduledSlots().isEmpty)
                   SliverToBoxAdapter(
                     child: Padding(
@@ -2823,6 +2834,36 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> with WidgetsBindi
   // ─────────────────────────────────────────────────────────────────────────
   // NO LIVE SESSIONS EMPTY STATE
   // ─────────────────────────────────────────────────────────────────────────
+
+  bool _isTodayStr(String? s) {
+    final d = DateTime.tryParse(s ?? '');
+    final n = DateTime.now();
+    return d != null && d.year == n.year && d.month == n.month && d.day == n.day;
+  }
+
+  Widget _buildOfflineNoTodayData() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 14),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: kCardBorder),
+      ),
+      child: const Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.wifi_off_rounded, color: kTextSecondary, size: 26),
+        SizedBox(height: 10),
+        Text("Today's sessions aren't downloaded yet",
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: kTextPrimary)),
+        SizedBox(height: 4),
+        Text('Connect to the internet once to load today\'s sessions. '
+            'After that you can keep working offline.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: kTextSecondary, height: 1.35)),
+      ]),
+    );
+  }
 
   Widget _buildNoLiveSessions() {
     return Container(

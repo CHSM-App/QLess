@@ -20,6 +20,13 @@ class DoctorLeaveModel {
         toDate: (json['to_date'] ?? '').toString(),
         reason: json['reason'] as String?,
       );
+
+  Map<String, dynamic> toJson() => {
+        'leave_id': leaveId,
+        'from_date': fromDate,
+        'to_date': toDate,
+        'reason': reason,
+      };
 }
 
 /// A single active leave date-range, used by the patient app to grey out

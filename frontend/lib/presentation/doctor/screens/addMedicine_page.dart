@@ -40,6 +40,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     with SingleTickerProviderStateMixin {
   final _formKey  = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
+  final _brandCtrl = TextEditingController();
+  final _strengthCtrl = TextEditingController();
+  final _componentsCtrl = TextEditingController();
 
   Medicine? _selectedType;
   bool _isEnsuringDoctorId = false;
@@ -66,6 +69,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _brandCtrl.dispose();
+    _strengthCtrl.dispose();
+    _componentsCtrl.dispose();
     _animCtrl.dispose();
     super.dispose();
   }
@@ -107,6 +113,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       medTypeId:    _selectedType!.medTypeId,
       medTypeName:  _selectedType!.medTypeName,
       doctorId:     doctorId,
+      brandName:    _optional(_brandCtrl),
+      strength:     _optional(_strengthCtrl),
+      components:   _optional(_componentsCtrl),
     );
 
     final response = await ref
@@ -116,6 +125,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
     if (response['success'] == 1) {
       _formKey.currentState?.reset();
       _nameCtrl.clear();
+      _brandCtrl.clear();
+      _strengthCtrl.clear();
+      _componentsCtrl.clear();
       setState(() => _selectedType = null);
       _snack('Medicine added successfully');
       widget.onSaved?.call(medicine);
@@ -128,6 +140,11 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
         isError: true,
       );
     }
+  }
+
+  String? _optional(TextEditingController c) {
+    final v = c.text.trim();
+    return v.isEmpty ? null : v;
   }
 
   void _snack(String msg, {bool isError = false}) {
@@ -220,6 +237,23 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                     _fieldLabel('Medicine Name', isRequired: true),
                     const SizedBox(height: 8),
                     _nameField(),
+                    const SizedBox(height: 16),
+                    _fieldLabel('Brand Name'),
+                    const SizedBox(height: 8),
+                    _optionalField(_brandCtrl, 'e.g. Crocin',
+                        Icons.local_offer_outlined),
+                    const SizedBox(height: 16),
+                    _fieldLabel('Strength'),
+                    const SizedBox(height: 8),
+                    _optionalField(_strengthCtrl, 'e.g. 500mg',
+                        Icons.straighten_outlined),
+                    const SizedBox(height: 16),
+                    _fieldLabel('Components'),
+                    const SizedBox(height: 8),
+                    _optionalField(_componentsCtrl,
+                        'e.g. Paracetamol 500mg + Caffeine 30mg',
+                        Icons.science_outlined,
+                        maxLines: 3),
                     const SizedBox(height: 16),
                     const Divider(height: 1, color: kDivider),
                     const SizedBox(height: 16),
@@ -350,6 +384,59 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       ]);
 
   // ---------------------------------------------------------------------------
+  // Input style (shared by all text fields)
+  // ---------------------------------------------------------------------------
+
+  InputDecoration _inputDecoration(String hint, IconData icon) => InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: kTextMuted, fontSize: 13.5),
+        prefixIcon: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 8, 0),
+          width: 32, height: 32,
+          decoration: BoxDecoration(
+              color: kPrimaryLight,
+              borderRadius: BorderRadius.circular(8)),
+          child: Icon(icon, color: kPrimary, size: 16),
+        ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 52),
+        filled: true,
+        fillColor: const Color(0xFFF7F8FA),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: kBorder)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: kBorder)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: kPrimary, width: 1.5)),
+        errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: kError)),
+        focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: kError, width: 1.5)),
+        contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        errorStyle: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: kError),
+      );
+
+  // ---------------------------------------------------------------------------
+  // Optional Fields (brand / strength / components) — no validator
+  // ---------------------------------------------------------------------------
+
+  Widget _optionalField(TextEditingController ctrl, String hint, IconData icon,
+          {int maxLines = 1}) =>
+      TextFormField(
+        controller: ctrl,
+        minLines: 1,
+        maxLines: maxLines,
+        textCapitalization: TextCapitalization.words,
+        style: const TextStyle(
+            fontSize: 14, color: Color(0xFF1A1D2E), fontWeight: FontWeight.w600),
+        decoration: _inputDecoration(hint, icon),
+      );
+
+  // ---------------------------------------------------------------------------
   // Name Field
   // ---------------------------------------------------------------------------
 
@@ -366,6 +453,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       },
       onSelected: (m) {
         _nameCtrl.text = m.medicineName ?? '';
+        _brandCtrl.text = m.brandName ?? '';
+        _strengthCtrl.text = m.strength ?? '';
+        _componentsCtrl.text = m.components ?? '';
         setState(() => _selectedType = m);
       },
       fieldViewBuilder: (context, controller, focusNode, onSubmit) {
@@ -384,39 +474,8 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
           textCapitalization: TextCapitalization.words,
           style: const TextStyle(
               fontSize: 14, color: Color(0xFF1A1D2E), fontWeight: FontWeight.w600),
-          decoration: InputDecoration(
-            hintText: 'e.g. Paracetamol',
-            hintStyle: const TextStyle(color: kTextMuted, fontSize: 13.5),
-            prefixIcon: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 8, 0),
-              width: 32, height: 32,
-              decoration: BoxDecoration(
-                  color: kPrimaryLight,
-                  borderRadius: BorderRadius.circular(8)),
-              child: const Icon(Icons.medication_outlined,
-                  color: kPrimary, size: 16),
-            ),
-            prefixIconConstraints: const BoxConstraints(minWidth: 52),
-            filled: true,
-            fillColor: const Color(0xFFF7F8FA),
-            border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: kBorder)),
-            enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: kBorder)),
-            focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: kPrimary, width: 1.5)),
-            errorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: kError)),
-            focusedErrorBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: kError, width: 1.5)),
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            errorStyle: const TextStyle(fontSize: 9.5, fontWeight: FontWeight.w600, color: kError),
-          ),
+          decoration:
+              _inputDecoration('e.g. Paracetamol', Icons.medication_outlined),
           validator: (v) => (v == null || v.trim().isEmpty)
               ? 'Medicine name is required'
               : null,
@@ -450,7 +509,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              m.medicineName ?? '',
+                              m.displayName,
                               style: const TextStyle(
                                   fontSize: 13.5,
                                   color: kTextPrimary,

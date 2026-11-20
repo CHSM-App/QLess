@@ -17,7 +17,9 @@ final authRepoProvider = Provider<AuthImpl>((ref) {
 final dioProvider = FutureProvider<Dio>((ref) {
   final dio = Dio(BaseOptions(
     baseUrl: baseUrl,          
-    connectTimeout: const Duration(seconds: 30),
+    // Short connect timeout so an unreachable server falls back to offline
+    // quickly instead of freezing each tap for 30 s. Receive stays generous.
+    connectTimeout: const Duration(seconds: 10),
     receiveTimeout: const Duration(seconds: 30),
     sendTimeout: kIsWeb ? null : const Duration(seconds: 30),
     headers: {

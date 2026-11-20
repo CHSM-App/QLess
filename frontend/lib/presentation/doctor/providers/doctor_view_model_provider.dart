@@ -24,8 +24,9 @@ final prescriptionViewModelProvider =
 
 final doctorSettingsViewModelProvider =
     StateNotifierProvider<DoctorSettingsViewModel, DoctorSettingsState>((ref) {
-  final usecase = ref.watch(doctorSettingsUsecaseProvider);
-  return DoctorSettingsViewModel(usecase);
+  final usecase      = ref.watch(doctorSettingsUsecaseProvider);
+  final offlineStore = ref.watch(offlineQueueStoreProvider);
+  return DoctorSettingsViewModel(usecase, offlineStore);
 });
 
 final appointmentViewModelProvider =

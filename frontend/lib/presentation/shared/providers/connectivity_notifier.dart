@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -168,6 +169,10 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState>
   }
 
   Future<bool> _checkInternet() async {
+    // dart:io DNS lookups throw on web, which made the browser build look
+    // permanently offline. Trust the adapter events there; a real outage is
+    // still caught by the request-level network-error fallback.
+    if (kIsWeb) return true;
     if (await _lookupOnce()) return true;
     // Radio can still be waking from doze right after the app resumes from
     // background — retry once before declaring offline to avoid a false

@@ -7,6 +7,7 @@ import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
+import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
@@ -703,8 +704,16 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   // provider's "current clinic" state.
   Future<void> _fetchPreviousVisits() async {
     try {
-      final all = await ref.read(appointmentUsecaseProvider)
-          .fetchPatientAppointments(widget.doctorId);
+      List<AppointmentList> all;
+      try {
+        all = await ref.read(appointmentUsecaseProvider)
+            .fetchPatientAppointments(widget.doctorId);
+      } catch (_) {
+        // Offline — fall back to visits already in the local cache (current
+        // clinic, last 30 days) so the doctor still sees recent history.
+        all = await ref.read(offlineQueueStoreProvider)
+            .getCachedAppointments(widget.doctorId);
+      }
       if (!mounted) return;
       final visits = all.where((a) =>
           a.patientId == widget.patientId &&

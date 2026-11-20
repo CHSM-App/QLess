@@ -46,6 +46,11 @@ class AppointmentRequestModel {
   @JsonKey(name: 'booking_closed')
   bool? bookingClosed;
 
+  /// Set only on actions queued offline (UTC ISO time they were queued) so the
+  /// backend can skip stale patient notifications when they are replayed.
+  @JsonKey(name: 'offline_queued_at', includeIfNull: false)
+  String? offlineQueuedAt;
+
   AppointmentRequestModel({
     this.operation,
     this.doctorId,
@@ -60,6 +65,7 @@ class AppointmentRequestModel {
     this.symptoms,
     this.clinicId,
     this.bookingClosed,
+    this.offlineQueuedAt,
   });
 
   factory AppointmentRequestModel.fromJson(Map<String, dynamic> json) =>

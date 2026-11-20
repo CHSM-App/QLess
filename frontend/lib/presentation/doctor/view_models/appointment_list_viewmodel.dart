@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/database/offline_queue_store.dart';
+import 'package:qless/core/network/network_errors.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
@@ -29,6 +28,9 @@ class AppointmentListState {
   final Set<int> emergencyQueueIds;
   /// Number of pending offline operations waiting to be synced.
   final int pendingOpsCount;
+  /// Offline items the server rejected — parked until the doctor retries or
+  /// discards them (Profile → Sync).
+  final int failedSyncCount;
   /// Whether the doctor has stopped accepting NEW bookings for today's queue.
   /// Independent of [queueState] — existing waiting patients are unaffected.
   final bool bookingClosed;
@@ -42,6 +44,7 @@ class AppointmentListState {
     this.doctorPatientCount,
     this.emergencyQueueIds = const {},
     this.pendingOpsCount = 0,
+    this.failedSyncCount = 0,
     this.bookingClosed = false,
   });
 
@@ -54,6 +57,7 @@ class AppointmentListState {
     int? doctorPatientCount,
     Set<int>? emergencyQueueIds,
     int? pendingOpsCount,
+    int? failedSyncCount,
     bool? bookingClosed,
   }) {
     return AppointmentListState(
@@ -66,6 +70,7 @@ class AppointmentListState {
       doctorPatientCount: doctorPatientCount ?? this.doctorPatientCount,
       emergencyQueueIds: emergencyQueueIds ?? this.emergencyQueueIds,
       pendingOpsCount: pendingOpsCount ?? this.pendingOpsCount,
+      failedSyncCount: failedSyncCount ?? this.failedSyncCount,
       bookingClosed: bookingClosed ?? this.bookingClosed,
     );
   }
@@ -504,7 +509,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         );
         return result;
       } catch (e) {
-        if (!_isNetworkError(e)) {
+        if (!isNetworkError(e)) {
           state = state.copyWith(isLoading: false, error: e.toString());
           rethrow;
         }
@@ -596,16 +601,23 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
 
   // ── Sync: flush pending operations after coming back online ─────────────────
 
+  /// Replays this doctor's queued queue actions. The sync controller refetches
+  /// once at the end of the whole sync, so no refresh here.
   Future<void> syncPendingOps(int doctorId) async {
     final flushed = await offlineStore.flushPendingOps(
       (op, payload) => _executeOp(op, payload),
+      doctorId: doctorId,
     );
-    if (flushed > 0) {
-      debugPrint('[AppointmentVM] Flushed $flushed pending op(s), refreshing.');
-      await fetchPatientAppointments(doctorId, isOnline: true);
-    }
-    final pendingCount = await offlineStore.pendingOpsCount();
-    state = state.copyWith(pendingOpsCount: pendingCount);
+    debugPrint('[AppointmentVM] Flushed $flushed pending op(s).');
+    await refreshSyncCounts();
+  }
+
+  /// Re-reads the pending / failed sync counters shown on the profile screen.
+  Future<void> refreshSyncCounts() async {
+    state = state.copyWith(
+      pendingOpsCount: await offlineStore.pendingOpsCount(),
+      failedSyncCount: await offlineStore.failedCount(),
+    );
   }
 
   Future<AppointmentResponseModel> _executeOp(
@@ -633,8 +645,9 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       case OfflineOperation.endSession:
         return usecase.endSession(AppointmentRequestModel.fromJson(payload));
       case OfflineOperation.walkInBook:
-        // Handled by ReceptionistLoginViewmodel.syncPendingWalkIns — skip here.
-        return AppointmentResponseModel(success: true, message: 'Skipped');
+        // flushPendingOps filters these out; they replay via
+        // ReceptionistLoginViewmodel.syncPendingWalkIns.
+        throw StateError('walkInBook must not replay through flushPendingOps');
     }
   }
 
@@ -661,7 +674,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       try {
         return await online();
       } catch (e) {
-        if (!_isNetworkError(e)) {
+        if (!isNetworkError(e)) {
           state = state.copyWith(isLoading: false, error: e.toString());
           rethrow;
         }
@@ -774,43 +787,6 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     if (d == null) return false;
     final n = DateTime.now();
     return d.year == n.year && d.month == n.month && d.day == n.day;
-  }
-
-  /// True when [e] is a loss-of-connectivity failure (no internet, timeout,
-  /// host lookup failed) rather than a real server response. Only these should
-  /// trigger the offline fallback — a 400/409 from the server is a genuine
-  /// rejection the doctor must see.
-  bool _isNetworkError(Object e) {
-    if (e is SocketException || e is TimeoutException) return true;
-    if (e is DioException) {
-      switch (e.type) {
-        case DioExceptionType.connectionError:
-        case DioExceptionType.connectionTimeout:
-        case DioExceptionType.sendTimeout:
-        case DioExceptionType.receiveTimeout:
-          return true;
-        case DioExceptionType.unknown:
-          if (e.error is SocketException) return true;
-          break; // message-only connectivity failure — sniff below
-        default:
-          return false; // badResponse / cancel — a real server reply
-      }
-    }
-    // Some layers wrap the cause in a plain Exception(message), and the
-    // TokenInterceptor rewrites connection failures to a user-facing string —
-    // sniff for both raw socket signatures and those sanitized phrases so a
-    // connectivity error that reaches us message-only still falls back to
-    // offline instead of being shown as a real server rejection.
-    final s = e.toString().toLowerCase();
-    return s.contains('socketexception') ||
-        s.contains('failed host lookup') ||
-        s.contains('network is unreachable') ||
-        s.contains('connection refused') ||
-        s.contains('connection timed out') ||
-        s.contains('connection closed') ||
-        s.contains('network error') ||
-        s.contains('check your connection') ||
-        s.contains('request timed out');
   }
 
   // ── Offline op helper ───────────────────────────────────────────────────────

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:qless/core/database/local_database.dart';
+import 'package:qless/core/network/network_errors.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
@@ -259,6 +260,11 @@ class OfflineQueueStore {
 
   // ── Pending-op queue ─────────────────────────────────────────────────────────
 
+  /// Stamped into every queued payload so the backend can tell a late replay
+  /// from a live action (and skip stale "your turn" pushes to patients).
+  static Map<String, dynamic> _stamp(Map<String, dynamic> payload) =>
+      {...payload, 'offline_queued_at': DateTime.now().toUtc().toIso8601String()};
+
   Future<void> enqueueOp(
     OfflineOperation op,
     AppointmentRequestModel request, {
@@ -266,7 +272,7 @@ class OfflineQueueStore {
   }) async {
     await _db.enqueuePendingOp(
       operation:     op.name,
-      payload:       request.toJson(),
+      payload:       _stamp(request.toJson()),
       doctorId:      request.doctorId,
       queueId:       queueId ?? request.queueId,
       appointmentId: request.appointmentId,
@@ -284,8 +290,11 @@ class OfflineQueueStore {
   /// without this, a walk-in booked offline was invisible until the doctor
   /// reconnected and synced.
   Future<void> enqueueWalkInBook(Map<String, dynamic> body, int? doctorId) async {
+    // A doctor (not receptionist) booking a walk-in has no doctorId on the
+    // receptionist state — the body always carries it.
+    doctorId ??= body['doctor_id'] as int?;
     final tempId = await _insertOptimisticWalkIn(body, doctorId);
-    final payload = tempId == null ? body : {...body, _tempApptKey: tempId};
+    final payload = _stamp(tempId == null ? body : {...body, _tempApptKey: tempId});
     await _db.enqueuePendingOp(
       operation: OfflineOperation.walkInBook.name,
       payload:   payload,
@@ -335,36 +344,30 @@ class OfflineQueueStore {
     }
   }
 
-  /// Flush all pending walk-in bookings by calling [executor].
+  /// Flush pending walk-in bookings for [doctorId] by calling [executor].
   /// Returns the number successfully sent.
   Future<int> flushPendingWalkIns(
-    Future<void> Function(Map<String, dynamic> body) executor,
-  ) async {
-    final rows = await _db.getPendingOps();
-    final walkInRows = rows.where(
-      (r) => (r['operation'] as String?) == OfflineOperation.walkInBook.name,
-    ).toList();
-    if (walkInRows.isEmpty) return 0;
-
-    int flushed = 0;
-    for (final row in walkInRows) {
-      final id = row['id'] as int;
-      try {
+    Future<AppointmentResponseModel> Function(Map<String, dynamic> body) executor, {
+    int? doctorId,
+  }) async {
+    final rows = (await _db.getPendingOps(doctorId: doctorId))
+        .where((r) => r['operation'] == OfflineOperation.walkInBook.name)
+        .toList();
+    return _flush(
+      rows,
+      send: (row) async {
         final payload = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
         final tempId = payload.remove(_tempApptKey) as int?;
-        await executor(payload);
+        final res = await executor(payload);
+        _checkSuccess(res.success, res.message);
         // Drop the placeholder — the real synced row (server appointment_id)
         // lands separately via the caller's post-flush fetchPatientAppointments.
         if (tempId != null) await _db.deleteAppointment(tempId);
-        await deletePendingOp(id);
-        flushed++;
-        debugPrint('[OfflineQueueStore] Flushed walkInBook op $id');
-      } catch (e) {
-        await incrementRetry(id);
-        debugPrint('[OfflineQueueStore] Failed walkInBook op $id: $e');
-      }
-    }
-    return flushed;
+      },
+      onSent: _db.deletePendingOp,
+      markFailed: _db.markOpFailed,
+      bumpRetry: _db.incrementRetry,
+    );
   }
 
   Future<void> enqueueEmergencyPause(int queueId, int doctorId) async {
@@ -377,16 +380,87 @@ class OfflineQueueStore {
     debugPrint('[OfflineQueueStore] Enqueued offline emergency pause: $queueId');
   }
 
-  Future<List<PendingOperation>> getPendingOps() async {
-    final rows = await _db.getPendingOps();
-    return rows.map(PendingOperation.fromRow).toList();
+  /// Everything still waiting to sync — queue ops, walk-ins and prescriptions.
+  Future<int> pendingOpsCount() async =>
+      await _db.pendingOpsCount() + await _db.pendingPrescriptionsCount();
+
+  // ── Failed (parked) items ──────────────────────────────────────────────────
+
+  Future<int> failedCount() => _db.failedCount();
+
+  /// Rows with `kind` ('op' | 'rx'), `id`, `operation`, `appointment_id`,
+  /// `last_error`, `created_at`, `payload_json`.
+  Future<List<Map<String, dynamic>>> getFailedItems() => _db.getFailedItems();
+
+  Future<void> retryFailed(String kind, int id) => _db.retryFailed(kind, id);
+
+  /// Throws the item away. A discarded walk-in also loses its placeholder row
+  /// so it stops showing in the offline queue.
+  Future<void> discardFailed(String kind, int id) async {
+    if (kind == 'op') {
+      final item = (await _db.getFailedItems())
+          .where((r) => r['kind'] == 'op' && r['id'] == id)
+          .firstOrNull;
+      try {
+        final payload = jsonDecode(item?['payload_json'] as String? ?? '{}');
+        final tempId = payload is Map ? payload[_tempApptKey] as int? : null;
+        if (tempId != null) await _db.deleteAppointment(tempId);
+      } catch (_) {} // corrupt payload — nothing to clean up
+    }
+    await _db.deletePendingItem(kind, id);
   }
 
-  Future<int> pendingOpsCount() => _db.pendingOpsCount();
+  Future<void> deletePendingForOtherDoctors(int doctorId) =>
+      _db.deletePendingForOtherDoctors(doctorId);
 
-  Future<void> deletePendingOp(int id) => _db.deletePendingOp(id);
+  // ── Replay loop ────────────────────────────────────────────────────────────
 
-  Future<void> incrementRetry(int id) => _db.incrementRetry(id);
+  static const _maxRetries = 5;
+
+  /// Throws [_Rejected] when the server answered `success: false` (HTTP 200
+  /// with a refusal, e.g. "Doctor is on leave") — retrying won't change it.
+  void _checkSuccess(bool? success, String? message) {
+    if (success == false) throw _Rejected(message ?? 'Rejected by server');
+  }
+
+  /// Shared replay loop for every pending table, oldest row first:
+  ///  * sent            → [onSent] (row deleted)
+  ///  * network error   → stop here; this and later rows stay pending, in order
+  ///  * server said no  → park as failed with the reason (shown to the doctor)
+  ///  * corrupt row     → park as failed so it can never block the rest
+  ///  * anything else   → retry next time; park after [_maxRetries] attempts
+  Future<int> _flush(
+    List<Map<String, dynamic>> rows, {
+    required Future<void> Function(Map<String, dynamic> row) send,
+    required Future<void> Function(int id) onSent,
+    required Future<void> Function(int id, String error) markFailed,
+    required Future<int> Function(int id) bumpRetry,
+  }) async {
+    int sent = 0;
+    for (final row in rows) {
+      final id = row['id'] as int;
+      try {
+        await send(row);
+        await onSent(id);
+        sent++;
+      } catch (e) {
+        if (e is _Rejected) {
+          await markFailed(id, e.message);
+        } else if (isServerRejection(e)) {
+          await markFailed(id, errorMessage(e));
+        } else if (e is FormatException || e is TypeError || e is ArgumentError) {
+          await markFailed(id, 'Corrupt offline data: $e');
+        } else if (isNetworkError(e)) {
+          debugPrint('[OfflineQueueStore] Network down mid-sync, stopping at row $id');
+          break;
+        } else if (await bumpRetry(id) >= _maxRetries) {
+          await markFailed(id, errorMessage(e));
+        }
+        debugPrint('[OfflineQueueStore] Row $id not synced: $e');
+      }
+    }
+    return sent;
+  }
 
   // ── Pending prescriptions ──────────────────────────────────────────────────
 
@@ -457,6 +531,22 @@ class OfflineQueueStore {
     }
   }
 
+  // ── Generic JSON cache (doctor schedule, leaves, …) ────────────────────────
+
+  Future<void> cacheJson(String key, Object? value) =>
+      _db.upsertJson(key, jsonEncode(value));
+
+  /// Decoded value, or null when nothing is cached (or the row is corrupt).
+  Future<dynamic> getCachedJson(String key) async {
+    final raw = await _db.getJson(key);
+    if (raw == null) return null;
+    try {
+      return jsonDecode(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ── Patient profile cache ──────────────────────────────────────────────────
 
   /// Cache the patient's own profile list (keyed by the lookup id, e.g. mobile)
@@ -484,30 +574,25 @@ class OfflineQueueStore {
   /// Flush all offline prescriptions by POSTing them via [executor].
   /// Returns the number successfully sent.
   Future<int> flushPendingPrescriptions(
-    Future<void> Function(PrescriptionModel prescription) executor,
-  ) async {
-    final rows = await _db.getPendingPrescriptions();
-    if (rows.isEmpty) return 0;
-
-    int flushed = 0;
-    for (final row in rows) {
-      final id = row['id'] as int;
-      try {
-        final json =
-            jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
-        await executor(PrescriptionModel.fromJson(json));
-        await _db.deletePendingPrescription(id);
-        flushed++;
-        debugPrint('[OfflineQueueStore] Flushed prescription $id');
-      } catch (e) {
-        await _db.incrementPrescriptionRetry(id);
-        debugPrint('[OfflineQueueStore] Failed prescription $id: $e');
-      }
-    }
-    return flushed;
+    Future<dynamic> Function(PrescriptionModel prescription) executor, {
+    int? doctorId,
+  }) async {
+    return _flush(
+      await _db.getPendingPrescriptions(doctorId: doctorId),
+      send: (row) async {
+        final json = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+        final res = await executor(PrescriptionModel.fromJson(json));
+        if (res is Map) _checkSuccess(res['success'] as bool?, res['message']?.toString());
+      },
+      onSent: _db.deletePendingPrescription,
+      markFailed: _db.markPrescriptionFailed,
+      bumpRetry: _db.incrementPrescriptionRetry,
+    );
   }
 
-  /// Flush all pending offline operations by executing them against the API.
+  /// Flush pending queue operations for [doctorId] by executing them against
+  /// the API. Walk-ins live in the same table but are replayed separately by
+  /// [flushPendingWalkIns] — they must never be consumed here.
   ///
   /// [executor] is a callback from the ViewModel that knows how to call each
   /// operation. Returns the number of successfully flushed ops.
@@ -515,24 +600,23 @@ class OfflineQueueStore {
     Future<AppointmentResponseModel> Function(
       OfflineOperation op,
       Map<String, dynamic> payload,
-    ) executor,
-  ) async {
-    final ops = await getPendingOps();
-    if (ops.isEmpty) return 0;
-
-    int flushed = 0;
-    for (final op in ops) {
-      try {
-        await executor(op.operation, op.payload);
-        await deletePendingOp(op.id);
-        flushed++;
-        debugPrint('[OfflineQueueStore] Flushed op ${op.id} (${op.operation.name})');
-      } catch (e) {
-        await incrementRetry(op.id);
-        debugPrint('[OfflineQueueStore] Failed op ${op.id}: $e');
-      }
-    }
-    return flushed;
+    ) executor, {
+    int? doctorId,
+  }) async {
+    final rows = (await _db.getPendingOps(doctorId: doctorId))
+        .where((r) => r['operation'] != OfflineOperation.walkInBook.name)
+        .toList();
+    return _flush(
+      rows,
+      send: (row) async {
+        final op = PendingOperation.fromRow(row);
+        final res = await executor(op.operation, op.payload);
+        _checkSuccess(res.success, res.message);
+      },
+      onSent: _db.deletePendingOp,
+      markFailed: _db.markOpFailed,
+      bumpRetry: _db.incrementRetry,
+    );
   }
 
   // ── Serialization helpers ────────────────────────────────────────────────────
@@ -626,4 +710,12 @@ class OfflineQueueStore {
     };
     return AppointmentList.fromJson(json);
   }
+}
+
+/// The server answered but refused the replayed action.
+class _Rejected implements Exception {
+  final String message;
+  _Rejected(this.message);
+  @override
+  String toString() => message;
 }

@@ -1,3 +1,4 @@
+import 'package:qless/core/database/local_database.dart';
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -200,6 +201,9 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
 
   Future<void> _logout() async {
     await ref.read(tokenProvider.notifier).clearTokens();
+    try {
+      await LocalDatabase.instance.clearAll(); // account is gone — keep nothing
+    } catch (_) {}
     ref.read(appointmentViewModelProvider.notifier).reset();
     ref.read(favoriteViewModelProvider.notifier).reset();
     await ref.read(patientLoginViewModelProvider.notifier).logout();

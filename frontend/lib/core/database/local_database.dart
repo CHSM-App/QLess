@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
@@ -13,7 +15,7 @@ class LocalDatabase {
   static final LocalDatabase instance = LocalDatabase._();
 
   static const _dbName    = 'qless_offline.db';
-  static const _dbVersion = 7;
+  static const _dbVersion = 8;
 
   // Table names
   static const _tQueues        = 'queues';
@@ -23,6 +25,7 @@ class LocalDatabase {
   static const _tMedicines     = 'medicines_cache';
   static const _tPatientAppts  = 'patient_appointments_cache';
   static const _tPatientProfile = 'patient_profile_cache';
+  static const _tJsonCache     = 'json_cache';
 
   Database? _db;
 
@@ -132,6 +135,24 @@ class LocalDatabase {
     await _createMedicinesTable(db);
     await _createPatientApptsTable(db);
     await _createPatientProfileTable(db);
+    await _migrateV8(db);
+  }
+
+  /// v8: pending rows the server rejected (or that can't be decoded) are
+  /// parked as `failed` with the reason, instead of being retried forever or
+  /// silently deleted. Plus a generic key → JSON cache (doctor schedule etc.).
+  Future<void> _migrateV8(Database db) async {
+    for (final t in [_tPendingOps, _tPendingRx]) {
+      await db.execute('ALTER TABLE $t ADD COLUMN failed INTEGER NOT NULL DEFAULT 0');
+      await db.execute('ALTER TABLE $t ADD COLUMN last_error TEXT');
+    }
+    await db.execute('''
+      CREATE TABLE $_tJsonCache (
+        cache_key    TEXT PRIMARY KEY,
+        payload_json TEXT NOT NULL,
+        updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+      )
+    ''');
   }
 
   Future<void> _createPendingRxTable(Database db) async {
@@ -213,6 +234,9 @@ class LocalDatabase {
       // to separate them, so offline could show the wrong clinic's queue.
       await db.execute('ALTER TABLE $_tQueues ADD COLUMN clinic_id TEXT');
     }
+    if (oldVersion < 8) {
+      await _migrateV8(db);
+    }
   }
 
   // ── Queue cache ─────────────────────────────────────────────────────────────
@@ -227,6 +251,10 @@ class LocalDatabase {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
+    // Old sessions are never shown (home hides past-dated queues) — prune so
+    // the table doesn't grow forever.
+    batch.delete(_tQueues,
+        where: "queue_date IS NOT NULL AND queue_date < date('now', '-7 days')");
     await batch.commit(noResult: true);
   }
 
@@ -303,6 +331,12 @@ class LocalDatabase {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
+    // Rows are upserted, never deleted by a refresh — prune old ones so the
+    // cache doesn't grow forever. Negative ids are offline walk-in
+    // placeholders, removed when their booking syncs or is discarded.
+    batch.delete(_tAppointments,
+        where: "appointment_id > 0 AND appointment_date IS NOT NULL "
+            "AND appointment_date < date('now', '-30 days')");
     await batch.commit(noResult: true);
   }
 
@@ -351,48 +385,35 @@ class LocalDatabase {
     int? appointmentId,
   }) async {
     final db = await database;
-    // Convert payload to JSON string inline — avoid importing dart:convert at
-    // call-sites that already pass a decoded Map.
-    final payloadJson = _mapToJsonString(payload);
     return db.insert(_tPendingOps, {
       'operation':      operation,
-      'payload_json':   payloadJson,
+      'payload_json':   jsonEncode(payload),
       'doctor_id':      doctorId,
       'queue_id':       queueId,
       'appointment_id': appointmentId,
     });
   }
 
-  Future<List<Map<String, dynamic>>> getPendingOps() async {
-    final db = await database;
-    return db.query(_tPendingOps, orderBy: 'id ASC');
-  }
+  /// Rows still waiting to sync, oldest first. [doctorId] scopes the read to
+  /// one account so rows queued by another doctor on this phone are never
+  /// replayed under the current session. Rows with no doctor_id (queued before
+  /// it was always stamped) are still included rather than stranded.
+  Future<List<Map<String, dynamic>>> getPendingOps({int? doctorId}) =>
+      _pending(_tPendingOps, doctorId);
 
-  Future<void> deletePendingOp(int id) async {
-    final db = await database;
-    await db.delete(_tPendingOps, where: 'id = ?', whereArgs: [id]);
-  }
+  Future<void> deletePendingOp(int id) => _deleteRow(_tPendingOps, id);
 
-  Future<void> incrementRetry(int id) async {
-    final db = await database;
-    await db.rawUpdate(
-      'UPDATE $_tPendingOps SET retry_count = retry_count + 1 WHERE id = ?',
-      [id],
-    );
-  }
+  /// Returns the new retry count.
+  Future<int> incrementRetry(int id) => _bumpRetry(_tPendingOps, id);
 
-  Future<int> pendingOpsCount() async {
-    final db = await database;
-    final result =
-        await db.rawQuery('SELECT COUNT(*) as cnt FROM $_tPendingOps');
-    return Sqflite.firstIntValue(result) ?? 0;
-  }
+  Future<void> markOpFailed(int id, String error) =>
+      _markFailed(_tPendingOps, id, error);
+
+  Future<int> pendingOpsCount() => _count(_tPendingOps, failed: false);
 
   // ── Pending prescriptions ────────────────────────────────────────────────────
 
-  /// [payloadJson] must already be a valid JSON string (the prescription has a
-  /// nested `medicines` list, so the caller encodes it with dart:convert rather
-  /// than the flat [_mapToJsonString] helper used for queue ops).
+  /// [payloadJson] must already be a valid JSON string.
   Future<int> enqueuePendingPrescription({
     required String payloadJson,
     int? doctorId,
@@ -406,28 +427,104 @@ class LocalDatabase {
     });
   }
 
-  Future<List<Map<String, dynamic>>> getPendingPrescriptions() async {
+  Future<List<Map<String, dynamic>>> getPendingPrescriptions({int? doctorId}) =>
+      _pending(_tPendingRx, doctorId);
+
+  Future<void> deletePendingPrescription(int id) => _deleteRow(_tPendingRx, id);
+
+  /// Returns the new retry count.
+  Future<int> incrementPrescriptionRetry(int id) => _bumpRetry(_tPendingRx, id);
+
+  Future<void> markPrescriptionFailed(int id, String error) =>
+      _markFailed(_tPendingRx, id, error);
+
+  Future<int> pendingPrescriptionsCount() => _count(_tPendingRx, failed: false);
+
+  // ── Failed (parked) items ────────────────────────────────────────────────────
+  // kind: 'op' = pending_operations row, 'rx' = pending_prescriptions row.
+
+  Future<int> failedCount() async =>
+      await _count(_tPendingOps, failed: true) +
+      await _count(_tPendingRx, failed: true);
+
+  Future<List<Map<String, dynamic>>> getFailedItems() async {
     final db = await database;
-    return db.query(_tPendingRx, orderBy: 'id ASC');
+    return db.rawQuery('''
+      SELECT id, 'op' AS kind, operation, payload_json, appointment_id,
+             last_error, created_at
+        FROM $_tPendingOps WHERE failed = 1
+      UNION ALL
+      SELECT id, 'rx' AS kind, 'prescription' AS operation, payload_json,
+             appointment_id, last_error, created_at
+        FROM $_tPendingRx WHERE failed = 1
+      ORDER BY created_at ASC
+    ''');
   }
 
-  Future<void> deletePendingPrescription(int id) async {
+  /// Puts a parked item back in the sync queue.
+  Future<void> retryFailed(String kind, int id) async {
     final db = await database;
-    await db.delete(_tPendingRx, where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> incrementPrescriptionRetry(int id) async {
-    final db = await database;
-    await db.rawUpdate(
-      'UPDATE $_tPendingRx SET retry_count = retry_count + 1 WHERE id = ?',
-      [id],
+    await db.update(
+      _pendingTable(kind),
+      {'failed': 0, 'retry_count': 0, 'last_error': null},
+      where: 'id = ?',
+      whereArgs: [id],
     );
   }
 
-  Future<int> pendingPrescriptionsCount() async {
+  Future<void> deletePendingItem(String kind, int id) =>
+      _deleteRow(_pendingTable(kind), id);
+
+  /// Drops unsynced rows left by a different doctor on this phone (e.g. after
+  /// a forced logout) so they are neither sent under this account nor kept.
+  Future<void> deletePendingForOtherDoctors(int doctorId) async {
     final db = await database;
-    final result =
-        await db.rawQuery('SELECT COUNT(*) as cnt FROM $_tPendingRx');
+    for (final t in [_tPendingOps, _tPendingRx]) {
+      await db.delete(t,
+          where: 'doctor_id IS NOT NULL AND doctor_id != ?',
+          whereArgs: [doctorId]);
+    }
+  }
+
+  String _pendingTable(String kind) => kind == 'rx' ? _tPendingRx : _tPendingOps;
+
+  Future<List<Map<String, dynamic>>> _pending(String table, int? doctorId) async {
+    final db = await database;
+    if (doctorId == null) {
+      return db.query(table, where: 'failed = 0', orderBy: 'id ASC');
+    }
+    return db.query(
+      table,
+      where: 'failed = 0 AND (doctor_id = ? OR doctor_id IS NULL)',
+      whereArgs: [doctorId],
+      orderBy: 'id ASC',
+    );
+  }
+
+  Future<void> _deleteRow(String table, int id) async {
+    final db = await database;
+    await db.delete(table, where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> _bumpRetry(String table, int id) async {
+    final db = await database;
+    await db.rawUpdate(
+        'UPDATE $table SET retry_count = retry_count + 1 WHERE id = ?', [id]);
+    final r = await db.query(table,
+        columns: ['retry_count'], where: 'id = ?', whereArgs: [id]);
+    return r.isEmpty ? 0 : (r.first['retry_count'] as int? ?? 0);
+  }
+
+  Future<void> _markFailed(String table, int id, String error) async {
+    final db = await database;
+    await db.update(table, {'failed': 1, 'last_error': error},
+        where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> _count(String table, {required bool failed}) async {
+    final db = await database;
+    final result = await db.rawQuery(
+        'SELECT COUNT(*) as cnt FROM $table WHERE failed = ?', [failed ? 1 : 0]);
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -520,31 +617,32 @@ class LocalDatabase {
     return rows.first['payload_json'] as String?;
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // ── Generic JSON cache ───────────────────────────────────────────────────────
 
-  /// Minimal JSON encode without importing dart:convert at every call-site.
-  String _mapToJsonString(Map<String, dynamic> map) {
-    // We rely on Dart's toString for primitives. Using dart:convert here is
-    // safe since this file already targets Flutter (not a pure Dart library).
-    // ignore: avoid_dynamic_calls
-    final buffer = StringBuffer('{');
-    bool first = true;
-    map.forEach((k, v) {
-      if (!first) buffer.write(',');
-      first = false;
-      buffer.write('"$k":');
-      if (v == null) {
-        buffer.write('null');
-      } else if (v is String) {
-        buffer.write('"${v.replaceAll('"', '\\"')}"');
-      } else if (v is bool) {
-        buffer.write(v ? 'true' : 'false');
-      } else {
-        buffer.write(v);
-      }
-    });
-    buffer.write('}');
-    return buffer.toString();
+  Future<void> upsertJson(String cacheKey, String payloadJson) async {
+    final db = await database;
+    await db.insert(
+      _tJsonCache,
+      {
+        'cache_key':    cacheKey,
+        'payload_json': payloadJson,
+        'updated_at':   DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String?> getJson(String cacheKey) async {
+    final db = await database;
+    final rows = await db.query(
+      _tJsonCache,
+      columns: ['payload_json'],
+      where: 'cache_key = ?',
+      whereArgs: [cacheKey],
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['payload_json'] as String?;
   }
 
   Future<void> close() async {
@@ -554,16 +652,24 @@ class LocalDatabase {
     }
   }
 
-  /// Wipe all local data (use for logout / account switch).
-  Future<void> clearAll() async {
+  /// Wipe cached server data but keep unsynced work (pending ops/Rx). Used on
+  /// forced logout (session expired) so a doctor who logs straight back in
+  /// still gets their offline prescriptions synced.
+  Future<void> clearCaches() async {
     final db = await database;
-    await db.delete(_tQueues);
-    await db.delete(_tAppointments);
+    for (final t in [_tQueues, _tAppointments, _tMedicines, _tPatientAppts,
+                     _tPatientProfile, _tJsonCache]) {
+      await db.delete(t);
+    }
+    debugPrint('[LocalDatabase] Cached data cleared (pending work kept).');
+  }
+
+  /// Wipe all local data, unsynced work included (voluntary logout).
+  Future<void> clearAll() async {
+    await clearCaches();
+    final db = await database;
     await db.delete(_tPendingOps);
     await db.delete(_tPendingRx);
-    await db.delete(_tMedicines);
-    await db.delete(_tPatientAppts);
-    await db.delete(_tPatientProfile);
     debugPrint('[LocalDatabase] All local data cleared.');
   }
 }

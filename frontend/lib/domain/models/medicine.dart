@@ -24,9 +24,13 @@ class Medicine {
   final String? medTypeName;
 
     @JsonKey(name: 'strength')
-  final int? strength;
- 
+  final String? strength;
 
+  @JsonKey(name: 'brand_name')
+  final String? brandName;
+
+  @JsonKey(name: 'components')
+  final String? components;
 
 
   Medicine({
@@ -37,8 +41,19 @@ class Medicine {
     this.mobileNo,
     this.strength,
     this.medTypeName,
+    this.brandName,
+    this.components,
   });
   
+  /// "Paracetamol 500mg · Crocin" — empty parts are left out.
+  String get displayName {
+    final name = [medicineName, strength]
+        .where((s) => s != null && s.isNotEmpty)
+        .join(' ');
+    final brand = brandName ?? '';
+    return brand.isEmpty ? name : '$name · $brand';
+  }
+
   factory Medicine.fromJson(Map<String, dynamic> json) =>
    _$MedicineFromJson(json);
   

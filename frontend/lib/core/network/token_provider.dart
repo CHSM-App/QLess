@@ -1,3 +1,4 @@
+import 'package:qless/core/database/local_database.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/storage/token_storage.dart';
 
@@ -76,10 +77,17 @@ class TokenNotifier extends StateNotifier<TokenState> {
     await TokenStorage.saveTokens(accessToken, refreshToken, roleId);
   }
 
-  /// Clear tokens and trigger logout
+  /// Clear tokens and trigger logout. Every logout path (button, forced
+  /// logout on a dead refresh token, AuthGate) lands here, so cached patient
+  /// data is wiped here too. Unsynced offline work is kept — a doctor whose
+  /// session merely expired logs back in and it syncs; the voluntary logout
+  /// button wipes it explicitly after warning.
   Future<void> clearTokens() async {
     state = const TokenState();
     await TokenStorage.clear();
+    try {
+      await LocalDatabase.instance.clearCaches();
+    } catch (_) {}
   }
 }
 

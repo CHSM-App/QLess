@@ -16,6 +16,17 @@ function emitQueueUpdate(req, event, doctor_id, extra = {}) {
   if (io && doctor_id) io.to('clinic_' + doctor_id).emit('queue_update', { event, doctor_id, ...extra });
 }
 
+// Actions the doctor took offline are replayed on reconnect carrying
+// offline_queued_at (UTC ISO, set on the device when queued). Live pushes like
+// "Your Turn Now" for an action older than this are stale — that patient was
+// already seen — so routes skip them; socket updates still go out.
+// ponytail: trusts the device clock; use server receive time if clocks drift.
+const STALE_REPLAY_MS = 10 * 60 * 1000;
+function isStaleReplay(req) {
+  const t = Date.parse(req.body?.offline_queued_at);
+  return Number.isFinite(t) && Date.now() - t > STALE_REPLAY_MS;
+}
+
 // Returns the furthest queue_number the active queue has reached — MAX among
 // in_progress and completed only. Skipped patients are handled outside the
 // main queue and must not affect this value. When a skipped patient is
@@ -320,8 +331,14 @@ router.post('/insertMedicine', async (req, res) => {
   const {
     doctor_id,
     medicine_name,
-    medicine_type_id
+    medicine_type_id,
+    brand_name,
+    strength,
+    components
   } = req.body;
+
+  // Optional fields: trim, empty -> null
+  const opt = (v) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
   try {
     const request = db.request();
@@ -330,6 +347,9 @@ router.post('/insertMedicine', async (req, res) => {
     request.input('doctor_id', doctor_id);
     request.input('medicine_name', medicine_name);
     request.input('medicine_type_id', medicine_type_id);
+    request.input('brand_name', opt(brand_name));
+    request.input('strength', opt(strength));
+    request.input('components', opt(components));
 
     const result = await request.execute('sp_Medicine_Master');
 
@@ -933,6 +953,20 @@ router.post('/insertPrescription', async (req, res) => {
   const clean = (v) => (v === '' || v === undefined ? null : v);
 
   try {
+    // One prescription per appointment. A retry (offline replay, or a resend
+    // after a timeout whose first attempt actually landed) must not create a
+    // duplicate or re-notify the patient — return the existing one.
+    if (parseInt(appointment_id) > 0) {
+      const existing = await db.request()
+        .input('appointment_id', sql.Int, parseInt(appointment_id))
+        .query('SELECT TOP 1 prescription_id FROM patient_records WHERE appointment_id = @appointment_id');
+      const existingId = existing.recordset?.[0]?.prescription_id;
+      if (existingId) {
+        log.info(`[insertPrescription] appointment ${appointment_id} already has prescription ${existingId} — skipped duplicate`);
+        return res.json({ success: true, prescription_id: existingId, message: 'Prescription already saved' });
+      }
+    }
+
     let prescription_id = null;
     let patientToken = null;
     let doctorName = null;
@@ -1137,11 +1171,12 @@ router.post('/appointment/queueNext', async (req, res) => {
     }
 
     const token = row.token;
+    const stale = isStaleReplay(req);
 
     log.debug('queueNext: next patient token present: ' + !!token);
 
     // 🔔 SEND NOTIFICATION TO NEXT PATIENT
-    if (token) {
+    if (token && !stale) {
       const nextTitle = 'Your Turn Now';
       const nextBody = 'Doctor is ready to see you. Please proceed.';
 
@@ -1158,8 +1193,10 @@ router.post('/appointment/queueNext', async (req, res) => {
       }
     }
 
-    sendProximityNotifications(doctor_id, clinic_id);
-    sendPositionNotifications(doctor_id, appointment_id);
+    if (!stale) {
+      sendProximityNotifications(doctor_id, clinic_id);
+      sendPositionNotifications(doctor_id, appointment_id);
+    }
     const nextServing = await fetchCurrentServing(appointment_id);
     emitQueueUpdate(req, 'next', doctor_id, { current_serving: nextServing, clinic_id });
 
@@ -1220,7 +1257,7 @@ router.post('/appointment/queueStart', async (req, res) => {
       .filter(r => r && r !== statusRow && r.token && String(r.token).trim() !== '')
       .map(r => r.token);
 
-    if (tokens.length === 0) {
+    if (tokens.length === 0 || isStaleReplay(req)) {
       emitQueueUpdate(req, 'queue_started', doctor_id, { queue_id });
       return res.json({
         success: true,
@@ -1314,7 +1351,7 @@ router.post('/appointment/queuePause', async (req, res) => {
     log.debug('queuePause: tokens count: ' + tokens.length);
 
     // 🔔 SEND NOTIFICATION
-    if (tokens.length > 0) {
+    if (tokens.length > 0 && !isStaleReplay(req)) {
       let doctorName = 'your doctor';
       try {
         const ctx = await db.request()
@@ -1579,11 +1616,12 @@ router.post('/appointment/queueSkip', async (req, res) => {
     }
 
     const token = row.token;
+    const stale = isStaleReplay(req);
 
     log.debug('queueSkip: skipped patient token present: ' + !!token);
 
     // 🔔 SEND ONLY TO SKIPPED PATIENT
-    if (token) {
+    if (token && !stale) {
       const skipTitle = 'You were skipped';
       const skipBody = 'Doctor skipped your turn due to absence. Please contact clinic.';
 
@@ -1607,8 +1645,10 @@ router.post('/appointment/queueSkip', async (req, res) => {
       }
     }
 
-    sendProximityNotifications(doctor_id);
-    sendPositionNotifications(doctor_id, appointment_id);
+    if (!stale) {
+      sendProximityNotifications(doctor_id);
+      sendPositionNotifications(doctor_id, appointment_id);
+    }
     const skipServing = await fetchCurrentServing(appointment_id);
     emitQueueUpdate(req, 'skip', doctor_id, { current_serving: skipServing });
 
@@ -1743,8 +1783,10 @@ router.post('/appointment/endSession', async (req, res) => {
     // "Be Ready (3rd in queue)" push, which only duplicated the proximity
     // 'near' stage for the same patient. Every ended consultation shifts each
     // waiting patient one slot closer, so re-scan proximity here.
-    sendProximityNotifications(doctor_id, clinic_id);
-    sendPositionNotifications(doctor_id, appointment_id);
+    if (!isStaleReplay(req)) {
+      sendProximityNotifications(doctor_id, clinic_id);
+      sendPositionNotifications(doctor_id, appointment_id);
+    }
     emitQueueUpdate(req, 'session_ended', doctor_id);
 
     return res.json({
@@ -2157,6 +2199,35 @@ router.post('/walkInBook', async (req, res) => {
   }
 
   try {
+    // Offline replay (offline_queued_at set by the app): the original send may
+    // have landed before its response was lost, so first check whether this
+    // walk-in already exists — same doctor, date, name and mobile, not
+    // cancelled — and return it instead of creating a second patient + booking.
+    // Online walk-ins skip this check and behave exactly as before.
+    if (req.body.offline_queued_at) {
+      const dup = await db.request()
+        .input('doctor_id', sql.Int, parseInt(doctor_id))
+        .input('appointment_date', appointment_date)
+        .input('name', String(name).trim())
+        .input('mobile_no', String(mobile_no))
+        .query(`
+          SELECT TOP 1 a.appointment_id, a.patient_id
+          FROM appointments a
+          LEFT JOIN patients p ON a.user_type = 1 AND p.patient_id = a.patient_id
+          LEFT JOIN family_members fm ON a.user_type = 2 AND fm.member_id = a.patient_id
+          WHERE a.doctor_id = @doctor_id
+            AND a.appointment_date = @appointment_date
+            AND LOWER(ISNULL(a.status, '')) <> 'cancelled'
+            AND LTRIM(RTRIM(COALESCE(p.name, fm.name))) = @name
+            AND COALESCE(p.mobile_no, fm.mobile_no) = @mobile_no
+        `);
+      const row = dup.recordset?.[0];
+      if (row) {
+        log.info(`walkInBook: replay matched existing appointment ${row.appointment_id} — skipped duplicate`);
+        return res.json({ success: true, message: 'Walk-in already booked', patient_id: row.patient_id });
+      }
+    }
+
     let patient_id;
 
     if (family_id) {
