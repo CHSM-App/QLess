@@ -73,7 +73,11 @@ One-off data scripts: `npm run db -- scripts/<file>.sql`.
 
 ```bash
 npm test
+npm run test:coverage   # fails if coverage drops below the threshold in package.json
 ```
+
+When a change raises coverage, raise `jest.coverageThreshold` to the new floor
+(rounded down) in the same commit — it only ever goes up.
 
 Route tests run against a scripted DB mock (`tests/helpers/db.js`): a suite
 answers by stored procedure + `@operation` instead of by call order.

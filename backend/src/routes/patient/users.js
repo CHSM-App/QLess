@@ -339,13 +339,16 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
 
 
 
-// SP Case 2: all favorites for a patient (doctor_id omitted → SP returns all rows)
+// All favorites for a patient, newest first.
 router.get('/favoriteDoctors/:patient_id', async (req, res) => {
   try {
     const result = await db.request()
-      .input('operation', 'Fetch')
-      .input('patient_id', req.params.patient_id)
-      .execute('sp_favorite_doctors');
+      .input('patient_id', sql.Int, req.params.patient_id)
+      .query(`
+        SELECT * FROM favorite_doctors
+        WHERE patient_id = @patient_id AND is_favorite = 1
+        ORDER BY created_at DESC
+      `);
     res.status(200).json(result.recordset || []);
   } catch (error) {
     log.error('Error in get all favorites: ' + error.message);
@@ -357,12 +360,18 @@ router.get('/favoriteDoctor/:patient_id/:doctor_id/:clinic_id', async (req, res)
   try {
     const { patient_id, doctor_id, clinic_id } = req.params;
 
+    // Heart icon: is this doctor at this clinic a favorite?
     const result = await db.request()
-      .input('operation', 'Fetch')
-      .input('patient_id', patient_id)
-      .input('doctor_id', doctor_id)
-      .input('clinic_id', clinic_id)
-      .execute('sp_favorite_doctors');
+      .input('patient_id', sql.Int, patient_id)
+      .input('doctor_id', sql.Int, doctor_id)
+      .input('clinic_id', sql.NVarChar(50), clinic_id)
+      .query(`
+        SELECT CASE WHEN EXISTS (
+          SELECT 1 FROM favorite_doctors
+          WHERE patient_id = @patient_id AND doctor_id = @doctor_id
+            AND clinic_id = @clinic_id AND is_favorite = 1
+        ) THEN 1 ELSE 0 END AS is_favorite
+      `);
 
     res.status(200).json({
       is_favorite: result.recordset?.[0]?.is_favorite || 0

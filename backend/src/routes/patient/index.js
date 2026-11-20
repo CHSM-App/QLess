@@ -56,15 +56,17 @@ router.delete("/favoriteDoctor/:patient_id/:doctor_id/:clinic_id", async (req, r
       });
     }
 
-    const request = db.request();
-    request.input("operation", "Delete");
-    request.input("patient_id", sql.Int, parseInt(patient_id));
-    request.input("doctor_id", sql.Int, parseInt(doctor_id));
-    request.input("clinic_id", sql.NVarChar(50), clinic_id);
+    const result = await db.request()
+      .input("patient_id", sql.Int, parseInt(patient_id))
+      .input("doctor_id", sql.Int, parseInt(doctor_id))
+      .input("clinic_id", sql.NVarChar(50), clinic_id)
+      .query(`
+        DELETE FROM favorite_doctors
+        WHERE patient_id = @patient_id AND doctor_id = @doctor_id AND clinic_id = @clinic_id;
+        SELECT 1 AS success, 'Deleted successfully' AS message;
+      `);
 
-    const result = await request.execute("sp_favorite_doctors");
-
-    // The SP returns a message like 'Deleted successfully' or error
+    // Message is 'Deleted successfully' (even when no row matched)
     const message = result.recordset?.[0]?.message || "Operation completed";
 
     // Determine success based on message

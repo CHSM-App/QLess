@@ -30,6 +30,8 @@ const http = require('http');
 const log = require('./middleware/logger');
 
 const protect = require('./middleware/protect');
+const authorize = require('./middleware/authorize');
+const { ROLE } = require('./middleware/roles');
 const uploadAuth = require('./middleware/uploadAuth');
 const requestId = require('./middleware/requestId');
 const { globalLimiter } = require('./middleware/rateLimit');
@@ -100,7 +102,8 @@ app.use('/delete-account', accountRouter);
 
 // Authenticated — every doctor/patient endpoint requires a valid JWT.
 app.use('/doctor/users', protect, doctorUsersRouter);
-app.use('/doctor/insert', protect, doctorInsertRouter);
+// Queue, leave, schedule, prescriptions, walk-in: clinic staff only.
+app.use('/doctor/insert', protect, authorize(ROLE.DOCTOR, ROLE.RECEPTIONIST), doctorInsertRouter);
 app.use('/doctor/index', protect, doctorIndexRouter);
 app.use('/patient/users', protect, patientUsersRouter);
 app.use('/patient/insert', protect, patientInsertRouter);

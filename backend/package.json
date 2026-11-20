@@ -10,7 +10,8 @@
     "migrate:up": "node src/migrate.js up",
     "migrate:down": "node src/migrate.js down",
     "migrate:status": "node src/migrate.js status",
-    "db": "node scripts/run-sql.js"
+    "db": "node scripts/run-sql.js",
+    "test:coverage": "jest --runInBand --coverage"
   },
   "dependencies": {
     "axios": "^1.16.1",
@@ -53,6 +54,18 @@
     "collectCoverageFrom": [
       "src/**/*.js",
       "!src/migrate.js"
-    ]
+    ],
+    "coverageReporters": [
+      "text-summary",
+      "lcov"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "statements": 29,
+        "branches": 19,
+        "functions": 23,
+        "lines": 30
+      }
+    }
   }
 }

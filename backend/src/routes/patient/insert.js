@@ -201,12 +201,24 @@ router.post('/favoriteDoctor/add', async (req, res) => {
   }
 
   try {
+    // Same check-then-insert as the old sp_favorite_doctors 'Insert' branch.
     const result = await db.request()
-      .input('operation', 'Insert')
-      .input('patient_id', patient_id)
-      .input('doctor_id', doctor_id)
-      .input('clinic_id', clinic_id || null)
-      .execute('sp_favorite_doctors');
+      .input('patient_id', sql.Int, patient_id)
+      .input('doctor_id', sql.Int, doctor_id)
+      .input('clinic_id', sql.NVarChar(50), clinic_id || null)
+      .query(`
+        IF NOT EXISTS (
+          SELECT 1 FROM favorite_doctors
+          WHERE patient_id = @patient_id AND doctor_id = @doctor_id AND clinic_id = @clinic_id
+        )
+        BEGIN
+          INSERT INTO favorite_doctors (patient_id, doctor_id, clinic_id, is_favorite, created_at)
+          VALUES (@patient_id, @doctor_id, @clinic_id, 1, GETDATE());
+          SELECT 1 AS success, SCOPE_IDENTITY() AS favorite_id, 'Added successfully' AS message;
+        END
+        ELSE
+          SELECT 0 AS success, 'Already added to favorites' AS message;
+      `);
 
     res.status(200).json({
       success: true,

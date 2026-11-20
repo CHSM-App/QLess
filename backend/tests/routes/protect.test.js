@@ -38,6 +38,43 @@ describe('JWT-protected mounts', () => {
   });
 });
 
+describe('/doctor/insert — clinic staff only', () => {
+  const { ROLE } = require('../helpers/auth');
+  const insertRouter = require('../../src/routes/doctor/insert');
+
+  // Every route on the router (walks the sub-routers), params filled with 1.
+  const routes = insertRouter.stack
+    .flatMap((layer) => (layer.handle.stack || []).filter((l) => l.route))
+    .flatMap((l) => Object.keys(l.route.methods).map((m) => [m, '/doctor/insert' + l.route.path.replace(/:\w+\??/g, '1')]));
+
+  test('covers every /doctor/insert route', () => {
+    expect(routes).toHaveLength(20);
+  });
+
+  test.each(routes)('%s %s → 403 for a patient, no DB call', async (method, url) => {
+    const res = await request(app)[method](url).set(authHeader({ role_id: ROLE.PATIENT })).send({});
+    expect(res.status).toBe(403);
+    expect(mockDb.calls).toHaveLength(0);
+  });
+
+  test.each([['doctor', ROLE.DOCTOR], ['receptionist', ROLE.RECEPTIONIST]])('%s reaches the route', async (_, role_id) => {
+    const res = await request(app)
+      .post('/doctor/insert/appointment/queueNext')
+      .set(authHeader({ role_id }))
+      .send({});
+    expect(res.status).toBe(400); // the route's own validation
+  });
+
+  test('token without role_id → 401 so the app signs in again', async () => {
+    const token = jwt.sign({ uid: 1 }, process.env.JWT_SECRET_KEY);
+    const res = await request(app)
+      .post('/doctor/insert/appointment/queueNext')
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('uploads', () => {
   test('GET /uploads/* → 401 without a token', async () => {
     const res = await request(app).get('/uploads/doctor_images/1/a.jpg');
