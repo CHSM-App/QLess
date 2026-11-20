@@ -9,7 +9,7 @@
 //
 // Run from backend/:  node scripts/bookManojActiveQueue.js 30
 
-const db = require('../routes/db');
+const db = require('../src/db');
 
 const DOCTOR_ID = 1;
 const CLINIC_ID = 'CL001';

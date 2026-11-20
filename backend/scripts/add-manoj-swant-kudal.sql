@@ -5,7 +5,7 @@
 -- number on doctor_id = 1.
 --
 -- Review before running. Set @clinic_name / @address / @fee as needed.
--- Login: 9000000001 + demo OTP 123456 (see DEMO_RANGES in routes/login.js).
+-- Login: 9000000001 + demo OTP 123456 (see DEMO_RANGES in src/routes/auth.js).
 
 SET XACT_ABORT ON;
 BEGIN TRAN;

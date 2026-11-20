@@ -1,6 +1,6 @@
 -- Adds a demo Patient account for App Store / Play Store review.
 -- Mobile sits inside the patient demo range used by the OTP bypass
--- (see DEMO_RANGES in routes/login.js and isDemoNumber() in
+-- (see DEMO_RANGES in src/routes/auth.js and isDemoNumber() in
 -- frontend/lib/core/demo_accounts.dart): 9878000001-9878000050.
 --
 -- Login: 9878000001 + demo OTP 123456 — no SMS is sent for this number.
@@ -26,7 +26,7 @@ INSERT INTO Patients
    role_id, active_status, token, img_url)
 VALUES
   (@name, @mobile, NULL, NULL, NULL, NULL, NULL, NULL,
-   2 /* ROLE.PATIENT, see routes/middleware/roles.js */, 1, NULL, NULL);
+   2 /* ROLE.PATIENT, see src/middleware/roles.js */, 1, NULL, NULL);
 
 COMMIT TRAN;
 

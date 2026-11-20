@@ -11,8 +11,6 @@
 -- The transaction is always committed or rolled back inside this script, so
 -- it never leaves a lock behind.
 
-USE [QLess];
-GO
 
 DECLARE @apply BIT = 0;   -- <<< change to 1 to really delete
 

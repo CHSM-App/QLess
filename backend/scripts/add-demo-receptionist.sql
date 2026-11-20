@@ -3,7 +3,7 @@
 -- reviewer logging in as this receptionist sees a real clinic queue.
 --
 -- Mobile sits inside the receptionist demo range used by the OTP bypass
--- (see DEMO_RANGES in routes/login.js and isDemoNumber() in
+-- (see DEMO_RANGES in src/routes/auth.js and isDemoNumber() in
 -- frontend/lib/core/demo_accounts.dart): 9877000001-9877000030.
 --
 -- Login: 9877000001 + demo OTP 123456 — no SMS is sent for this number.
@@ -44,7 +44,7 @@ INSERT INTO receptionist
    clinic_id, created_at, role_id, doctor_id)
 VALUES
   (@name, @mobile, NULL, NULL, NULL, 1, NULL, NULL,
-   @clinic_id, GETDATE(), 3 /* ROLE.RECEPTIONIST, see routes/middleware/roles.js */, @doctor_id);
+   @clinic_id, GETDATE(), 3 /* ROLE.RECEPTIONIST, see src/middleware/roles.js */, @doctor_id);
 
 COMMIT TRAN;
 
