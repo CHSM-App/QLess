@@ -4,6 +4,8 @@ const db = require('../../../db');
 const sql = require('mssql');
 const admin = require('../../../fcm');
 const log = require('../../../middleware/logger');
+const notificationsSql = require('../../../queries/notifications');
+const appointmentsSql = require('../../../queries/appointments');
 
 // Helper — emits a queue_update event to all sockets in clinic_<doctor_id> room.
 // req.app.get('io') is available because app.set('io', io) is called in server.js.
@@ -65,7 +67,7 @@ async function insertNotification(patient_id, title, body, type, ref_id = null) 
       .input('body', body)
       .input('type', type)
       .input('ref_id', ref_id != null ? String(ref_id) : null)
-      .execute('sp_notification');
+      .run(notificationsSql);
     return r.recordset?.[0] ?? { success: 1 };
   } catch (err) {
     log.error('insertNotification failed: ' + err.message);
@@ -78,9 +80,12 @@ async function insertNotification(patient_id, title, body, type, ref_id = null) 
 async function insertNotificationForToken(token, title, body, type, ref_id = null) {
   if (!token) return;
   try {
+    // token_hash (migration 009) is indexed; token itself is NVARCHAR(MAX).
+    // Typed as NVARCHAR so the hash is over the same bytes as the column's.
     const r = await db.request()
-      .input('token', token)
-      .query('SELECT TOP 1 patient_id FROM patients WHERE token = @token');
+      .input('token', sql.NVarChar(sql.MAX), token)
+      .query(`SELECT TOP 1 patient_id FROM patients
+              WHERE token_hash = CONVERT(CHAR(64), HASHBYTES('SHA2_256', @token), 2) AND token = @token`);
     const patient_id = r.recordset?.[0]?.patient_id;
     if (!patient_id) return;
     await insertNotification(patient_id, title, body, type, ref_id);
@@ -89,32 +94,78 @@ async function insertNotificationForToken(token, title, body, type, ref_id = nul
   }
 }
 
-// Idempotency check for proximity notifications. As the queue moves, the same
-// patient would cross the same threshold across multiple endSession events —
-// we send the "30 min" / "10 min" notification ONCE per stage per appointment.
-// ref_id is namespaced as "<appointment_id>:<stage>" to allow one row per stage
-// without conflicting with single-stage notifications used elsewhere.
-async function hasNotificationBeenSent(patient_id, type, ref_id) {
-  if (!patient_id || !type || !ref_id) return false;
+// One inbox row per distinct token owner, in a single statement (queue start /
+// pause used to do one lookup + one insert per token, in sequence).
+// OPENJSON values are NVARCHAR, so the hash matches Patients.token_hash.
+async function insertNotificationsForTokens(tokens, title, body, type, ref_id = null) {
+  if (!tokens.length) return;
+  await db.request()
+    .input('tokens', sql.NVarChar(sql.MAX), JSON.stringify(tokens))
+    .input('title', sql.NVarChar(200), title)
+    .input('body', sql.NVarChar(1000), body)
+    .input('type', sql.VarChar(40), type)
+    .input('ref_id', sql.VarChar(40), ref_id != null ? String(ref_id) : null)
+    .query(`
+      INSERT INTO notifications (patient_id, title, body, type, ref_id)
+      SELECT DISTINCT o.patient_id, @title, @body, @type, @ref_id
+      FROM OPENJSON(@tokens) j
+      CROSS APPLY (
+        SELECT TOP 1 p.patient_id FROM patients p
+        WHERE p.token_hash = CONVERT(CHAR(64), HASHBYTES('SHA2_256', j.value), 2) AND p.token = j.value
+      ) o;
+    `);
+}
+
+// Queue start / pause: the change is saved and the doctor already answered,
+// so the inbox rows and the one multicast push run in the background. Errors
+// are logged, never thrown. Returns the promise (tests await it).
+function notifyTokensInBackground(tokens, title, body, ref_id, label) {
+  return (async () => {
+    try {
+      await insertNotificationsForTokens(tokens, title, body, 'queue', ref_id);
+    } catch (err) {
+      log.error(`[${label}] inbox insert failed: ${err.message}`);
+    }
+    try {
+      const r = await admin.messaging().sendEachForMulticast({
+        notification: { title, body },
+        data: { type: 'queue' },
+        tokens,
+      });
+      log.info(`[${label}] push: ${r.successCount}/${tokens.length}`);
+    } catch (err) {
+      log.error(`[${label}] push failed: ${err.message}`);
+    }
+  })();
+}
+
+// Once-per-stage notifications. As the queue moves, the same patient would
+// cross the same threshold across multiple endSession events — the "30 min" /
+// "10 min" / position notification goes out ONCE per stage per appointment.
+// ref_id is namespaced as "<appointment_id>:<stage>". Stores the inbox row
+// atomically; returns true only for the caller that stored it (that one sends
+// the push). On a DB error returns false: a missed push beats a duplicate.
+async function insertNotificationOnce(patient_id, title, body, type, ref_id) {
+  if (!patient_id || !title || !body || !type || !ref_id) return false;
   try {
     const r = await db.request()
+      .input('operation', 'INSERT_ONCE')
       .input('patient_id', patient_id)
+      .input('title', title)
+      .input('body', body)
       .input('type', type)
       .input('ref_id', String(ref_id))
-      .query(`SELECT TOP 1 1 AS hit FROM notifications
-              WHERE patient_id = @patient_id
-                AND type = @type
-                AND ref_id = @ref_id`);
-    return (r.recordset?.[0]?.hit === 1);
+      .run(notificationsSql);
+    return r.recordset?.[0]?.inserted === 1;
   } catch (err) {
-    log.error('hasNotificationBeenSent failed: ' + err.message);
+    log.error('insertNotificationOnce failed: ' + err.message);
     return false;
   }
 }
 
 // Position-based notifications — Practo style. Every time the queue moves,
 // the top-3 waiting patients get a position milestone push (once per milestone
-// per appointment, idempotency via hasNotificationBeenSent):
+// per appointment, idempotency via insertNotificationOnce):
 //   Position 1 → "You're Next!"
 //   Position 2 → "Get Ready! — 2nd in line"
 //   Position 3 → "3rd in Queue"
@@ -134,12 +185,12 @@ async function sendPositionNotifications(doctor_id, appointment_id) {
           d.name AS doctor_name
         FROM appointments a
         JOIN doctor_queue   dq ON dq.queue_id   = a.queue_id
-        JOIN doctors        d  ON d.doctor_id   = dq.doctor_id
+        JOIN doctor_login   d  ON d.doctor_id   = dq.doctor_id
         LEFT JOIN patients  p  ON a.user_type = 1 AND p.patient_id  = a.patient_id
         LEFT JOIN family_members fm ON a.user_type = 2 AND fm.member_id = a.patient_id
         LEFT JOIN patients  ph ON a.user_type = 2 AND ph.patient_id = fm.family_id
         WHERE a.queue_id = (SELECT TOP 1 queue_id FROM appointments WHERE appointment_id = @ref_apt_id)
-          AND a.status = 'waiting'
+          AND a.status = 'booked'
         ORDER BY a.queue_number ASC
       `);
 
@@ -167,9 +218,7 @@ async function sendPositionNotifications(doctor_id, appointment_id) {
       } else { continue; }
 
       const refId = `${aptId}:${stage}`;
-      if (await hasNotificationBeenSent(patient_id, 'queue', refId)) continue;
-
-      await insertNotification(patient_id, title, body, 'queue', refId);
+      if (!(await insertNotificationOnce(patient_id, title, body, 'queue', refId))) continue;
 
       if (token && String(token).trim()) {
         await admin.messaging().send({
@@ -211,7 +260,7 @@ async function sendProximityNotifications(doctor_id, clinic_id = null) {
       .input('operation', 'QUEUE_PROXIMITY_LIST')
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const rows = r.recordset || [];
     if (rows.length === 0) return;
@@ -224,7 +273,7 @@ async function sendProximityNotifications(doctor_id, clinic_id = null) {
       const doctor = row.doctor_name || 'your doctor';
       if (!patient_id || !aptId || minutes == null) return;
 
-      let stage = null, title = null, body = null;
+      let stage, title, body;
       if (minutes >= 25 && minutes <= 35) {
         stage = 'queue_far';
         title = 'Your turn is approaching';
@@ -238,9 +287,7 @@ async function sendProximityNotifications(doctor_id, clinic_id = null) {
       }
 
       const refId = `${aptId}:${stage}`;
-      if (await hasNotificationBeenSent(patient_id, 'queue', refId)) return;
-
-      await insertNotification(patient_id, title, body, 'queue', refId);
+      if (!(await insertNotificationOnce(patient_id, title, body, 'queue', refId))) return;
 
       if (token && token.trim() !== '') {
         await admin.messaging().send({
@@ -305,7 +352,9 @@ module.exports = {
   fetchCurrentServing,
   insertNotification,
   insertNotificationForToken,
-  hasNotificationBeenSent,
+  insertNotificationOnce,
+  insertNotificationsForTokens,
+  notifyTokensInBackground,
   sendPositionNotifications,
   sendProximityNotifications,
   formatApptDate,

@@ -6,6 +6,8 @@ const appointments = require('./appointments');
 require('./reminders'); // registers the cron jobs
 
 const router = express.Router();
+const ownStaff = require('../../../middleware/ownStaff');
+ownStaff(router); // staff: only their own doctor's records
 router.use(require('./notifications'));
 router.use(require('./prescriptions'));
 router.use(require('./schedule'));

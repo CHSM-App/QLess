@@ -15,9 +15,16 @@ const weakSecret = !!jwtSecret && (WEAK_DEFAULTS.includes(jwtSecret.toLowerCase(
 if (weakSecret) {
   console.error('[startup] JWT_SECRET_KEY is weak — use at least 32 random characters.');
 }
+// Demo (store-review) logins accept a fixed OTP; with the well-known default
+// anyone could sign in to the demo accounts.
+const { demoEnabled, demoOtp, DEFAULT_OTP } = require('./demo');
+const weakDemo = demoEnabled() && (demoOtp() === DEFAULT_OTP || demoOtp().length < 6);
+if (weakDemo) {
+  console.error('[startup] DEMO_ENABLED=true needs a non-default DEMO_OTP of 6+ digits.');
+}
 // In production a missing or weak secret is fatal: booting anyway would sign
 // every session with a guessable key. Dev and test only warn.
-if (process.env.NODE_ENV === 'production' && (missing.length > 0 || weakSecret)) {
+if (process.env.NODE_ENV === 'production' && (missing.length > 0 || weakSecret || weakDemo)) {
   console.error('[startup] Refusing to start in production with the configuration errors above.');
   process.exit(1);
 }
@@ -34,7 +41,8 @@ const authorize = require('./middleware/authorize');
 const { ROLE } = require('./middleware/roles');
 const uploadAuth = require('./middleware/uploadAuth');
 const requestId = require('./middleware/requestId');
-const { globalLimiter } = require('./middleware/rateLimit');
+const { globalLimiter, healthLimiter } = require('./middleware/rateLimit');
+const db = require('./db');
 
 const app = express();
 
@@ -42,10 +50,26 @@ const app = express();
 // from 127.0.0.1 and the rate limiter buckets everyone together.
 app.set('trust proxy', 1);
 
-// Security headers.
+// Security headers + Content-Security-Policy. No inline scripts anywhere (the
+// admin / delete-account page scripts live in src/static/*.js); styles may be
+// inline; pages embed data: images and use Google Fonts.
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+      },
+    },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }),
 );
@@ -69,6 +93,23 @@ app.use(
 
 // Request-ID first so it's available to the logger and every error handler.
 app.use(requestId);
+
+// Uptime monitor (R1). Before hideServerErrors so a 503 keeps its body.
+app.get('/health', healthLimiter, async (req, res) => {
+  const uptime = Math.round(process.uptime());
+  try {
+    await db.ensureConnected();
+    await db.request().query('SELECT 1 AS ok');
+    res.json({ status: 'ok', db: 'up', uptime });
+  } catch (err) {
+    log.error('health: database down: ' + err.message);
+    res.status(503).json({ status: 'degraded', db: 'down', uptime });
+  }
+});
+// 5xx bodies never carry internal error text (logged with the request id instead).
+app.use(require('./middleware/errors').hideServerErrors);
+// /uploads?token=<jwt> — keep access tokens out of the request log.
+morgan.token('url', (req) => (req.originalUrl || req.url).replace(/([?&]token=)[^&]*/g, '$1[REDACTED]'));
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 }
@@ -106,16 +147,20 @@ app.use('/doctor/users', protect, doctorUsersRouter);
 app.use('/doctor/insert', protect, authorize(ROLE.DOCTOR, ROLE.RECEPTIONIST), doctorInsertRouter);
 app.use('/doctor/index', protect, doctorIndexRouter);
 app.use('/patient/users', protect, patientUsersRouter);
-app.use('/patient/insert', protect, patientInsertRouter);
-app.use('/patient/index', protect, patientIndexRouter);
+// Booking, cancelling, family and favorites: patient tokens only. (patient/users
+// lets staff into the few read routes the clinic app needs — see its guard.)
+app.use('/patient/insert', protect, authorize(ROLE.PATIENT), patientInsertRouter);
+app.use('/patient/index', protect, authorize(ROLE.PATIENT), patientIndexRouter);
 
-// Uploaded images — JWT-gated. Stored outside src/ (backend/uploads).
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+// Uploaded images — JWT-gated. Folder: UPLOADS_DIR (src/uploads.js).
+const UPLOADS_DIR = require('./uploads');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 app.use('/uploads', uploadAuth, express.static(UPLOADS_DIR));
 
 // Landing page static assets (CSS, JS, images).
 app.use(express.static(PUBLIC_DIR));
+// Scripts of the server-rendered pages (admin panel, delete-account).
+app.use('/static', express.static(path.join(__dirname, 'static'), { index: false }));
 
 // Keep old Play Store privacy/logo links working.
 app.get('/privacy', (req, res) => res.sendFile(path.join(__dirname, 'static', 'privacy.html')));

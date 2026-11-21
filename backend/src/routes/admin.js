@@ -11,6 +11,7 @@ const { ROLE } = require('../middleware/roles');
 const { authLimiter } = require('../middleware/rateLimit');
 const db = require('../db');
 const log = require('../middleware/logger');
+const doctorsSql = require('../queries/doctors');
 
 // There is no admin table — a single shared staff credential (env vars)
 // mints a token carrying ROLE.ADMIN. Good enough for one support team;
@@ -61,7 +62,7 @@ router.get('/doctors/pending', async (req, res) => {
 	try {
 		const result = await db.request()
 			.input('operation', 'ListPendingDoctors')
-			.execute('sp_doctor_login');
+			.run(doctorsSql);
 		res.json(result.recordset);
 	} catch (err) {
 		log.error('admin ListPendingDoctors error: ' + err.message);
@@ -77,7 +78,7 @@ router.post('/doctors/:id/verify', async (req, res) => {
 		const result = await db.request()
 			.input('operation', 'VerifyDoctor')
 			.input('doctor_id', doctorId)
-			.execute('sp_doctor_login');
+			.run(doctorsSql);
 		res.json(result.recordset?.[0] || { success: true });
 	} catch (err) {
 		log.error('admin VerifyDoctor error: ' + err.message);
@@ -96,7 +97,7 @@ router.post('/doctors/:id/reject', async (req, res) => {
 		const result = await db.request()
 			.input('operation', 'DeleteDoctor')
 			.input('doctor_id', doctorId)
-			.execute('sp_doctor_login');
+			.run(doctorsSql);
 		res.json(result.recordset?.[0] || { success: true });
 	} catch (err) {
 		log.error('admin reject doctor error: ' + err.message);

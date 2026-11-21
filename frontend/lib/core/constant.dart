@@ -16,8 +16,6 @@
 // the value requires a full rebuild (hot reload won't pick it up).
 const String baseUrl = String.fromEnvironment(
   'API_URL',
-  defaultValue: 'https://qless.vengurlatech.com/',
+  defaultValue: 'http://192.168.1.12:3000/',
   
-); 
-
-  
+);   

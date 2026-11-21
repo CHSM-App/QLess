@@ -19,6 +19,7 @@ class DoctorLoginImpl implements DoctorLoginRepository {
     DoctorDetails doctorLogin, {
     File? doctorImage,
     List<File>? clinicImages,
+    String? loginTicket,
   }) async {
     MultipartFile? multipartDoctorImage;
     List<MultipartFile>? multipartClinicImages;
@@ -62,6 +63,7 @@ class DoctorLoginImpl implements DoctorLoginRepository {
       doctorLogin.genderId ?? 0,
       multipartDoctorImage,
       multipartClinicImages,
+      loginTicket,
     );
   }
 

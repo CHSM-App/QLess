@@ -8,6 +8,7 @@ process.env.DB_PASSWORD = 'test';
 process.env.DB_NAME = 'test';
 process.env.CORS_ORIGINS = 'http://localhost:3000';
 process.env.PUBLIC_BASE_URL = 'http://localhost:3000';
+process.env.DEMO_ENABLED = 'true'; // suites use the demo numbers
 process.env.DEMO_OTP = '123456';
 // Never send real WhatsApp OTPs or push notifications from a test run.
 process.env.WHATSAPP_API_TOKEN = '';

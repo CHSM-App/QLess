@@ -14,9 +14,12 @@ src/
   fcm.js             Firebase Admin, initialised once
   migrate.js         Migration runner
   migrations/        000_baseline.sql, 001_…, each with an optional _rollback.sql
-  middleware/        auth, protect, authorize, roles, rate limits, uploads, logger
+  queries/           SQL that used to be stored procedures, one batch per operation
+  familyMembers.js   family-member insert/update (patient app + walk-in)
+  middleware/        auth, protect, authorize, roles, ownPatient, rate limits, uploads, logger
   routes/
-    auth.js          /login           OTP, sessions, sign-up, clinics, receptionists
+    auth/            /login           index.js mounts: session, lookups, signup, otp,
+                                      pages, clinics, receptionist; helpers in shared.js
     admin.js         /admin           doctor approval panel
     account.js       /delete-account  OTP-verified account deletion
     doctor/          /doctor/*        (insert/ is split by feature)
@@ -27,9 +30,25 @@ tests/               Jest + supertest (DB, Firebase and cron are mocked)
 uploads/             user images (served at /uploads, JWT-gated)
 ```
 
-Business logic for most endpoints lives in stored procedures (`sp_*`). Their
-definitions are versioned in `src/migrations/` — never edit them directly on
-the server.
+There are no stored procedures any more: all SQL lives in this repo. Most of it
+is inline in the routes; the large former procedures (appointments, doctors,
+patients, …) are in `src/queries/*.js` as one SQL batch per operation:
+
+```js
+const appointmentsSql = require('../queries/appointments');
+await db.request()
+  .input('operation', 'NEXT_SESSION')
+  .input('doctor_id', doctor_id)
+  .run(appointmentsSql);   // see run() in src/db.js
+```
+
+`run()` declares the old procedure parameters as typed locals, so values
+convert and default exactly as they did. Change a batch like any other code
+(with its test); schema changes still go through `src/migrations/`.
+
+Access rules: `/doctor/insert/*` is for doctor and receptionist tokens; on
+`/patient/*` a patient token may only use its own ids (and its family members'
+where the app books for family) — `src/middleware/ownPatient.js`.
 
 ## Setup
 
@@ -81,6 +100,21 @@ When a change raises coverage, raise `jest.coverageThreshold` to the new floor
 
 Route tests run against a scripted DB mock (`tests/helpers/db.js`): a suite
 answers by stored procedure + `@operation` instead of by call order.
+
+`npm run lint` (ESLint errors only, as CI runs it); `npm run lint:all` also lists
+the style warnings in older code. CI (`.github/workflows/main.yml`, job
+`test-backend`) runs lint, tests with coverage and `npm audit --omit=dev
+--audit-level=high`, and only then syncs the `backend` branch Plesk deploys.
+
+## Response shapes
+
+Existing routes answer in the shapes the app already parses: `{ success,
+message }`, `{ error }` on auth failures, or a raw array for lists. Don't change
+an existing route's shape without changing the app at the same time; its tests
+pin the current one. **New** endpoints use `{ success, message, data }`.
+Every 5xx answer is replaced by `{ success: false, message, correlation_id }`
+(`hideServerErrors`); the full error is in the log under that id.
+`GET /health` → `{ status, db, uptime }` (503 when the database is down).
 
 ## Deployment (IIS / iisnode)
 

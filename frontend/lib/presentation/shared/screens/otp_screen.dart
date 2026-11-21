@@ -9,7 +9,7 @@ import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
 import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/firebase_options.dart';
-import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
+import 'package:qless/presentation/shared/providers/view_model_provider.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
@@ -138,8 +138,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
     _fadeController.dispose();
     _shakeController.dispose();
     _timer?.cancel();
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -424,7 +428,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
   void _triggerError() {
     setState(() => _hasError = true);
     _shakeController.forward(from: 0);
-    for (final c in _controllers) c.clear();
+    for (final c in _controllers) {
+      c.clear();
+    }
     _focusNodes[0].requestFocus();
   }
 
@@ -477,7 +483,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen>
 
   void _resendOtp() {
     if (_secondsLeft > 0) return;
-    for (final c in _controllers) c.clear();
+    for (final c in _controllers) {
+      c.clear();
+    }
     setState(() => _hasError = false);
     _focusNodes[0].requestFocus();
     _startTimer();
@@ -1061,10 +1069,10 @@ class _OtpHeroIcon extends StatelessWidget {
           colors: [kPrimaryLight, Colors.white],
           stops: [0.0, 1.0],
         ),
-        border: Border.all(color: kPrimary.withOpacity(0.3), width: 1.5),
+        border: Border.all(color: kPrimary.withValues(alpha: 0.3), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: kPrimary.withOpacity(0.18),
+            color: kPrimary.withValues(alpha: 0.18),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -1083,7 +1091,7 @@ class _OtpHeroIcon extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: kPrimary.withOpacity(0.35),
+                color: kPrimary.withValues(alpha: 0.35),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
               ),
@@ -1135,7 +1143,7 @@ class _OtpCard extends StatelessWidget {
         border: Border.all(color: kBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: kTextPrimary.withOpacity(0.04),
+            color: kTextPrimary.withValues(alpha: 0.04),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -1276,7 +1284,7 @@ class _ErrorText extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: kRedLight,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kError.withOpacity(0.35)),
+                  border: Border.all(color: kError.withValues(alpha: 0.35)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1338,7 +1346,7 @@ class _VerifyButton extends StatelessWidget {
         boxShadow: enabled
             ? [
                 BoxShadow(
-                  color: kPrimary.withOpacity(0.35),
+                  color: kPrimary.withValues(alpha: 0.35),
                   blurRadius: 16,
                   offset: const Offset(0, 6),
                 ),
@@ -1609,12 +1617,12 @@ class _OtpBoxState extends State<_OtpBox> {
       borderColor = kError;
       borderWidth = 1.6;
     } else if (_isFocused) {
-      bg = kPrimaryLight.withOpacity(0.5);
+      bg = kPrimaryLight.withValues(alpha: 0.5);
       borderColor = kPrimary;
       borderWidth = 1.8;
     } else if (filled) {
       bg = kPrimaryLight;
-      borderColor = kPrimary.withOpacity(0.5);
+      borderColor = kPrimary.withValues(alpha: 0.5);
       borderWidth = 1.4;
     } else {
       bg = kBgSoft;
@@ -1637,7 +1645,7 @@ class _OtpBoxState extends State<_OtpBox> {
           boxShadow: _isFocused && !widget.hasError
               ? [
                   BoxShadow(
-                    color: kPrimary.withOpacity(0.15),
+                    color: kPrimary.withValues(alpha: 0.15),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),

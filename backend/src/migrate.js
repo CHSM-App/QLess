@@ -46,9 +46,9 @@ const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 // ---------------------------------------------------------------------------
 const ENSURE_TRACKING_TABLE = `
   IF NOT EXISTS (
-    SELECT 1 FROM sys.tables WHERE name = 'schema_migrations'
+    SELECT 1 FROM sys.tables WHERE name = 'schema_migrations' AND schema_id = SCHEMA_ID('dbo')
   )
-  CREATE TABLE schema_migrations (
+  CREATE TABLE dbo.schema_migrations (
     version     NVARCHAR(10)  NOT NULL PRIMARY KEY,  -- e.g. '001'
     name        NVARCHAR(200) NOT NULL,              -- e.g. 'initial_schema'
     applied_at  DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
@@ -89,7 +89,7 @@ function discoverMigrations() {
 /** Return the set of already-applied versions from the tracking table. */
 async function appliedVersions(pool) {
   const result = await pool.request().query(
-    'SELECT version FROM schema_migrations ORDER BY version ASC'
+    'SELECT version FROM dbo.schema_migrations ORDER BY version ASC'
   );
   return new Set(result.recordset.map((r) => r.version));
 }
@@ -156,7 +156,7 @@ async function recordApplied(pool, version, name) {
     .input('version', sql.NVarChar(10),  version)
     .input('name',    sql.NVarChar(200), name)
     .query(`
-      INSERT INTO schema_migrations (version, name)
+      INSERT INTO dbo.schema_migrations (version, name)
       VALUES (@version, @name)
     `);
 }
@@ -165,7 +165,7 @@ async function recordApplied(pool, version, name) {
 async function recordReverted(pool, version) {
   await pool.request()
     .input('version', sql.NVarChar(10), version)
-    .query('DELETE FROM schema_migrations WHERE version = @version');
+    .query('DELETE FROM dbo.schema_migrations WHERE version = @version');
 }
 
 // ---------------------------------------------------------------------------
@@ -177,7 +177,7 @@ async function cmdStatus(pool) {
   const applied    = await appliedVersions(pool);
 
   const rows = await pool.request().query(
-    'SELECT version, name, applied_at, applied_by FROM schema_migrations ORDER BY version ASC'
+    'SELECT version, name, applied_at, applied_by FROM dbo.schema_migrations ORDER BY version ASC'
   );
   const appliedMeta = {};
   for (const r of rows.recordset) appliedMeta[r.version] = r;

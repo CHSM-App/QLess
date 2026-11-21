@@ -9,7 +9,6 @@ import 'package:qless/presentation/doctor/screens/doctor_registration.dart';
 import 'package:qless/presentation/patient/screens/patient_registration.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/shared/screens/otp_screen.dart';
-import 'package:qless/domain/models/receptionist_model.dart';
 
 // ── Colour Palette ─────────────────────────────────────────────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -194,13 +193,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  bool _intToBool(dynamic doctor, String key) {
-    if (doctor is Map) return (doctor[key] ?? 0) == 1;
-    if (key == 'doc_is_verified') return (doctor.isVerified ?? 0) == 1;
-    if (key == 'doc_active_status') return (doctor.activeStatus ?? 0) == 1;
-    return false;
-  }
-
   void _showStatusDialog({
     required IconData icon,
     required Color iconColor,
@@ -212,7 +204,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha: 0.45),
       builder: (_) => Dialog(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -227,12 +219,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                 height: 72,
                 decoration: BoxDecoration(
                   gradient: RadialGradient(
-                    colors: [iconBg, iconBg.withOpacity(0.4)],
+                    colors: [iconBg, iconBg.withValues(alpha: 0.4)],
                   ),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: iconColor.withOpacity(0.18),
+                      color: iconColor.withValues(alpha: 0.18),
                       blurRadius: 16,
                       spreadRadius: 2,
                     ),
@@ -381,9 +373,9 @@ class _LoginBackButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(0.18),
+      color: Colors.white.withValues(alpha: 0.18),
       shape: CircleBorder(
-        side: BorderSide(color: Colors.white.withOpacity(0.30)),
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.30)),
       ),
       child: InkWell(
         customBorder: const CircleBorder(),
@@ -487,10 +479,10 @@ class _LandscapeLayout extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.18),
+                            color: Colors.white.withValues(alpha: 0.18),
                             borderRadius: BorderRadius.circular(30),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.35),
+                              color: Colors.white.withValues(alpha: 0.35),
                               width: 1,
                             ),
                           ),
@@ -527,7 +519,7 @@ class _LandscapeLayout extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13.5,
-                              color: Colors.white.withOpacity(0.88),
+                              color: Colors.white.withValues(alpha: 0.88),
                               height: 1.6,
                               fontWeight: FontWeight.w400,
                             ),
@@ -700,8 +692,6 @@ class _PortraitLayout extends StatelessWidget {
         final heroVPad = isVerySmall ? 16.0 : (isSmall ? 20.0 : 24.0);
         final heroBottomPad = isVerySmall ? 44.0 : (isSmall ? 52.0 : 64.0);
         final titleSize = isVerySmall ? 22.0 : (isSmall ? 26.0 : 29.0);
-        final logoSize = isVerySmall ? 44.0 : (isSmall ? 50.0 : 56.0);
-        final gapBeforeTitle = isVerySmall ? 16.0 : (isSmall ? 20.0 : 28.0);
         final gapTopRowToLogo = isVerySmall ? 16.0 : (isSmall ? 20.0 : 28.0);
 
         return SingleChildScrollView(
@@ -709,7 +699,7 @@ class _PortraitLayout extends StatelessWidget {
           child: Column(
             children: [
               // ── HERO HEADER (self-sizing, no IntrinsicHeight) ───────────
-              Container(
+              SizedBox(
                 width: double.infinity,
                 child: Stack(
                   children: [
@@ -760,10 +750,10 @@ class _PortraitLayout extends StatelessWidget {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 6),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.18),
+                                    color: Colors.white.withValues(alpha: 0.18),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.30),
+                                      color: Colors.white.withValues(alpha: 0.30),
                                       width: 1,
                                     ),
                                   ),
@@ -796,10 +786,10 @@ class _PortraitLayout extends StatelessWidget {
                                 //   width: 36,
                                 //   height: 36,
                                 //   decoration: BoxDecoration(
-                                //     color: Colors.white.withOpacity(0.18),
+                                //     color: Colors.white.withValues(alpha: 0.18),
                                 //     shape: BoxShape.circle,
                                 //     border: Border.all(
-                                //       color: Colors.white.withOpacity(0.25),
+                                //       color: Colors.white.withValues(alpha: 0.25),
                                 //       width: 1,
                                 //     ),
                                 //   ),
@@ -832,7 +822,7 @@ class _PortraitLayout extends StatelessWidget {
                             //           'Care, simplified',
                             //           style: TextStyle(
                             //             fontSize: 12,
-                            //             color: Colors.white.withOpacity(0.85),
+                            //             color: Colors.white.withValues(alpha: 0.85),
                             //             fontWeight: FontWeight.w400,
                             //           ),
                             //         ),
@@ -858,7 +848,7 @@ class _PortraitLayout extends StatelessWidget {
                             //       : 'Sign in to book and track your appointments',
                             //   style: TextStyle(
                             //     fontSize: isVerySmall ? 12.5 : 14,
-                            //     color: Colors.white.withOpacity(0.88),
+                            //     color: Colors.white.withValues(alpha: 0.88),
                             //     height: 1.5,
                             //     fontWeight: FontWeight.w400,
                             //   ),
@@ -906,7 +896,7 @@ class _PortraitLayout extends StatelessWidget {
                             border: Border.all(color: kBorder, width: 1),
                             boxShadow: [
                               BoxShadow(
-                                color: kTextPrimary.withOpacity(0.04),
+                                color: kTextPrimary.withValues(alpha: 0.04),
                                 blurRadius: 24,
                                 offset: const Offset(0, 8),
                               ),
@@ -1075,7 +1065,7 @@ class _MobileField extends StatelessWidget {
         boxShadow: isFocused
             ? [
                 BoxShadow(
-                  color: kPrimary.withOpacity(0.12),
+                  color: kPrimary.withValues(alpha: 0.12),
                   blurRadius: 12,
                   spreadRadius: 1,
                 ),
@@ -1092,7 +1082,7 @@ class _MobileField extends StatelessWidget {
               color: isFocused ? kPrimaryLight : Colors.white,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: isFocused ? kPrimary.withOpacity(0.3) : kBorderStrong,
+                color: isFocused ? kPrimary.withValues(alpha: 0.3) : kBorderStrong,
                 width: 1,
               ),
             ),
@@ -1186,7 +1176,7 @@ class _LoginButton extends StatelessWidget {
               ? []
               : [
                   BoxShadow(
-                    color: kPrimary.withOpacity(0.35),
+                    color: kPrimary.withValues(alpha: 0.35),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -1275,10 +1265,10 @@ class _RegisterCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: kPrimaryLight.withOpacity(0.4),
+            color: kPrimaryLight.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color: kPrimary.withOpacity(0.25),
+              color: kPrimary.withValues(alpha: 0.25),
               width: 1,
             ),
           ),
@@ -1367,10 +1357,10 @@ class _FeaturePill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.white.withOpacity(0.25),
+            color: Colors.white.withValues(alpha: 0.25),
             width: 1,
           ),
         ),
@@ -1401,15 +1391,15 @@ class _BrandLogo extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withValues(alpha: 0.18),
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withValues(alpha: 0.4),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               blurRadius: 20,
               spreadRadius: -4,
             ),
@@ -1437,8 +1427,8 @@ class _Blob extends StatelessWidget {
           shape: BoxShape.circle,
           gradient: RadialGradient(
             colors: [
-              Colors.white.withOpacity(opacity),
-              Colors.white.withOpacity(0),
+              Colors.white.withValues(alpha: opacity),
+              Colors.white.withValues(alpha: 0),
             ],
           ),
         ),
@@ -1457,7 +1447,7 @@ class _DotPattern extends StatelessWidget {
 class _DotPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withOpacity(0.08);
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.08);
     const spacing = 22.0;
     const radius = 1.1;
     for (double x = 0; x < size.width; x += spacing) {

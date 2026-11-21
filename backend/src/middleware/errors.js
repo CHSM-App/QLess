@@ -24,4 +24,22 @@ function serverError(req, res, err, context) {
   });
 }
 
-module.exports = { serverError };
+// Same rule for every route at once: any 5xx JSON body is logged in full and
+// replaced by a generic message + correlation id, so a catch block that does
+// `res.status(500).json({ message: err.message })` can no longer leak SQL /
+// driver details. 4xx bodies (validation, business messages) are untouched.
+const GENERIC = 'Something went wrong. Please try again.';
+function hideServerErrors(req, res, next) {
+  const json = res.json.bind(res);
+  res.json = (body) => {
+    if (res.statusCode < 500 || !body || typeof body !== 'object') return json(body);
+    const id = req.id || crypto.randomBytes(6).toString('hex');
+    log.error(`[${id}] [${res.statusCode}] ${req.method} ${req.originalUrl || req.path}: ${JSON.stringify(body).slice(0, 2000)}`);
+    const safe = { success: false, message: GENERIC, correlation_id: id };
+    if ('error' in body) safe.error = GENERIC;
+    return json(safe);
+  };
+  next();
+}
+
+module.exports = { serverError, hideServerErrors, GENERIC };

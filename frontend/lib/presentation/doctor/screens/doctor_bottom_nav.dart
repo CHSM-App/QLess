@@ -463,6 +463,8 @@ class _DoctorBottomNavState extends ConsumerState<DoctorBottomNav>
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _TealNotificationBell extends StatelessWidget {
+  const _TealNotificationBell({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -472,7 +474,7 @@ class _TealNotificationBell extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: DoctorNavTheme.teal.withOpacity(0.10),
+            color: DoctorNavTheme.teal.withValues(alpha: 0.10),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
               color: DoctorNavTheme.tealLight,
@@ -507,7 +509,9 @@ class _TealNotificationBell extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// Reusable teal notification bell — use anywhere a standalone bell is needed.
-class DoctorNotificationBell extends _TealNotificationBell {}
+class DoctorNotificationBell extends _TealNotificationBell {
+  const DoctorNotificationBell({super.key});
+}
 
 PreferredSizeWidget buildDoctorAppBar({
   required String doctorName,

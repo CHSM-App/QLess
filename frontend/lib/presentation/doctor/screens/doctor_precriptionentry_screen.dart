@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/core/navigation/navigator_key.dart';
@@ -11,7 +11,7 @@ import 'package:qless/presentation/doctor/providers/doctor_repository_provider.d
 import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
-import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
+import 'package:qless/presentation/doctor/screens/add_medicine_page.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 
 // ════════════════════════════════════════════════════════════════════
@@ -362,14 +362,14 @@ class _InlineDrumPanelState extends State<_InlineDrumPanel> {
       decoration: BoxDecoration(
         color: kCardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: ac.withOpacity(0.22)),
-        boxShadow: [BoxShadow(color: ac.withOpacity(0.07), blurRadius: 14, offset: const Offset(0, 4))],
+        border: Border.all(color: ac.withValues(alpha: 0.22)),
+        boxShadow: [BoxShadow(color: ac.withValues(alpha: 0.07), blurRadius: 14, offset: const Offset(0, 4))],
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
-            color: ac.withOpacity(0.07),
+            color: ac.withValues(alpha: 0.07),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
           ),
           child: Row(children: [
@@ -456,8 +456,10 @@ class _DrumPickerState extends State<_DrumPicker> {
     super.didUpdateWidget(old);
     if (old.selected != widget.selected) {
       final idx = widget.opts.indexOf(widget.selected);
-      if (idx >= 0) _ctrl.animateToItem(idx,
+      if (idx >= 0) {
+        _ctrl.animateToItem(idx,
           duration: const Duration(milliseconds: 200), curve: Curves.easeOut);
+      }
     }
   }
 
@@ -471,17 +473,17 @@ class _DrumPickerState extends State<_DrumPicker> {
       height: 110,
       child: Stack(alignment: Alignment.center, children: [
         Container(height: 36, margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(color: ac.withOpacity(0.10), borderRadius: BorderRadius.circular(7))),
+            decoration: BoxDecoration(color: ac.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(7))),
         Positioned(top: 0, left: 0, right: 0, height: 37,
           child: IgnorePointer(child: Container(decoration: BoxDecoration(
             gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                colors: [kCardBg, kCardBg.withOpacity(0)]),
+                colors: [kCardBg, kCardBg.withValues(alpha: 0)]),
           ))),
         ),
         Positioned(bottom: 0, left: 0, right: 0, height: 37,
           child: IgnorePointer(child: Container(decoration: BoxDecoration(
             gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                colors: [kCardBg, kCardBg.withOpacity(0)]),
+                colors: [kCardBg, kCardBg.withValues(alpha: 0)]),
           ))),
         ),
         ListWheelScrollView.useDelegate(
@@ -548,7 +550,7 @@ class _CompleteDropdownState extends State<_CompleteDropdown> {
           ]),
         ),
       ),
-      Container(width: 1, height: 46, color: Colors.white.withOpacity(0.3)),
+      Container(width: 1, height: 46, color: Colors.white.withValues(alpha: 0.3)),
       PopupMenuButton<int>(
         onSelected: (v) => setState(() => _selected = v),
         padding: EdgeInsets.zero,
@@ -1179,7 +1181,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   //     ),
   //     if (state.isLoading)
   //       Container(
-  //         color: Colors.black.withOpacity(0.28),
+  //         color: Colors.black.withValues(alpha: 0.28),
   //         child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
   //       ),
   //   ]);
@@ -1209,7 +1211,7 @@ Widget build(BuildContext context) {
     ),
     if (state.isLoading)
       Container(
-        color: Colors.black.withOpacity(0.28),
+        color: Colors.black.withValues(alpha: 0.28),
         child: const Center(child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5)),
       ),
   ]);
@@ -1247,7 +1249,7 @@ Widget build(BuildContext context) {
             decoration: BoxDecoration(
               color: kPrimaryLight,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kPrimary.withOpacity(0.2)),
+              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
             ),
             child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
           ),
@@ -1425,7 +1427,7 @@ Widget build(BuildContext context) {
   );
 
   Widget _textSection(String label, TextEditingController ctrl, String hint, {bool hasError = false, Key? key}) =>
-      Container(key: key, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      KeyedSubtree(key: key, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _secLabel(label), _gap(8),
         TextField(
           controller: ctrl, maxLines: 3,
@@ -1484,7 +1486,7 @@ Widget build(BuildContext context) {
           });
         }
       },
-      child: Container(key: _sympKey, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      child: KeyedSubtree(key: _sympKey, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _secLabel('Symptoms *'), _gap(8),
         // One box: pills + typing area together
         GestureDetector(
@@ -1503,8 +1505,8 @@ Widget build(BuildContext context) {
               for (final s in _symptomChips)
                 Chip(
                   label: Text(s, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black)),
-                  backgroundColor: kPrimary.withOpacity(0.08),
-                  side: BorderSide(color: kPrimary.withOpacity(0.3)),
+                  backgroundColor: kPrimary.withValues(alpha: 0.08),
+                  side: BorderSide(color: kPrimary.withValues(alpha: 0.3)),
                   visualDensity: VisualDensity.compact,
                   deleteIcon: const Icon(Icons.close_rounded, size: 14, color: Colors.black),
                   onDeleted: () => setState(() => _symptomChips.remove(s)),
@@ -1902,8 +1904,8 @@ void _onTypeChange(MedicineType t) {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: e.hasError ? kError : tc.withOpacity(0.30), width: e.hasError ? 1.6 : 1.2),
-        boxShadow: [BoxShadow(color: tc.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 2))],
+        border: Border.all(color: e.hasError ? kError : tc.withValues(alpha: 0.30), width: e.hasError ? 1.6 : 1.2),
+        boxShadow: [BoxShadow(color: tc.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 2))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _header(tc),
@@ -1915,13 +1917,13 @@ void _onTypeChange(MedicineType t) {
   Widget _header(Color tc) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
     decoration: BoxDecoration(
-      color: tc.withOpacity(0.07),
+      color: tc.withValues(alpha: 0.07),
       borderRadius: const BorderRadius.vertical(top: Radius.circular(13)),
     ),
     child: Row(children: [
       Container(
         width: 28, height: 28,
-        decoration: BoxDecoration(color: tc.withOpacity(0.15), borderRadius: BorderRadius.circular(7)),
+        decoration: BoxDecoration(color: tc.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(7)),
         child: Icon(e.type.icon, color: tc, size: 14),
       ),
       const SizedBox(width: 9),
@@ -2081,7 +2083,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
           decoration: BoxDecoration(
             color: e.type.colorLight,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: e.type.color.withOpacity(0.3)),
+            border: Border.all(color: e.type.color.withValues(alpha: 0.3)),
           ),
           child: Row(children: [
             Icon(e.type.icon, color: e.type.color, size: 15),
@@ -2090,7 +2092,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
                 overflow: TextOverflow.ellipsis)),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: e.type.color.withOpacity(0.12), borderRadius: BorderRadius.circular(5)),
+              decoration: BoxDecoration(color: e.type.color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(5)),
               child: Text(e.type.label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: e.type.colorDark)),
             ),
             const SizedBox(width: 6),
@@ -2175,7 +2177,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
               decoration: BoxDecoration(
                 color: kPrimaryLight,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kPrimary.withOpacity(0.3)),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.3)),
               ),
               child: const Row(children: [
                 Icon(Icons.add_circle_outline_rounded, color: kPrimary, size: 15),
@@ -2230,7 +2232,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       _lbl(label), _gap(5),
       DropdownButtonFormField<String>(
-        value: safe, isExpanded: true,
+        initialValue: safe, isExpanded: true,
         items: opts.map((o) => DropdownMenuItem(value: o,
             child: Text(o, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis))).toList(),
         onChanged: cb,
@@ -2313,7 +2315,7 @@ class _PreviousHistoryPage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: kPurpleLight,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kPurple.withOpacity(0.2)),
+                    border: Border.all(color: kPurple.withValues(alpha: 0.2)),
                   ),
                   child: const Icon(Icons.history_rounded, color: kPurpleDark, size: 16),
                 ),

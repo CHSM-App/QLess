@@ -193,7 +193,7 @@ class _PortraitLayout extends StatelessWidget {
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: isVerySmall ? 12 : 13.5,
-                                color: Colors.white.withOpacity(0.88),
+                                color: Colors.white.withValues(alpha: 0.88),
                                 height: 1.5,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -377,7 +377,7 @@ class _LandscapeLayout extends StatelessWidget {
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontSize: 13.5,
-                              color: Colors.white.withOpacity(0.88),
+                              color: Colors.white.withValues(alpha: 0.88),
                               height: 1.6,
                             ),
                           ),
@@ -530,7 +530,7 @@ class _RoleCard extends StatelessWidget {
         border: Border.all(color: kBorderStrong, width: 1),
         boxShadow: [
           BoxShadow(
-            color: kTextPrimary.withOpacity(0.03),
+            color: kTextPrimary.withValues(alpha: 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -626,31 +626,6 @@ class _RoleCard extends StatelessWidget {
   }
 }
 
-class _MiniChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _MiniChip({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.18), width: 0.8),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: color,
-            letterSpacing: 0.1,
-          ),
-        ),
-      );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED SMALL WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -724,10 +699,10 @@ class _FeaturePill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Colors.white.withOpacity(0.25),
+            color: Colors.white.withValues(alpha: 0.25),
             width: 1,
           ),
         ),
@@ -758,15 +733,15 @@ class _BrandLogo extends StatelessWidget {
         width: size,
         height: size,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
+          color: Colors.white.withValues(alpha: 0.18),
           shape: BoxShape.circle,
           border: Border.all(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withValues(alpha: 0.4),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               blurRadius: 20,
               spreadRadius: -4,
             ),
@@ -794,8 +769,8 @@ class _Blob extends StatelessWidget {
           shape: BoxShape.circle,
           gradient: RadialGradient(
             colors: [
-              Colors.white.withOpacity(opacity),
-              Colors.white.withOpacity(0),
+              Colors.white.withValues(alpha: opacity),
+              Colors.white.withValues(alpha: 0),
             ],
           ),
         ),
@@ -812,7 +787,7 @@ class _DotPattern extends StatelessWidget {
 class _DotPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withOpacity(0.08);
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.08);
     const spacing = 22.0;
     const radius = 1.1;
     for (double x = 0; x < size.width; x += spacing) {

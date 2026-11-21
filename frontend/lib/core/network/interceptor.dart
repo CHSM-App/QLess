@@ -264,6 +264,11 @@ class TokenInterceptor extends Interceptor {
           return "Session expired. Please sign in again.";
         }
         if (statusCode == 403) {
+          final data = err.response?.data;
+          // An admin blocked this doctor (verification itself never blocks).
+          if (data is Map && data['code'] == 'DOCTOR_BLOCKED') {
+            return "Your account has been blocked. Please contact support.";
+          }
           return "Your account does not have access to this action.";
         }
         if (statusCode == 404) {

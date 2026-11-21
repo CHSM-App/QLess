@@ -53,10 +53,51 @@ jobs:
           path: frontend/coverage/
           retention-days: 14
 
+  # ── Job 1b: Backend tests, coverage threshold, lint, audit ─────────────────
+  # Tests use a mocked database (tests/setup.js), so no SQL Server is needed.
+  test-backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Tests with coverage threshold
+        working-directory: backend
+        run: npm run test:coverage
+
+      - name: Audit production dependencies (high and critical fail)
+        working-directory: backend
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Upload backend coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage/
+          retention-days: 14
+
   # ── Job 2: Build landing page, copy into backend/public/, sync backend branch
+  # Only after the backend tests pass: Plesk deploys from that branch.
   sync-backend:
     name: Build landing page + sync backend branch
     runs-on: ubuntu-latest
+    needs: test-backend
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     steps:
       - uses: actions/checkout@v4

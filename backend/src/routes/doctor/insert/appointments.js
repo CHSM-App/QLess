@@ -6,6 +6,7 @@ const sql = require('mssql');
 const admin = require('../../../fcm');
 const cron = require('node-cron');
 const log = require('../../../middleware/logger');
+const { saveFamilyMember } = require('../../../familyMembers');
 
 const {
   emitQueueUpdate,
@@ -13,13 +14,19 @@ const {
   fetchCurrentServing,
   insertNotification,
   insertNotificationForToken,
+  notifyTokensInBackground,
   sendPositionNotifications,
   sendProximityNotifications,
   formatApptDate,
   formatApptTime,
 } = require('./shared');
+const doctorLeaveSql = require('../../../queries/doctorLeave');
+const notificationsSql = require('../../../queries/notifications');
+const patientsSql = require('../../../queries/patients');
+const appointmentsSql = require('../../../queries/appointments');
 
 const router = express.Router();
+require('../../../middleware/ownStaff').params(router); // URL ids (body ids: insert/index.js)
 
 router.post('/appointment/queueNext', async (req, res) => {
   const { doctor_id, appointment_id, clinic_id } = req.body;
@@ -37,7 +44,7 @@ router.post('/appointment/queueNext', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('appointment_id', appointment_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const row = result.recordset?.[0] ?? {};
 
@@ -110,7 +117,7 @@ router.post('/appointment/queueStart', async (req, res) => {
       .input('operation', 'QUEUE_START')
       .input('queue_id', queue_id)
       .input('doctor_id', doctor_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     // QUEUE_START's SP returns the status row and the waiting-patient token
     // rows. Depending on the SP it may put them in ONE recordset (status first,
@@ -149,25 +156,14 @@ router.post('/appointment/queueStart', async (req, res) => {
         .input('operation', 'APPT_CONTEXT_QUEUE')
         .input('doctor_id', doctor_id)
         .input('queue_id', queue_id)
-        .execute('sp_notification');
+        .run(notificationsSql);
       doctorName = ctx.recordset?.[0]?.doctor_name || 'your doctor';
     } catch (e) { log.error('[queueStart] name lookup failed: ' + e.message); }
     const startTitle = 'Doctor Arrived';
     const startBody = `Dr. ${doctorName} has started the queue. Please be ready.`;
 
-    for (const tk of tokens) {
-      await insertNotificationForToken(tk, startTitle, startBody, 'queue', doctor_id);
-    }
-
-
-    // 🔥 SEND NOTIFICATION
-    const message = {
-      notification: { title: startTitle, body: startBody },
-      data: { type: 'queue' },
-      tokens: tokens,
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message);
+    // Inbox rows + push go out after the answer (A1); failures only log (B12).
+    notifyTokensInBackground(tokens, startTitle, startBody, doctor_id, 'queueStart');
 
     sendProximityNotifications(doctor_id);
     emitQueueUpdate(req, 'queue_started', doctor_id, { queue_id });
@@ -175,9 +171,7 @@ router.post('/appointment/queueStart', async (req, res) => {
     return res.json({
       success: true,
       message: 'Queue started and notifications sent',
-      total_tokens: tokens.length,
-      success_count: response.successCount,
-      failure_count: response.failureCount
+      total_tokens: tokens.length
     });
 
   } catch (error) {
@@ -205,7 +199,7 @@ router.post('/appointment/queuePause', async (req, res) => {
       .input('operation', 'QUEUE_PAUSE')
       .input('queue_id', queue_id)
       .input('doctor_id', doctor_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     // SP returns 2 separate result sets: [0] = status, [1] = token rows.
     // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
@@ -236,31 +230,19 @@ router.post('/appointment/queuePause', async (req, res) => {
           .input('operation', 'APPT_CONTEXT_QUEUE')
           .input('doctor_id', doctor_id)
           .input('queue_id', queue_id)
-          .execute('sp_notification');
+          .run(notificationsSql);
         doctorName = ctx.recordset?.[0]?.doctor_name || 'your doctor';
       } catch (e) { log.error('[queuePause] name lookup failed: ' + e.message); }
       const pauseTitle = 'Queue Paused';
       const pauseBody = `Dr. ${doctorName} has paused the queue. Please wait.`;
 
-      for (const tk of tokens) {
-        await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', doctor_id);
-      }
-
-      const message = {
-        notification: { title: pauseTitle, body: pauseBody },
-        data: { type: 'queue' },
-        tokens: tokens,
-      };
-
-      const response = await admin.messaging().sendEachForMulticast(message);
+      notifyTokensInBackground(tokens, pauseTitle, pauseBody, doctor_id, 'queuePause');
 
       emitQueueUpdate(req, 'queue_paused', doctor_id, { queue_id });
       return res.json({
         success: true,
         message: 'Queue paused and notifications sent',
-        total_tokens: tokens.length,
-        success_count: response.successCount,
-        failure_count: response.failureCount
+        total_tokens: tokens.length
       });
     }
 
@@ -297,7 +279,7 @@ router.post('/appointment/queueStop', async (req, res) => {
       .input('operation', 'APPT_CONTEXT_QUEUE')
       .input('doctor_id', doctor_id)
       .input('queue_id', queue_id)
-      .execute('sp_notification');
+      .run(notificationsSql);
 
     const affectedAppts = [];
     for (const row of (detailsRes.recordset || [])) {
@@ -336,7 +318,7 @@ router.post('/appointment/queueStop', async (req, res) => {
       .input('operation', 'QUEUE_STOP')
       .input('queue_id', queue_id)
       .input('doctor_id', doctor_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const rows = result.recordset || [];
     const statusRow = rows[0] || {};
@@ -481,7 +463,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('appointment_id', appointment_id)
       .input('is_next', is_next)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const row = result.recordset?.[0] ?? {};
 
@@ -562,7 +544,10 @@ router.post('/appointment/queueRecall', async (req, res) => {
     const result = await db.request()
       .input('operation', 'RECALL_SESSION')
       .input('appointment_id', appointment_id)
-      .execute('sp_appointment');
+      // RECALL_SESSION finds today's running queue by doctor; without it
+      // every queue recall answered "Queue not started or already stopped".
+      .input('doctor_id', doctor_id)
+      .run(appointmentsSql);
 
     const row = result.recordset?.[0] ?? {};
 
@@ -602,7 +587,7 @@ router.post('/appointment/startSession', async (req, res) => {
       .input('operation', 'START_SESSION')
       .input('doctor_id', doctor_id)
       .input('appointment_id', appointment_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const row = result.recordset?.[0] ?? {};
 
@@ -643,7 +628,7 @@ router.post('/appointment/endSession', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('appointment_id', appointment_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const allRows = (result.recordsets || [result.recordset || []]).flat();
     const statusRow = allRows.find(r => r && r.success != null) || {};
@@ -701,7 +686,7 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
     const result = await db.request()
       .input('operation', 'QUEUE_PAUSE_EMERGENCY')
       .input('queue_id', queue_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     // SP returns 2 separate result sets: [0] = status, [1] = token rows.
     // node-mssql's `result.recordset` is only the FIRST recordset, so tokens
@@ -743,26 +728,13 @@ router.post('/appointment/queuePauseEmergency/:queue_id', async (req, res) => {
       const pauseTitle = 'Queue Paused (Emergency)';
       const pauseBody = `Dr. ${doctorName} has paused the queue due to an emergency. Please wait — we will notify you when it resumes.`;
 
-      for (const tk of tokens) {
-        await insertNotificationForToken(tk, pauseTitle, pauseBody, 'queue', queue_id);
-      }
-
-      const message = {
-        notification: { title: pauseTitle, body: pauseBody },
-        data: { type: 'queue' },
-        tokens: tokens,
-      };
-
-      const response = await admin.messaging().sendEachForMulticast(message);
-      log.info('[queuePauseEmergency] FCM result: ' + response.successCount + '/' + tokens.length);
+      notifyTokensInBackground(tokens, pauseTitle, pauseBody, queue_id, 'queuePauseEmergency');
 
       emitQueueUpdate(req, 'queue_paused_emergency', emergencyDoctorId, { queue_id });
       return res.json({
         success: true,
         message: statusRow.message || 'Queue paused successfully',
-        total_tokens: tokens.length,
-        success_count: response.successCount,
-        failure_count: response.failureCount
+        total_tokens: tokens.length
       });
     }
 
@@ -798,7 +770,7 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
       .input('operation', 'CANCEL_BY_DOCTOR')
       .input('appointment_id', appointment_id)
       .input('doctor_id', doctor_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const row = result.recordset?.[0] || {};
 
@@ -837,6 +809,9 @@ router.post('/walkInBook', async (req, res) => {
   if (!name || !mobile_no || !doctor_id || !appointment_date) {
     return res.status(400).json({ success: false, message: 'name, mobile_no, doctor_id, appointment_date required' });
   }
+  if (String(name).trim().length > 100) {
+    return res.status(400).json({ success: false, message: 'Name can be at most 100 characters.' });
+  }
 
   try {
     // Offline replay (offline_queued_at set by the app): the original send may
@@ -873,18 +848,17 @@ router.post('/walkInBook', async (req, res) => {
     if (family_id) {
       // Family member booking: insert into family_members, then book appointment under the
       // primary patient's id (family_id) with user_type=2.
-      const famRes = await db.request()
-        .input('operation', 'Insert')
-        .input('member_id', null)
-        .input('family_id', parseInt(family_id))
-        .input('name', String(name).trim())
-        .input('Gender_id', gender_id ? parseInt(gender_id) : null)
-        .input('relation_id', null)
-        .input('DOB', null)
-        .input('mobile_no', mobile_no)
-        .execute('sp_family_members');
+      const famRes = await saveFamilyMember('Insert', {
+        member_id: null,
+        family_id: parseInt(family_id),
+        name: String(name).trim(),
+        Gender_id: gender_id ? parseInt(gender_id) : null,
+        relation_id: null,
+        DOB: null,
+        mobile_no,
+      });
       patient_id = famRes.recordset[0]?.member_id;
-      log.info(`walkInBook family: family_id=${family_id} member_id=${patient_id} recordset=${JSON.stringify(famRes.recordset)}`);
+      log.info(`walkInBook family: family_id=${family_id} member_id=${patient_id}`);
       if (!patient_id) throw new Error('Failed to create family member record');
     } else if (existingPatientId) {
       // Existing patient returning — use their patient_id directly.
@@ -902,7 +876,7 @@ router.post('/walkInBook', async (req, res) => {
         .input('DOB', null)
         .input('blood_group_id', null)
         .input('weight', null)
-        .execute('sp_patients');
+        .run(patientsSql);
       patient_id = insertRes.recordset[0]?.patient_id;
       if (!patient_id) throw new Error('Failed to create patient profile');
     }
@@ -912,7 +886,7 @@ router.post('/walkInBook', async (req, res) => {
       .input('operation', 'IS_BLOCKED')
       .input('doctor_id', doctor_id)
       .input('from_date', appointment_date)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     if (blockRes.recordset?.[0]?.blocked === 1) {
       return res.json({ success: false, message: 'Doctor is on leave on this date. Please pick another date.' });
@@ -929,16 +903,60 @@ router.post('/walkInBook', async (req, res) => {
       .input('slot_id', slot_id || null)
       .input('symptoms', symptoms || '')
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const booked = bookRes.recordset[0].success === 1;
     log.info(`walkInBook: patient_id=${patient_id} user_type=${user_type} family_id=${family_id || null} booked=${booked} msg=${bookRes.recordset[0].message}`);
     if (booked) emitQueueUpdate(req, 'booked', doctor_id);
 
+    // Queue running and nobody in progress or waiting → start this walk-in
+    // straight away so the doctor doesn't have to press Start on them. The app
+    // opens the prescription for started_appointment_id.
+    let started_appointment_id = null;
+    if (booked) {
+      try {
+        const idle = await db.request()
+          .input('doctor_id', sql.Int, parseInt(doctor_id))
+          .input('patient_id', sql.Int, patient_id)
+          .input('user_type', sql.Int, parseInt(user_type || 1))
+          .input('appointment_date', appointment_date)
+          .query(`
+            SELECT TOP 1 a.appointment_id
+            FROM appointments a
+            JOIN doctor_queue dq ON dq.queue_id = a.queue_id AND dq.queue_status = 1
+            WHERE a.doctor_id = @doctor_id AND a.patient_id = @patient_id
+              AND a.user_type = @user_type AND a.appointment_date = @appointment_date
+              AND a.booking_type = 1 AND a.status = 'booked'
+              AND NOT EXISTS (
+                SELECT 1 FROM appointments o
+                WHERE o.queue_id = a.queue_id AND o.appointment_id <> a.appointment_id
+                  AND o.status IN ('booked', 'in_progress'))
+            ORDER BY a.appointment_id DESC
+          `);
+        const appointment_id = idle.recordset?.[0]?.appointment_id;
+        if (appointment_id) {
+          const start = await db.request()
+            .input('operation', 'START_SESSION')
+            .input('doctor_id', doctor_id)
+            .input('appointment_id', appointment_id)
+            .run(appointmentsSql);
+          if (start.recordset?.[0]?.success === 1) {
+            started_appointment_id = appointment_id;
+            const serving = await fetchCurrentServing(appointment_id);
+            emitQueueUpdate(req, 'session_started', doctor_id, { current_serving: serving });
+          }
+        }
+      } catch (e) {
+        // Booking already succeeded; the doctor can still start manually.
+        log.error('walkInBook auto-start failed: ' + e.message);
+      }
+    }
+
     return res.json({
       success: booked,
       message: bookRes.recordset[0].message,
       patient_id,
+      started_appointment_id,
     });
 
   } catch (error) {
@@ -1018,7 +1036,7 @@ async function closeOneStaleQueue(doctor_id, queue_id) {
     .input('operation', 'APPT_CONTEXT_QUEUE')
     .input('doctor_id', doctor_id)
     .input('queue_id', queue_id)
-    .execute('sp_notification');
+    .run(notificationsSql);
 
   const affected = [];
   for (const row of (detailsRes.recordset || [])) {
@@ -1066,7 +1084,7 @@ async function closeOneStaleQueue(doctor_id, queue_id) {
     .input('operation', 'QUEUE_STOP')
     .input('queue_id', queue_id)
     .input('doctor_id', doctor_id)
-    .execute('sp_appointment');
+    .run(appointmentsSql);
   const statusRow = (result.recordset || [])[0] || {};
   if (statusRow.success !== 1) {
     throw new Error(statusRow.message || 'QUEUE_STOP failed');
@@ -1097,7 +1115,7 @@ async function cancelStalePendingAppointments() {
         .input('operation', 'CANCEL_BY_DOCTOR')
         .input('appointment_id', row.appointment_id)
         .input('doctor_id', row.doctor_id)
-        .execute('sp_appointment');
+        .run(appointmentsSql);
       if ((r.recordset?.[0]?.success) !== 1) continue;
       count++;
       await notifyMissedAppointment(row.doctor_id, {
@@ -1122,7 +1140,7 @@ async function closeStaleSessions() {
   if (_staleSweepRunning) return { skipped: true };
   _staleSweepRunning = true;
   let queuesClosed = 0;
-  let slotsCancelled = 0;
+  let slotsCancelled;
   try {
     const staleQ = await db.request().query(`
       SELECT queue_id, doctor_id FROM doctor_queue

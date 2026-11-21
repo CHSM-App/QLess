@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:qless/presentation/patient/screens/appintment_screen.dart';
@@ -85,9 +84,6 @@ class PatientBottomNav extends StatefulWidget {
 class PatientBottomNavState extends State<PatientBottomNav>
     with TickerProviderStateMixin {
   int _tab = 0;
-  bool _isDragging = false;
-  double? _dragX;
-  int? _dragHoverIndex;
 
   final GlobalKey<AppointmentScreenState> _appointmentsKey =
       GlobalKey<AppointmentScreenState>();
@@ -96,19 +92,12 @@ class PatientBottomNavState extends State<PatientBottomNav>
 
   late final List<Widget> _screens;
   late final List<AnimationController> _iconControllers;
-  late final List<Animation<double>> _iconScales;
 
   // ── Palette ────────────────────────────────────────────────────
-static const _accent      = Color(0xFF6366F1); // indigo
 static const _accentDark  = Color(0xFF4F46E5);
 static const _inactiveClr = Color(0xFF94A3B8); // muted slate for inactive icons/labels
-static const _pillBg      = Colors.white;
 static const _pillBorder  = Color(0xFFE2E8F0);
-static const _activePill  = Color(0x1A6366F1); // 10% indigo tint
 static const _iconChipInactive = Color(0xFFEEF0FF); // soft indigo chip bg
-static const _iconChipActive   = Color(0xFF6366F1); // solid indigo (active)
-static const _compactNavHeight = 54.0;
-static const _regularNavHeight = 64.0;
 
   static const _navItems = [
     _NavItem(
@@ -202,11 +191,6 @@ static const _regularNavHeight = 64.0;
         duration: const Duration(milliseconds: 380),
       ),
     );
-    _iconScales = _iconControllers
-        .map((c) => Tween<double>(begin: 1.0, end: 1.18).animate(
-              CurvedAnimation(parent: c, curve: Curves.elasticOut),
-            ))
-        .toList();
     _iconControllers[_tab].forward();
 
     // screens
@@ -257,7 +241,9 @@ static const _regularNavHeight = 64.0;
 
   @override
   void dispose() {
-    for (final c in _iconControllers) c.dispose();
+    for (final c in _iconControllers) {
+      c.dispose();
+    }
     super.dispose();
 
   }

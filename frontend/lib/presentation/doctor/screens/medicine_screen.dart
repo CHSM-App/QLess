@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
-import 'package:qless/presentation/doctor/screens/addMedicine_page.dart';
+import 'package:qless/presentation/doctor/screens/add_medicine_page.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour Palette (matches QueueHomePage exactly) ───────────────────────────
@@ -130,7 +130,7 @@ class DoctorMedicinePage extends ConsumerStatefulWidget {
 class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
   final _searchCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
-  int _selectedType = 0;
+  final int _selectedType = 0;
   bool _hasFetched = false;
   bool _fabVisible = true;
 
@@ -603,7 +603,7 @@ class _MedicineCard extends StatelessWidget {
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: style.fg.withOpacity(0.18)),
+              border: Border.all(color: style.fg.withValues(alpha: 0.18)),
             ),
             alignment: Alignment.center,
             child: Icon(style.icon, color: style.fg, size: 17),
@@ -650,7 +650,7 @@ class _MedicineCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: style.bg,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: style.fg.withOpacity(0.18)),
+                    border: Border.all(color: style.fg.withValues(alpha: 0.18)),
                   ),
                   child: Text(
                     medicine.medTypeName ?? '—',
@@ -675,7 +675,7 @@ class _MedicineCard extends StatelessWidget {
               decoration: BoxDecoration(
                 color: kRedLight,
                 borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: kError.withOpacity(0.15)),
+                border: Border.all(color: kError.withValues(alpha: 0.15)),
               ),
               child: const Icon(
                 Icons.delete_outline_rounded,
@@ -717,7 +717,7 @@ class _CountRow extends StatelessWidget {
           decoration: BoxDecoration(
             color: kPrimaryLight,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: kPrimary.withOpacity(0.18)),
+            border: Border.all(color: kPrimary.withValues(alpha: 0.18)),
           ),
           child: Text(
             '$total total',

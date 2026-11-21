@@ -3,7 +3,7 @@ const fs = require('fs-extra');
 const fsp = require('fs').promises; // FileHandle API — fs-extra's fs.open returns a numeric fd
 const multer = require('multer');
 
-const TEMP_DIR = path.join(__dirname, '..', '..', 'uploads', 'temp');
+const TEMP_DIR = path.join(require('../uploads'), 'temp');
 const MAX_FILE_BYTES = 5 * 1024 * 1024; // 5 MB per file
 
 // Mime allowlist. SVG is intentionally excluded — it's XML and can carry
@@ -31,7 +31,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     // Strip anything that isn't a word char, dot, or hyphen — defends against
     // path traversal (../) and shell metacharacters in the saved filename.
-    const safe = file.originalname.replace(/[^\w.\-]/g, '_');
+    const safe = file.originalname.replace(/[^\w.-]/g, '_');
     cb(null, `${Date.now()}-${safe}`);
   },
 });

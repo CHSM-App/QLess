@@ -14,11 +14,13 @@ class DoctorLoginUsecase {
     DoctorDetails doctorLogin, {
     File? doctorImage,
     List<File>? clinicImages,
+    String? loginTicket,
   }) {
     return doctorLoginRepository.addDoctorDetails(
       doctorLogin,
       doctorImage: doctorImage,
       clinicImages: clinicImages,
+      loginTicket: loginTicket,
     );
   }
 

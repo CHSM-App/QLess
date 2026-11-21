@@ -3,6 +3,40 @@
 // instance through req.app.get('io').
 const { Server } = require('socket.io');
 const db = require('./db');
+const log = require('./middleware/logger');
+const { verifyAccessToken } = require('./middleware/auth');
+const { staffDoctorId } = require('./middleware/ownStaff');
+const { ROLE } = require('./middleware/roles');
+
+const toId = (v) => (Number.isInteger(Number(v)) && Number(v) > 0 ? Number(v) : null);
+
+/**
+ * Doctor presence events change what every watching patient sees, so they
+ * must come from that doctor's own staff: payload { doctorId, token } with a
+ * doctor/receptionist access token acting for doctorId. Returns the doctor id,
+ * or null (event ignored). A bare id (app versions before this check) is
+ * accepted only while SOCKET_LEGACY_DOCTOR_EVENTS=true.
+ */
+async function resolveDoctorEvent(payload) {
+  if (payload && typeof payload === 'object') {
+    const doctorId = toId(payload.doctorId);
+    if (!doctorId) return null;
+    try {
+      const user = verifyAccessToken(String(payload.token || ''));
+      if (![ROLE.DOCTOR, ROLE.RECEPTIONIST].includes(Number(user.role_id))) return null;
+      return (await staffDoctorId({ user })) === doctorId ? doctorId : null;
+    } catch (err) {
+      log.warn('socket: doctor event refused (' + err.message + ')');
+      return null;
+    }
+  }
+  const legacyId = toId(payload);
+  if (legacyId && process.env.SOCKET_LEGACY_DOCTOR_EVENTS === 'true') {
+    log.warn('socket: unauthenticated legacy doctor event for ' + legacyId + ' — allowed until SOCKET_LEGACY_DOCTOR_EVENTS=false');
+    return legacyId;
+  }
+  return null;
+}
 
 function attach(server, allowed) {
   const io = new Server(server, {
@@ -39,7 +73,7 @@ function attach(server, allowed) {
 
   // SOCKET EVENTS
   io.on('connection', (socket) => {
-    console.log('Socket connected:', socket.id);
+    log.debug('Socket connected: ' + socket.id);
 
     // Patient/general join.
     // Sends two immediate replies so the patient's screen is correct even if
@@ -47,7 +81,9 @@ function attach(server, allowed) {
     //   1. doctor_status  — avoids a stuck offline banner on reconnect
     //   2. queue_update   — seeds current_serving so the NOW circle shows the
     //                       real value instead of the SP's stale/buggy value
-    socket.on('joinClinic', async (clinicId) => {
+    socket.on('joinClinic', async (rawId) => {
+      const clinicId = toId(rawId);
+      if (!clinicId) return;
       socket.join(`clinic_${clinicId}`);
       if (doctorStatus.has(clinicId)) {
         const isOnline = doctorStatus.get(clinicId);
@@ -64,7 +100,7 @@ function attach(server, allowed) {
       // Flutter app's doctorCurrentServing map is populated on cold start.
       try {
         const res = await db.request()
-          .input('doctor_id', parseInt(clinicId))
+          .input('doctor_id', clinicId)
           .query(`
             SELECT MAX(a.queue_number) AS current_serving
             FROM   appointments a
@@ -88,8 +124,10 @@ function attach(server, allowed) {
     });
 
     // Doctor join — tracked for offline detection
-    socket.on('doctorJoinClinic', (doctorId) => {
-      console.log(`[DOCTOR] doctorJoinClinic doctorId=${doctorId} socket=${socket.id}`);
+    socket.on('doctorJoinClinic', async (payload) => {
+      const doctorId = await resolveDoctorEvent(payload);
+      if (!doctorId) return;
+      log.debug(`[DOCTOR] doctorJoinClinic doctorId=${doctorId} socket=${socket.id}`);
       socket.join(`clinic_${doctorId}`);
       if (!doctorSockets.has(doctorId)) doctorSockets.set(doctorId, new Set());
       doctorSockets.get(doctorId).add(socket.id);
@@ -107,17 +145,20 @@ function attach(server, allowed) {
       doctorStatusAt.set(doctorId, Date.now());
       doctorStatusReason.delete(doctorId);
       io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: true });
-      console.log(`[DOCTOR] emitted online=true to clinic_${doctorId}`);
+      log.debug(`[DOCTOR] emitted online=true to clinic_${doctorId}`);
     });
 
-    socket.on('leaveClinic', (clinicId) => {
-      socket.leave(`clinic_${clinicId}`);
+    socket.on('leaveClinic', (rawId) => {
+      const clinicId = toId(rawId);
+      if (clinicId) socket.leave(`clinic_${clinicId}`);
     });
 
     // Explicit doctor logout — skip the reconnect grace period and tell
     // patients immediately, since this isn't a network blip.
-    socket.on('doctorLogout', (doctorId) => {
-      console.log(`[DOCTOR] doctorLogout doctorId=${doctorId} socket=${socket.id}`);
+    socket.on('doctorLogout', async (payload) => {
+      const doctorId = await resolveDoctorEvent(payload);
+      if (!doctorId) return;
+      log.debug(`[DOCTOR] doctorLogout doctorId=${doctorId} socket=${socket.id}`);
       const pendingTimer = doctorOfflineTimers.get(doctorId);
       if (pendingTimer) {
         clearTimeout(pendingTimer);
@@ -132,11 +173,11 @@ function attach(server, allowed) {
       doctorStatusAt.set(doctorId, Date.now());
       doctorStatusReason.set(doctorId, 'logout');
       io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false, reason: 'logout' });
-      console.log(`[DOCTOR] emitted online=false to clinic_${doctorId} (explicit logout)`);
+      log.debug(`[DOCTOR] emitted online=false to clinic_${doctorId} (explicit logout)`);
     });
 
     socket.on('disconnect', () => {
-      console.log('Socket disconnected:', socket.id, '| doctorRooms:', socket._doctorRooms ? [...socket._doctorRooms] : 'none');
+      log.debug('Socket disconnected: ' + socket.id + ' | doctorRooms: ' + (socket._doctorRooms ? [...socket._doctorRooms].join(',') : 'none'));
       if (socket._doctorRooms) {
         for (const doctorId of socket._doctorRooms) {
           const sockets = doctorSockets.get(doctorId);
@@ -156,7 +197,7 @@ function attach(server, allowed) {
                 doctorStatusAt.set(doctorId, Date.now());
                 doctorStatusReason.set(doctorId, 'disconnect');
                 io.to(`clinic_${doctorId}`).emit('doctor_status', { doctor_id: doctorId, online: false, reason: 'disconnect' });
-                console.log(`[DOCTOR] emitted online=false to clinic_${doctorId} (after grace period)`);
+                log.debug(`[DOCTOR] emitted online=false to clinic_${doctorId} (after grace period)`);
               }, DOCTOR_OFFLINE_GRACE_MS);
               doctorOfflineTimers.set(doctorId, timer);
             }
@@ -169,4 +210,4 @@ function attach(server, allowed) {
   return io;
 }
 
-module.exports = { attach };
+module.exports = { attach, resolveDoctorEvent };

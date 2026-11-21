@@ -267,7 +267,9 @@ class _DoctorAvailabilityPageState
     // Empty-slot validation
     final invalid = _days.where((d) => d.isEnabled && d.timeSlots.isEmpty).toList();
     if (invalid.isNotEmpty) {
-      setState(() { for (final d in invalid) d.isExpanded = true; });
+      setState(() { for (final d in invalid) {
+        d.isExpanded = true;
+      } });
       _snack(
         '${invalid.map((d) => d.dayName).join(', ')} enabled but has no time slots.',
         isError: true,
@@ -661,7 +663,7 @@ class _ErrorBanner extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        color: kRedLight.withOpacity(0.6),
+        color: kRedLight.withValues(alpha: 0.6),
         child: Row(children: [
           const Icon(Icons.error_outline_rounded, color: kError, size: 15),
           const SizedBox(width: 8),
@@ -770,12 +772,12 @@ class _DayCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: schedule.isEnabled
-              ? kPrimary.withOpacity(0.3)
+              ? kPrimary.withValues(alpha: 0.3)
               : kBorder,
         ),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2)),
         ],
@@ -845,7 +847,7 @@ class _DayCard extends StatelessWidget {
               child: Switch(
                 value: schedule.isEnabled,
                 onChanged: onToggle,
-                activeColor: kPrimary,
+                activeThumbColor: kPrimary,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),

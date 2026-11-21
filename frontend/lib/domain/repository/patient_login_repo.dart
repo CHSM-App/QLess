@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:qless/domain/models/patients.dart';
 
 abstract class PatientLoginRepository {
-  Future<dynamic> addPatient(Patients patient, {File? image});
+  Future<dynamic> addPatient(Patients patient, {File? image, String? loginTicket});
 
   Future<List<Patients>> checkPhonePatient(String mobile);
 

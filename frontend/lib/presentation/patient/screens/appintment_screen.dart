@@ -289,13 +289,15 @@ bool _passesDateFilter(AppointmentList a, _DateFilter df,
     _DateFilter.custom      => () {
         if (customFrom != null && p.isBefore(customFrom)) return false;
         if (customTo != null &&
-            p.isAfter(customTo.add(const Duration(days: 1)))) return false;
+            p.isAfter(customTo.add(const Duration(days: 1)))) {
+          return false;
+        }
         return true;
       }(),
   };
 }
 
-List<AppointmentList> applyFilter(
+List<AppointmentList> _applyFilter(
     List<AppointmentList> list, String filter, String search,
     _DateFilter dateFilter, DateTime? customFrom, DateTime? customTo) {
   return list.where((a) {
@@ -345,10 +347,14 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
   bool        _sortNewest = true;
 
   late final TabController _tabCtrl;
+  // Read once here: ref cannot be used in dispose() (the element is already
+  // unmounted there, so it threw and skipped the rest of dispose).
+  late final AppointmentViewmodel _apptVm;
 
   @override
   void initState() {
     super.initState();
+    _apptVm = ref.read(appointmentViewModelProvider.notifier);
     _tabCtrl = TabController(length: _filters.length, vsync: this, initialIndex: 1);
     _tabCtrl.addListener(_syncFilterToSettledTab);
     _tabCtrl.animation?.addListener(_syncFilterToSwipeProgress);
@@ -384,7 +390,7 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
 
   @override
   void dispose() {
-    ref.read(appointmentViewModelProvider.notifier).unwatchClinics();
+    _apptVm.unwatchClinics();
     _tabCtrl.animation?.removeListener(_syncFilterToSwipeProgress);
     _tabCtrl.removeListener(_syncFilterToSettledTab);
     _tabCtrl.dispose();
@@ -1070,9 +1076,9 @@ Widget _filterChip({
     Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15), 
+        color: color.withValues(alpha: 0.15), 
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, color: color, size: 11),
@@ -1094,7 +1100,7 @@ Widget _filterChip({
     return TabBarView(
       controller: _tabCtrl,
       children: _filters.map((f) {
-        var list = applyFilter(
+        var list = _applyFilter(
             appointments, f.key, _search, _dateFilter, _customFrom, _customTo);
 
         // Apply sort order to every tab: by date, then within the same day by
@@ -1648,7 +1654,7 @@ class _AppointmentCard extends StatelessWidget {
             border: Border.all(color: kBorder),
             boxShadow: [
               BoxShadow(
-                  color: kTextPrimary.withOpacity(0.04),
+                  color: kTextPrimary.withValues(alpha: 0.04),
                   blurRadius: 10,
                   offset: const Offset(0, 3)),
             ],
@@ -1872,7 +1878,7 @@ class _AppointmentCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                      color: kPrimary.withOpacity(0.4),
+                      color: kPrimary.withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 3)),
                 ],
@@ -2021,8 +2027,8 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
         : _isSkipped ? kError
         : started    ? kPrimary
         : kWarning;
-    final topBg     = accentColor.withOpacity(0.08);
-    final topBorder = accentColor.withOpacity(0.25);
+    final topBg     = accentColor.withValues(alpha: 0.08);
+    final topBorder = accentColor.withValues(alpha: 0.25);
 
     return Column(
       children: [
@@ -2087,7 +2093,7 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                           margin: const EdgeInsets.only(right: 4),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(_pulse.value),
+                            color: Colors.white.withValues(alpha: _pulse.value),
                           ),
                         ),
                       ),
@@ -2111,7 +2117,7 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.06),
+              color: accentColor.withValues(alpha: 0.06),
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
               border: Border(
                 left:   BorderSide(color: topBorder),
@@ -2154,7 +2160,7 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                          color: color.withOpacity(op), width: 1.3),
+                          color: color.withValues(alpha: op), width: 1.3),
                     ),
                   ),
                 );
@@ -2165,13 +2171,13 @@ class _LiveQueueBannerState extends State<_LiveQueueBanner>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
-                colors: [color, color.withOpacity(0.75)],
+                colors: [color, color.withValues(alpha: 0.75)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: [
                 BoxShadow(
-                    color: color.withOpacity(0.4),
+                    color: color.withValues(alpha: 0.4),
                     blurRadius: 10,
                     offset: const Offset(0, 3)),
               ],
@@ -2273,7 +2279,7 @@ class _DetailSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(18),
                           boxShadow: [
                             BoxShadow(
-                                color: kPrimary.withOpacity(0.3),
+                                color: kPrimary.withValues(alpha: 0.3),
                                 blurRadius: 16,
                                 offset: const Offset(0, 6)),
                           ],
@@ -2283,7 +2289,7 @@ class _DetailSheet extends StatelessWidget {
                             Container(
                               width: 54, height: 54,
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.22),
+                                color: Colors.white.withValues(alpha: 0.22),
                                 borderRadius: BorderRadius.circular(15),
                               ),
                               alignment: Alignment.center,
@@ -2311,7 +2317,7 @@ class _DetailSheet extends StatelessWidget {
                                     style: TextStyle(
                                         fontSize: 11.5,
                                         color:
-                                            Colors.white.withOpacity(0.88)),
+                                            Colors.white.withValues(alpha: 0.88)),
                                   ),
                                   const SizedBox(height: 8),
                                   Container(
@@ -2319,11 +2325,11 @@ class _DetailSheet extends StatelessWidget {
                                         horizontal: 9, vertical: 4),
                                     decoration: BoxDecoration(
                                       color:
-                                          Colors.white.withOpacity(0.22),
+                                          Colors.white.withValues(alpha: 0.22),
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
                                           color: Colors.white
-                                              .withOpacity(0.32)),
+                                              .withValues(alpha: 0.32)),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -3125,7 +3131,7 @@ class _SkeletonCard extends StatelessWidget {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: kTextPrimary.withOpacity(0.04),
+            color: kTextPrimary.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),

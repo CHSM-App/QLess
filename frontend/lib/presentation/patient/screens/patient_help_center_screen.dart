@@ -144,7 +144,7 @@ class _HelpHeader extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: _primaryLight,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _primary.withOpacity(0.2)),
+                        border: Border.all(color: _primary.withValues(alpha: 0.2)),
                       ),
                       child: const Icon(
                         Icons.arrow_back_rounded,
@@ -357,7 +357,7 @@ class _HelpSectionCard extends StatelessWidget {
         border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),

@@ -4,6 +4,18 @@ const dotenv = require('dotenv');
 dotenv.config();
 const log = require('./logger');
 
+/**
+ * Verifies an access token and returns its payload, or throws.
+ * Only real sessions pass: the OTP loginTicket is signed with the same key
+ * but carries `purpose` and no role_id — accepting it here let anyone who
+ * verified their own phone skip every role and ownership check.
+ */
+function verifyAccessToken(token) {
+  const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY, { algorithms: ['HS256'] });
+  if (decoded.purpose || !decoded.role_id) throw new Error('not an access token');
+  return decoded;
+}
+
 module.exports = function (req, res, next) {
   const authHeader = req.header('Authorization');
 
@@ -18,8 +30,7 @@ module.exports = function (req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-    req.user = decoded; // Attach decoded token data (like user_id)
+    req.user = verifyAccessToken(token);
     next();
   } catch (err) {
     log.error('JWT verification failed: ' + err.message);
@@ -27,3 +38,4 @@ module.exports = function (req, res, next) {
   }
 };
 
+module.exports.verifyAccessToken = verifyAccessToken;

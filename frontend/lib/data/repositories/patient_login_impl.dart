@@ -13,7 +13,7 @@ class PatientLoginImpl implements PatientLoginRepository {
   PatientLoginImpl(this.apiService);
 
   @override
-  Future<dynamic> addPatient(Patients patient, {File? image}) async {
+  Future<dynamic> addPatient(Patients patient, {File? image, String? loginTicket}) async {
     MultipartFile? multipartImage;
     if (image != null) {
       multipartImage = await MultipartFile.fromFile(
@@ -33,6 +33,7 @@ class PatientLoginImpl implements PatientLoginRepository {
       patient.bloodGroupId ?? 0,
       patient.weight ?? "",
       multipartImage,
+      loginTicket,
     );
   }
 

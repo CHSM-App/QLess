@@ -17,7 +17,6 @@ import 'package:qless/domain/models/queue_preview_model.dart';
 import 'package:qless/domain/models/review_model.dart';
 import 'package:qless/domain/models/today_queue_model.dart';
 import 'package:qless/domain/models/review_request_model.dart';
-import 'package:qless/domain/models/clinic_image_model.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
 
 import 'package:qless/domain/models/token_response.dart';
@@ -182,6 +181,9 @@ abstract class ApiService {
     @Part(name: "gender_id") int genderId,
     @Part(name: "doctor_image") MultipartFile? doctorImage,
     @Part(name: "clinic_images") List<MultipartFile>? clinicImages,
+    // OTP proof for this mobile (/login/verify-otp). Required by the server
+    // for registration and for a mobile change once its flags are on.
+    @Part(name: "loginTicket") String? loginTicket,
   );
 
 
@@ -400,7 +402,9 @@ Future<AppointmentResponseModel> queuePauseEmergency(
     @Part(name: "blood_group_id") int bloodGroupId,
     @Part(name: "weight") String weight,
     @Part(name: "image") MultipartFile? image,
-    
+    // OTP proof for this mobile (/login/verify-otp). Required by the server
+    // for registration and for a mobile change once its flags are on.
+    @Part(name: "loginTicket") String? loginTicket,
   );
 
   @POST("patient/insert/insertFamilyMember")

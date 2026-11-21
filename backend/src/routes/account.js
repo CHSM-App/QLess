@@ -26,10 +26,12 @@
 
 const express = require('express');
 const bcrypt  = require('bcryptjs');
+const crypto  = require('crypto');
 const axios   = require('axios');
 const db      = require('../db');
 const log     = require('../middleware/logger');
-const { deletionLimiter } = require('../middleware/rateLimit');
+const { deletionLimiter, otpSendLimiter, otpVerifyLimiter } = require('../middleware/rateLimit');
+const otpSql = require('../queries/otp');
 
 const router = express.Router();
 
@@ -37,21 +39,10 @@ const DELETION_DELAY_DAYS = 30;
 
 const VALID_ROLE_IDS = [1, 2, 3]; // 1=Doctor, 2=Patient, 3=Receptionist
 
-// Review/QA demo accounts (mirrors DEMO_RANGES in routes/auth.js — keep in
-// sync). They have no real phone, so no OTP is sent: the fixed demo OTP is
-// accepted instead, and confirming deletion is a harmless no-op so the account
-// stays usable for the next reviewer.
-const DEMO_OTP = process.env.DEMO_OTP || '123456';
-const DEMO_RANGES = [
-  [9000000001, 9000000001],
-  [9876000001, 9876000030],
-  [9877000001, 9877000030],
-  [9878000001, 9878000050],
-];
-function isDemoPhone(phone) {
-  const n = Number(phone);
-  return !!n && DEMO_RANGES.some(([from, to]) => n >= from && n <= to);
-}
+// Review/QA demo accounts (src/demo.js, only while DEMO_ENABLED=true): no real
+// phone, so no OTP is sent — the demo OTP is accepted instead, and confirming
+// deletion is a harmless no-op so the account stays usable for the next reviewer.
+const { isDemoMobile: isDemoPhone, demoOtp } = require('../demo');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -66,7 +57,7 @@ function normalizePhone(raw) {
 }
 
 async function sendWhatsAppOtp(phone) {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const otp = crypto.randomInt(100000, 1000000).toString();
 
   if (!process.env.WHATSAPP_API_TOKEN) {
     throw new Error('WhatsApp API token not configured');
@@ -89,21 +80,20 @@ async function sendWhatsAppOtp(phone) {
     .input('operation', 'send_otp')
     .input('mobile_no', phone)
     .input('otp_hash', otp_hash)
-    .execute('sp_otp');
+    .run(otpSql);
 
   if (dbResult.recordset[0].status === 0) {
     throw new Error(dbResult.recordset[0].message || 'Failed to save OTP');
   }
-
-  // Return otp in non-production for dev convenience (mirrors /login/send-otp)
-  return process.env.NODE_ENV !== 'production' ? otp : null;
+  // The OTP is never returned to the caller: with it in the response, anyone
+  // could schedule deletion of any account. Use the demo numbers to test.
 }
 
 async function verifyOtp(phone, otp) {
   const result = await db.request()
     .input('operation', 'verify_otp')
     .input('mobile_no', phone)
-    .execute('sp_otp');
+    .run(otpSql);
 
   const data = result.recordset[0];
   if (!data || data.status === 0) return false;
@@ -113,14 +103,14 @@ async function verifyOtp(phone, otp) {
     await db.request()
       .input('operation', 'update_attempt')
       .input('mobile_no', phone)
-      .execute('sp_otp');
+      .run(otpSql);
     return false;
   }
 
   await db.request()
     .input('operation', 'mark_verified')
     .input('mobile_no', phone)
-    .execute('sp_otp');
+    .run(otpSql);
 
   return true;
 }
@@ -130,7 +120,7 @@ async function verifyOtp(phone, otp) {
 // Sends a WhatsApp OTP to the given phone. Always 200 — prevents enumeration.
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.post('/request', deletionLimiter, async (req, res) => {
+router.post('/request', deletionLimiter, otpSendLimiter, async (req, res) => {
   const phone  = normalizePhone(req.body.phone);
   const roleId = parseInt(req.body.role_id);
 
@@ -149,12 +139,11 @@ router.post('/request', deletionLimiter, async (req, res) => {
   }
 
   try {
-    const devOtp = await sendWhatsAppOtp(phone);
+    await sendWhatsAppOtp(phone);
     log.info(`[DELETE-ACCOUNT] OTP sent phone=${phone} role_id=${roleId}`);
     return res.json({
       success: true,
       message: 'If an account exists for this number, an OTP has been sent via WhatsApp.',
-      ...(devOtp ? { dev_otp: devOtp } : {}),
     });
   } catch (err) {
     log.error('[DELETE-ACCOUNT] request error: ' + err.message);
@@ -171,7 +160,7 @@ router.post('/request', deletionLimiter, async (req, res) => {
 // Verifies OTP and schedules the account for deletion in 30 days.
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.post('/confirm', deletionLimiter, async (req, res) => {
+router.post('/confirm', deletionLimiter, otpVerifyLimiter, async (req, res) => {
   const phone  = normalizePhone(req.body.phone);
   const roleId = parseInt(req.body.role_id);
   const otp    = (req.body.otp || '').toString().trim();
@@ -188,7 +177,7 @@ router.post('/confirm', deletionLimiter, async (req, res) => {
   }
 
   if (isDemoPhone(phone)) {
-    if (otp !== DEMO_OTP) {
+    if (otp !== demoOtp()) {
       return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });
     }
     const demoDate = new Date(Date.now() + DELETION_DELAY_DAYS * 24 * 60 * 60 * 1000);
@@ -258,7 +247,7 @@ router.post('/confirm', deletionLimiter, async (req, res) => {
 // Cancels a pending deletion request after verifying a fresh OTP.
 // ─────────────────────────────────────────────────────────────────────────────
 
-router.post('/cancel', deletionLimiter, async (req, res) => {
+router.post('/cancel', deletionLimiter, otpVerifyLimiter, async (req, res) => {
   const phone  = normalizePhone(req.body.phone);
   const roleId = parseInt(req.body.role_id);
   const otp    = (req.body.otp || '').toString().trim();
@@ -274,7 +263,7 @@ router.post('/cancel', deletionLimiter, async (req, res) => {
   }
 
   if (isDemoPhone(phone)) {
-    if (otp !== DEMO_OTP) {
+    if (otp !== demoOtp()) {
       return res.status(400).json({ success: false, message: 'Invalid or expired OTP.' });
     }
     return res.json({

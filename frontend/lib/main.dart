@@ -10,13 +10,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/token_response.dart';
-import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
+import 'package:qless/presentation/shared/providers/view_model_provider.dart';
 import 'package:qless/firebase_options.dart';
 import 'package:qless/core/services/remote_config_service.dart';
 import 'package:qless/core/update/update_dialog.dart';
@@ -183,7 +182,7 @@ void main() async {
 }
 
 class HealthcareApp extends StatelessWidget {
-  const HealthcareApp({Key? key}) : super(key: key);
+  const HealthcareApp({super.key});
 
   @override
   Widget build(BuildContext context) {

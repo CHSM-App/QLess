@@ -12,7 +12,7 @@ part of 'api_service.dart';
 
 class _ApiService implements ApiService {
   _ApiService(this._dio, {this.baseUrl, this.errorLogger}) {
-    baseUrl ??= 'https://qless.vengurlatech.com/';
+    baseUrl ??= 'http://192.168.1.12:3000/';
   }
 
   final Dio _dio;
@@ -769,6 +769,7 @@ class _ApiService implements ApiService {
     int genderId,
     MultipartFile? doctorImage,
     List<MultipartFile>? clinicImages,
+    String? loginTicket,
   ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -800,6 +801,9 @@ class _ApiService implements ApiService {
     }
     if (clinicImages != null) {
       _data.files.addAll(clinicImages.map((i) => MapEntry('clinic_images', i)));
+    }
+    if (loginTicket != null) {
+      _data.fields.add(MapEntry('loginTicket', loginTicket));
     }
     final _options = _setStreamType<dynamic>(
       Options(
@@ -1870,6 +1874,7 @@ class _ApiService implements ApiService {
     int bloodGroupId,
     String weight,
     MultipartFile? image,
+    String? loginTicket,
   ) async {
     final _extra = <String, dynamic>{};
     final queryParameters = <String, dynamic>{};
@@ -1889,6 +1894,9 @@ class _ApiService implements ApiService {
     _data.fields.add(MapEntry('weight', weight));
     if (image != null) {
       _data.files.add(MapEntry('image', image));
+    }
+    if (loginTicket != null) {
+      _data.fields.add(MapEntry('loginTicket', loginTicket));
     }
     final _options = _setStreamType<dynamic>(
       Options(

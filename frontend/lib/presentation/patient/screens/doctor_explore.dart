@@ -595,7 +595,7 @@ class DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [_kPrimaryLight, _kPrimaryLight.withOpacity(0.4)],
+              colors: [_kPrimaryLight, _kPrimaryLight.withValues(alpha: 0.4)],
             ),
             shape: BoxShape.circle,
           ),
@@ -616,44 +616,6 @@ class DoctorExploreScreenState extends ConsumerState<DoctorExploreScreen>
     );
   }
 } // ← closes _DoctorExploreScreenState
-
-// ════════════════════════════════════════════════════════════════════
-//  HEADER BUTTON  — soft rounded square, teal-tinted on tap
-//  (kept for reuse elsewhere even though the filter button above is
-//  currently commented out)
-// ════════════════════════════════════════════════════════════════════
-class _HeaderBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool badge;
-  const _HeaderBtn(
-      {required this.icon, required this.onTap, this.badge = false});
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: Stack(children: [
-          Container(
-            width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: _kPrimaryLight,
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: _kPrimary.withOpacity(0.15)),
-            ),
-            child: Icon(icon, color: _kPrimaryDark, size: 19),
-          ),
-          if (badge)
-            Positioned(
-              right: 8, top: 8,
-              child: Container(
-                width: 7, height: 7,
-                decoration: const BoxDecoration(
-                    color: _kWarning, shape: BoxShape.circle),
-              ),
-            ),
-        ]),
-      );
-}
 
 // ════════════════════════════════════════════════════════════════════
 //  SECTION TITLE  — icon badge + label, matches HomeScreen conventions
@@ -748,7 +710,7 @@ class _RecentDoctorCard extends StatelessWidget {
           border: Border.all(color: _kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.045),
+                color: Colors.black.withValues(alpha: 0.045),
                 blurRadius: 14,
                 offset: const Offset(0, 5)),
           ],
@@ -769,7 +731,7 @@ class _RecentDoctorCard extends StatelessWidget {
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [accent, accent.withOpacity(0.4)],
+                      colors: [accent, accent.withValues(alpha: 0.4)],
                     ),
                   ),
                   child: Container(
@@ -792,7 +754,7 @@ class _RecentDoctorCard extends StatelessWidget {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withValues(alpha: 0.08),
                               blurRadius: 4),
                         ],
                       ),
@@ -858,7 +820,7 @@ class _RecentDoctorCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                        color: _kPrimary.withOpacity(0.3),
+                        color: _kPrimary.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3)),
                   ],
@@ -914,7 +876,7 @@ class _NearbyDoctorCard extends StatelessWidget {
           border: Border.all(color: _kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.045),
+                color: Colors.black.withValues(alpha: 0.045),
                 blurRadius: 14,
                 offset: const Offset(0, 5)),
           ],
@@ -1033,7 +995,7 @@ class _NearbyDoctorCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [
                     BoxShadow(
-                        color: _kPrimary.withOpacity(0.3),
+                        color: _kPrimary.withValues(alpha: 0.3),
                         blurRadius: 8,
                         offset: const Offset(0, 3)),
                   ],
@@ -1126,7 +1088,7 @@ class _SpecialtyTile extends StatelessWidget {
           border: Border.all(color: _kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.035),
+                color: Colors.black.withValues(alpha: 0.035),
                 blurRadius: 10,
                 offset: const Offset(0, 3)),
           ],
@@ -1139,7 +1101,7 @@ class _SpecialtyTile extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [bg, accent.withOpacity(0.28)],
+                colors: [bg, accent.withValues(alpha: 0.28)],
               ),
               borderRadius: BorderRadius.circular(11),
             ),
@@ -1249,7 +1211,7 @@ class _RecentDoctorSkeleton extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _kBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
       ),
       padding: const EdgeInsets.all(13),
       child: Column(
@@ -1282,7 +1244,7 @@ class _NearbyDoctorSkeleton extends StatelessWidget {
         color: const Color(0xFFF7F8FA),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: _kBorder),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
       ),
       padding: const EdgeInsets.all(13),
       child: Column(

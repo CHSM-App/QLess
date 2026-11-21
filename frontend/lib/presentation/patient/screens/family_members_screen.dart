@@ -50,7 +50,7 @@ BoxDecoration _cardDecoration({
       boxShadow: elevated
           ? [
               BoxShadow(
-                color: const Color(0xFF000000).withOpacity(0.03),
+                color: const Color(0xFF000000).withValues(alpha: 0.03),
                 blurRadius: 6,
                 offset: const Offset(0, 2),
               ),
@@ -142,7 +142,9 @@ class _FamilyMembersScreenState extends ConsumerState<FamilyMembersScreen> {
     final now = DateTime.now();
     int age = now.year - dob.year;
     if (now.month < dob.month ||
-        (now.month == dob.month && now.day < dob.day)) age--;
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
     return age;
   }
 

@@ -8,8 +8,8 @@ class PatientLoginUsecase {
 
   PatientLoginUsecase(this.patientLoginRepository);
 
-  Future<dynamic> addPatient(Patients patient, {File? image}) {
-    return patientLoginRepository.addPatient(patient, image: image);
+  Future<dynamic> addPatient(Patients patient, {File? image, String? loginTicket}) {
+    return patientLoginRepository.addPatient(patient, image: image, loginTicket: loginTicket);
   }
 
   Future<List<Patients>> checkPhonePatient(String mobileNo) {

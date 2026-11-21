@@ -89,8 +89,12 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
   @override
   void dispose() {
     _timer?.cancel();
-    for (final c in _otpCtrl) c.dispose();
-    for (final f in _otpFocus) f.dispose();
+    for (final c in _otpCtrl) {
+      c.dispose();
+    }
+    for (final f in _otpFocus) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -190,7 +194,9 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
       // leaving them stuck resubmitting the same rejected code.
       if (e.response?.statusCode == 400) {
         setState(() { _step = 2; _otpError = true; });
-        for (final c in _otpCtrl) c.clear();
+        for (final c in _otpCtrl) {
+          c.clear();
+        }
         if (_otpFocus.isNotEmpty) _otpFocus[0].requestFocus();
       }
     } catch (_) {
@@ -297,7 +303,9 @@ class _DeleteAccountPageState extends ConsumerState<DeleteAccountPage> {
 
   void _resendOtp() {
     if (_secondsLeft > 0) return;
-    for (final c in _otpCtrl) c.clear();
+    for (final c in _otpCtrl) {
+      c.clear();
+    }
     setState(() => _otpError = false);
     if (_otpFocus.isNotEmpty) _otpFocus[0].requestFocus();
     _startTimer();
@@ -407,7 +415,7 @@ class _StepIndicator extends StatelessWidget {
           Expanded(
             child: Container(
               height: 2,
-              color: current > i ? _kError.withOpacity(0.5) : _kBorderStrong,
+              color: current > i ? _kError.withValues(alpha: 0.5) : _kBorderStrong,
             ),
           ),
       ],
@@ -456,7 +464,7 @@ class _ErrorBanner extends StatelessWidget {
     decoration: BoxDecoration(
       color: _kRedLight,
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: _kError.withOpacity(0.3)),
+      border: Border.all(color: _kError.withValues(alpha: 0.3)),
     ),
     child: Row(children: [
       const Icon(Icons.error_outline_rounded, size: 16, color: _kError),
@@ -493,7 +501,7 @@ class _Step1 extends StatelessWidget {
         decoration: BoxDecoration(
           color: _kRedLight,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _kError.withOpacity(0.2)),
+          border: Border.all(color: _kError.withValues(alpha: 0.2)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: const [
@@ -595,7 +603,7 @@ class _Step2 extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _kBorder),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 10, offset: const Offset(0, 4)),
           ],
         ),
@@ -652,7 +660,7 @@ class _Step2 extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _kRedLight,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: _kError.withOpacity(0.3)),
+                border: Border.all(color: _kError.withValues(alpha: 0.3)),
               ),
               child: const Row(children: [
                 Icon(Icons.error_outline_rounded, color: _kError, size: 14),
@@ -762,7 +770,7 @@ class _Step3 extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _kBorder),
           boxShadow: [BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10, offset: const Offset(0, 4))],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -773,7 +781,7 @@ class _Step3 extends StatelessWidget {
                   color: _kTextPrimary)),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            value: reason.isEmpty ? null : reason,
+            initialValue: reason.isEmpty ? null : reason,
             hint: const Text('Select a reason…',
                 style: TextStyle(fontSize: 13, color: _kTextMuted)),
             items: _reasons
@@ -802,7 +810,7 @@ class _Step3 extends StatelessWidget {
         decoration: BoxDecoration(
           color: _kRedLight,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _kError.withOpacity(0.2)),
+          border: Border.all(color: _kError.withValues(alpha: 0.2)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Final Confirmation',
@@ -865,7 +873,7 @@ class _PrimaryButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(13),
         boxShadow: enabled
             ? [BoxShadow(
-                color: color.withOpacity(0.3),
+                color: color.withValues(alpha: 0.3),
                 blurRadius: 14,
                 offset: const Offset(0, 5))]
             : [],
@@ -967,9 +975,9 @@ class _OtpBoxState extends State<_OtpBox> {
     if (widget.hasError) {
       bg = _kRedLight; border = _kError;
     } else if (_focused) {
-      bg = _kPrimaryLight.withOpacity(0.6); border = _kPrimary;
+      bg = _kPrimaryLight.withValues(alpha: 0.6); border = _kPrimary;
     } else if (filled) {
-      bg = _kPrimaryLight; border = _kPrimary.withOpacity(0.5);
+      bg = _kPrimaryLight; border = _kPrimary.withValues(alpha: 0.5);
     } else {
       bg = const Color(0xFFF7FAFC); border = _kBorderStrong;
     }

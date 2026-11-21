@@ -1,11 +1,15 @@
 var express = require('express');
 var router = express.Router();
+require('../../middleware/ownPatient')(router); // a patient token may only touch its own records
 var db = require('../../db');
 const sql = require("mssql");
 const multer = require("multer");
 const log = require('../../middleware/logger');
+const { saveFamilyMember } = require('../../familyMembers');
 const path = require("path");
 const fs = require("fs-extra");
+const doctorLeaveSql = require('../../queries/doctorLeave');
+const appointmentsSql = require('../../queries/appointments');
 
 function emitQueueUpdate(req, event, doctor_id, extra = {}) {
   const io = req.app.get('io');
@@ -27,18 +31,24 @@ router.post('/insertFamilyMember', async (req, res) => {
 
     const clean = (v) => (v === "" ? null : v);
 
+    if (!family_id) {
+      return res.status(400).json({ success: false, message: "family_id is required" });
+    }
+    if (String(name || '').length > 100) {
+      return res.status(400).json({ success: false, message: "Name can be at most 100 characters." });
+    }
+
     const operation = member_id && member_id > 0 ? "Update" : "Insert";
 
-    const result = await db.request()
-      .input('operation', operation)
-      .input('member_id', member_id || null)
-      .input('family_id', family_id)
-      .input('name', clean(name))
-      .input('Gender_id', Gender_id || null)
-      .input('relation_id', relation_id || null)
-      .input('DOB', DOB || null)
-      .input('mobile_no', clean(mobile_no))
-      .execute('sp_family_members');
+    const result = await saveFamilyMember(operation, {
+      member_id: member_id || null,
+      family_id,
+      name: clean(name),
+      Gender_id: Gender_id || null,
+      relation_id: relation_id || null,
+      DOB: DOB || null,
+      mobile_no: clean(mobile_no),
+    });
 
     // ✅ Handle SQL error
     if (result.recordset?.[0]?.ErrorMessage) {
@@ -46,6 +56,9 @@ router.post('/insertFamilyMember', async (req, res) => {
         success: false,
         error: result.recordset[0].ErrorMessage
       });
+    }
+    if (operation === "Update" && result.recordset?.[0]?.updated === 0) {
+      return res.status(404).json({ success: false, message: "Family member not found" });
     }
 
     return res.status(200).json({
@@ -79,7 +92,7 @@ router.post('/appointment/book', async (req, res) => {
       .input('operation', 'IS_BLOCKED')
       .input('doctor_id', doctor_id)
       .input('from_date', appointment_date)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     if (blockRes.recordset?.[0]?.blocked === 1) {
       return res.json({
@@ -127,7 +140,7 @@ router.post('/appointment/book', async (req, res) => {
       .input('slot_id', slot_id)
       .input('symptoms', symptoms)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const booked = result.recordset[0].success === 1;
     if (booked) emitQueueUpdate(req, 'booked', doctor_id);
@@ -147,13 +160,13 @@ router.post('/appointment/cancel', async (req, res) => {
 
   try {
     const result = await db.request()
-      .input('operation', 'CANCEL')
+      .input('operation', 'CANCEL_APPOINTMENT')
       .input('appointment_id', appointment_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     res.json({
       success: true,
-      message: result.recordset[0].message
+      message: result.recordset?.[0]?.message || 'Appointment cancelled successfully'
     });
 
   } catch (error) {
@@ -173,7 +186,7 @@ router.post('/appointment/queueStatus', async (req, res) => {
       .input('operation', 'QUEUE_STATUS')
       .input('doctor_id', doctor_id)
       .input('appointment_date', appointment_date)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     res.json({
       success: true,
@@ -201,7 +214,8 @@ router.post('/favoriteDoctor/add', async (req, res) => {
   }
 
   try {
-    // Same check-then-insert as the old sp_favorite_doctors 'Insert' branch.
+    // Check-then-insert. The clinic compare is NULL-safe: "= NULL" never
+    // matched, so a second add without clinic_id hit the UQ_fav key → 500.
     const result = await db.request()
       .input('patient_id', sql.Int, patient_id)
       .input('doctor_id', sql.Int, doctor_id)
@@ -209,7 +223,8 @@ router.post('/favoriteDoctor/add', async (req, res) => {
       .query(`
         IF NOT EXISTS (
           SELECT 1 FROM favorite_doctors
-          WHERE patient_id = @patient_id AND doctor_id = @doctor_id AND clinic_id = @clinic_id
+          WHERE patient_id = @patient_id AND doctor_id = @doctor_id
+            AND (clinic_id = @clinic_id OR (clinic_id IS NULL AND @clinic_id IS NULL))
         )
         BEGIN
           INSERT INTO favorite_doctors (patient_id, doctor_id, clinic_id, is_favorite, created_at)
@@ -220,10 +235,15 @@ router.post('/favoriteDoctor/add', async (req, res) => {
           SELECT 0 AS success, 'Already added to favorites' AS message;
       `);
 
+    const row = result.recordset?.[0] || {};
+    // Already a favorite is still a success for the app, but says so.
+    if (row.success === 0) {
+      return res.status(200).json({ success: true, already: true, message: 'Doctor is already in your favorites' });
+    }
     res.status(200).json({
       success: true,
       message: 'Doctor added to favorites',
-      favorite_id: result.recordset?.[0]?.favorite_id
+      favorite_id: row.favorite_id
     });
 
   } catch (error) {
@@ -246,17 +266,43 @@ router.post('/review/add', async (req, res) => {
     });
   }
 
+  if (String(comment || '').length > 500) {
+    return res.status(400).json({ success: false, message: 'Comment can be at most 500 characters.' });
+  }
+
   try {
+    // Only a completed appointment of this doctor+patient, one review per
+    // appointment. DECIMAL(2,1) keeps half stars (3.5). The review and the
+    // appointment's is_reviewed flag are written together or not at all.
     const result = await db.request()
-      .input('operation', 'Insert')
-      .input('appointment_id', appointment_id)
-      .input('doctor_id', doctor_id)
-      .input('patient_id', patient_id)
-      .input('rating', rating)
-      .input('comment', comment || '')
-      .input('reviewed_by_user_id', reviewed_by_user_id)
-      .input('clinic_id', clinic_id || null)
-      .execute('sp_review');
+      .input('appointment_id', sql.Int, appointment_id)
+      .input('doctor_id', sql.Int, doctor_id)
+      .input('patient_id', sql.Int, patient_id)
+      .input('rating', sql.Decimal(2, 1), rating)
+      .input('comment', sql.NVarChar(500), String(comment || ''))
+      .input('reviewed_by_user_id', sql.Int, reviewed_by_user_id)
+      .input('clinic_id', sql.NVarChar(50), clinic_id || null)
+      .query(`
+        SET XACT_ABORT ON;
+        IF NOT EXISTS (
+          SELECT 1 FROM appointments
+          WHERE appointment_id = @appointment_id AND doctor_id = @doctor_id
+            AND patient_id = @patient_id AND status = 'completed'
+        )
+          SELECT 0 AS success, 'Appointment not completed or invalid' AS message;
+        ELSE IF EXISTS (SELECT 1 FROM reviews WHERE appointment_id = @appointment_id)
+          SELECT 0 AS success, 'Review already submitted' AS message;
+        ELSE
+        BEGIN
+          BEGIN TRANSACTION;
+          INSERT INTO reviews (appointment_id, doctor_id, patient_id, rating, comment, created_at, reviewed_by_user_id, clinic_id)
+          VALUES (@appointment_id, @doctor_id, @patient_id, @rating, @comment, GETDATE(), @reviewed_by_user_id, @clinic_id);
+          DECLARE @review_id NUMERIC(38, 0) = SCOPE_IDENTITY();
+          UPDATE appointments SET is_reviewed = 1 WHERE appointment_id = @appointment_id;
+          COMMIT TRANSACTION;
+          SELECT 1 AS success, @review_id AS review_id, 'Review added' AS message;
+        END
+      `);
 
     res.status(200).json({
       success: result.recordset?.[0]?.success ?? true,
@@ -292,7 +338,7 @@ router.post('/rescheduleAppointment', async (req, res) => {
       .input('slot_id', slot_id)
       .input('symptoms', symptoms)
 
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     emitQueueUpdate(req, 'rescheduled', doctor_id);
     res.status(200).json({
@@ -325,7 +371,7 @@ router.post('/cancelAppointment/:appointment_id', async (req, res) => {
     const result = await db.request()
       .input('operation', 'CANCEL_APPOINTMENT')
       .input('appointment_id', appointment_id)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     emitQueueUpdate(req, 'patient_cancelled', doctor_id);
     res.status(200).json({
@@ -406,7 +452,7 @@ router.post('/queueEstimate', async (req, res) => {
       .input('appointment_id', appointment_id)
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     res.status(200).json(result.recordset[0]);
 
@@ -432,7 +478,7 @@ router.post('/queuePreviewEstimate', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('slot_id', slot_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const preview = result.recordset[0] || {};
 
@@ -475,7 +521,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
     request.input('operation', 'patient_Appointments');
     request.input('family_id', family_id);
 
-    const result = await request.execute('sp_appointment');
+    const result = await request.run(appointmentsSql);
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -498,7 +544,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
             .input('operation', 'QUEUE_ESTIMATE_SMART')
             .input('appointment_id', item.appointment_id)
             .input('doctor_id', item.doctor_id)
-            .execute('sp_appointment');
+            .run(appointmentsSql);
 
           if (queueResult.recordset.length > 0) {
             const q = queueResult.recordset[0];

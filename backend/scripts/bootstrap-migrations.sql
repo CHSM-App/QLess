@@ -14,8 +14,8 @@
   everything from 000.
 */
 
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'schema_migrations')
-CREATE TABLE schema_migrations (
+IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'schema_migrations' AND schema_id = SCHEMA_ID('dbo'))
+CREATE TABLE dbo.schema_migrations (
     version     NVARCHAR(10)  NOT NULL PRIMARY KEY,
     name        NVARCHAR(200) NOT NULL,
     applied_at  DATETIME2     NOT NULL DEFAULT GETUTCDATE(),
@@ -23,9 +23,9 @@ CREATE TABLE schema_migrations (
 );
 GO
 
-IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = '000')
-    INSERT INTO schema_migrations (version, name) VALUES ('000', 'baseline');
+IF NOT EXISTS (SELECT 1 FROM dbo.schema_migrations WHERE version = '000')
+    INSERT INTO dbo.schema_migrations (version, name) VALUES ('000', 'baseline');
 GO
 
-SELECT * FROM schema_migrations ORDER BY version;
+SELECT * FROM dbo.schema_migrations ORDER BY version;
 GO

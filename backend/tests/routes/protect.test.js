@@ -96,3 +96,76 @@ describe('public pages', () => {
       expect(res.headers['content-type']).toMatch(/html/);
     });
 });
+
+// The OTP loginTicket is signed with the same key; it must never act as a
+// session (it has no role, so it slipped past every ownership check).
+describe('only real access tokens authenticate', () => {
+  const bearer = (payload, opts = {}) => ({
+    Authorization: `Bearer ${jwt.sign(payload, process.env.JWT_SECRET_KEY, opts)}`,
+  });
+
+  test.each(PROTECTED)('%s %s → 401 with a loginTicket', async (method, url) => {
+    const res = await request(app)[method](url).set(bearer({ mobile: '9123400000', purpose: 'login' }));
+    expect(res.status).toBe(401);
+    expect(mockDb.calls).toHaveLength(0);
+  });
+
+  test('a token without role_id → 401', async () => {
+    const res = await request(app).get('/patient/users/patientPrescriptionList/1').set(bearer({ mobile: '9123400000', uid: 1 }));
+    expect(res.status).toBe(401);
+  });
+
+  test('an unsigned (alg none) token → 401', async () => {
+    const none = jwt.sign({ role_id: 4, uid: 'admin' }, null, { algorithm: 'none' });
+    const res = await request(app).get('/admin/doctors/pending').set('Authorization', `Bearer ${none}`);
+    expect(res.status).toBe(401);
+  });
+
+  test('/uploads refuses a loginTicket in ?token=', async () => {
+    const ticket = jwt.sign({ mobile: '9123400000', purpose: 'login' }, process.env.JWT_SECRET_KEY);
+    const res = await request(app).get(`/uploads/doctor_images/1/x.png?token=${ticket}`);
+    expect(res.status).toBe(401);
+  });
+});
+
+// Verification is reviewed by an admin in the background and never restricts;
+// only an admin block (active_status 1) does — for the doctor and their staff.
+describe('doctor verification and block', () => {
+  const staffRoutes = [
+    ['post', '/doctor/insert/appointment/queueNext'],
+    ['post', '/doctor/insert/walkInBook'],
+    ['post', '/doctor/insert/insertPrescription'],
+    ['get', '/doctor/users/patientAppointmentList/1'],
+    ['get', '/doctor/users/appointment/getTodayQueue/1'],
+    ['get', '/patient/users/patientPrescriptionList/10'],
+    ['get', '/patient/users/fetchFamilyMembers/10'],
+    ['post', '/doctor/insert/saveDoctorSchedule'],
+    ['post', '/doctor/insert/insertMedicine'],
+  ];
+
+  test.each(staffRoutes)('active doctor (verified or not): %s %s is not blocked', async (method, url) => {
+    const res = await request(app)[method](url).set(authHeader()).send({});
+    expect(res.status).not.toBe(403);
+  });
+
+  test.each(staffRoutes)('blocked doctor: %s %s → 403 DOCTOR_BLOCKED', async (method, url) => {
+    mockDb.doctorActive = false;
+    const res = await request(app)[method](url).set(authHeader()).send({});
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('DOCTOR_BLOCKED');
+  });
+
+  test('a receptionist of a blocked doctor is blocked too', async () => {
+    mockDb.doctorActive = false;
+    const res = await request(app).get('/doctor/users/appointment/getTodayQueue/1')
+      .set(authHeader({ role_id: 3, uid: 5 }));
+    expect(res.body.code).toBe('DOCTOR_BLOCKED');
+  });
+
+  test('patients are never affected by the doctor flag', async () => {
+    mockDb.doctorActive = false;
+    const res = await request(app).get('/patient/users/getNotifications/9')
+      .set(authHeader({ role_id: 2, uid: 9 }));
+    expect(res.status).not.toBe(403);
+  });
+});

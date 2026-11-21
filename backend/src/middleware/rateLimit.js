@@ -52,9 +52,36 @@ const deletionLimiter = rateLimit({
   max: 10,
 });
 
+// ── OTP. Every send is a paid WhatsApp message to someone's phone, and a fresh
+// code resets the 5-guess counter — so sending is limited per number (any IP)
+// AND per IP (any number), verifying per number. One bucket per mobile however
+// it is typed ("+91 98…", "098…", "98…"); shared by login and account deletion.
+const mobileKey = (req) => {
+  const b = req.body || {};
+  const digits = String(b.mobile_no ?? b.mobileNo ?? b.mobile ?? b.phone ?? '').replace(/\D/g, '');
+  return digits.slice(-10) || 'none';
+};
+const otpSendLimiter = [
+  rateLimit({ ...commonOptions, windowMs: 60 * 60 * 1000, max: 10 }),
+  rateLimit({ ...commonOptions, windowMs: 15 * 60 * 1000, max: 3, keyGenerator: (req) => `send:${mobileKey(req)}` }),
+];
+const otpVerifyLimiter = rateLimit({
+  ...commonOptions, windowMs: 15 * 60 * 1000, max: 10, keyGenerator: (req) => `verify:${mobileKey(req)}`,
+});
+
+// ── /health: an uptime monitor polls every few minutes; this only stops abuse.
+const healthLimiter = rateLimit({
+  ...commonOptions,
+  windowMs: 60 * 1000,
+  max: 30,
+});
+
 module.exports = {
   globalLimiter,
+  healthLimiter,
   authLimiter,
   lookupLimiter,
   deletionLimiter,
+  otpSendLimiter,
+  otpVerifyLimiter,
 };

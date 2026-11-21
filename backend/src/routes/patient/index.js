@@ -1,5 +1,6 @@
 var express = require('express');
 var router = express.Router();
+require('../../middleware/ownPatient')(router); // a patient token may only touch its own records
 var db = require('../../db');
 var sql = require('mssql');
 const log = require('../../middleware/logger');
@@ -16,21 +17,31 @@ router.delete("/deleteFamilyMember/:member_id", async (req, res) => {
       });
     }
 
-    const request = db.request();
-    request.input("operation", "DeleteMember");
-    request.input("member_id", sql.Int, parseInt(member_id));
+    // A member with appointments or prescriptions cannot be deleted → success 0
+    // row. No foreign key guards this (appointments/patient_records hold either
+    // a patient or a member id, told apart by user_type = 2), so check here.
+    const result = await db.request()
+      .input("member_id", sql.Int, parseInt(member_id))
+      .query(`
+        IF EXISTS (SELECT 1 FROM dbo.appointments WHERE user_type = 2 AND patient_id = @member_id)
+           OR EXISTS (SELECT 1 FROM dbo.patient_records WHERE user_type = 2 AND patient_id = @member_id)
+          SELECT 0 AS success, 'Member is used in other records, cannot delete.' AS message;
+        ELSE
+        BEGIN TRY
+          DELETE FROM dbo.family_members WHERE member_id = @member_id;
+          SELECT 1 AS success, 'Member deleted successfully' AS message;
+        END TRY
+        BEGIN CATCH
+          SELECT 0 AS success, 'Member is used in other records, cannot delete.' AS message;
+        END CATCH
+      `);
 
-    const result = await request.execute("sp_family_members");
+    const row = result.recordset?.[0] || {};
+    const success = row.success === 1;
 
-    // The SP returns a message like 'Family Member deleted successfully.' or error message
-    const message = result.recordset?.[0]?.Message || "Operation completed";
-
-    // Determine success based on message
-    const success = message.toLowerCase().includes("successfully");
-
-    return res.status(success ? 200 : 400).json({
+    return res.status(success ? 200 : 409).json({
       success,
-      message
+      message: row.message
     });
 
   } catch (err) {
@@ -56,26 +67,23 @@ router.delete("/favoriteDoctor/:patient_id/:doctor_id/:clinic_id", async (req, r
       });
     }
 
+    // A favorite saved without a clinic arrives here as "null" in the URL.
+    const clinic = clinic_id === 'null' ? null : clinic_id;
     const result = await db.request()
       .input("patient_id", sql.Int, parseInt(patient_id))
       .input("doctor_id", sql.Int, parseInt(doctor_id))
-      .input("clinic_id", sql.NVarChar(50), clinic_id)
+      .input("clinic_id", sql.NVarChar(50), clinic)
       .query(`
         DELETE FROM favorite_doctors
-        WHERE patient_id = @patient_id AND doctor_id = @doctor_id AND clinic_id = @clinic_id;
-        SELECT 1 AS success, 'Deleted successfully' AS message;
+        WHERE patient_id = @patient_id AND doctor_id = @doctor_id
+          AND (clinic_id = @clinic_id OR (clinic_id IS NULL AND @clinic_id IS NULL));
+        SELECT @@ROWCOUNT AS deleted;
       `);
 
-    // Message is 'Deleted successfully' (even when no row matched)
-    const message = result.recordset?.[0]?.message || "Operation completed";
-
-    // Determine success based on message
-    const success = message.toLowerCase().includes("successfully");
-
-    return res.status(success ? 200 : 400).json({
-      success,
-      message
-    });
+    if (!result.recordset?.[0]?.deleted) {
+      return res.status(404).json({ success: false, message: "This doctor is not in your favorites" });
+    }
+    return res.status(200).json({ success: true, message: "Deleted successfully" });
 
   } catch (err) {
     log.error('Error in deleteFavoriteDoctor API: ' + err.message);
@@ -101,12 +109,13 @@ router.delete('/review/:appointment_id/:patient_id', async (req, res) => {
       });
     }
 
-    const request = db.request();
-    request.input("operation", "Delete");
-    request.input("appointment_id", sql.Int, parseInt(appointment_id));
-    request.input("patient_id", sql.Int, parseInt(patient_id));
-
-    const result = await request.execute("sp_review");
+    const result = await db.request()
+      .input("appointment_id", sql.Int, parseInt(appointment_id))
+      .input("patient_id", sql.Int, parseInt(patient_id))
+      .query(`
+        DELETE FROM reviews WHERE appointment_id = @appointment_id AND patient_id = @patient_id;
+        SELECT 1 AS success, 'Review deleted' AS message;
+      `);
 
     const message = result.recordset?.[0]?.message || "Operation completed";
     const success = message.toLowerCase().includes("deleted") || message.toLowerCase().includes("success");

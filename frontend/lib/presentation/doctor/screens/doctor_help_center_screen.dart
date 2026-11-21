@@ -148,7 +148,7 @@ class _HelpHeader extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: _primaryLight,
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: _primary.withOpacity(0.2)),
+                        border: Border.all(color: _primary.withValues(alpha: 0.2)),
                       ),
                       child: const Icon(
                         Icons.arrow_back_rounded,
@@ -294,13 +294,13 @@ class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.icon,
     required this.label,
-    this.onTap,
     this.isPrimary = false,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback? onTap;
+  // No caller passes a tap handler yet; the button then renders without one.
+  VoidCallback? get onTap => null;
   final bool isPrimary;
 
   @override
@@ -365,7 +365,7 @@ class _DeleteAccountCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: _redLight,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _error.withOpacity(0.3)),
+        border: Border.all(color: _error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -442,7 +442,7 @@ class _HelpSectionCard extends StatelessWidget {
         border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),

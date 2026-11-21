@@ -63,7 +63,7 @@ class _MyClinicsPageState extends ConsumerState<MyClinicsPage> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(doctorLoginViewModelProvider);
-    final primaryClinicId = state.clinic_id;
+    final primaryClinicId = state.clinicId;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -411,9 +411,11 @@ class _AddClinicPageState extends ConsumerState<AddClinicPage> {
       final urls = await ref
           .read(doctorLoginViewModelProvider.notifier)
           .fetchClinicGallery(clinicId);
-      if (mounted) setState(() { _networkImages
+      if (mounted) {
+        setState(() { _networkImages
         ..clear()
         ..addAll(urls); });
+      }
     } catch (_) {}
   }
 

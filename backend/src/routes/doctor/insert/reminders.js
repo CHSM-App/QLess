@@ -10,13 +10,15 @@ const {
   formatApptDate,
   formatApptTime,
 } = require('./shared');
+const prescriptionsSql = require('../../../queries/prescriptions');
+const appointmentsSql = require('../../../queries/appointments');
 
 //cron job ---------------------------------------------------------------------------------------------------------------------------------
 cron.schedule('0 14 * * *', async () => {
   try {
     const result = await db.request()
       .input('operation', 'TOMORROW_PATIENT_APPOINTMENTS')
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const rows = result.recordset || [];
 
@@ -72,7 +74,7 @@ cron.schedule('0 15 * * *', async () => {
   try {
     const result = await db.request()
       .input('operation', 'TOMORROW_PATIENT_APPOINTMENTS')
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const rows = result.recordset || [];
 
@@ -122,7 +124,7 @@ cron.schedule('0 16 * * *', async () => {
   try {
     const result = await db.request()
       .input('operation', 'YESTERDAY_COMPLETED_PATIENTS')
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     const rows = result.recordset || [];
 
@@ -185,7 +187,7 @@ cron.schedule('0 16 * * *', async () => {
 async function runFollowUpReminders(tag = 'cron 09:00') {
   const result = await db.request()
     .input('operation', 'FollowUpReminders')
-    .execute('sp_prescription');
+    .run(prescriptionsSql);
 
   const rows = result.recordset || [];
 

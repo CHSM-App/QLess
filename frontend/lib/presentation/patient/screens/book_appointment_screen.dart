@@ -16,7 +16,6 @@ import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/patient/view_models/appointment_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
-import 'package:qless/domain/models/review_model.dart';
 
 // ── Modern Teal Minimal Colour Palette ────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -104,7 +103,7 @@ bool _sessionEnded(DoctorAvailabilityModel s, bool isToday) {
     h = int.tryParse(p[0]);
     m = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
   }
-  if (h == null || m == null) return false;
+  if (h == null) return false;
   final now = DateTime.now();
   return now.hour * 60 + now.minute >= h * 60 + m;
 }
@@ -177,12 +176,12 @@ class _FavoriteButtonState extends State<_FavoriteButton>
           width: 36, height: 36,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            color: _isFav ? kFavActive.withOpacity(0.12) : kPrimaryLight,
+            color: _isFav ? kFavActive.withValues(alpha: 0.12) : kPrimaryLight,
             border: Border.all(
-              color: _isFav ? kFavActive.withOpacity(0.4) : kPrimary.withOpacity(0.2),
+              color: _isFav ? kFavActive.withValues(alpha: 0.4) : kPrimary.withValues(alpha: 0.2),
             ),
             boxShadow: _isFav
-                ? [BoxShadow(color: kFavActive.withOpacity(0.2), blurRadius: 8)]
+                ? [BoxShadow(color: kFavActive.withValues(alpha: 0.2), blurRadius: 8)]
                 : [],
           ),
           child: Center(
@@ -715,7 +714,7 @@ void dispose() {
               isReschedule:   widget.isReschedule,
               selectedDate:   _selectedDate,
               selectedSlot:   _selectedTime,
-              queueStartTime: isQueue ? _fmtTime(selAvail!.startTime) : null,
+              queueStartTime: isQueue ? _fmtTime(selAvail.startTime) : null,
               // fee:            widget.doctor.consultationFee,
               isLoading:      _isBooking,
               onConfirm:      _onConfirm,
@@ -976,10 +975,10 @@ class _AppBar extends StatelessWidget {
           width: 52,
           height: 52,
           decoration: BoxDecoration(
-            color: ac.withOpacity(0.12),
+            color: ac.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(13),
             border: Border.all(
-              color: ac.withOpacity(0.2),
+              color: ac.withValues(alpha: 0.2),
               width: 1.5,
             ),
           ),
@@ -1088,7 +1087,7 @@ class _AppBar extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: kPrimaryLight,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: kPrimary.withOpacity(0.25)),
+                  border: Border.all(color: kPrimary.withValues(alpha: 0.25)),
                 ),
                 child: const Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.person_outline_rounded, size: 12, color: kPrimary),
@@ -1106,7 +1105,7 @@ class _AppBar extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: kPrimaryLight,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: kPrimary.withOpacity(0.25)),
+                    border: Border.all(color: kPrimary.withValues(alpha: 0.25)),
                   ),
                   child: const Row(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.map_rounded, size: 12, color: kPrimary),
@@ -1148,119 +1147,6 @@ class _AppBar extends StatelessWidget {
       );
     return infoOnly ? info : bar;
   }
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  STATS ROW
-// ════════════════════════════════════════════════════════════════════
-class _StatsRow extends ConsumerWidget {
-  final DoctorDetails doctor;
-  const _StatsRow({required this.doctor});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reviews       = ref.watch(reviewViewModelProvider).reviews ?? <ReviewModel>[];
-    final avgRating     = reviews.isEmpty
-        ? 0.0
-        : reviews.fold<double>(0, (acc, r) =>
-              acc + (r.rating?.toDouble() ?? 0)) /
-            reviews.length;
-    final patientCount  = ref.watch(appointmentViewModelProvider).doctorPatientCount;
-
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
-      child: Row(
-        children: [
-          _StatBox(label: 'Experience',
-              value: doctor.experience != null
-                  ? '${doctor.experience} yrs' : '--'),
-          const SizedBox(width: 8),
-          _StatBox(
-            label: reviews.isEmpty ? 'Rating' : '${reviews.length} reviews',
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.star_rounded, color: kWarning, size: 14),
-                const SizedBox(width: 2),
-                Text(
-                  avgRating == 0 ? '--' : avgRating.toStringAsFixed(1),
-                  style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: kTextPrimary)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          _StatBox(label: 'Patients', value: patientCount == null ? '--' : '$patientCount'),
-          const SizedBox(width: 8),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute(
-                      builder: (_) => DoctorProfileScreen(doctor: doctor))),
-              child: Container(
-                height: 58,
-                decoration: BoxDecoration(
-                  color: kPrimaryLight,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kPrimary.withOpacity(0.25)),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.person_outline_rounded,
-                        color: kPrimary, size: 16),
-                    SizedBox(height: 3),
-                    Text('Profile',
-                        style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: kPrimary)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatBox extends StatelessWidget {
-  final String  label;
-  final String? value;
-  final Widget? child;
-  const _StatBox({required this.label, this.value, this.child});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-        child: Container(
-          height: 58,
-          decoration: BoxDecoration(
-            color: const Color(0xFFF7F8FA),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kBorder),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(label,
-                  style: const TextStyle(
-                      fontSize: 10, color: kTextMuted)),
-              const SizedBox(height: 3),
-              child ??
-                  Text(value ?? '--',
-                      style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: kTextPrimary)),
-            ],
-          ),
-        ),
-      );
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1324,7 +1210,7 @@ class _BookingFor extends ConsumerWidget {
         child: Row(children: [
           CircleAvatar(
             radius: 13,
-            backgroundColor: kPrimary.withOpacity(0.15),
+            backgroundColor: kPrimary.withValues(alpha: 0.15),
             child: Text(
               (patState.name?.isNotEmpty ?? false)
                   ? patState.name![0].toUpperCase() : 'M',
@@ -1354,7 +1240,7 @@ class _BookingFor extends ConsumerWidget {
             child: Row(children: [
               CircleAvatar(
                 radius: 13,
-                backgroundColor: kPurple.withOpacity(0.12),
+                backgroundColor: kPurple.withValues(alpha: 0.12),
                 child: Text(
                   m.memberName?.isNotEmpty == true
                       ? m.memberName![0].toUpperCase() : '?',
@@ -1388,7 +1274,7 @@ class _BookingFor extends ConsumerWidget {
             width: 26,
             height: 26,
             decoration: BoxDecoration(
-              color: kPrimary.withOpacity(0.12),
+              color: kPrimary.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.add_rounded, size: 16, color: kPrimary),
@@ -1407,9 +1293,9 @@ class _BookingFor extends ConsumerWidget {
       margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: kPrimaryLight.withOpacity(0.5),
+        color: kPrimaryLight.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kPrimary.withOpacity(0.2)),
+        border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
       ),
       child: Row(children: [
         const Icon(Icons.person_outline_rounded, color: kPrimary, size: 14),
@@ -1536,9 +1422,9 @@ class _Body extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             decoration: BoxDecoration(
-              color: kRedLight.withOpacity(0.5),
+              color: kRedLight.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: kError.withOpacity(0.35)),
+              border: Border.all(color: kError.withValues(alpha: 0.35)),
             ),
             child: const Row(children: [
               Icon(Icons.event_busy_rounded, size: 20, color: kError),
@@ -1589,9 +1475,9 @@ class _Body extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: kRedLight.withOpacity(0.4),
+                color: kRedLight.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kError.withOpacity(0.3)),
+                border: Border.all(color: kError.withValues(alpha: 0.3)),
               ),
               child: const Row(children: [
                 Icon(Icons.event_busy_rounded, size: 15, color: kError),
@@ -1756,7 +1642,7 @@ class _CalendarStripState extends State<_CalendarStrip> {
                         ? (onLeave ? kError : kPrimary)
                         : (avail
                             ? (onLeave
-                                ? kRedLight.withOpacity(0.5)
+                                ? kRedLight.withValues(alpha: 0.5)
                                 : Colors.white)
                             : Colors.transparent),
                     borderRadius: BorderRadius.circular(12),
@@ -1765,12 +1651,12 @@ class _CalendarStripState extends State<_CalendarStrip> {
                         : (avail
                             ? Border.all(
                                 color: onLeave
-                                    ? kError.withOpacity(0.35)
+                                    ? kError.withValues(alpha: 0.35)
                                     : kBorder)
                             : null),
                     boxShadow: isSel
                         ? [BoxShadow(
-                            color: (onLeave ? kError : kPrimary).withOpacity(0.3),
+                            color: (onLeave ? kError : kPrimary).withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 3))]
                         : null,
@@ -1783,14 +1669,14 @@ class _CalendarStripState extends State<_CalendarStrip> {
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               color: isSel
-                                  ? Colors.white.withOpacity(0.8)
+                                  ? Colors.white.withValues(alpha: 0.8)
                                   : (avail
                                       ? (onLeave
-                                          ? kError.withOpacity(0.7)
+                                          ? kError.withValues(alpha: 0.7)
                                           : (dt.weekday >= 6
                                               ? kPrimary
                                               : kTextMuted))
-                                      : kTextMuted.withOpacity(0.3)))),
+                                      : kTextMuted.withValues(alpha: 0.3)))),
                       const SizedBox(height: 4),
                       Text('${dt.day}',
                           style: TextStyle(
@@ -1800,14 +1686,14 @@ class _CalendarStripState extends State<_CalendarStrip> {
                                   ? Colors.white
                                   : (avail
                                       ? (onLeave ? kError : kTextPrimary)
-                                      : kTextMuted.withOpacity(0.3)))),
+                                      : kTextMuted.withValues(alpha: 0.3)))),
                       const SizedBox(height: 4),
                       Container(
                         width: 5, height: 5,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: isSel
-                              ? Colors.white.withOpacity(0.7)
+                              ? Colors.white.withValues(alpha: 0.7)
                               : (dot ?? Colors.transparent),
                         ),
                       ),
@@ -1843,7 +1729,7 @@ class _DateBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: kPrimaryLight,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kPrimary.withOpacity(0.3)),
+          border: Border.all(color: kPrimary.withValues(alpha: 0.3)),
         ),
         child: Row(children: [
           const Icon(Icons.event_rounded, size: 14, color: kPrimary),
@@ -1923,8 +1809,8 @@ class _SessionRow extends StatelessWidget {
                       horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: sel
-                        ? Colors.white.withOpacity(0.15)
-                        : color.withOpacity(0.1),
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -1966,8 +1852,8 @@ class _QueueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final noteColor = isQueueOpen ? kSuccess : kError;
     final noteBg    = isQueueOpen
-        ? kGreenLight.withOpacity(0.4)
-        : kRedLight.withOpacity(0.4);
+        ? kGreenLight.withValues(alpha: 0.4)
+        : kRedLight.withValues(alpha: 0.4);
     final noteIcon  = isQueueOpen
         ? Icons.check_circle_rounded
         : (bookingClosedByDoctor ? Icons.event_busy_rounded : Icons.access_time_rounded);
@@ -1990,7 +1876,7 @@ class _QueueCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: noteBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: noteColor.withOpacity(0.3)),
+          border: Border.all(color: noteColor.withValues(alpha: 0.3)),
         ),
         child: Row(children: [
           Icon(noteIcon, size: 15, color: noteColor),
@@ -2030,15 +1916,15 @@ class _QueueCard extends StatelessWidget {
       //   width: double.infinity,
       //   padding: const EdgeInsets.all(14),
       //   decoration: BoxDecoration(
-      //     color: kAmberLight.withOpacity(0.5),
+      //     color: kAmberLight.withValues(alpha: 0.5),
       //     borderRadius: BorderRadius.circular(12),
-      //     border: Border.all(color: kWarning.withOpacity(0.3)),
+      //     border: Border.all(color: kWarning.withValues(alpha: 0.3)),
       //   ),
       //   child: Row(children: [
       //     Container(
       //       width: 44, height: 44,
       //       decoration: BoxDecoration(
-      //         color: kWarning.withOpacity(0.15),
+      //         color: kWarning.withValues(alpha: 0.15),
       //         borderRadius: BorderRadius.circular(11),
       //       ),
       //       child: const Icon(Icons.confirmation_number_rounded,
@@ -2069,9 +1955,9 @@ class _QueueCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: kPrimaryLight.withOpacity(0.4),
+            color: kPrimaryLight.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: kPrimary.withOpacity(0.2)),
+            border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
           ),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
@@ -2107,11 +1993,11 @@ class _QueueCard extends StatelessWidget {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: kPrimary.withOpacity(0.25)),
+                  borderSide: BorderSide(color: kPrimary.withValues(alpha: 0.25)),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: kPrimary.withOpacity(0.2)),
+                  borderSide: BorderSide(color: kPrimary.withValues(alpha: 0.2)),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -2140,9 +2026,9 @@ class _EstimateBanner extends StatelessWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
-          color: kInfoLight.withOpacity(0.4),
+          color: kInfoLight.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kInfo.withOpacity(0.25)),
+          border: Border.all(color: kInfo.withValues(alpha: 0.25)),
         ),
         child: Row(children: [
           if (_isLoading)
@@ -2471,9 +2357,9 @@ class _SymptomsField extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: kPrimaryLight.withOpacity(0.4),
+          color: kPrimaryLight.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: kPrimary.withOpacity(0.2)),
+          border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
@@ -2514,11 +2400,11 @@ class _SymptomsField extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: kPrimary.withOpacity(0.25)),
+                borderSide: BorderSide(color: kPrimary.withValues(alpha: 0.25)),
               ),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: kPrimary.withOpacity(0.2)),
+                borderSide: BorderSide(color: kPrimary.withValues(alpha: 0.2)),
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),

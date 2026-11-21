@@ -31,5 +31,3 @@ iisnode_logs/
 coverage/
 startup-error.txt
 
-# Old unused business images (kept on disk, not tracked)
-routes/BusinessImages/

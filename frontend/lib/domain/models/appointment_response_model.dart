@@ -24,10 +24,15 @@ class AppointmentResponseModel {
   @JsonKey(name: 'data')
   List<AppointmentData>? data;
 
+  // walkInBook: set when the walk-in was started straight away (idle queue).
+  @JsonKey(name: 'started_appointment_id')
+  int? startedAppointmentId;
+
   AppointmentResponseModel({
     this.success,
     this.message,
     this.data,
+    this.startedAppointmentId,
   });
 
   factory AppointmentResponseModel.fromJson(Map<String, dynamic> json) =>

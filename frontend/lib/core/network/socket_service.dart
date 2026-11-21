@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/constant.dart';
 import 'package:socket_io_client/socket_io_client.dart' as sio;
 
+import 'token_provider.dart';
+
 class SocketService {
   late final sio.Socket _socket;
   final _controller       = StreamController<Map<String, dynamic>>.broadcast();
@@ -11,7 +13,10 @@ class SocketService {
   final _joinedRooms      = <int>{};
   final _doctorRooms      = <int>{}; // rooms joined as doctor (for reconnect)
 
-  SocketService() {
+  /// Current access token, read at emit time so refreshes/reconnects send a fresh one.
+  final String? Function() _accessToken;
+
+  SocketService(this._accessToken) {
     final serverUrl = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
         : baseUrl;
@@ -46,7 +51,7 @@ class SocketService {
         _socket.emit('joinClinic', id);
       }
       for (final id in _doctorRooms) {
-        _socket.emit('doctorJoinClinic', id);
+        _socket.emit('doctorJoinClinic', _doctorPayload(id));
       }
     });
 
@@ -54,6 +59,10 @@ class SocketService {
       // ignore — app works without socket (polling fallback)
     });
   }
+
+  // Presence events must prove they come from this doctor's staff.
+  Map<String, dynamic> _doctorPayload(int doctorId) =>
+      {'doctorId': doctorId, 'token': _accessToken()};
 
   Stream<Map<String, dynamic>> get updates       => _controller.stream;
   Stream<Map<String, dynamic>> get doctorStatusUpdates => _statusController.stream;
@@ -69,7 +78,7 @@ class SocketService {
   void doctorJoinClinic(int doctorId) {
     _doctorRooms.add(doctorId);
     if (!_socket.connected) _socket.connect();
-    _socket.emit('doctorJoinClinic', doctorId);
+    _socket.emit('doctorJoinClinic', _doctorPayload(doctorId));
   }
 
   void leaveClinic(int doctorId) {
@@ -106,7 +115,7 @@ class SocketService {
       _socket.off('connect', onConnect);
     }
     if (_socket.connected) {
-      _socket.emit('doctorLogout', doctorId);
+      _socket.emit('doctorLogout', _doctorPayload(doctorId));
       await Future.delayed(const Duration(milliseconds: 300));
     }
     _doctorRooms.remove(doctorId);
@@ -128,7 +137,7 @@ class SocketService {
 }
 
 final socketServiceProvider = Provider<SocketService>((ref) {
-  final service = SocketService();
+  final service = SocketService(() => ref.read(tokenProvider).accessToken);
   ref.onDispose(service.dispose);
   return service;
 });

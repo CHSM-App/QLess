@@ -10,8 +10,12 @@ const {
   formatApptDate,
   formatApptTime,
 } = require('./shared');
+const doctorLeaveSql = require('../../../queries/doctorLeave');
+const notificationsSql = require('../../../queries/notifications');
+const appointmentsSql = require('../../../queries/appointments');
 
 const router = express.Router();
+require('../../../middleware/ownStaff').params(router); // URL ids (body ids: insert/index.js)
 
 // ──────────────────────────────────────────────────────────────────────────
 //  DOCTOR LEAVE / SUTTI  (date-range unavailability — industry "Mark
@@ -43,7 +47,7 @@ router.post('/addDoctorLeave', async (req, res) => {
       .input('from_date', from_date)
       .input('to_date', to_date)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     const affected = countRes.recordset?.[0]?.cnt ?? 0;
 
@@ -63,7 +67,7 @@ router.post('/addDoctorLeave', async (req, res) => {
       .input('to_date', to_date)
       .input('reason', reason ?? null)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     const row = addRes.recordset?.[0] ?? {};
     if (row.error) {
@@ -83,7 +87,7 @@ router.post('/addDoctorLeave', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('from_date', from_date)
       .input('to_date', to_date)
-      .execute('sp_notification');
+      .run(notificationsSql);
 
     const affectedAppts = [];
     for (const row of (detailsRes.recordset || [])) {
@@ -104,7 +108,7 @@ router.post('/addDoctorLeave', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('from_date', from_date)
       .input('to_date', to_date)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     // PASS 3.5 — normalize status to 'CancleD' so the patient app shows
     // "Cancelled by Doctor" (the leave SP otherwise sets generic 'cancelled'
@@ -114,7 +118,7 @@ router.post('/addDoctorLeave', async (req, res) => {
         db.request()
           .input('operation', 'MARK_APPT_DOCTOR_CANCELLED')
           .input('appointment_id', a.appointment_id)
-          .execute('sp_appointment')
+          .run(appointmentsSql)
           .catch(err =>
             log.error('status normalize err: ' + a.appointment_id + ' ' + err.message),
           ),
@@ -179,7 +183,7 @@ router.get('/doctorLeaves/:doctor_id/:clinic_id?', async (req, res) => {
       .input('operation', 'LIST_LEAVE')
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     res.status(200).json(result.recordset || []);
   } catch (error) {
@@ -207,7 +211,7 @@ router.post('/cancelDoctorLeave', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('leave_id', leave_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     return res.status(200).json({
       success: true,

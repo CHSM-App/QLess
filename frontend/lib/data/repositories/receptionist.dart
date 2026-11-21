@@ -86,7 +86,6 @@ class ReceptionistImpl implements ReceptionistRepository {
     return apiService.deleteReceptionist(recepId);
   }
   
-  @override
   Future<dynamic> updateReceptionist(ReceptionistApiModel recept, {File? image}) async {
     MultipartFile? multipartImage;
     if (image != null) {

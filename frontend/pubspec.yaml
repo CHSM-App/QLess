@@ -8,7 +8,7 @@ publish_to: 'none'
 # not strictly greater than the previous build, so always bump N — even
 # for a hotfix that keeps the same X.Y.Z.
 # Bump via: scripts/bump-version.ps1 -Type patch (or minor/major).
-version: 1.0.7+10
+version: 1.0.8+11
 
 environment:
   sdk: ">=3.8.0 <4.0.0"
@@ -130,3 +130,15 @@ flutter_launcher_icons:
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/icon/qless_logo.png"
   adaptive_icon_foreground_inset: 20
+  windows:
+    generate: true
+    image_path: "assets/icon/qless_logo.png"
+    icon_size: 256
+  macos:
+    generate: true
+    image_path: "assets/icon/qless_logo.png"
+  web:
+    generate: true
+    image_path: "assets/icon/qless_logo.png"
+    background_color: "#FFFFFF"
+    theme_color: "#FFFFFF"

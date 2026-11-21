@@ -19,8 +19,8 @@ class DoctorLoginState {
   final String? email;
   final String? roleId;
   final String? token;
-  final String? clinic_name;
-  final String? clinic_id;
+  final String? clinicName;
+  final String? clinicId;
   final String? loginTicket;
   final int? leadTimeMinutes;
   final AsyncValue<List<DoctorDetails>> phoneCheckResult;
@@ -37,9 +37,9 @@ class DoctorLoginState {
     this.roleId,
     this.token,
     this.doctorId,
-    this.clinic_id,
+    this.clinicId,
     this.loginTicket,
-    this.clinic_name,
+    this.clinicName,
     this.leadTimeMinutes,
     this.phoneCheckResult = const AsyncValue.data([]),
     this.medicineTypes,
@@ -58,7 +58,7 @@ class DoctorLoginState {
     int? doctorId,
     String? clinicId,
     String? loginTicket,
-    String? clinic_name,
+    String? clinicName,
     int? leadTimeMinutes,
     bool clearError = false,
     AsyncValue<List<DoctorDetails>>? phoneCheckResult,
@@ -75,10 +75,10 @@ class DoctorLoginState {
       email: email ?? this.email,
       roleId: roleId ?? this.roleId,
       token: token ?? this.token,
-      clinic_id: clinicId ?? this.clinic_id,
+      clinicId: clinicId ?? this.clinicId,
       loginTicket: loginTicket ?? this.loginTicket,
       leadTimeMinutes: leadTimeMinutes ?? this.leadTimeMinutes,
-      clinic_name: clinic_name ?? this.clinic_name,
+      clinicName: clinicName ?? this.clinicName,
       phoneCheckResult: phoneCheckResult ?? this.phoneCheckResult,
       medicineTypes: medicineTypes ?? this.medicineTypes,
       medicines: medicines ?? this.medicines,
@@ -137,7 +137,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       mobile: mobile,
       email: email,
       roleId: roleId,
-      clinic_name: clinicName,
+      clinicName: clinicName,
       token: token,
       leadTimeMinutes: leadTimeMinutes,
       phoneCheckResult: hasFullDetails
@@ -172,6 +172,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     DoctorDetails doctorLogin, {
     File? doctorImage,
     List<File>? clinicImages,
+    String? loginTicket,
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
@@ -179,6 +180,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         doctorLogin,
         doctorImage: doctorImage,
         clinicImages: clinicImages,
+        loginTicket: loginTicket,
       );
       final dynamic rawDoctorId = result['doctor_id'];
       final dynamic rawClinicId = result['clinic_id'];
@@ -186,7 +188,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           ? rawDoctorId
           : int.tryParse(rawDoctorId?.toString() ?? '');
       final String? clinicId = rawClinicId?.toString();
-      final String? loginTicket = result['loginTicket']?.toString();
+      final String? echoedTicket = result['loginTicket']?.toString();
       if (clinicId != null &&
           clinicId.trim().isNotEmpty &&
           clinicId.trim().toLowerCase() != 'null') {
@@ -196,7 +198,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         isLoading: false,
         doctorId: doctorId, // stored on state for the screen to read
         clinicId: clinicId,
-        loginTicket: loginTicket,
+        loginTicket: echoedTicket,
         clearError: true,
       );
     } catch (e) {
@@ -282,7 +284,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         state = state.copyWith(phoneCheckResult: AsyncValue.data(result));
         return;
       }
-      final existingClinicId = state.clinic_id;
+      final existingClinicId = state.clinicId;
       if (existingClinicId != null) {
         // Clinic already selected via picker.
         // Update personal fields from API, preserve clinic fields from selectClinic.
@@ -311,7 +313,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           qStartSection:  d.qStartSection,
           // Clinic fields preserved from selectClinic merge
           clinicId:        currentFirst?.clinicId      ?? existingClinicId,
-          clinicName:      currentFirst?.clinicName    ?? state.clinic_name,
+          clinicName:      currentFirst?.clinicName    ?? state.clinicName,
           clinicAddress:   currentFirst?.clinicAddress,
           latitude:        currentFirst?.latitude,
           longitude:       currentFirst?.longitude,
@@ -347,7 +349,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
           roleId: d.roleId?.toString(),
           token: d.Token,
           clinicId: d.clinicId,
-          clinic_name: d.clinicName,
+          clinicName: d.clinicName,
           leadTimeMinutes: d.leadTime,
           phoneCheckResult: AsyncValue.data(result),
         );
@@ -580,10 +582,10 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       debugPrint('[RecepDebug] d.clinicId=${d.clinicId} d.clinicName=${d.clinicName}');
 
       // Preserve any clinic the user already selected (saved via selectClinic).
-      // On first login state.clinic_id is null → use API value.
-      // On app restart state.clinic_id is loaded from storage → keep it.
-      final existingClinicId   = state.clinic_id;
-      final existingClinicName = state.clinic_name;
+      // On first login state.clinicId is null → use API value.
+      // On app restart state.clinicId is loaded from storage → keep it.
+      final existingClinicId   = state.clinicId;
+      final existingClinicName = state.clinicName;
       final resolvedClinicId   = existingClinicId   ?? d.clinicId;
       final resolvedClinicName = existingClinicName ?? d.clinicName;
 
@@ -595,7 +597,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
         roleId: d.roleId?.toString(),
         token: d.Token,
         clinicId: resolvedClinicId,
-        clinic_name: resolvedClinicName,
+        clinicName: resolvedClinicName,
         leadTimeMinutes: d.leadTime,
         phoneCheckResult: AsyncValue.data(doctors),
       );
@@ -616,7 +618,7 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     // First, update clinic_id/name immediately so UI is responsive.
     state = state.copyWith(
       clinicId: clinic.clinicId,
-      clinic_name: clinic.clinicName,
+      clinicName: clinic.clinicName,
       leadTimeMinutes: clinic.leadTime,
     );
     if (clinic.clinicId != null) {

@@ -94,11 +94,7 @@ class DoctorSettingsPage extends ConsumerStatefulWidget {
 }
 
 class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
-  bool _notificationsEnabled = true;
-  bool _emailAlerts          = false;
-  bool _smsAlerts            = true;
-  bool _darkMode             = false;
-  bool _availableForConsult  = true;
+  final bool _availableForConsult  = true;
   bool _didFetchProfile      = false;
   bool _didFetchCounts       = false;
   String? _lastClinicId;
@@ -138,7 +134,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         final doctorId = roleId == 3
             ? ref.read(receptionistLoginViewModelProvider).doctorId
             : next.doctorId;
-        final clinicId = next.clinic_id;
+        final clinicId = next.clinicId;
         final clinicChanged = clinicId != _lastClinicId && _didFetchCounts;
         if (doctorId != null && doctorId > 0) {
           _fetchCounts(doctorId, force: clinicChanged, clinicId: clinicId);
@@ -163,7 +159,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
           ? ref.read(receptionistLoginViewModelProvider).doctorId
           : s.doctorId;
       if (doctorId != null && doctorId > 0) {
-        _fetchCounts(doctorId, clinicId: s.clinic_id);
+        _fetchCounts(doctorId, clinicId: s.clinicId);
       }
     });
   }
@@ -229,7 +225,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     }
     final s = ref.read(doctorLoginViewModelProvider);
     final doctorId = s.doctorId;
-    if (doctorId != null && doctorId > 0) _fetchCounts(doctorId, force: true, clinicId: s.clinic_id);
+    if (doctorId != null && doctorId > 0) _fetchCounts(doctorId, force: true, clinicId: s.clinicId);
     await Future.delayed(const Duration(milliseconds: 600));
   }
 
@@ -307,7 +303,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
       _hasText(d?.specialization),
       _hasText(d?.qualification),
       _hasText(d?.licenseNo),
-      _hasText(d?.clinicName ?? s.clinic_name),
+      _hasText(d?.clinicName ?? s.clinicName),
       _hasText(d?.clinicAddress),
       d?.consultationFee != null,
       d?.leadTime != null || s.leadTimeMinutes != null,
@@ -332,7 +328,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         mobile:         s.mobile ?? '—',
         specialization: d?.specialization ?? '—',
         qualification:  d?.qualification ?? '—',
-        clinicName:     d?.clinicName ?? s.clinic_name ?? '—',
+        clinicName:     d?.clinicName ?? s.clinicName ?? '—',
         experience:     d?.experience?.toString() ?? '—',
         fee:            d?.consultationFee != null
             ? '₹${d!.consultationFee!.toStringAsFixed(0)}'
@@ -355,7 +351,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
         fee:            d?.consultationFee != null
             ? '₹${d!.consultationFee!.toStringAsFixed(0)}'
             : '—',
-        clinicName:    d?.clinicName ?? s.clinic_name ?? '—',
+        clinicName:    d?.clinicName ?? s.clinicName ?? '—',
         clinicAddress: d?.clinicAddress ?? '—',
         clinicEmail:   d?.clinicEmail ?? '—',
         clinicContact: d?.clinicContact ?? '—',
@@ -619,7 +615,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                         fontSize: 13, fontWeight: FontWeight.w600)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: kError,
-                  side: BorderSide(color: kError.withOpacity(0.5)),
+                  side: BorderSide(color: kError.withValues(alpha: 0.5)),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                 ),
@@ -645,7 +641,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
     final displayName = isReceptionist ? (rs?.name ?? 'Receptionist') : (d?.name ?? s.name ?? 'Doctor');
     final initials = _initials(displayName);
     final name     = displayName;
-    final clinic   = d?.clinicName ?? s.clinic_name ?? '';
+    final clinic   = d?.clinicName ?? s.clinicName ?? '';
     final spec     = isReceptionist ? 'Receptionist' : (d?.specialization ?? 'General');
     final qual     = isReceptionist ? '' : (d?.qualification ?? '');
 
@@ -723,7 +719,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                     decoration: BoxDecoration(
                       color: kPrimaryLight,
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: kPrimary.withOpacity(0.2)),
+                      border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -852,7 +848,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                           decoration: BoxDecoration(
                             color: kAmberLight,
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: kWarning.withOpacity(0.4)),
+                            border: Border.all(color: kWarning.withValues(alpha: 0.4)),
                           ),
                           alignment: Alignment.center,
                           child: Row(
@@ -1015,7 +1011,7 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
   }
 
   Widget _buildClinicInfoCard(DoctorLoginState s, DoctorDetails? d) {
-    final clinicName    = d?.clinicName    ?? s.clinic_name ?? '—';
+    final clinicName    = d?.clinicName    ?? s.clinicName ?? '—';
     final clinicAddress = d?.clinicAddress ?? '—';
     final clinicContact = d?.clinicContact ?? '—';
     final clinicEmail   = d?.clinicEmail   ?? '—';
@@ -1242,7 +1238,7 @@ Widget _buildAvailabilityCard() => Container(
     ),
     TextButton.icon(
       onPressed: () {
-        final clinicId = ref.read(doctorLoginViewModelProvider).clinic_id;
+        final clinicId = ref.read(doctorLoginViewModelProvider).clinicId;
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -1550,69 +1546,6 @@ Widget _buildAvailabilityCard() => Container(
         ],
       );
 
-  Widget _dayRow(String day, String hours, bool active) =>
-      Row(children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: active ? kSuccess : kError),
-        ),
-        const SizedBox(width: 8),
-        SizedBox(
-          width: 88,
-          child: Text(day,
-              style: const TextStyle(
-                  fontSize: 12, color: kTextPrimary)),
-        ),
-        Text(hours,
-            style: TextStyle(
-                fontSize: 12,
-                color: active ? kTextPrimary : kTextMuted)),
-      ]);
-
-  // ── Notifications Card ────────────────────────────────────────────────────
-
-  Widget _buildNotificationsCard() => Container(
-        decoration: _cardDec(),
-        child: Column(children: [
-          _toggleTile(
-              Icons.notifications_outlined, kAmberLight, kWarning,
-              'Push Notifications', 'Appointment reminders & alerts',
-              _notificationsEnabled,
-              (v) => setState(() => _notificationsEnabled = v)),
-          const Divider(height: 1, indent: 56, color: kDivider),
-          _toggleTile(Icons.email_outlined, kInfoLight, kInfo,
-              'Email Alerts', 'Daily summaries & reports',
-              _emailAlerts,
-              (v) => setState(() => _emailAlerts = v)),
-          const Divider(height: 1, indent: 56, color: kDivider),
-          _toggleTile(Icons.sms_outlined, kGreenLight, kSuccess,
-              'SMS Notifications', 'Critical appointment updates',
-              _smsAlerts,
-              (v) => setState(() => _smsAlerts = v)),
-        ]),
-      );
-
-  // ── Appearance Card ───────────────────────────────────────────────────────
-
-  Widget _buildAppearanceCard() => Container(
-        decoration: _cardDec(),
-        child: Column(children: [
-          _toggleTile(Icons.dark_mode_outlined, kPurpleLight, kPurple,
-              'Dark Mode', 'Switch to dark theme',
-              _darkMode,
-              (v) => setState(() => _darkMode = v)),
-          const Divider(height: 1, indent: 56, color: kDivider),
-          _navTile(
-              _Item(Icons.language_outlined, 'Language', 'English (India)')),
-          const Divider(height: 1, indent: 56, color: kDivider),
-          _navTile(
-              _Item(Icons.text_fields_outlined, 'Text Size', 'Medium')),
-        ]),
-      );
-
   // ── Support Card ──────────────────────────────────────────────────────────
 
   Widget _buildSupportCard() => _tileCard([
@@ -1877,7 +1810,7 @@ Widget _buildAvailabilityCard() => Container(
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8)),
             child: Icon(icon, color: color, size: 14),
           ),
@@ -1972,49 +1905,6 @@ Widget _buildAvailabilityCard() => Container(
                 color: kTextMuted, size: 17),
           ]),
         ),
-      );
-
-  Widget _toggleTile(
-    IconData icon,
-    Color iconBg,
-    Color iconFg,
-    String label,
-    String subtitle,
-    bool value,
-    ValueChanged<bool> onChanged,
-  ) =>
-      Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: 14, vertical: 10),
-        child: Row(children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: iconFg, size: 17),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: kTextPrimary)),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 11, color: kTextMuted)),
-                ]),
-          ),
-          Switch.adaptive(
-              value: value,
-              activeColor: kPrimary,
-              onChanged: onChanged),
-        ]),
       );
 
   Widget _sectionLabel(String title) => Padding(

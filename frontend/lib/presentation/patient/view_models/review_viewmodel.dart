@@ -83,7 +83,7 @@ class ReviewViewmodel extends StateNotifier<ReviewState> {
   }
 
   String _extractMessage(Object error) {
-    if (error is DioError) {
+    if (error is DioException) {
       if (error.response != null && error.response?.data != null) {
         final data = error.response!.data;
         if (data is Map<String, dynamic> && data['message'] != null) {

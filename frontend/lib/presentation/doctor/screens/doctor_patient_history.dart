@@ -82,7 +82,9 @@ bool _passesDateFilter(AppointmentList a, _DateFilter df,
     _DateFilter.custom      => () {
         if (customFrom != null && p.isBefore(customFrom)) return false;
         if (customTo != null &&
-            p.isAfter(customTo.add(const Duration(days: 1)))) return false;
+            p.isAfter(customTo.add(const Duration(days: 1)))) {
+          return false;
+        }
         return true;
       }(),
   };
@@ -164,14 +166,6 @@ class _DoctorPatientHistoryScreenState
     final d = DateTime.tryParse(dob);
     return d == null ? null : DateTime.now().year - d.year;
   }
-
-  String _initials(String name) => name
-      .trim()
-      .split(' ')
-      .take(2)
-      .map((w) => w.isNotEmpty ? w[0] : '')
-      .join()
-      .toUpperCase();
 
   void _openDetail(AppointmentList a) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -440,9 +434,9 @@ class _DoctorPatientHistoryScreenState
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
         decoration: BoxDecoration(
-          color: _kPrimary.withOpacity(0.15),
+          color: _kPrimary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: _kPrimary.withOpacity(0.3)),
+          border: Border.all(color: _kPrimary.withValues(alpha: 0.3)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, color: _kPrimaryDark, size: 11),
@@ -477,7 +471,6 @@ class _DoctorPatientHistoryScreenState
 
   Widget _historyCard(AppointmentList p) {
     final name = p.patientName ?? p.bookingFor ?? 'Unknown';
-    final initials = _initials(name);
     final age = _calcAge(p.dob);
 
     final palettes = [
@@ -497,7 +490,7 @@ class _DoctorPatientHistoryScreenState
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: avBd.withOpacity(0.6)),
+          border: Border.all(color: avBd.withValues(alpha: 0.6)),
         ),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
         child: Row(children: [
@@ -578,21 +571,6 @@ class _DoctorPatientHistoryScreenState
       ),
     );
   }
-
-  Widget _completedBadge() => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-        decoration: BoxDecoration(
-            color: _kPrimaryLighter, borderRadius: BorderRadius.circular(20)),
-        child: Row(mainAxisSize: MainAxisSize.min, children: const [
-          Icon(Icons.check_circle_rounded, size: 10, color: _kPrimaryDark),
-          SizedBox(width: 4),
-          Text('Completed',
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: _kPrimaryDark)),
-        ]),
-      );
 
   String _fmtTime(String? raw) {
     if (raw == null) return '';

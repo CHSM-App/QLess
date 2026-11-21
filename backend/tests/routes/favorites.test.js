@@ -8,7 +8,7 @@ const patient = () => authHeader({ role_id: ROLE.PATIENT, uid: 9 });
 // Answers the favorite-doctor reads/writes. `kind` tells a stored-procedure
 // call from inline SQL, so this one responder serves both implementations:
 // the suite must pass unchanged before and after sp_favorite_doctors is inlined.
-function favoritesDb({ exists = false, rows = [], insertedId = 31 } = {}) {
+function favoritesDb({ exists = false, rows = [], insertedId = 31, deleted = 1 } = {}) {
   return ({ kind, target, inputs }) => {
     const op = kind === 'execute' && target === 'sp_favorite_doctors' ? inputs.operation
       : kind === 'query' && /INSERT INTO favorite_doctors/.test(target) ? 'Insert'
@@ -20,7 +20,7 @@ function favoritesDb({ exists = false, rows = [], insertedId = 31 } = {}) {
         ? [{ success: 0, message: 'Already added to favorites' }]
         : [{ success: 1, favorite_id: insertedId, message: 'Added successfully' }];
     }
-    if (op === 'Delete') return [{ success: 1, message: 'Deleted successfully' }];
+    if (op === 'Delete') return [{ deleted }];
     if (op === 'Fetch' && inputs.doctor_id != null) return [{ is_favorite: exists ? 1 : 0 }];
     if (op === 'Fetch') return rows;
     return [];
@@ -56,19 +56,28 @@ describe('POST /patient/insert/favoriteDoctor/add', () => {
     expect(favCall().inputs.clinic_id).toBeNull();
   });
 
-  // Pinned quirk: "already added" still answers success:true, favorite_id absent.
-  test('already a favorite → still success:true, no favorite_id', async () => {
+  // B1: the app treats it as success; `already` tells it nothing was added.
+  test('already a favorite → success:true, already:true, no favorite_id', async () => {
     mockDb.respond = favoritesDb({ exists: true });
     const res = await add({ patient_id: 9, doctor_id: 2, clinic_id: '4' });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ success: true, message: 'Doctor added to favorites' });
+    expect(res.body).toEqual({ success: true, already: true, message: 'Doctor is already in your favorites' });
   });
 
-  test('DB failure → 500 with the error message', async () => {
+  // B2: "clinic_id = NULL" never matched, so the second add hit UQ_fav → 500.
+  test('the exists check compares clinic_id NULL-safely', async () => {
+    mockDb.respond = favoritesDb({ exists: true });
+    await add({ patient_id: 9, doctor_id: 2 });
+    expect(favCall().target).toMatch(/clinic_id IS NULL AND @clinic_id IS NULL/);
+  });
+
+  test('DB failure → 500, no SQL details in the response (S7)', async () => {
     mockDb.respond = () => { throw new Error('Violation of UNIQUE KEY constraint UQ_fav'); };
     const res = await add({ patient_id: 9, doctor_id: 2 });
     expect(res.status).toBe(500);
-    expect(res.body).toEqual({ success: false, message: 'Violation of UNIQUE KEY constraint UQ_fav' });
+    expect(res.body).toMatchObject({ success: false, message: 'Something went wrong. Please try again.' });
+    expect(res.body.correlation_id).toBeTruthy();
+    expect(JSON.stringify(res.body)).not.toContain('UQ_fav');
   });
 });
 
@@ -80,6 +89,23 @@ describe('DELETE /patient/index/favoriteDoctor/:patient_id/:doctor_id/:clinic_id
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, message: 'Deleted successfully' });
     expect(favCall().inputs).toMatchObject({ patient_id: 9, doctor_id: 2, clinic_id: '4' });
+  });
+
+  // B3: deleting nothing used to answer 200 "Deleted successfully".
+  test('not a favorite → 404', async () => {
+    mockDb.respond = favoritesDb({ deleted: 0 });
+    const res = await request(app).delete('/patient/index/favoriteDoctor/9/2/4').set(patient());
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ success: false, message: 'This doctor is not in your favorites' });
+  });
+
+  // B2: a favorite saved without a clinic arrives as "null" in the URL.
+  test('"null" clinic in the URL is deleted as NULL', async () => {
+    mockDb.respond = favoritesDb();
+    const res = await request(app).delete('/patient/index/favoriteDoctor/9/2/null').set(patient());
+    expect(res.status).toBe(200);
+    expect(favCall().inputs.clinic_id).toBeNull();
+    expect(favCall().target).toMatch(/clinic_id IS NULL AND @clinic_id IS NULL/);
   });
 
   test('DB failure → 500', async () => {

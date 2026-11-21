@@ -5,13 +5,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:qless/core/fcm_token.dart';
 import 'package:qless/domain/models/patients.dart';
+import 'package:qless/domain/models/token_response.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
+import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
+import 'package:qless/presentation/shared/providers/view_model_provider.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
-import 'package:qless/presentation/shared/providers/viewModel_provider.dart';
 import 'package:qless/presentation/shared/screens/login_screen.dart';
 import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
+import 'package:qless/presentation/shared/widgets/otp_verify_sheet.dart';
 
 // ── Colour palette (matches login + continue_as screens) ──────────
 const kPrimary       = Color(0xFF26C6B0);
@@ -468,7 +472,9 @@ class _PatientRegistrationScreenState
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────
-  void _submit() {
+  final _otpTickets = OtpTicketCache();
+
+  Future<void> _submit() async {
     // Run the form validator first so every invalid field shows its red
     // border / "required" error text, then focus/scroll to the first
     // offending one below.
@@ -520,10 +526,14 @@ class _PatientRegistrationScreenState
       weight:       _weightController.text.trim(),
     );
 
-    debugPrint('Image before submit: $_patientImage');
+    // S14: prove the patient owns this mobile before creating the account.
+    final signupTicket =
+        await _otpTickets.obtain(context, ref, _mobileController.text.trim());
+    if (!mounted || signupTicket == null) return;
+
     ref
         .read(patientLoginViewModelProvider.notifier)
-        .addPatient(patient, image: _patientImage);
+        .addPatient(patient, image: _patientImage, loginTicket: signupTicket);
   }
 
   void _snack(String msg, {bool isError = false}) {
@@ -558,12 +568,48 @@ class _PatientRegistrationScreenState
     );
   }
 
-  void _onStateChange(PatientLoginState? prev, PatientLoginState next) {
-    if (next.isSuccess && !(prev?.isSuccess ?? false)) {
+  /// Signs the new patient in with the signup ticket (still valid for 5 min)
+  /// so they don't need a second OTP; falls back to the login screen.
+  Future<void> _signInAfterSignup() async {
+    final mobile = _mobileController.text.trim();
+    final ticket = await _otpTickets.obtain(context, ref, mobile);
+    final result = ticket == null
+        ? null
+        : await ref.read(authViewModelProvider.notifier).login(
+            TokenResponse(mobile: mobile, role: 'patient', loginTicket: ticket));
+    if (result != null) {
+      await ref.read(patientLoginViewModelProvider.notifier).checkPhonePatient(mobile);
+    }
+    if (!mounted) return;
+    if (result == null || (ref.read(patientLoginViewModelProvider).patientId ?? 0) <= 0) {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const LoginScreen(role: 'patient')),
       );
+      return;
+    }
+    getFcmTokenSafe().then((token) {
+      if (token == null) return;
+      ref.read(authViewModelProvider.notifier).saveFirebaseToken(
+          TokenResponse(firebaseToken: token, role: 'patient', mobile: mobile));
+    }).catchError((_) {});
+    patientShellKey = GlobalKey<PatientBottomNavState>();
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PatientBottomNav(
+          key: patientShellKey,
+          onToggleTheme: () {},
+          themeMode: ThemeMode.light,
+        ),
+      ),
+      (_) => false,
+    );
+  }
+
+  void _onStateChange(PatientLoginState? prev, PatientLoginState next) {
+    if (next.isSuccess && !(prev?.isSuccess ?? false)) {
+      _signInAfterSignup();
     }
     if (next.error != null && next.error != prev?.error) {
       final isConnectivityError =
@@ -851,7 +897,7 @@ class _PatientRegistrationScreenState
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: kPrimary.withOpacity(0.18),
+                      color: kPrimary.withValues(alpha: 0.18),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -883,7 +929,7 @@ class _PatientRegistrationScreenState
                   border: Border.all(color: Colors.white, width: 2.5),
                   boxShadow: [
                     BoxShadow(
-                      color: kPrimary.withOpacity(0.35),
+                      color: kPrimary.withValues(alpha: 0.35),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
                     ),
@@ -1127,7 +1173,7 @@ class _SectionCard extends StatelessWidget {
         border: Border.all(color: kBorder, width: 1),
         boxShadow: [
           BoxShadow(
-            color: kTextPrimary.withOpacity(0.04),
+            color: kTextPrimary.withValues(alpha: 0.04),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -1213,7 +1259,7 @@ class _SubmitButton extends StatelessWidget {
               ? []
               : [
                   BoxShadow(
-                    color: kPrimary.withOpacity(0.35),
+                    color: kPrimary.withValues(alpha: 0.35),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   ),
@@ -1275,10 +1321,10 @@ class _BackToLoginLink extends StatelessWidget {
           padding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: kPrimaryLight.withOpacity(0.4),
+            color: kPrimaryLight.withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-                color: kPrimary.withOpacity(0.25), width: 1),
+                color: kPrimary.withValues(alpha: 0.25), width: 1),
           ),
           child: Row(
             children: [
@@ -1384,9 +1430,9 @@ class _ImageSourceTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 18),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withOpacity(0.22)),
+            border: Border.all(color: color.withValues(alpha: 0.22)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1395,7 +1441,7 @@ class _ImageSourceTile extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
+                  color: color.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 26),
@@ -1648,7 +1694,7 @@ class _GenderSelector extends StatelessWidget {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: kPrimary.withOpacity(0.18),
+                            color: kPrimary.withValues(alpha: 0.18),
                             blurRadius: 10,
                             offset: const Offset(0, 3),
                           ),
@@ -1732,7 +1778,7 @@ class _BloodGroupPicker extends StatelessWidget {
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
-                            color: kPrimary.withOpacity(0.32),
+                            color: kPrimary.withValues(alpha: 0.32),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -1755,57 +1801,6 @@ class _BloodGroupPicker extends StatelessWidget {
           }).toList(),
         );
       },
-    );
-  }
-}
-
-class _InlineLoading extends StatelessWidget {
-  const _InlineLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 56,
-      child: Center(
-        child: SizedBox(
-          width: 20,
-          height: 20,
-          child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2),
-        ),
-      ),
-    );
-  }
-}
-
-class _InlineError extends StatelessWidget {
-  final String text;
-  const _InlineError({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: kRedLight,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: kError.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline_rounded, size: 18, color: kError),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: kError,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

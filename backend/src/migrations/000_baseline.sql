@@ -6078,7 +6078,7 @@ BEGIN
 END
 GO
 
-CREATE PROCEDURE sp_notification
+CREATE PROCEDURE [dbo].[sp_notification]
     @operation       VARCHAR(40),
     @notification_id INT            = NULL,
     @patient_id      INT            = NULL,
@@ -6213,7 +6213,7 @@ BEGIN
 END
 GO
 
-CREATE   PROCEDURE sp_otp
+CREATE   PROCEDURE [dbo].[sp_otp]
     @operation VARCHAR(20),
     @mobile_no VARCHAR(15),
     @otp_hash VARCHAR(255) = NULL

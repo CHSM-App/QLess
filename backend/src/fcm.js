@@ -4,21 +4,26 @@
 // JSON), else the legacy routes/ServiceAccountKey.json the server still has.
 // With neither, the app still boots and each send() rejects with a clear error
 // instead of the whole backend crashing at require time.
+//
+// Modular API (firebase-admin/app, /messaging): present in v13 and the only
+// one in v14, so upgrading is a version bump. Routes keep calling
+// `admin.messaging().send(...)` through the object exported below.
 const fs = require('fs');
 const path = require('path');
-const admin = require('firebase-admin');
+const { initializeApp, getApps, cert, applicationDefault } = require('firebase-admin/app');
+const { getMessaging } = require('firebase-admin/messaging');
 const log = require('./middleware/logger');
 
-if (!admin.apps.length) {
+if (!getApps().length) {
   const legacyKey = path.join(__dirname, '..', 'routes', 'ServiceAccountKey.json');
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    initializeApp({ credential: applicationDefault() });
   } else if (fs.existsSync(legacyKey)) {
-    admin.initializeApp({ credential: admin.credential.cert(require(legacyKey)) });
+    initializeApp({ credential: cert(require(legacyKey)) });
   } else {
     log.warn('Firebase credentials not found; push notifications will fail');
-    admin.initializeApp();
+    initializeApp();
   }
 }
 
-module.exports = admin;
+module.exports = { messaging: () => getMessaging() };

@@ -70,10 +70,10 @@ class PatientLoginViewmodel extends StateNotifier<PatientLoginState> {
     loadFromStoragePatient();
   }
 
-  Future<void> addPatient(Patients patient, {File? image}) async {
+  Future<void> addPatient(Patients patient, {File? image, String? loginTicket}) async {
     state = state.copyWith(isLoading: true, clearError: true, isSuccess: false);
     try {
-      await usecase.addPatient(patient, image: image);
+      await usecase.addPatient(patient, image: image, loginTicket: loginTicket);
       state = state.copyWith(isLoading: false, isSuccess: true);
     } catch (e) {
       state = state.copyWith(

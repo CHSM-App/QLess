@@ -9,7 +9,6 @@ import 'package:qless/presentation/patient/providers/patient_usecase_provider.da
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/screens/doctor_profile_view.dart';
-import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
 import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
@@ -52,7 +51,9 @@ const _kBgPalette = [
 int _hashIndex(String? s, int len) {
   if (s == null || s.isEmpty) return 0;
   var h = 0;
-  for (final c in s.toLowerCase().codeUnits) h = (h * 31 + c) & 0x7fffffff;
+  for (final c in s.toLowerCase().codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
   return h % len;
 }
 
@@ -233,7 +234,9 @@ class _DoctorSearchScreenState extends ConsumerState<DoctorSearchScreen> {
         perm = await Geolocator.requestPermission();
       }
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) return;
+          perm == LocationPermission.deniedForever) {
+        return;
+      }
       final pos = await Geolocator.getCurrentPosition(
           locationSettings:
               const LocationSettings(accuracy: LocationAccuracy.low));
@@ -423,8 +426,8 @@ Widget build(BuildContext context) {
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
                 color: _favOnly
-                    ? kError.withOpacity(0.3)
-                    : kPrimary.withOpacity(0.2),
+                    ? kError.withValues(alpha: 0.3)
+                    : kPrimary.withValues(alpha: 0.2),
               ),
             ),
             child: Icon(
@@ -514,9 +517,9 @@ Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
       decoration: BoxDecoration(
-        color: kPrimaryLight.withOpacity(0.5),
+        color: kPrimaryLight.withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: kPrimary.withOpacity(0.2)),
+        border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
       ),
       child: Row(children: [
         const Icon(Icons.person_outline_rounded,
@@ -580,60 +583,6 @@ Widget build(BuildContext context) {
     );
   }
 
-  // ── Search Bar ─────────────────────────────────────────────────────
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-      child: AppExpandableHeaderSearch(
-        controller: _searchCtrl,
-        leadingIcon: Icons.medical_services_rounded,
-        title: 'Search Doctors',
-        subtitle: 'Doctor, specialty, clinic',
-        hintText: 'Doctor, specialty, clinic...',
-        height: 40,
-        accentColor: kPrimary,
-        leadingBackgroundColor: kPrimaryLight,
-        titleColor: kTextPrimary,
-        subtitleColor: kTextMuted,
-        fieldColor: const Color(0xFFF7F8FA),
-        borderColor: kBorder,
-        iconColor: kTextMuted,
-        textColor: kTextPrimary,
-        onChanged: (_) => setState(() {}),
-      ),
-    );
-  }
-
-  // ── Specialty Chips ────────────────────────────────────────────────
-  Widget _buildSpecialtyChips(List<String> specialties) {
-    return SizedBox(
-      height: 36,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(14, 6, 14, 0),
-        children: [
-          _SpecChip(
-            label: 'All',
-            selected: _specialty == null,
-            accent: kPrimary,
-            bg: kPrimaryLight,
-            onTap: () => setState(() => _specialty = null),
-          ),
-          ...specialties.map((s) => _SpecChip(
-                label: s,
-                selected: _specialty?.toLowerCase() == s.toLowerCase(),
-                accent: _accentFor(s),
-                bg: _bgFor(s),
-                onTap: () => setState(() =>
-                    _specialty = _specialty?.toLowerCase() == s.toLowerCase()
-                        ? null
-                        : s),
-              )),
-        ],
-      ),
-    );
-  }
-
   // ── Fav Strip ──────────────────────────────────────────────────────
   Widget _buildFavStrip() {
     return Container(
@@ -641,9 +590,9 @@ Widget build(BuildContext context) {
       padding:
           const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: kRedLight.withOpacity(0.4),
+        color: kRedLight.withValues(alpha: 0.4),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: kError.withOpacity(0.2)),
+        border: Border.all(color: kError.withValues(alpha: 0.2)),
       ),
       child: Row(children: [
         const Icon(Icons.favorite_rounded, color: kError, size: 13),
@@ -784,7 +733,7 @@ class _MemberOption extends StatelessWidget {
   Widget build(BuildContext context) => Row(children: [
         CircleAvatar(
           radius: 10,
-          backgroundColor: color.withOpacity(0.15),
+          backgroundColor: color.withValues(alpha: 0.15),
           child: Text(label.isNotEmpty ? label[0] : '?',
               style: TextStyle(
                   fontSize: 9,
@@ -828,43 +777,6 @@ class _DropSelected extends StatelessWidget {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  SPECIALTY CHIP
-// ════════════════════════════════════════════════════════════════════
-class _SpecChip extends StatelessWidget {
-  final String label;
-  final bool   selected;
-  final Color  accent, bg;
-  final VoidCallback onTap;
-  const _SpecChip({
-    required this.label,    required this.selected,
-    required this.accent,   required this.bg,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          margin: const EdgeInsets.only(right: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
-          decoration: BoxDecoration(
-            color: selected ? accent : bg,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: selected ? accent : accent.withOpacity(0.25),
-            ),
-          ),
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : accent)),
-        ),
-      );
-}
-
-// ════════════════════════════════════════════════════════════════════
 //  DOCTOR CARD  — tappable card → BookAppointment
 //                info icon     → DoctorProfile
 // ════════════════════════════════════════════════════════════════════
@@ -904,10 +816,10 @@ class _DoctorCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-              color: qs.tintCard ? kError.withOpacity(0.25) : kBorder),
+              color: qs.tintCard ? kError.withValues(alpha: 0.25) : kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4)),
           ],
@@ -923,10 +835,10 @@ class _DoctorCard extends StatelessWidget {
             //     Container(
             //       width: 46, height: 46,
             //       decoration: BoxDecoration(
-            //         color: accent.withOpacity(0.12),
+            //         color: accent.withValues(alpha: 0.12),
             //         borderRadius: BorderRadius.circular(12),
             //         border: Border.all(
-            //             color: accent.withOpacity(0.2), width: 1.5),
+            //             color: accent.withValues(alpha: 0.2), width: 1.5),
             //       ),
             //       alignment: Alignment.center,
             //       child: Text(init,
@@ -1031,25 +943,6 @@ class _DoctorCard extends StatelessWidget {
   }
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  CARD SUB-COMPONENTS
-// ════════════════════════════════════════════════════════════════════
-class _FeeTag extends StatelessWidget {
-  final double fee;
-  const _FeeTag({required this.fee});
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-        decoration: BoxDecoration(
-            color: kPrimaryLight, borderRadius: BorderRadius.circular(6)),
-        child: Text('₹${fee.toStringAsFixed(0)}',
-            style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: kPrimary)),
-      );
-}
-
 class _SpecTag extends StatelessWidget {
   final String label;
   final Color  accent, bg;
@@ -1122,7 +1015,7 @@ class _QueuePill extends StatelessWidget {
               padding: const EdgeInsets.symmetric(
                   horizontal: 7, vertical: 3),
               decoration: BoxDecoration(
-                color: status.color.withOpacity(0.1),
+                color: status.color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -1179,7 +1072,7 @@ class _InfoButton extends StatelessWidget {
               decoration: BoxDecoration(
                 color: kInfoLight,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kInfo.withOpacity(0.25)),
+                border: Border.all(color: kInfo.withValues(alpha: 0.25)),
               ),
               child: const Icon(
                 Icons.info_outline_rounded,
@@ -1269,7 +1162,7 @@ class _ShimmerCard extends StatelessWidget {
           border: Border.all(color: kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 3)),
           ],
@@ -1357,7 +1250,7 @@ class _FilterButton extends StatelessWidget {
                 border: Border.all(
                     color: activeCount > 0
                         ? kPrimary
-                        : kPrimary.withOpacity(0.2)),
+                        : kPrimary.withValues(alpha: 0.2)),
               ),
               child: Icon(Icons.tune_rounded,
                   size: 18,
@@ -1475,7 +1368,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: kRedLight.withOpacity(0.5),
+                    color: kRedLight.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text('Clear all',
@@ -1715,7 +1608,7 @@ class _FilterSheetState extends State<_FilterSheet> {
             color: sel ? kPrimaryLight : Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-                color: sel ? kPrimary.withOpacity(0.4) : kBorder),
+                color: sel ? kPrimary.withValues(alpha: 0.4) : kBorder),
           ),
           child: Row(children: [
             Expanded(

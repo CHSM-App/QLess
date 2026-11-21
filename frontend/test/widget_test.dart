@@ -8,7 +8,7 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: const ContinueAsScreen(),
+          home: ContinueAsScreen(),
         ),
       ),
     );
@@ -20,7 +20,7 @@ void main() {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: const ContinueAsScreen(),
+          home: ContinueAsScreen(),
         ),
       ),
     );

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/domain/models/family_member.dart';
@@ -118,7 +118,9 @@ class _AddFamilyMemberScreenState
     final now = DateTime.now();
     int age = now.year - dob.year;
     if (now.month < dob.month ||
-        (now.month == dob.month && now.day < dob.day)) age--;
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
     return age;
   }
 
@@ -535,18 +537,6 @@ class _AddFamilyMemberScreenState
     );
   }
 
-  Widget _buildProgressBar() {
-    return Row(
-      children: [
-        _ProgStep(done: true,  active: false),
-        const SizedBox(width: 5),
-        _ProgStep(done: false, active: true),
-        const SizedBox(width: 5),
-        _ProgStep(done: false, active: false),
-      ],
-    );
-  }
-
   // ---------------------------------------------------------------------------
   // Form helpers
   // ---------------------------------------------------------------------------
@@ -667,7 +657,7 @@ class _AddFamilyMemberScreenState
   );
 
   Widget _relationDropdown() => DropdownButtonFormField<int>(
-    value: _selectedRelationId,
+    initialValue: _selectedRelationId,
     decoration: _dec(''),
     isExpanded: true,
     icon: const Icon(Icons.keyboard_arrow_down_rounded,
@@ -698,48 +688,12 @@ class _AddFamilyMemberScreenState
     decoration: _dec('10-digit mobile number'),
   );
 
-  Widget _mobileHint() => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-    decoration: BoxDecoration(
-      color: kInfoLight.withOpacity(0.4),
-      borderRadius: BorderRadius.circular(8),
-      border: Border.all(color: kInfoLight, width: 1),
-    ),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(Icons.info_outline_rounded, size: 13, color: kInfo),
-        const SizedBox(width: 6),
-        Expanded(
-          child: const Text(
-            'This number will be used to access benefits and cannot be changed once verified.',
-            style: TextStyle(
-                fontSize: 11, color: kInfo, height: 1.5),
-          ),
-        ),
-        const SizedBox(width: 8),
-        GestureDetector(
-          onTap: () {},
-          child: const Text(
-            'Verify',
-            style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: kPrimary,
-                decoration: TextDecoration.underline,
-                decorationColor: kPrimary),
-          ),
-        ),
-      ],
-    ),
-  );
-
   Widget _confirmBox() => GestureDetector(
     onTap: () => setState(() => _isConfirmed = !_isConfirmed),
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: _isConfirmed ? kPrimaryLight.withOpacity(0.5) : Colors.white,
+        color: _isConfirmed ? kPrimaryLight.withValues(alpha: 0.5) : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: _isConfirmed ? kPrimary : kBorder,
@@ -822,34 +776,6 @@ class _AddFamilyMemberScreenState
                     ),
                   ],
                 ),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// Progress step
-// =============================================================================
-
-class _ProgStep extends StatelessWidget {
-  final bool active;
-  final bool done;
-  const _ProgStep({required this.active, required this.done});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = done
-        ? kPrimary
-        : active
-            ? kPrimary.withOpacity(0.4)
-            : kBorder;
-    return Expanded(
-      child: Container(
-        height: 3,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(2),
         ),
       ),
     );

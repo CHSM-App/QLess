@@ -10,6 +10,11 @@ const {
   formatApptDate,
   formatApptTime,
 } = require('./shared');
+const doctorScheduleSql = require('../../../queries/doctorSchedule');
+const notificationsSql = require('../../../queries/notifications');
+const doctorsSql = require('../../../queries/doctors');
+const appointmentsSql = require('../../../queries/appointments');
+const slotTodayCountSql = require('../../../queries/slotTodayCount');
 
 const router = express.Router();
 
@@ -27,7 +32,7 @@ router.post('/addQueueStartTime/', async (req, res) => {
     request.input('q_start_before', q_start_before);
 
     // Execute stored procedure
-    const result = await request.execute('sp_doctor_login');
+    const result = await request.run(doctorsSql);
 
     res.status(200).json({
       success: 1,
@@ -98,7 +103,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
     const cur = await addClinic(db.request()
       .input('operation', 'GET')
       .input('doctor_id', doctor_id))
-      .execute('sp_doctor_schedule');
+      .run(doctorScheduleSql);
     const curTiming = {};
     for (const r of (cur.recordset || [])) {
       if (r.slot_id != null) {
@@ -112,7 +117,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
     const todayCount = async (slot_id) => {
       const r = await db.request()
         .input('slot_id', slot_id)
-        .execute('sp_slot_today_count');
+        .run(slotTodayCountSql);
       return r.recordset?.[0]?.cnt ?? 0;
     };
 
@@ -121,7 +126,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         .input('operation', 'GET_DAY_SLOT_IDS')
         .input('doctor_id', doctor_id)
         .input('day_of_week', day.day))
-        .execute('sp_doctor_schedule');
+        .run(doctorScheduleSql);
 
       const existingIds = (existing.recordset || []).map(r => r.slot_id);
       const incomingIds = (day.slots || [])
@@ -142,7 +147,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         const r = await db.request()
           .input('operation', 'COUNT_FUTURE_APPTS_FOR_SLOT')
           .input('slot_id', slot_id)
-          .execute('sp_doctor_schedule');
+          .run(doctorScheduleSql);
 
         const count = r.recordset?.[0]?.cnt ?? 0;
         if (count > 0) {
@@ -198,7 +203,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         .input('doctor_id', doctor_id)
         .input('day_of_week', day.day)
         .input('is_enabled', day.is_enabled))
-        .execute('sp_doctor_schedule');
+        .run(doctorScheduleSql);
 
       const availability_id = dayResult.recordset?.[0]?.availability_id;
       if (!availability_id) {
@@ -210,7 +215,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         .input('operation', 'GET_DAY_SLOT_IDS')
         .input('doctor_id', doctor_id)
         .input('day_of_week', day.day))
-        .execute('sp_doctor_schedule');
+        .run(doctorScheduleSql);
       const existingIds = (existing.recordset || []).map(r => r.slot_id);
 
       const incomingIds = (day.slots || [])
@@ -236,7 +241,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         const details = await db.request()
           .input('operation', 'APPT_CONTEXT_SLOT')
           .input('slot_id', slot_id)
-          .execute('sp_notification');
+          .run(notificationsSql);
 
         for (const row of (details.recordset || [])) {
           if (!row.owner_id) continue;
@@ -254,7 +259,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         await db.request()
           .input('operation', releaseOp)
           .input('slot_id', slot_id)
-          .execute('sp_doctor_schedule');
+          .run(doctorScheduleSql);
 
         // For 'cancel' mode, normalize status to 'CancleD' so the patient app
         // shows "Cancelled by Doctor" (the release SP otherwise sets generic
@@ -266,7 +271,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
             db.request()
               .input('operation', 'MARK_APPT_DOCTOR_CANCELLED')
               .input('appointment_id', aid)
-              .execute('sp_appointment')
+              .run(appointmentsSql)
               .catch(err =>
                 log.error('status normalize err: ' + aid + ' ' + err.message),
               ),
@@ -277,7 +282,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
         await db.request()
           .input('operation', 'DELETE_SLOT')
           .input('slot_id', slot_id)
-          .execute('sp_doctor_schedule');
+          .run(doctorScheduleSql);
       }
 
       // UPSERT each slot, only if day enabled
@@ -292,7 +297,7 @@ router.post('/saveDoctorSchedule', async (req, res) => {
             .input('booking_mode', slot.booking_mode)
             .input('slot_duration', slot.slot_duration ?? null)
             .input('max_queue_length', slot.max_queue_length ?? null)
-            .execute('sp_doctor_schedule');
+            .run(doctorScheduleSql);
         }
       }
     }

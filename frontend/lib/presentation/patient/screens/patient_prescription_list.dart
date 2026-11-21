@@ -215,7 +215,9 @@ class _PatientPrescriptionListScreenState
         final q = _search.toLowerCase();
         if (!(p.diagnosis ?? '').toLowerCase().contains(q) &&
             !p.prescriptionId.toString().contains(q) &&
-            !p.doctorName.toLowerCase().contains(q)) return false;
+            !p.doctorName.toLowerCase().contains(q)) {
+          return false;
+        }
       }
       return true;
     }).toList();
@@ -318,7 +320,7 @@ class _PatientPrescriptionListScreenState
                   decoration: BoxDecoration(
                     color: kPrimaryLight,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: kPrimary.withOpacity(0.2)),
+                    border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
                   ),
                   child: const Icon(Icons.arrow_back_ios_new_rounded,
                       color: kPrimary, size: 15),
@@ -334,7 +336,7 @@ class _PatientPrescriptionListScreenState
               decoration: BoxDecoration(
                 color: kPrimaryLight,
                 borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: kPrimary.withOpacity(0.2)),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
               ),
               child: const Icon(Icons.receipt_long_rounded,
                   color: kPrimary, size: 15),
@@ -388,7 +390,7 @@ class _PatientPrescriptionListScreenState
           ),
           if (state.isLoading)
             Container(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               child: const Center(
                   child: CircularProgressIndicator(
                       color: kPrimary, strokeWidth: 2.5)),
@@ -493,7 +495,7 @@ class _PatientPrescriptionListScreenState
         decoration: BoxDecoration(
           color: kPrimaryLight,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: kPrimary.withOpacity(0.3)),
+          border: Border.all(color: kPrimary.withValues(alpha: 0.3)),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, color: kPrimary, size: 11),
@@ -699,11 +701,11 @@ class _PrescriptionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
               color: prescription.status == 'active'
-                  ? kSuccess.withOpacity(0.3)
+                  ? kSuccess.withValues(alpha: 0.3)
                   : kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.03),
+                color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8,
                 offset: const Offset(0, 3)),
           ],
@@ -714,7 +716,7 @@ class _PrescriptionCard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: prescription.status == 'active'
-                  ? kGreenLight.withOpacity(0.35)
+                  ? kGreenLight.withValues(alpha: 0.35)
                   : const Color(0xFFF7F8FA),
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(11)),
@@ -880,8 +882,10 @@ class _MemberDropdown extends StatelessWidget {
 
   String get _label {
     if (selected == _filterAll)  return 'All';
-    if (selected == _filterSelf) return patientName.split(' ').first.isNotEmpty
+    if (selected == _filterSelf) {
+      return patientName.split(' ').first.isNotEmpty
         ? patientName.split(' ').first : 'Self';
+    }
     final m = members.cast<FamilyMember?>()
         .firstWhere((m) => m?.memberId == selected, orElse: () => null);
     return m?.memberName?.split(' ').first ?? 'Member';
@@ -893,7 +897,7 @@ class _MemberDropdown extends StatelessWidget {
         width: 22, height: 22,
         decoration: BoxDecoration(
             color: kPrimaryLight, shape: BoxShape.circle,
-            border: Border.all(color: kPrimary.withOpacity(0.3))),
+            border: Border.all(color: kPrimary.withValues(alpha: 0.3))),
         child: const Icon(Icons.people_rounded, color: kPrimary, size: 12),
       );
     }
@@ -1469,7 +1473,7 @@ class _PatientPrescriptionViewScreenState
             decoration: BoxDecoration(
               color: kPrimaryLight,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kPrimary.withOpacity(0.2)),
+              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
             ),
             child: const Icon(Icons.arrow_back_ios_new_rounded,
                 color: kPrimary, size: 15),
@@ -1482,7 +1486,7 @@ class _PatientPrescriptionViewScreenState
             decoration: BoxDecoration(
               color: kPrimaryLight,
               borderRadius: BorderRadius.circular(9),
-              border: Border.all(color: kPrimary.withOpacity(0.2)),
+              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
             ),
             child: const Icon(Icons.description_rounded,
                 color: kPrimary, size: 15),
@@ -1526,7 +1530,7 @@ class _PatientPrescriptionViewScreenState
           ),
           if (state.isLoading)
             Container(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withValues(alpha: 0.15),
               child: const Center(
                   child: CircularProgressIndicator(
                       color: kPrimary, strokeWidth: 2.5)),
@@ -1543,7 +1547,7 @@ class _PatientPrescriptionViewScreenState
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05),
                 blurRadius: 12, offset: const Offset(0, 4)),
           ],
         ),
@@ -1562,7 +1566,7 @@ class _PatientPrescriptionViewScreenState
               Container(
                 width: 34, height: 34,
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(9)),
                 child: const Icon(Icons.local_hospital_rounded,
                     color: Colors.white, size: 17),
@@ -1579,7 +1583,7 @@ class _PatientPrescriptionViewScreenState
                   Text('${_rx.clinicAddress}  ·  Ph: ${_rx.clinicContact}',
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.82), fontSize: 11)),
+                          color: Colors.white.withValues(alpha: 0.82), fontSize: 11)),
                 ],
               )),
             ]),
@@ -1600,11 +1604,11 @@ class _PatientPrescriptionViewScreenState
                   const SizedBox(height: 2),
                   Text('${_rx.qualification}  ·  ${_rx.specialization}',
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.78), fontSize: 11)),
+                          color: Colors.white.withValues(alpha: 0.78), fontSize: 11)),
                   if (_rx.regNo?.isNotEmpty == true)
                     Text('Reg. ${_rx.regNo}',
                         style: TextStyle(
-                            color: Colors.white.withOpacity(0.65), fontSize: 10)),
+                            color: Colors.white.withValues(alpha: 0.65), fontSize: 10)),
                 ],
               )),
             ]),
@@ -1664,7 +1668,7 @@ class _PatientPrescriptionViewScreenState
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: kAmberLight.withOpacity(0.5),
+              color: kAmberLight.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: kAmberLight),
             ),
@@ -1689,7 +1693,7 @@ class _PatientPrescriptionViewScreenState
                 padding: const EdgeInsets.all(5),
                 margin: const EdgeInsets.only(top: 1),
                 decoration: BoxDecoration(
-                    color: kPrimary.withOpacity(0.12),
+                    color: kPrimary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6)),
                 child: const Icon(Icons.biotech_rounded, color: kPrimary, size: 13),
               ),
@@ -1753,12 +1757,12 @@ class _PatientPrescriptionViewScreenState
     if (!hasClinical && !hasAdvice) return const SizedBox.shrink();
     return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (hasClinical) Expanded(child: _noteBox(
-        color: kInfoLight.withOpacity(0.3), borderColor: kInfoLight,
+        color: kInfoLight.withValues(alpha: 0.3), borderColor: kInfoLight,
         iconColor: kInfo, icon: Icons.notes_rounded,
         title: 'INSTRUCTIONS', text: _rx.clinicalNotes!)),
       if (hasClinical && hasAdvice) const SizedBox(width: 10),
       if (hasAdvice) Expanded(child: _noteBox(
-        color: kGreenLight.withOpacity(0.4), borderColor: kGreenLight,
+        color: kGreenLight.withValues(alpha: 0.4), borderColor: kGreenLight,
         iconColor: kSuccess, icon: Icons.medical_information_rounded,
         title: "ADVICE", text: _rx.advice!)),
     ]);
@@ -1790,7 +1794,7 @@ class _PatientPrescriptionViewScreenState
   Widget _buildFollowUpCard() => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: kGreenLight.withOpacity(0.4),
+          color: kGreenLight.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: kGreenLight),
         ),
@@ -1798,7 +1802,7 @@ class _PatientPrescriptionViewScreenState
           Container(
             width: 40, height: 40,
             decoration: BoxDecoration(
-                color: kSuccess.withOpacity(0.15),
+                color: kSuccess.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(11)),
             child: const Icon(Icons.event_available_rounded,
                 color: kSuccess, size: 19),
@@ -1924,7 +1928,7 @@ class _Card extends StatelessWidget {
           border: Border.all(color: kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12, offset: const Offset(0, 4)),
           ],
         ),
@@ -1976,7 +1980,9 @@ class _MedRow extends StatelessWidget {
 
   List<String> _splitSlots(String? raw) {
     final parts = (raw ?? '').split('-').map((p) => p.trim()).toList();
-    while (parts.length < 3) parts.add('-');
+    while (parts.length < 3) {
+      parts.add('-');
+    }
     return parts.take(3).map((p) => p.isEmpty ? '-' : p).toList();
   }
 
@@ -2005,7 +2011,7 @@ class _MedRow extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(typeIcon, color: color, size: 9),
@@ -2331,7 +2337,7 @@ class _PrescriptionSkeletonCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: kBorder),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03),
                 blurRadius: 8, offset: const Offset(0, 3))
           ],
         ),

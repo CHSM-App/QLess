@@ -288,7 +288,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-                color: kPrimary.withOpacity(0.25),
+                color: kPrimary.withValues(alpha: 0.25),
                 blurRadius: 14,
                 offset: const Offset(0, 6)),
           ],
@@ -297,7 +297,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
           Container(
             width: 46, height: 46,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.medication_rounded,
@@ -325,7 +325,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Text('NEW',
@@ -351,7 +351,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
           border: Border.all(color: kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4)),
           ],
@@ -587,9 +587,9 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
   Widget _typeError() => Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: kRedLight.withOpacity(0.5),
+          color: kRedLight.withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kError.withOpacity(0.3)),
+          border: Border.all(color: kError.withValues(alpha: 0.3)),
         ),
         child: Row(children: [
           const Icon(Icons.error_outline_rounded, color: kError, size: 15),
@@ -658,7 +658,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
                     width: sel ? 1.5 : 1),
                 boxShadow: sel
                     ? [BoxShadow(
-                        color: kPrimary.withOpacity(0.2),
+                        color: kPrimary.withValues(alpha: 0.2),
                         blurRadius: 6, offset: const Offset(0, 2))]
                     : [],
               ),

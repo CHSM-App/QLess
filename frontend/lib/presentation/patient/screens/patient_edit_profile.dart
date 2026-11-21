@@ -187,9 +187,13 @@ String? _networkImageUrl;   // ← add this
       return;
     }
     final id = d.genderId;
-    if (id == 2) _selectedGender = 'Female';
-    else if (id == 3) _selectedGender = 'Other';
-    else if (id == 1) _selectedGender = 'Male';
+    if (id == 2) {
+      _selectedGender = 'Female';
+    } else if (id == 3) {
+      _selectedGender = 'Other';
+    } else if (id == 1) {
+      _selectedGender = 'Male';
+    }
   }
 
   void _applyBloodGroup(Patients d) {
@@ -671,7 +675,7 @@ String? _networkImageUrl;   // ← add this
   //       border: Border.all(color: kBorder),
   //       boxShadow: [
   //         BoxShadow(
-  //             color: Colors.black.withOpacity(0.04),
+  //             color: Colors.black.withValues(alpha: 0.04),
   //             blurRadius: 12,
   //             offset: const Offset(0, 4)),
   //       ],
@@ -748,7 +752,7 @@ String? _networkImageUrl;   // ← add this
       border: Border.all(color: kBorder),
       boxShadow: [
         BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
             offset: const Offset(0, 4)),
       ],
@@ -771,7 +775,7 @@ String? _networkImageUrl;   // ← add this
                   border: Border.all(color: kPrimaryLight, width: 2),
                   boxShadow: [
                     BoxShadow(
-                        color: kPrimary.withOpacity(0.18),
+                        color: kPrimary.withValues(alpha: 0.18),
                         blurRadius: 14,
                         offset: const Offset(0, 4)),
                   ],
@@ -790,7 +794,7 @@ String? _networkImageUrl;   // ← add this
                     border: Border.all(color: Colors.white, width: 2.5),
                     boxShadow: [
                       BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
+                          color: Colors.black.withValues(alpha: 0.15),
                           blurRadius: 4,
                           offset: const Offset(0, 1)),
                     ],
@@ -1026,7 +1030,7 @@ Widget _sourceOption({
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4)),
         ],

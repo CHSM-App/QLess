@@ -155,7 +155,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
               decoration: BoxDecoration(
                 color: kPrimaryLight,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kPrimary.withOpacity(0.2)),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
               ),
               child: const Icon(Icons.person_rounded, color: kPrimary, size: 20),
             ),
@@ -248,7 +248,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -428,34 +428,6 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                 fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
       );
 
-  Widget _infoTile(IconData icon, Color iconFg, Color iconBg,
-      String label, String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-      decoration: BoxDecoration(
-        color: iconBg.withOpacity(0.35),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: iconBg),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 14, color: iconFg),
-          const SizedBox(height: 5),
-          Text(label,
-              style: const TextStyle(fontSize: 10, color: kTextMuted)),
-          const SizedBox(height: 1),
-          Text(value,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: kTextPrimary)),
-        ],
-      ),
-    );
-  }
-
   // ---------------------------------------------------------------------------
   //  STATS ROW
   // ---------------------------------------------------------------------------
@@ -531,7 +503,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
                 border: Border.all(color: kBorder),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 3)),
                 ],
@@ -610,7 +582,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 12,
               offset: const Offset(0, 4)),
         ],
@@ -689,7 +661,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
             title: 'Delete Account',
             subtitle: 'Permanently delete your account and data',
             titleColor: kError,
-            chevronColor: kError.withOpacity(0.4),
+            chevronColor: kError.withValues(alpha: 0.4),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const DeleteAccountPage()),
@@ -701,7 +673,7 @@ class _PatientProfilePageState extends ConsumerState<PatientProfilePage> {
           title: 'Log Out',
           subtitle: 'Sign out of account',
           titleColor: kError,
-          chevronColor: kError.withOpacity(0.4),
+          chevronColor: kError.withValues(alpha: 0.4),
           showDivider: false,
           onTap: () => _showLogoutDialog(context, ref),
         ),
@@ -1149,7 +1121,7 @@ class _ProfileSkeletonState extends State<_ProfileSkeleton>
               border: Border.all(color: kBorder),
               boxShadow: [
                 BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 12,
                     offset: const Offset(0, 4))
               ],

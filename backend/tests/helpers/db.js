@@ -19,9 +19,16 @@ const mockDb = {
   calls: [],
   respond: () => [],
 
+  owns: true,
+  staffDoctorId: 1, // the doctor a receptionist token works for (ownStaff lookup)
+  doctorActive: true, // false = an admin blocked that doctor (active_status 1)
+
   reset() {
     this.calls = [];
     this.respond = () => [];
+    this.owns = true;
+    this.staffDoctorId = 1;
+    this.doctorActive = true;
   },
 
   /** Calls made to one stored procedure (or query text containing `target`). */
@@ -40,6 +47,11 @@ const mockDb = {
     };
     req.output = req.input;
     const run = (kind) => async (target) => {
+      // ownership checks (src/middleware/ownPatient.js): answered by the
+      // mockDb.owns switch, not recorded, so suites keep their call counts
+      if (kind === 'query' && String(target).startsWith('/* ownership */')) {
+        return { recordset: mockDb.owns ? [{ ok: 1, doctor_id: mockDb.staffDoctorId, active_status: mockDb.doctorActive ? 0 : 1 }] : [], recordsets: [], rowsAffected: [0] };
+      }
       const call = { kind, target, inputs: req.inputs };
       mockDb.calls.push(call);
       const answer = await mockDb.respond(call);
@@ -49,6 +61,9 @@ const mockDb = {
     req.execute = run('execute');
     req.query = run('query');
     req.batch = run('batch');
+    // .run(queries) runs a former stored procedure's SQL (src/queries/*.js);
+    // recorded under that procedure's name, like the .execute() it replaced.
+    req.run = (queries) => run('execute')(queries.procedure);
     return req;
   },
 

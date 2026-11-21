@@ -1,11 +1,28 @@
 var express = require('express');
 var router = express.Router();
+require('../../middleware/ownPatient')(router); // a patient token may only touch its own records
+const ownStaff = require('../../middleware/ownStaff');
+const { ROLE } = require('../../middleware/roles');
+// Patient-app routes. Clinic staff use only the walk-in family lookup and the
+// prescription history (their own doctor's prescriptions only), plus the
+// public doctor catalogue reads; every other route is patients-only.
+const STAFF_OK = /^\/(fetchFamilyMembers|patientPrescriptionList|patientPrescriptionDetails|getDoctorAvailability|getDoctorLeaveDates|appointment\/getBookedSlots|appointment\/getAvailability|review\/doctor)(\/|$)/;
+router.use((req, res, next) => (Number(req.user && req.user.role_id) !== ROLE.PATIENT
+  && !(ownStaff.isStaff(req) && STAFF_OK.test(req.path))
+  ? res.status(403).json({ msg: 'Your account does not have access to this action.' })
+  : next()));
+ownStaff(router); // staff: patient_id must have seen their doctor, prescription_id be written by them
 var db = require('../../db');
 const sql = require("mssql");
 const multer = require("multer");
 const log = require('../../middleware/logger');
 const path = require("path");
 const fs = require("fs-extra");
+const doctorLeaveSql = require('../../queries/doctorLeave');
+const notificationsSql = require('../../queries/notifications');
+const prescriptionsSql = require('../../queries/prescriptions');
+const patientsSql = require('../../queries/patients');
+const appointmentsSql = require('../../queries/appointments');
 
 // The furthest token the queue has actually reached — the largest
 // queue_number N such that every token from 1..N-1 is fully resolved
@@ -49,12 +66,16 @@ router.get('/fetchFamilyMembers/:family_id', async (req, res) => {
   const { family_id } = req.params;
 
   try {
-    const request = db.request();
-
-    request.input('operation', 'AllFamilyMembers');
-    request.input('family_id', family_id);
-
-    const result = await request.execute('sp_family_members');
+    const result = await db.request()
+      .input('family_id', sql.Int, family_id)
+      .query(`
+        SELECT fm.member_id, fm.family_id, fm.name, fm.Gender_id, g.Gender,
+               fm.relation_id, r.relation, fm.DOB, fm.mobile_no
+        FROM dbo.family_members fm
+        LEFT JOIN Gender g ON fm.Gender_id = g.gender_id
+        LEFT JOIN Relations r ON fm.relation_id = r.relation_id
+        WHERE family_id = @family_id
+      `);
 
     // ✅ SEND DIRECT LIST
     res.status(200).json(result.recordset);
@@ -76,7 +97,7 @@ router.get('/getDoctorAvailability/:doctor_id/:clinic_id', async (req, res) => {
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id || null)
       .input('operation', 'doctor_availability')
-      .execute('sp_patients');
+      .run(patientsSql);
 
     res.status(200).json(result.recordset);
 
@@ -99,7 +120,7 @@ router.get('/getDoctorLeaveDates/:doctor_id/:clinic_id', async (req, res) => {
       .input('operation', 'GET_LEAVE_DATES')
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id)
-      .execute('sp_doctor_leave');
+      .run(doctorLeaveSql);
 
     res.status(200).json(result.recordset || []);
 
@@ -119,7 +140,7 @@ router.get('/getDoctors/:patient_id', async (req, res) => {
     const result = await db.request()
       .input('operation', 'getDoctors')
       .input('patient_id', patient_id)
-      .execute('sp_patients');
+      .run(patientsSql);
 
     const doctors = result.recordset;
     const today = new Date().toISOString().split('T')[0];
@@ -133,7 +154,7 @@ router.get('/getDoctors/:patient_id', async (req, res) => {
             .input('operation', 'IS_BLOCKED')
             .input('doctor_id', d.doctor_id)
             .input('from_date', today)
-            .execute('sp_doctor_leave');
+            .run(doctorLeaveSql);
           return { doctor_id: d.doctor_id, blocked: r.recordset?.[0]?.blocked ?? 0 };
         } catch { return { doctor_id: d.doctor_id, blocked: 0 }; }
       })
@@ -159,10 +180,12 @@ router.get('/patientPrescriptionList/:patient_id', async (req, res) => {
 
   try {
 
-    const result = await db.request()
+    // Staff get only the prescriptions their own doctor wrote.
+    const request = db.request()
       .input('patient_id', patient_id)
-      .input('operation', 'PatientPrescriptionList')
-      .execute('sp_prescription');
+      .input('operation', 'PatientPrescriptionList');
+    if (ownStaff.isStaff(req)) request.input('doctor_id', await ownStaff.staffDoctorId(req));
+    const result = await request.run(prescriptionsSql);
 
     res.status(200).json(result.recordset);
 
@@ -185,7 +208,7 @@ router.get('/patientPrescriptionDetails/:prescription_id', async (req, res) => {
     const result = await db.request()
       .input('prescription_id', prescription_id)
       .input('operation', 'PrescriptionDetail')
-      .execute('sp_prescription');
+      .run(prescriptionsSql);
 
     res.status(200).json(result.recordset);
 
@@ -206,7 +229,7 @@ router.get('/appointment/getBookedSlots/:doctor_id/:clinic_id', async (req, res)
       .input('operation', 'GET_MONTH_SLOTS')
       .input('doctor_id', doctor_id)
       .input('clinic_id', clinic_id || null)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     res.status(200).json(result.recordset);
 
@@ -228,7 +251,7 @@ router.get('/appointment/getAvailability', async (req, res) => {
       .input('operation', 'GET_AVAILABILITY')
       .input('doctor_id', doctor_id)
       .input('appointment_date', appointment_date)
-      .execute('sp_appointment');
+      .run(appointmentsSql);
 
     res.json({
       success: true,
@@ -256,7 +279,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
     request.input('operation', 'patient_Appointments');
     request.input('family_id', family_id);
 
-    const result = await request.execute('sp_appointment');
+    const result = await request.run(appointmentsSql);
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -280,7 +303,7 @@ router.get('/getPatientAppointments/:family_id', async (req, res) => {
             .input('appointment_id', item.appointment_id)
             .input('doctor_id', item.doctor_id)
             .input('clinic_id', item.clinic_id)
-            .execute('sp_appointment');
+            .run(appointmentsSql);
 
           if (queueResult.recordset.length > 0) {
             const q = queueResult.recordset[0];
@@ -364,12 +387,13 @@ router.get('/favoriteDoctor/:patient_id/:doctor_id/:clinic_id', async (req, res)
     const result = await db.request()
       .input('patient_id', sql.Int, patient_id)
       .input('doctor_id', sql.Int, doctor_id)
-      .input('clinic_id', sql.NVarChar(50), clinic_id)
+      .input('clinic_id', sql.NVarChar(50), clinic_id === 'null' ? null : clinic_id)
       .query(`
         SELECT CASE WHEN EXISTS (
           SELECT 1 FROM favorite_doctors
           WHERE patient_id = @patient_id AND doctor_id = @doctor_id
-            AND clinic_id = @clinic_id AND is_favorite = 1
+            AND (clinic_id = @clinic_id OR (clinic_id IS NULL AND @clinic_id IS NULL))
+            AND is_favorite = 1
         ) THEN 1 ELSE 0 END AS is_favorite
       `);
 
@@ -392,9 +416,8 @@ router.get('/review/appointment/:appointment_id', async (req, res) => {
     const { appointment_id } = req.params;
 
     const result = await db.request()
-      .input('operation', 'Fetch')
-      .input('appointment_id', appointment_id)
-      .execute('sp_review');
+      .input('appointment_id', sql.Int, appointment_id)
+      .query('SELECT * FROM reviews WHERE appointment_id = @appointment_id');
 
     res.status(200).json(result.recordset || []);
 
@@ -417,7 +440,7 @@ router.get('/getNotifications/:patient_id', async (req, res) => {
     const result = await db.request()
       .input('operation', 'LIST')
       .input('patient_id', patient_id)
-      .execute('sp_notification');
+      .run(notificationsSql);
     res.status(200).json(result.recordset || []);
   } catch (error) {
     res.status(500).json({
@@ -441,7 +464,7 @@ router.post('/markNotificationRead', async (req, res) => {
       .input('operation', 'MARK_READ')
       .input('notification_id', notification_id)
       .input('patient_id', patient_id)
-      .execute('sp_notification');
+      .run(notificationsSql);
     res.status(200).json({ success: true, message: 'Marked as read' });
   } catch (error) {
     res.status(500).json({
@@ -458,7 +481,7 @@ router.post('/markAllNotificationsRead/:patient_id', async (req, res) => {
     await db.request()
       .input('operation', 'MARK_ALL_READ')
       .input('patient_id', patient_id)
-      .execute('sp_notification');
+      .run(notificationsSql);
     res.status(200).json({ success: true, message: 'All marked as read' });
   } catch (error) {
     res.status(500).json({
@@ -474,11 +497,27 @@ router.get('/review/doctor/:doctor_id/:clinic_id', async (req, res) => {
   try {
     const { doctor_id, clinic_id } = req.params;
 
+    // reviewed_by_name = the account that wrote it; patient_name = who the
+    // appointment was for (the account holder, or one of their family members).
+    // Reviews saved without a clinic show under every clinic of the doctor.
     const result = await db.request()
-      .input('operation', 'Fetch')
-      .input('doctor_id', doctor_id)
-      .input('clinic_id', clinic_id)
-      .execute('sp_review');
+      .input('doctor_id', sql.Int, doctor_id)
+      .input('clinic_id', sql.NVarChar(50), clinic_id)
+      .query(`
+        SELECT r.review_id, r.appointment_id, r.doctor_id, r.patient_id,
+               p.name AS reviewed_by_name,
+               -- self vs family comes from the appointment: patient and
+               -- family-member ids are separate sequences and can be equal
+               CASE WHEN a.user_type = 2 THEN fm.name ELSE p.name END AS patient_name,
+               r.rating, r.comment, r.created_at
+        FROM reviews r
+        LEFT JOIN appointments a ON a.appointment_id = r.appointment_id
+        LEFT JOIN Patients p ON p.patient_id = r.reviewed_by_user_id
+        LEFT JOIN family_members fm ON fm.member_id = r.patient_id
+        WHERE r.doctor_id = @doctor_id
+          AND (@clinic_id IS NULL OR r.clinic_id = @clinic_id OR r.clinic_id IS NULL)
+        ORDER BY r.created_at DESC
+      `);
 
     res.status(200).json(result.recordset || []);
 

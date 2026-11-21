@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+const { verifyAccessToken } = require('./auth');
 
 // Same JWT validation as the API protect middleware, but with one key
 // difference: the token is accepted via the `?token=` query string in
@@ -19,7 +19,7 @@ module.exports = function uploadAuth(req, res, next) {
   }
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    req.user = verifyAccessToken(token);
     return next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });

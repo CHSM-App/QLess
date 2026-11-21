@@ -73,7 +73,7 @@ class _ReceptionistPageState extends ConsumerState<ReceptionistPage> {
 
   String? get _clinicId {
     final doctorState = ref.read(doctorLoginViewModelProvider);
-    final doctorClinicId = doctorState.clinic_id;
+    final doctorClinicId = doctorState.clinicId;
     final receptionistClinicId =
         ref.read(receptionistLoginViewModelProvider).clinicId;
     final phoneCheckClinicId = doctorState.phoneCheckResult.maybeWhen(
@@ -803,7 +803,7 @@ class _AddReceptionistPageState extends ConsumerState<AddReceptionistPage> {
                         textCap: TextCapitalization.sentences, maxLines: 2),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _gender,
+                      initialValue: _gender,
                       decoration: InputDecoration(
                         labelText: 'Gender',
                         prefixIcon: const Icon(Icons.wc_rounded, size: 17, color: _kTextMuted),

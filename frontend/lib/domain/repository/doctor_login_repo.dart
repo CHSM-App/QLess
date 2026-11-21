@@ -10,6 +10,7 @@ abstract class DoctorLoginRepository {
     DoctorDetails doctorLogin, {
     File? doctorImage,
     List<File>? clinicImages,
+    String? loginTicket,
   });
    /// [saveIdentity] false when a receptionist is loading their linked
    /// doctor — the doctor's name/mobile/role_id must not overwrite the

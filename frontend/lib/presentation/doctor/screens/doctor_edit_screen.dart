@@ -4,8 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/domain/models/otp_response.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
@@ -40,7 +40,6 @@ const kAmberLight = Color(0xFFFEF3C7);
 const kAmberDark = Color(0xFF975A16);
 
 const _kTabletBreak = 650.0;
-const _kDesktopBreak = 1050.0;
 
 // ════════════════════════════════════════════════════════════════════
 //  DOCTOR EDIT PROFILE PAGE
@@ -66,7 +65,9 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage> {
   bool _isOtpSent = false;
   bool _isVerifyingOtp = false;
   String _otpError = '';
-  String _dummyOtp = '';
+  // Proof from /login/verify-otp that the doctor owns the new number (B16);
+  // sent with the profile update.
+  String? _mobileTicket;
 
   // ── Personal ────────────────────────────────────────────────────
   final _nameCtrl = TextEditingController();
@@ -81,9 +82,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage> {
 
   // ── Doctor image ─────────────────────────────────────────────────
   File? _doctorImage;
-  String? _doctorNetworkImage;
 
-  final ImagePicker _picker = ImagePicker();
 
   final _specs = const [
     'Cardiology',
@@ -150,148 +149,10 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage> {
     _set(_licenseCtrl, details.licenseNo);
     _set(_expCtrl, details.experience?.toString());
 
-    _doctorNetworkImage = details.image;
-
     _originalMobile = (details.mobile ?? state.mobile ?? '').trim();
     _applyGender(details);
     _applySpec(details);
     if (mounted) setState(() {});
-  }
-
-  // ── Doctor photo picker ──────────────────────────────────────────
-  Future<void> _pickImage({required bool isDoctor}) async {
-    final hasNetwork =
-        _doctorNetworkImage != null && _doctorNetworkImage!.isNotEmpty;
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36, height: 4,
-                  decoration: BoxDecoration(
-                      color: kBorder, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text('Doctor Photo',
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: kTextPrimary)),
-              const SizedBox(height: 4),
-              const Text('Choose how to set the profile picture',
-                  style: TextStyle(fontSize: 12, color: kTextMuted)),
-              const SizedBox(height: 16),
-              _sourceOption(
-                icon: Icons.camera_alt_outlined,
-                iconBg: kPrimaryLight,
-                iconFg: kPrimary,
-                label: 'Take a Photo',
-                subtitle: 'Use your camera',
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final xfile = await _picker.pickImage(
-                      source: ImageSource.camera, imageQuality: 80);
-                  if (xfile != null) {
-                    setState(() => _doctorImage = File(xfile.path));
-                  }
-                },
-              ),
-              const SizedBox(height: 10),
-              _sourceOption(
-                icon: Icons.photo_library_outlined,
-                iconBg: const Color(0xFFEDE9FE),
-                iconFg: const Color(0xFF9F7AEA),
-                label: 'Choose from Gallery',
-                subtitle: 'Pick from your photos',
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final xfile = await _picker.pickImage(
-                      source: ImageSource.gallery, imageQuality: 80);
-                  if (xfile != null) {
-                    setState(() => _doctorImage = File(xfile.path));
-                  }
-                },
-              ),
-              if (_doctorImage != null || hasNetwork) ...[
-                const SizedBox(height: 10),
-                _sourceOption(
-                  icon: Icons.delete_outline_rounded,
-                  iconBg: const Color(0xFFFEE2E2),
-                  iconFg: const Color(0xFFFC8181),
-                  label: 'Remove Photo',
-                  subtitle: 'Reset to default avatar',
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    setState(() {
-                      _doctorImage = null;
-                      _doctorNetworkImage = null;
-                    });
-                  },
-                ),
-              ],
-              const SizedBox(height: 8),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _sourceOption({
-    required IconData icon,
-    required Color iconBg,
-    required Color iconFg,
-    required String label,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: kBorder),
-        ),
-        child: Row(children: [
-          Container(
-            width: 38, height: 38,
-            decoration: BoxDecoration(
-                color: iconBg, borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, size: 18, color: iconFg),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: kTextPrimary)),
-                Text(subtitle,
-                    style: const TextStyle(fontSize: 11, color: kTextMuted)),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, size: 18, color: kTextMuted),
-        ]),
-      ),
-    );
   }
 
   void _set(TextEditingController c, String? v) {
@@ -331,32 +192,40 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage> {
     }
     setState(() => _isVerifyingOtp = true);
     try {
-      _dummyOtp = ((DateTime.now().millisecond % 1000) + 111111)
-          .toString()
-          .substring(0, 6);
-      debugPrint('DEV OTP for $m → $_dummyOtp');
-      await Future.delayed(const Duration(seconds: 2));
+      // B16: a real OTP to the new number (it used to be made up on the phone).
+      final r = await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .sendOtp(OtpResponse(mobileNo: m));
+      if (!mounted) return;
+      if ((r.status ?? 0) != 1) {
+        _showSnack(r.message ?? 'Failed to send OTP', isError: true);
+        return;
+      }
       setState(() { _isOtpSent = true; _otpError = ''; });
-      _showSnack('OTP sent to $m  •  Test OTP: $_dummyOtp');
+      _showSnack('OTP sent on WhatsApp to $m');
     } catch (e) {
       _showSnack('Failed to send OTP: $e', isError: true);
     } finally {
-      setState(() => _isVerifyingOtp = false);
+      if (mounted) setState(() => _isVerifyingOtp = false);
     }
   }
 
   Future<void> _verifyOtp() async {
     final otp = _otpCtrl.text.trim();
     if (otp.isEmpty) { setState(() => _otpError = 'Please enter OTP'); return; }
-    if (otp.length < 4) {
-      setState(() => _otpError = 'OTP must be at least 4 digits');
+    if (otp.length != 6) {
+      setState(() => _otpError = 'Enter the 6-digit OTP');
       return;
     }
     setState(() => _isVerifyingOtp = true);
     try {
-      await Future.delayed(const Duration(milliseconds: 1500));
-      if (otp == _dummyOtp) {
+      final r = await ref
+          .read(doctorLoginViewModelProvider.notifier)
+          .verifyOtp(OtpResponse(mobileNo: _contactCtrl.text.trim(), otp: otp));
+      if (!mounted) return;
+      if ((r.status ?? 0) == 1 && (r.loginTicket ?? '').isNotEmpty) {
         setState(() {
+          _mobileTicket = r.loginTicket;
           _originalMobile = _contactCtrl.text.trim();
           _isMobileChanged = false;
           _isOtpSent = false;
@@ -370,7 +239,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage> {
     } catch (e) {
       setState(() => _otpError = 'Verification failed: $e');
     } finally {
-      setState(() => _isVerifyingOtp = false);
+      if (mounted) setState(() => _isVerifyingOtp = false);
     }
   }
 
@@ -423,7 +292,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage> {
       experience: _parseInt(_expCtrl.text),
       specialization: _selectedSpec,
       roleId: details?.roleId ?? _parseInt(state.roleId),
-      clinicId: details?.clinicId ?? state.clinic_id,
+      clinicId: details?.clinicId ?? state.clinicId,
       // Clinic fields passed as-is — editing happens via My Clinics
       clinicName: details?.clinicName,
       clinicAddress: details?.clinicAddress,
@@ -440,6 +309,7 @@ class _DoctorEditProfilePageState extends ConsumerState<DoctorEditProfilePage> {
     await ref.read(doctorLoginViewModelProvider.notifier).addDoctorDetails(
           doctor,
           doctorImage: _doctorImage,
+          loginTicket: _mobileTicket,
         );
 
     if (!mounted) return;

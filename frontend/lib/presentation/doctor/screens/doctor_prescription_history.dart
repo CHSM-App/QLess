@@ -319,7 +319,7 @@ class _DoctorPrescriptionDetailScreenState
   //           decoration: BoxDecoration(
   //             color: kPrimaryLight,
   //             borderRadius: BorderRadius.circular(10),
-  //             border: Border.all(color: kPrimary.withOpacity(0.2)),
+  //             border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
   //           ),
   //           child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
   //         ),
@@ -379,7 +379,7 @@ Widget _buildHeader() => Container(
           decoration: BoxDecoration(
             color: kPrimaryLight,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: kPrimary.withOpacity(0.2)),
+            border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
           ),
           child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
         ),
@@ -410,7 +410,7 @@ Widget _buildHeader() => Container(
               decoration: BoxDecoration(
                 color: kPrimaryLight,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: kPrimary.withOpacity(0.2)),
+                border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
               ),
               child: const Icon(Icons.print_rounded, color: kPrimary, size: 16),
             ),
@@ -450,7 +450,7 @@ Widget _buildHeader() => Container(
         onPressed: _canGoUp ? () => _go(-1) : null,
         icon: const Icon(Icons.arrow_upward_rounded),
         color: kPrimary,
-        disabledColor: kTextMuted.withOpacity(0.5),
+        disabledColor: kTextMuted.withValues(alpha: 0.5),
         iconSize: 22,
         visualDensity: VisualDensity.compact,
       ),
@@ -459,7 +459,7 @@ Widget _buildHeader() => Container(
         onPressed: _canGoDown ? () => _go(1) : null,
         icon: const Icon(Icons.arrow_downward_rounded),
         color: kPrimary,
-        disabledColor: kTextMuted.withOpacity(0.5),
+        disabledColor: kTextMuted.withValues(alpha: 0.5),
         iconSize: 22,
         visualDensity: VisualDensity.compact,
       ),
@@ -468,9 +468,11 @@ Widget _buildHeader() => Container(
 
   // ── Body ──────────────────────────────────────────────────────────
   Widget _buildBody() {
-    if (_loading) return const Center(
+    if (_loading) {
+      return const Center(
       child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5),
     );
+    }
 
     if (_error != null) return _buildError();
 
@@ -732,7 +734,7 @@ Widget _buildHeader() => Container(
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: kBorder),
       boxShadow: [
-        BoxShadow(color: Colors.black.withOpacity(0.04),
+        BoxShadow(color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12, offset: const Offset(0, 4)),
       ],
     ),
@@ -790,7 +792,9 @@ Widget _buildHeader() => Container(
 
   List<String> _splitSlots(String? raw) {
     final parts = (raw ?? '').split('-').map((p) => p.trim()).toList();
-    while (parts.length < 3) parts.add('-');
+    while (parts.length < 3) {
+      parts.add('-');
+    }
     return parts.take(3).map((p) => p.isEmpty ? '-' : p).toList();
   }
 
@@ -819,7 +823,7 @@ Widget _buildHeader() => Container(
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
+                  color: color.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4)),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(typeIcon, color: color, size: 9),

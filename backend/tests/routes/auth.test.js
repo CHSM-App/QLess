@@ -88,6 +88,19 @@ describe('POST /login/Createlogin — role comes from the database', () => {
     expect(sessionInserts()[0].inputs.role).toBe('receptionist');
   });
 
+  // doctor_mobile_exist returns receptionist mobiles too (doctor_id NULL) —
+  // the real database answers like this; it must still be a receptionist session.
+  test('receptionist row from doctor_mobile_exist (doctor_id NULL) is not a doctor', async () => {
+    const lookup = accounts({ receptionist: { recep_id: 7 } });
+    mockDb.respond = (call) => (call.target === 'sp_doctor_login' && call.inputs.operation === 'doctor_mobile_exist'
+      ? [{ doctor_id: null, mobile: DEMO_MOBILE, doc_active_status: 1, doc_is_verified: 1 }]
+      : lookup(call));
+    const res = await login('doctor');
+
+    expect(res.body.roleId).toBe(ROLE.RECEPTIONIST);
+    expect(decode(res.body.accessToken)).toMatchObject({ role_id: ROLE.RECEPTIONIST, uid: 7 });
+  });
+
   test('a body claiming "doctor" cannot get a doctor session for a receptionist', async () => {
     mockDb.respond = accounts({ receptionist: { recep_id: 7 } });
     const res = await login('doctor');
@@ -158,5 +171,38 @@ describe('POST /login/refreshAccessToken', () => {
     expect(res.status).toBe(500);
     expect(res.body.roleId).toBeUndefined();
     expect(sessionInserts()).toHaveLength(0);
+  });
+
+  // A doctor an admin blocked no longer resolves (doctor_mobile_exist needs
+  // active_status 0): the session ends instead of renewing without a uid.
+  test('blocked doctor → 403 DOCTOR_BLOCKED, no new session', async () => {
+    mockDb.respond = storedSession({ user_mobile: DEMO_MOBILE, role_id: ROLE.DOCTOR, device_info: 'jest' });
+    const res = await refresh();
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('DOCTOR_BLOCKED');
+    expect(res.body.accessToken).toBeUndefined();
+    expect(sessionInserts()).toHaveLength(0);
+  });
+});
+
+// Verification runs in the background: it never filters login or the
+// patients' doctor list; only an admin block (active_status) does.
+describe('doctor verification SQL', () => {
+  const doctorsSql = require('../../src/queries/doctors');
+  const patientsSql = require('../../src/queries/patients');
+
+  test('a new doctor is saved as pending review (is_verified 1)', () => {
+    expect(doctorsSql.ops.Insert).toMatch(/@clinic_id,\s*0, 1, @gender_id, @image\)/);
+  });
+
+  test('login lookup ignores verification, still refuses blocked doctors', () => {
+    expect(doctorsSql.ops.check_phone_doctor).not.toMatch(/is_verified/);
+    expect(doctorsSql.ops.check_phone_doctor).toMatch(/doc_active_status = 0/);
+  });
+
+  test("patients' doctor list hides blocked doctors, not unverified ones", () => {
+    const text = Object.values(patientsSql.ops).find((t) => /ACTIVE DOCTORS/.test(t));
+    expect(text).toMatch(/dl_main\.active_status = 0/);
+    expect(text).not.toMatch(/dl_main\.is_verified/);
   });
 });

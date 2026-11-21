@@ -12,7 +12,6 @@ import 'package:qless/presentation/patient/providers/patient_usecase_provider.da
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/book_appointment_screen.dart';
 import 'package:qless/presentation/patient/view_models/favorite_viewmodel.dart';
-import 'package:qless/presentation/patient/view_models/patient_login_viewmodel.dart';
 
 // ── Shared colour palette (same across all screens) ───────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -54,7 +53,9 @@ const _kBgPalette = [
 int _hashIdx(String? s, int len) {
   if (s == null || s.isEmpty) return 0;
   var h = 0;
-  for (final c in s.toLowerCase().codeUnits) h = (h * 31 + c) & 0x7fffffff;
+  for (final c in s.toLowerCase().codeUnits) {
+    h = (h * 31 + c) & 0x7fffffff;
+  }
   return h % len;
 }
 
@@ -281,7 +282,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
               decoration: BoxDecoration(
                 color: accentBg,
                 borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: accent.withOpacity(0.2)),
+                border: Border.all(color: accent.withValues(alpha: 0.2)),
               ),
               child: Icon(Icons.person_rounded, color: accent, size: 15),
             ),
@@ -311,7 +312,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 color: _isFav ? kRedLight : const Color(0xFFF7F8FA),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                    color: _isFav ? kError.withOpacity(0.3) : kBorder),
+                    color: _isFav ? kError.withValues(alpha: 0.3) : kBorder),
               ),
               child: Icon(
                 _isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -438,7 +439,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
         border: Border.all(color: kBorder),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 12,
               offset: const Offset(0, 4)),
         ],
@@ -456,7 +457,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                   width: 58, height: 58,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [accent, accent.withOpacity(0.7)],
+                      colors: [accent, accent.withValues(alpha: 0.7)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -650,7 +651,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 border: Border.all(color: kBorder),
                 boxShadow: [
                   BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withValues(alpha: 0.04),
                       blurRadius: 8,
                       offset: const Offset(0, 3)),
                 ],
@@ -683,40 +684,6 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
           );
         }).toList(),
       ),
-    );
-  }
-
-  // ── Action pills ────────────────────────────────────────────────────
-  Widget _buildActionPills() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      child: Row(children: [
-        Expanded(
-          child: _ActionPill(
-            icon: _isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            label: _isFav ? 'Saved' : 'Save',
-            active: _isFav,
-            activeColor: kError,
-            onTap: () => _toggleFav(!_isFav),
-          ),
-        ),
-        // const SizedBox(width: 8),
-        // Expanded(
-        //   child: _ActionPill(
-        //     icon: Icons.share_outlined,
-        //     label: 'Share',
-        //     onTap: () {},
-        //   ),
-        // ),
-        // const SizedBox(width: 8),
-        // Expanded(
-        //   child: _ActionPill(
-        //     icon: Icons.message_outlined,
-        //     label: 'Message',
-        //     onTap: () {},
-        //   ),
-        // ),
-      ]),
     );
   }
 
@@ -816,7 +783,7 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
 
       String subtitle = '';
       if (isOpen) {
-        slots!.sort((a, b) => (a.startTime ?? '').compareTo(b.startTime ?? ''));
+        slots.sort((a, b) => (a.startTime ?? '').compareTo(b.startTime ?? ''));
         final parts = <String>[];
         for (final s in slots) {
           final timeStr = '${_fmtTime(s.startTime)} – ${_fmtTime(s.endTime)}';
@@ -881,9 +848,9 @@ class _DoctorProfileScreenState extends ConsumerState<DoctorProfileScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: kPrimaryLight.withOpacity(0.5),
+                  color: kPrimaryLight.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: kPrimary.withOpacity(0.2)),
+                  border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
                 ),
                 child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                   const Icon(Icons.expand_more_rounded, size: 16, color: kPrimary),
@@ -944,7 +911,7 @@ class _Card extends StatelessWidget {
           border: Border.all(color: kBorder),
           boxShadow: [
             BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4)),
           ],
@@ -1116,53 +1083,6 @@ class _DayRow extends StatelessWidget {
           ),
         ],
       );
-}
-
-// ════════════════════════════════════════════════════════════════════
-//  ACTION PILL
-// ════════════════════════════════════════════════════════════════════
-class _ActionPill extends StatelessWidget {
-  final IconData     icon;
-  final String       label;
-  final bool         active;
-  final Color?       activeColor;
-  final VoidCallback onTap;
-  const _ActionPill({
-    required this.icon, required this.label, required this.onTap,
-    this.active = false, this.activeColor,
-  });
-  @override
-  Widget build(BuildContext context) {
-    final color = active ? (activeColor ?? kPrimary) : kTextSecondary;
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(vertical: 9),
-        decoration: BoxDecoration(
-          color: active ? color.withOpacity(0.08) : Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              color: active ? color.withOpacity(0.3) : kBorder),
-          boxShadow: [
-            BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 15, color: color),
-          const SizedBox(height: 4),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: color)),
-        ]),
-      ),
-    );
-  }
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1348,7 +1268,7 @@ class _BookingBar extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text('Confirm →',

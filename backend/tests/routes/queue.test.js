@@ -9,14 +9,15 @@ const emitted = [];
 app.set('io', { to: (room) => ({ emit: (event, payload) => emitted.push({ room, event, payload }) }) });
 
 const send = () => fcm.messaging().send;
-const post = (url, body) => request(app).post('/doctor/insert' + url).set(authHeader()).send(body);
+// a token for doctor 2 — the doctor whose queue these tests drive
+const post = (url, body) => request(app).post('/doctor/insert' + url).set(authHeader({ uid: 2 })).send(body);
 
 // sp_appointment answers per operation; the helpers around it (inbox lookup,
 // current-serving query) answer with fixed rows.
 function queueDb(spRows) {
   return ({ kind, target, inputs }) => {
     if (target === 'sp_appointment') return spRows[inputs.operation] || [];
-    if (kind === 'query' && target.includes('FROM patients WHERE token')) return [{ patient_id: 9 }];
+    if (kind === 'query' && target.includes('FROM patients') && target.includes('token_hash')) return [{ patient_id: 9 }];
     if (kind === 'query' && target.includes('MAX(a.queue_number) AS current_serving')) return [{ current_serving: 4 }];
     return [];
   };
@@ -31,7 +32,7 @@ beforeEach(() => {
 describe('POST /appointment/queueNext', () => {
   test('400 without doctor_id or appointment_id', async () => {
     expect((await post('/appointment/queueNext', { appointment_id: 1 })).status).toBe(400);
-    expect((await post('/appointment/queueNext', { doctor_id: 1 })).status).toBe(400);
+    expect((await post('/appointment/queueNext', { doctor_id: 2 })).status).toBe(400);
     expect(mockDb.callsTo('sp_appointment')).toHaveLength(0);
   });
 
@@ -123,11 +124,13 @@ describe('POST /appointment/queueRecall', () => {
 describe('POST /walkInBook', () => {
   const walkIn = { name: ' Asha ', mobile_no: '9000011111', doctor_id: 2, appointment_date: '2026-11-20', clinic_id: 3 };
 
-  function walkInDb({ blocked = 0, booked = 1, duplicate = null } = {}) {
+  function walkInDb({ blocked = 0, booked = 1, duplicate = null, idle = null } = {}) {
     return ({ kind, target, inputs }) => {
+      if (kind === 'query' && target.includes('JOIN doctor_queue dq')) return idle ? [idle] : [];
       if (kind === 'query' && target.includes('FROM appointments a')) return duplicate ? [duplicate] : [];
+      if (target === 'sp_appointment' && inputs.operation === 'START_SESSION') return [{ success: 1 }];
       if (target === 'sp_patients' && inputs.operation === 'Insert') return [{ patient_id: 41 }];
-      if (target === 'sp_family_members' && inputs.operation === 'Insert') return [{ member_id: 51 }];
+      if (kind === 'query' && /INSERT INTO dbo\.family_members/.test(target)) return [{ member_id: 51 }];
       if (target === 'sp_doctor_leave' && inputs.operation === 'IS_BLOCKED') return [{ blocked }];
       if (target === 'sp_appointment' && inputs.operation === 'BOOK') return [{ success: booked, message: booked ? 'Booked' : 'Full' }];
       return [];
@@ -143,10 +146,20 @@ describe('POST /walkInBook', () => {
     mockDb.respond = walkInDb();
     const res = await post('/walkInBook', walkIn);
 
-    expect(res.body).toEqual({ success: true, message: 'Booked', patient_id: 41 });
+    expect(res.body).toEqual({ success: true, message: 'Booked', patient_id: 41, started_appointment_id: null });
+    expect(mockDb.callsTo('sp_appointment', 'START_SESSION')).toHaveLength(0);
     expect(mockDb.callsTo('sp_patients', 'Insert')[0].inputs.name).toBe('Asha');
     expect(mockDb.callsTo('sp_appointment', 'BOOK')[0].inputs).toMatchObject({ patient_id: 41, user_type: 1, clinic_id: 3 });
     expect(emitted.map((e) => e.payload.event)).toEqual(['booked']);
+  });
+
+  test('idle running queue: starts the walk-in straight away', async () => {
+    mockDb.respond = walkInDb({ idle: { appointment_id: 90 } });
+    const res = await post('/walkInBook', walkIn);
+
+    expect(res.body.started_appointment_id).toBe(90);
+    expect(mockDb.callsTo('sp_appointment', 'START_SESSION')[0].inputs.appointment_id).toBe(90);
+    expect(emitted.map((e) => e.payload.event)).toEqual(['booked', 'session_started']);
   });
 
   test('family member walk-in books under the new member id', async () => {

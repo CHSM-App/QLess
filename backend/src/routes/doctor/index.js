@@ -1,10 +1,14 @@
 var express = require('express');
 var router = express.Router();
+require('../../middleware/ownStaff')(router); // staff: only their own doctor's records
 var db = require('../../db');
 var sql = require('mssql');
 const log = require('../../middleware/logger');
 const authorize = require('../../middleware/authorize');
 const { ROLE } = require('../../middleware/roles');
+const medicinesSql = require('../../queries/medicines');
+const receptionistsSql = require('../../queries/receptionists');
+const doctorsSql = require('../../queries/doctors');
 
 // DELETE Medicine (per-doctor link unlink)
 router.delete("/deleteMedicine/:doctor_id/:medicine_id", authorize(ROLE.DOCTOR), async (req, res) => {
@@ -23,7 +27,7 @@ router.delete("/deleteMedicine/:doctor_id/:medicine_id", authorize(ROLE.DOCTOR),
     request.input("doctor_id", sql.Int, parseInt(doctor_id));
     request.input("medicine_id", sql.Int, parseInt(medicine_id));
 
-    const result = await request.execute("sp_Medicine_Master");
+    const result = await request.run(medicinesSql);
 
     // SP returns 'Medicine removed from your list.' on success
     // OR 'No medicine found to delete.' on failure
@@ -70,7 +74,7 @@ router.delete("/delete/clinicGallery", authorize(ROLE.DOCTOR), async (req, res) 
       .input("operation", "deleteClinicGallery")
       .input("clinic_id", clinic_id)
       .input("image_url", urls.join(","))
-      .execute("sp_doctor_login");
+      .run(doctorsSql);
 
     const deletedCount = result.recordset?.[0]?.deleted_count ?? 0;
     return res.status(200).json({
@@ -105,7 +109,7 @@ router.delete("/deletereceptionist/:recep_id", authorize(ROLE.DOCTOR), async (re
     request.input("operation", "DeleteReceptionist");
     request.input("recep_id", sql.Int, parseInt(recep_id));
 
-    const result = await request.execute("sp_receptionist");
+    const result = await request.run(receptionistsSql);
 
     // SP returns 'Medicine removed from your list.' on success
     // OR 'No medicine found to delete.' on failure

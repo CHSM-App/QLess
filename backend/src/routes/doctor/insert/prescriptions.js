@@ -9,6 +9,8 @@ const log = require('../../../middleware/logger');
 const {
   insertNotification,
 } = require('./shared');
+const medicinesSql = require('../../../queries/medicines');
+const prescriptionsSql = require('../../../queries/prescriptions');
 
 const router = express.Router();
 
@@ -36,10 +38,10 @@ router.post('/insertMedicine', async (req, res) => {
     request.input('strength', opt(strength));
     request.input('components', opt(components));
 
-    const result = await request.execute('sp_Medicine_Master');
+    const result = await request.run(medicinesSql);
 
     const message = result.recordset?.[0]?.Message || 'Medicine inserted successfully';
-    const isDuplicate = message.toLowerCase().includes('already exists');
+    const isDuplicate = /already (exists|in your list)/i.test(message);
 
     res.status(isDuplicate ? 409 : 200).json({
       success: isDuplicate ? 0 : 1,
@@ -152,7 +154,7 @@ router.post('/insertPrescription', async (req, res) => {
       request.input('inhaler_technique', clean(med?.inhaler_technique));
       request.input('inhaler_usage', clean(med?.inhaler_usage));
 
-      const result = await request.execute('sp_prescription');
+      const result = await request.run(prescriptionsSql);
 
       const row = result.recordset?.[0];
 

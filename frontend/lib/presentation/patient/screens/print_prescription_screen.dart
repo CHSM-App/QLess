@@ -1,10 +1,6 @@
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -39,7 +35,6 @@ class _PatientPrescriptionPdfScreenState
   bool _generating = false;
   bool _generated = false;
   double _progress = 0;
-  String? _savedPath;
   Uint8List? _pdfBytes;
 
   PatientPrescription get _rx => widget.prescription;

@@ -60,12 +60,17 @@ describe('POST /delete-account/request', () => {
     expect(bcrypt.compareSync(sent.OtpCode, stored)).toBe(true);
   });
 
-  // Pinned current behaviour (see IMPROVEMENT_PLAN.md S8): outside
-  // NODE_ENV=production the OTP itself is in the response.
-  test('non-production responses include dev_otp', async () => {
-    mockDb.respond = accountDb();
-    const res = await request(app).post('/delete-account/request').send({ phone: PHONE, role_id: 2 });
-    expect(res.body.dev_otp).toBe(axios.post.mock.calls[0][1].OtpCode);
+  // S8: the OTP must never be in the response, in any environment.
+  test.each(['development', 'test', 'production'])('NODE_ENV=%s → no OTP in the response', async (env) => {
+    const saved = process.env.NODE_ENV;
+    process.env.NODE_ENV = env;
+    try {
+      mockDb.respond = accountDb();
+      const res = await request(app).post('/delete-account/request').send({ phone: PHONE, role_id: 2 });
+      const otp = axios.post.mock.calls[0][1].OtpCode;
+      expect(res.body.dev_otp).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toContain(otp);
+    } finally { process.env.NODE_ENV = saved; }
   });
 
   test('WhatsApp failure still answers 200 (no account enumeration)', async () => {

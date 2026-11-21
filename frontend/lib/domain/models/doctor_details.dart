@@ -1,3 +1,6 @@
+// Field names such as Token / DOB mirror the server JSON and are used across
+// the app; renaming them is a separate change.
+// ignore_for_file: non_constant_identifier_names
 import 'package:json_annotation/json_annotation.dart';
 
 part 'doctor_details.g.dart';
