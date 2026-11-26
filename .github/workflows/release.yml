@@ -72,7 +72,7 @@ jobs:
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: echo "$KEYSTORE_BASE64" | base64 --decode > "$FLUTTER_DIR/android/app/upload-keystore.jks"
+        run: printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > "$FLUTTER_DIR/android/app/upload-keystore.jks"
 
       - name: Create key.properties
         env:
@@ -84,10 +84,10 @@ jobs:
           [ -n "$STOREPASSWORD" ] && [ -n "$KEYPASSWORD" ] && [ -n "$KEYALIAS" ] \
             || { echo "::error::STORE_PASSWORD / KEY_PASSWORD / KEY_ALIAS secret missing"; exit 1; }
           {
-            echo "storePassword=$STOREPASSWORD"
-            echo "keyPassword=$KEYPASSWORD"
-            echo "keyAlias=$KEYALIAS"
-            echo "storeFile=upload-keystore.jks"
+            printf 'storePassword=%s\n' "$STOREPASSWORD"
+            printf 'keyPassword=%s\n'   "$KEYPASSWORD"
+            printf 'keyAlias=%s\n'      "$KEYALIAS"
+            printf 'storeFile=upload-keystore.jks\n'
           } > "$FLUTTER_DIR/android/key.properties"
 
       - name: Create google-services.json
@@ -102,7 +102,7 @@ jobs:
         env:
           PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 }}
         run: |
-          echo "$PLAY_SERVICE_ACCOUNT_JSON_BASE64" | base64 --decode > deploy/service-account.json
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > deploy/service-account.json
           jq -e '.private_key and .client_email' deploy/service-account.json > /dev/null \
             || { echo "::error::PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 secret is empty or not a base64 service-account key"; exit 1; }
 
