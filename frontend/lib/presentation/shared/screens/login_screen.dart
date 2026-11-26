@@ -125,28 +125,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           }
           // Receptionist found — proceed to OTP (role stays 'doctor' so
           // otp_screen detects receptionist automatically via mobileExistReceptionist)
-        } else {
-          // Doctor found — run verification check. is_verified: 1 = approved
-          // by an admin, 0/null = still pending review (see
-          // backend/scripts/migrate-doctor-verification.sql).
-          if (!isDemoNumber(mobile)) {
-            final doctor = doctorResult.first;
-            final isNotVerified = (doctor.isverified) == 1;
-            if (isNotVerified) {
-              _showStatusDialog(
-                icon: Icons.hourglass_top_rounded,
-                iconColor: kWarning,
-                iconBg: kAmberLight,
-                title: 'Under Verification',
-                message:
-                    'Your account is currently being reviewed by our team. '
-                    'You will be notified once verification is complete.',
-                buttonLabel: 'OK, Got it',
-              );
-              return;
-            }
-          }
         }
+        // Doctor found: admin verification is a background review only and
+        // never blocks login (only an admin block does, via the backend).
       } else {
         final patientResult = await ref
             .read(patientLoginViewModelProvider.notifier)
@@ -191,96 +172,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     } finally {
       if (!navigated && mounted) setState(() => _isLoading = false);
     }
-  }
-
-  void _showStatusDialog({
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBg,
-    required String title,
-    required String message,
-    required String buttonLabel,
-  }) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (_) => Dialog(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(28, 32, 28, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    colors: [iconBg, iconBg.withValues(alpha: 0.4)],
-                  ),
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: iconColor.withValues(alpha: 0.18),
-                      blurRadius: 16,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: iconColor, size: 34),
-              ),
-              const SizedBox(height: 22),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: kTextPrimary,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 13.5,
-                  color: kTextSecondary,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 26),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimary,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: Text(
-                    buttonLabel,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   void _snack(String msg) {
