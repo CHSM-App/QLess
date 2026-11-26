@@ -56,7 +56,12 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
 		// Never in production — anyone reading the logs could sign in as anyone.
 		const otpToConsole = process.env.OTP_TO_CONSOLE === '1' && process.env.NODE_ENV !== 'production';
 
-		if (!otpToConsole && !process.env.WHATSAPP_API_TOKEN) {
+		// ponytail: TEMPORARY while OTP delivery is broken — every number gets
+		// 123456 and nothing is sent, so anyone can sign in as anyone. Set
+		// FIXED_OTP= (empty) in .env to restore real OTPs, then delete this.
+		const fixedOtp = process.env.FIXED_OTP ?? '123456';
+
+		if (!fixedOtp && !otpToConsole && !process.env.WHATSAPP_API_TOKEN) {
 			return res.status(500).json({
 				status: 0,
 				message: 'WhatsApp API token not configured'
@@ -64,10 +69,12 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
 		}
 
 		// ✅ Generate OTP
-		const otp = crypto.randomInt(100000, 1000000).toString();
+		const otp = fixedOtp || crypto.randomInt(100000, 1000000).toString();
 
 		// ✅ Send WhatsApp OTP (or print it, see otpToConsole)
-		const waResponse = otpToConsole
+		const waResponse = fixedOtp
+			? { data: { IsSuccess: true } }
+			: otpToConsole
 			? (console.log(`\n[OTP] ${normalized} → ${otp}\n`), { data: { IsSuccess: true } })
 			: await axios.post(
 				"https://api2.smsala.com/whatsapp/SendOtp",

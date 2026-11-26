@@ -92,7 +92,8 @@ jobs:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
         run: |
           printf '%s' "$GOOGLE_SERVICES_JSON" > "$FLUTTER_DIR/android/app/google-services.json"
-          jq empty "$FLUTTER_DIR/android/app/google-services.json"
+          jq -e '.project_info.project_id' "$FLUTTER_DIR/android/app/google-services.json" > /dev/null \
+            || { echo "::error::GOOGLE_SERVICES_JSON secret is empty or not the raw google-services.json"; exit 1; }
 
       - name: Build AAB
         working-directory: ${{ env.FLUTTER_DIR }}
