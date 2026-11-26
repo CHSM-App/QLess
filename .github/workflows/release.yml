@@ -76,10 +76,13 @@ jobs:
 
       - name: Create key.properties
         env:
-          STOREPASSWORD: ${{ secrets.STOREPASSWORD }}
-          KEYPASSWORD: ${{ secrets.KEYPASSWORD }}
-          KEYALIAS: ${{ secrets.KEYALIAS }}
+          STOREPASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEYPASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEYALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
+          # build.gradle.kts silently falls back to debug signing when any is blank.
+          [ -n "$STOREPASSWORD" ] && [ -n "$KEYPASSWORD" ] && [ -n "$KEYALIAS" ] \
+            || { echo "::error::STORE_PASSWORD / KEY_PASSWORD / KEY_ALIAS secret missing"; exit 1; }
           {
             echo "storePassword=$STOREPASSWORD"
             echo "keyPassword=$KEYPASSWORD"
@@ -97,11 +100,11 @@ jobs:
 
       - name: Write Play service account
         env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          PLAY_SERVICE_ACCOUNT_JSON_BASE64: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 }}
         run: |
-          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > deploy/service-account.json
+          echo "$PLAY_SERVICE_ACCOUNT_JSON_BASE64" | base64 --decode > deploy/service-account.json
           jq -e '.private_key and .client_email' deploy/service-account.json > /dev/null \
-            || { echo "::error::PLAY_SERVICE_ACCOUNT_JSON secret is empty or not the raw service-account key JSON"; exit 1; }
+            || { echo "::error::PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 secret is empty or not a base64 service-account key"; exit 1; }
 
       - name: Build AAB
         working-directory: ${{ env.FLUTTER_DIR }}
