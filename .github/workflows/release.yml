@@ -90,7 +90,9 @@ jobs:
       - name: Create google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: printf '%s' "$GOOGLE_SERVICES_JSON" > "$FLUTTER_DIR/android/app/google-services.json"
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > "$FLUTTER_DIR/android/app/google-services.json"
+          jq empty "$FLUTTER_DIR/android/app/google-services.json"
 
       - name: Build AAB
         working-directory: ${{ env.FLUTTER_DIR }}
