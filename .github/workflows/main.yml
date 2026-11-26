@@ -6,6 +6,31 @@ on:
       - '**'
     tags:
       - 'v*'
+  # Manual "Run workflow" button for Play Store deploys. Nothing is ever pushed
+  # to the Play Store automatically — you trigger this deliberately and pick the
+  # track / priority / rollout each time.
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Target: internal, sharing (Internal App Sharing link) or production'
+        type: choice
+        default: internal
+        options:
+          - internal
+          - sharing
+          - production
+      priority:
+        description: 'In-app update priority (0-5). 5 = forced full-screen update.'
+        type: string
+        default: '0'
+      fraction:
+        description: 'Staged rollout fraction for production (e.g. 0.1 = 10%, 1 = 100%).'
+        type: string
+        default: '0.1'
+      dry_run:
+        description: 'Dry run — validate + authenticate but do NOT upload.'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -177,16 +202,32 @@ jobs:
         run: flutter pub get
 
       - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > frontend/android/app/upload-keystore.jks
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        # tr -d strips stray spaces/newlines the secret box may have added.
+        run: printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > frontend/android/app/upload-keystore.jks
 
       - name: Create key.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        # build.gradle.kts silently falls back to debug signing when any is blank.
         run: |
-          cat > frontend/android/key.properties << EOF
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=upload-keystore.jks
-          EOF
+          [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ] && [ -n "$KEY_ALIAS" ]             || { echo "::error::STORE_PASSWORD / KEY_PASSWORD / KEY_ALIAS secret missing"; exit 1; }
+          {
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyPassword=%s\n'   "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n'      "$KEY_ALIAS"
+            printf 'storeFile=upload-keystore.jks\n'
+          } > frontend/android/key.properties
+
+      - name: Create google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > frontend/android/app/google-services.json
+          jq -e '.project_info.project_id' frontend/android/app/google-services.json > /dev/null             || { echo "::error::GOOGLE_SERVICES_JSON secret is empty or not the raw google-services.json"; exit 1; }
 
       - name: Build APK (release)
         working-directory: frontend
@@ -224,27 +265,99 @@ jobs:
             frontend/build/app/outputs/flutter-apk/qless-*.apk
             frontend/build/app/outputs/bundle/release/qless-*.aab
 
-  # ── Job 4: Upload AAB to Google Play Console on tag push (v*) ───────────────
-  deploy-play-store:
-    name: Deploy to Google Play Console
+  # ── Job 4: Deploy signed AAB to the Play Store ─────────────────────────────
+  # Manual only — triggered from the Actions tab via "Run workflow". Builds a
+  # fresh signed AAB and hands it to deploy/deploy.js, which uploads it.
+  deploy-playstore:
+    name: Deploy to Play Store
     runs-on: ubuntu-latest
-    needs: build-apk
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
-      - name: Download AAB artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: qless-aab-${{ github.ref_name }}
-          path: aab
+      - uses: actions/checkout@v4
 
-      - name: Decode Play Store service account key
-        run: echo "${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 }}" | base64 --decode > service-account.json
-
-      - name: Upload AAB to Play Console
-        uses: r0adkll/upload-google-play@v1
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          serviceAccountJson: service-account.json
-          packageName: com.vengurlatech.qless
-          releaseFiles: aab/qless-${{ github.ref_name }}.aab
-          tracks: internal
-          status: completed
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get Flutter dependencies
+        working-directory: frontend
+        run: flutter pub get
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        # tr -d strips stray spaces/newlines the secret box may have added.
+        run: printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > frontend/android/app/upload-keystore.jks
+
+      - name: Create key.properties
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        # build.gradle.kts silently falls back to debug signing when any is blank.
+        run: |
+          [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_PASSWORD" ] && [ -n "$KEY_ALIAS" ]             || { echo "::error::STORE_PASSWORD / KEY_PASSWORD / KEY_ALIAS secret missing"; exit 1; }
+          {
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'keyPassword=%s\n'   "$KEY_PASSWORD"
+            printf 'keyAlias=%s\n'      "$KEY_ALIAS"
+            printf 'storeFile=upload-keystore.jks\n'
+          } > frontend/android/key.properties
+
+      - name: Create google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          printf '%s' "$GOOGLE_SERVICES_JSON" > frontend/android/app/google-services.json
+          jq -e '.project_info.project_id' frontend/android/app/google-services.json > /dev/null             || { echo "::error::GOOGLE_SERVICES_JSON secret is empty or not the raw google-services.json"; exit 1; }
+
+      - name: Write Play service account
+        env:
+          PLAY_SA_BASE64: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 }}
+        run: |
+          printf '%s' "$PLAY_SA_BASE64" | tr -d '[:space:]' | base64 --decode > deploy/service-account.json
+          jq -e '.private_key and .client_email' deploy/service-account.json > /dev/null             || { echo "::error::PLAY_STORE_SERVICE_ACCOUNT_JSON_BASE64 secret is empty or not a base64 service-account key"; exit 1; }
+
+      - name: Build AAB (release)
+        working-directory: frontend
+        run: flutter build appbundle --release --no-tree-shake-icons
+
+      - name: Install deploy dependencies
+        working-directory: deploy
+        run: npm ci
+
+      - name: Deploy to Play Store
+        working-directory: deploy
+        env:
+          TRACK: ${{ inputs.track }}
+          PRIORITY: ${{ inputs.priority }}
+          FRACTION: ${{ inputs.fraction }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          ARGS="--yes --track=$TRACK --priority=$PRIORITY"
+          if [ "$TRACK" = "production" ]; then
+            if [ "$FRACTION" = "1" ] || [ "$FRACTION" = "1.0" ]; then ARGS="$ARGS --force"; else ARGS="$ARGS --fraction=$FRACTION"; fi
+          fi
+          if [ "$DRY_RUN" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          echo "node deploy.js $ARGS"
+          node deploy.js $ARGS
+
+      - name: Clean up secrets
+        if: always()
+        run: |
+          rm -f deploy/service-account.json frontend/android/key.properties \
+                frontend/android/app/upload-keystore.jks frontend/android/app/google-services.json
