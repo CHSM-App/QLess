@@ -5,6 +5,7 @@ import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
+import 'package:qless/presentation/shared/widgets/skeleton.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DESIGN TOKENS — match home_screen.dart
@@ -196,9 +197,7 @@ class _DoctorPatientHistoryScreenState
           // ── Scrollable list only ─────────────────────────────────────────
           Expanded(
             child: async.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: _kPrimary),
-              ),
+              loading: () => const SkeletonList(),
               error: (e, _) => Center(
                 child: Text('$e',
                     style: const TextStyle(color: _kTextMuted, fontSize: 12)),

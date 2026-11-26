@@ -250,6 +250,15 @@ class LocalDatabase {
         {...row, 'updated_at': DateTime.now().toIso8601String()},
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+      // The real session for a slot has arrived — drop the offline stand-in
+      // (queue_id = -slot_id, see OfflineQueueStore.ensureScheduledSessions).
+      final realId = row['queue_id'] as int? ?? 0;
+      final date = row['queue_date'] as String?;
+      if (realId > 0 && row['slot_id'] != null && date != null && date.length >= 10) {
+        batch.delete(_tQueues,
+            where: 'queue_id < 0 AND slot_id = ? AND substr(queue_date, 1, 10) = ?',
+            whereArgs: [row['slot_id'], date.substring(0, 10)]);
+      }
     }
     // Old sessions are never shown (home hides past-dated queues) — prune so
     // the table doesn't grow forever.
@@ -430,6 +439,16 @@ class LocalDatabase {
   Future<List<Map<String, dynamic>>> getPendingPrescriptions({int? doctorId}) =>
       _pending(_tPendingRx, doctorId);
 
+  /// Newest unsynced prescription for an appointment — parked ones included,
+  /// since the doctor still wrote it and should be able to see it.
+  Future<Map<String, dynamic>?> getPendingPrescriptionFor(int appointmentId) async {
+    final db = await database;
+    final rows = await db.query(_tPendingRx,
+        where: 'appointment_id = ?', whereArgs: [appointmentId],
+        orderBy: 'id DESC', limit: 1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
   Future<void> deletePendingPrescription(int id) => _deleteRow(_tPendingRx, id);
 
   /// Returns the new retry count.
@@ -439,6 +458,73 @@ class LocalDatabase {
       _markFailed(_tPendingRx, id, error);
 
   Future<int> pendingPrescriptionsCount() => _count(_tPendingRx, failed: false);
+
+  /// A walk-in booked offline has synced: point every queued prescription /
+  /// queue op that still uses its placeholder [tempId] at the server's
+  /// [realId]. A brand-new patient also only gets a [patientId] now — fill it
+  /// in where the payload has none. Without this those rows replay with the
+  /// negative id and the server rejects them.
+  Future<void> remapAppointment(int tempId, int realId, int? patientId) async {
+    final db = await database;
+    for (final t in [_tPendingOps, _tPendingRx]) {
+      final rows = await db.query(t, columns: ['id', 'payload_json']);
+      for (final row in rows) {
+        final Map<String, dynamic> payload;
+        try {
+          payload = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+        } catch (_) {
+          continue; // corrupt row — the replay loop parks it
+        }
+        if (payload['appointment_id'] != tempId) continue;
+        payload['appointment_id'] = realId;
+        final pid = payload['patient_id'];
+        if (patientId != null && (pid == null || pid == 0)) payload['patient_id'] = patientId;
+        await db.update(
+          t,
+          {'payload_json': jsonEncode(payload), 'appointment_id': realId},
+          where: 'id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+    }
+  }
+
+  /// Drops every queued op / prescription tied to [appointmentId] — used when
+  /// the offline walk-in that created it is discarded.
+  Future<void> deletePendingForAppointment(int appointmentId) async {
+    final db = await database;
+    for (final t in [_tPendingOps, _tPendingRx]) {
+      await db.delete(t, where: 'appointment_id = ?', whereArgs: [appointmentId]);
+    }
+  }
+
+  /// A medicine added offline has synced: swap its placeholder [tempId] for
+  /// the server's [realId] in queued prescriptions and in the catalog cache.
+  Future<void> remapMedicine(int tempId, int realId) async {
+    final db = await database;
+    for (final row in await db.query(_tPendingRx, columns: ['id', 'payload_json'])) {
+      final Map<String, dynamic> payload;
+      try {
+        payload = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+      } catch (_) {
+        continue; // corrupt row — the replay loop parks it
+      }
+      final meds = payload['medicines'];
+      if (meds is! List || !meds.any((m) => m is Map && m['medicine_id'] == tempId)) continue;
+      for (final m in meds) {
+        if (m is Map && m['medicine_id'] == tempId) m['medicine_id'] = realId;
+      }
+      await db.update(_tPendingRx, {'payload_json': jsonEncode(payload)},
+          where: 'id = ?', whereArgs: [row['id']]);
+    }
+    final cached = await db.query(_tMedicines, where: 'medicine_id = ?', whereArgs: [tempId]);
+    if (cached.isNotEmpty) {
+      final json = jsonDecode(cached.first['payload_json'] as String) as Map<String, dynamic>;
+      await db.delete(_tMedicines, where: 'medicine_id = ?', whereArgs: [tempId]);
+      await insertMedicine(realId, cached.first['doctor_id'] as int?,
+          jsonEncode({...json, 'medicine_id': realId}));
+    }
+  }
 
   // ── Failed (parked) items ────────────────────────────────────────────────────
   // kind: 'op' = pending_operations row, 'rx' = pending_prescriptions row.
@@ -538,7 +624,8 @@ class LocalDatabase {
     final batch = db.batch();
     // Clear the doctor's old catalog first so deletions on the server are
     // reflected, then re-insert the fresh set.
-    batch.delete(_tMedicines, where: 'doctor_id = ?', whereArgs: [doctorId]);
+    // Negative ids are medicines added offline and not synced yet — keep them.
+    batch.delete(_tMedicines, where: 'doctor_id = ? AND medicine_id > 0', whereArgs: [doctorId]);
     for (final row in rows) {
       batch.insert(
         _tMedicines,
@@ -547,6 +634,26 @@ class LocalDatabase {
       );
     }
     await batch.commit(noResult: true);
+  }
+
+  /// Adds (or replaces) one catalog row — a medicine added offline.
+  Future<void> insertMedicine(int medicineId, int? doctorId, String payloadJson) async {
+    final db = await database;
+    await db.insert(
+      _tMedicines,
+      {
+        'medicine_id':  medicineId,
+        'doctor_id':    doctorId,
+        'payload_json': payloadJson,
+        'updated_at':   DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteMedicine(int medicineId) async {
+    final db = await database;
+    await db.delete(_tMedicines, where: 'medicine_id = ?', whereArgs: [medicineId]);
   }
 
   Future<List<Map<String, dynamic>>> getMedicines(int doctorId) async {
@@ -630,6 +737,15 @@ class LocalDatabase {
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  /// Drops cached JSON under [prefix] older than [days] (json_cache has no
+  /// other pruning; per-appointment keys would otherwise grow forever).
+  Future<void> pruneJson(String prefix, {int days = 7}) async {
+    final db = await database;
+    final cutoff = DateTime.now().subtract(Duration(days: days)).toIso8601String();
+    await db.delete(_tJsonCache,
+        where: 'cache_key LIKE ? AND updated_at < ?', whereArgs: ['$prefix%', cutoff]);
   }
 
   Future<String?> getJson(String cacheKey) async {

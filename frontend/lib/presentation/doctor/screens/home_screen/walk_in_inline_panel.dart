@@ -9,8 +9,16 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
   bool    _loading = true;
   String? _error;
 
-  List<DoctorAvailabilityModel> _todaySessions = [];
+  List<DoctorAvailabilityModel> _sessions = []; // bookable on _date
   DoctorAvailabilityModel? _selected;
+
+  // Today = walk-in into the queue. A later day = a time slot (queues are
+  // today-only on the server), picked from _freeTimes.
+  DoctorScheduleModel? _schedule;
+  DateTime _date = DateUtils.dateOnly(DateTime.now());
+  bool get _isToday => DateUtils.isSameDay(_date, DateTime.now());
+  List<MonthSlotData> _booked = [];
+  int? _startMins; // chosen slot time, minutes from midnight
 
   bool    _booking  = false;
   String? _bookError;
@@ -98,7 +106,6 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       setState(() { _loading = false; _error = 'Doctor not linked'; });
       return;
     }
-    final dayName = const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][DateTime.now().weekday - 1];
     DoctorScheduleModel? schedule;
     try {
       schedule = await api.getDoctorSchedule(doctorId, clinicId: clinicId);
@@ -112,15 +119,32 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       if (mounted) setState(() { _loading = false; _error = 'Could not load sessions'; });
       return;
     }
-    final todaySlots = (schedule.schedule ?? [])
+    // Taken slot times (today → end of next month). Offline: none known; the
+    // server still refuses a taken slot.
+    var booked = <MonthSlotData>[];
+    if (clinicId != null) {
+      try { booked = await api.getBookedSlots(doctorId, clinicId); } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() {
+      _schedule = schedule;
+      _booked = booked;
+      _applyDate();
+      _loading = false;
+    });
+  }
+
+  /// Sessions for _date: queue sessions (1/3) today, slot sessions (2/3) later.
+  void _applyDate() {
+    final dayName = const ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][_date.weekday - 1];
+    _sessions = (_schedule?.schedule ?? [])
         .where((d) => d.day == dayName && (d.isEnabled ?? 0) == 1)
         .expand((d) => d.slots ?? [])
-        .toList();
-    final sessions = todaySlots
         .where((slot) {
-          if (_hasSessionEndedToday(slot.endTime)) return false;
+          // Ended-or-not is decided at build (_isSessionOpen): today's queues
+          // may not have loaded yet, and a running one keeps it open.
           final mode = slot.bookingMode ?? 0;
-          return mode == 1 || mode == 3; // queue only — exclude slots-only (mode 2)
+          return _isToday ? (mode == 1 || mode == 3) : (mode == 2 || mode == 3);
         })
         .map((slot) => DoctorAvailabilityModel(
               dayOfWeek:   dayName,
@@ -132,12 +156,38 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
               slotDuration: slot.slotDuration,
             ))
         .toList();
-    if (!mounted) return;
-    setState(() {
-      _todaySessions = sessions;
-      _selected = sessions.length == 1 ? sessions.first : null;
-      _loading = false;
-    });
+    final open = _sessions.where(_isLive).toList();
+    _selected = open.length == 1 ? open.first : null;
+    _startMins = null;
+  }
+
+  bool _isLive(DoctorAvailabilityModel s) => !_isToday || _isSessionOpen(s.slotId, s.endTime);
+
+  /// '09:30', '09:30:00' or an ISO time (mssql TIME) → minutes from midnight.
+  int? _mins(String? t) {
+    if (t == null || t.isEmpty) return null;
+    final dt = DateTime.tryParse(t);
+    if (dt != null) return dt.hour * 60 + dt.minute;
+    final p = t.split(':');
+    final h = int.tryParse(p[0]);
+    if (h == null) return null;
+    return h * 60 + (p.length > 1 ? (int.tryParse(p[1]) ?? 0) : 0);
+  }
+
+  String _hhmm(int m) => '${(m ~/ 60).toString().padLeft(2, '0')}:${(m % 60).toString().padLeft(2, '0')}';
+
+  String get _dateStr => '${_date.year}-${_date.month.toString().padLeft(2,'0')}-${_date.day.toString().padLeft(2,'0')}';
+
+  /// Untaken slot start times of [s] on _date.
+  List<int> _freeTimes(DoctorAvailabilityModel s) {
+    final step = s.slotDuration ?? 0;
+    final start = _mins(s.startTime), end = _mins(s.endTime);
+    if (step <= 0 || start == null || end == null) return const [];
+    final taken = {
+      for (final b in _booked)
+        if (b.bookingDate?.startsWith(_dateStr) == true) _mins(b.startTime),
+    };
+    return [for (var m = start; m < end; m += step) if (!taken.contains(m)) m];
   }
 
   void _onMobileChanged() {
@@ -264,6 +314,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     if (name.isEmpty) { setState(() { _bookError = 'Patient name is required'; }); return; }
     if (mobile.length < 10) { setState(() { _bookError = 'Enter valid 10-digit mobile'; }); return; }
     if (_selected == null) { setState(() { _bookError = 'Please select a session'; }); return; }
+    if (!_isToday && _startMins == null) { setState(() { _bookError = 'Please select a time'; }); return; }
 
     final isReceptionist = ref.read(tokenProvider).roleId == 3;
     final doctorId = isReceptionist
@@ -275,8 +326,8 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
 
     setState(() { _booking = true; _bookError = null; });
 
-    final today = DateTime.now();
-    final dateStr = '${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}';
+    final dateStr = _dateStr;
+    final bookedMins = _isToday ? null : _startMins;
     final isNewFamily      = _familyHeadPatientId != null;
     final isExistingFamily = _familyMemberId != null;
     final isFamilyBooking  = isNewFamily || isExistingFamily;
@@ -287,6 +338,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       'doctor_id':        doctorId,
       'appointment_date': dateStr,
       'slot_id':          _selected!.slotId,
+      if (bookedMins != null) 'start_time': '${_hhmm(bookedMins)}:00', // slot booking
       'user_type':        isFamilyBooking ? 2 : 1,
       if (clinicId != null) 'clinic_id': clinicId,
       if (isExistingFamily) 'patient_id': _familyMemberId,
@@ -334,7 +386,14 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
       ));
       _nameCtr.clear();
       _mobileCtr.clear();
-      setState(() { _clearPatientState(); _selected = _todaySessions.length == 1 ? _todaySessions.first : null; });
+      setState(() {
+        _clearPatientState();
+        if (bookedMins != null) {
+          _booked = [..._booked, MonthSlotData(bookingDate: dateStr, startTime: _hhmm(bookedMins))];
+        }
+        _selected = _sessions.length == 1 ? _sessions.first : null;
+        _startMins = null;
+      });
       if (startedId != null && widget.onAutoStarted != null) {
         widget.onBooked(); // close the form/dialog first
         widget.onAutoStarted!(startedId);
@@ -342,8 +401,26 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
     }
   }
 
+  /// A session is open for walk-ins until its scheduled end — and after it,
+  /// for as long as the doctor keeps its queue running or paused (they're
+  /// still seeing patients and haven't stopped it). The server books by date,
+  /// not clock, so this matches what it accepts.
+  bool _isSessionOpen(int? slotId, String? endTime) {
+    if (!_hasSessionEndedToday(endTime)) return true;
+    final now = DateTime.now();
+    final queues = ref.read(appointmentViewModelProvider).todayQueueResult?.value ?? const [];
+    return queues.any((q) {
+      final d = DateTime.tryParse(q.queueDate ?? '');
+      return q.slotId == slotId &&
+          (q.queueStatus == 1 || q.queueStatus == 2) &&
+          d != null && d.year == now.year && d.month == now.month && d.day == now.day;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    // re-check open sessions when the queue starts / stops
+    ref.watch(appointmentViewModelProvider.select((s) => s.todayQueueResult));
     final bookedFor = _resolvedPatientId != null || _familyMemberId != null || _familyHeadPatientId != null
         ? _nameCtr.text : null;
 
@@ -360,12 +437,13 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
               child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary)))
           : _error != null
               ? _errBox(_error!)
-              : _todaySessions.isEmpty
-                  ? _errBox('No sessions scheduled for today')
+              : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  _dateStrip(),
+                  const SizedBox(height: 12),
+                  _sessions.isEmpty
+                  ? _errBox(_isToday ? 'No sessions scheduled for today' : 'No slot sessions on this day')
                   : Builder(builder: (context) {
-                      final liveSessions = _todaySessions
-                          .where((s) => !_hasSessionEndedToday(s.endTime))
-                          .toList();
+                      final liveSessions = _sessions.where(_isLive).toList();
                       // Auto-clear stale selection
                       if (_selected != null &&
                           !liveSessions.any((s) => s.slotId == _selected!.slotId)) {
@@ -382,7 +460,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            'Today  ·  ${const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][DateTime.now().weekday - 1]}, ${DateTime.now().day} ${const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][DateTime.now().month - 1]}',
+                            '${_isToday ? 'Today' : 'Slot booking'}  ·  ${const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][_date.weekday - 1]}, ${_date.day} ${const ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][_date.month - 1]}',
                             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: kPrimary),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -400,7 +478,7 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                         children: liveSessions.map((s) {
                           final isSel = _selected?.slotId == s.slotId;
                           return GestureDetector(
-                            onTap: () => setState(() => _selected = s),
+                            onTap: () => setState(() { _selected = s; _startMins = null; }),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 150),
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -423,6 +501,29 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                           );
                         }).toList(),
                       ),
+                      if (!_isToday && _selected != null) ...[
+                        const SizedBox(height: 12),
+                        const Text('SELECT TIME',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                                color: kTextMuted, letterSpacing: 0.7)),
+                        const SizedBox(height: 8),
+                        Builder(builder: (_) {
+                          final free = _freeTimes(_selected!);
+                          if (free.isEmpty) return _errBox('All slots in this session are booked');
+                          return Wrap(spacing: 6, runSpacing: 6, children: [
+                            for (final m in free)
+                              ChoiceChip(
+                                label: Text(_fmtTime(_hhmm(m))),
+                                selected: _startMins == m,
+                                onSelected: (_) => setState(() => _startMins = m),
+                                selectedColor: kPrimaryDark,
+                                labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                                    color: _startMins == m ? Colors.white : kTextPrimary),
+                                showCheckmark: false,
+                              ),
+                          ]);
+                        }),
+                      ],
                       const SizedBox(height: 14),
                       _inlineField(controller: _nameCtr, label: 'Patient Name',
                           icon: Icons.person_outline_rounded,
@@ -640,12 +741,49 @@ class _WalkInInlinePanelState extends ConsumerState<_WalkInInlinePanel> {
                           child: _booking
                               ? const SizedBox(width: 18, height: 18,
                                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Text('Book Walk-in Patient',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                              : Text(_isToday ? 'Book Walk-in Patient' : 'Book Appointment',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         ),
                       ),
                       ]);
                     }),
+                ]),
+    );
+  }
+
+  /// Today + the next 27 days, like the patient app's booking strip.
+  Widget _dateStrip() {
+    final today = DateUtils.dateOnly(DateTime.now());
+    return SizedBox(
+      height: 54,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: 28,
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final d = DateTime(today.year, today.month, today.day + i);
+          final sel = DateUtils.isSameDay(d, _date);
+          return GestureDetector(
+            onTap: () => setState(() { _date = d; _bookError = null; _applyDate(); }),
+            child: Container(
+              width: 46,
+              decoration: BoxDecoration(
+                color: sel ? kPrimaryDark : kPrimaryLight,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: sel ? kPrimaryDark : const Color(0xFF9FE1CB)),
+              ),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Text(i == 0 ? 'Today' : const ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.weekday - 1],
+                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500,
+                        color: sel ? Colors.white70 : kTextMuted)),
+                const SizedBox(height: 2),
+                Text('${d.day}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                    color: sel ? Colors.white : kTextPrimary)),
+              ]),
+            ),
+          );
+        },
+      ),
     );
   }
 

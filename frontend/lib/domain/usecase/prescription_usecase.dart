@@ -12,6 +12,10 @@ class PrescriptionUsecase {
     return prescriptionRepository.insertPrescription(prescription);
   }
 
+  Future<dynamic> sendWhatsApp(int appointmentId, String kind) {
+    return prescriptionRepository.sendWhatsApp(appointmentId, kind);
+  }
+
   Future<Medicine> deleteMedicine(int doctorId, int medicineId) {
     return prescriptionRepository.deleteMedicine(doctorId, medicineId);
   }

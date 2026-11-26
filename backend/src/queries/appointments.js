@@ -176,6 +176,15 @@ BEGIN
                     IF @minutes % @slot_duration <> 0
                         RAISERROR('Invalid slot interval', 16, 1);
 
+                    IF @appointment_date < CAST(GETDATE() AS DATE)
+                        RAISERROR('Cannot book a past date', 16, 1);
+
+                    -- same rule GET_MONTH_SLOTS uses to show a slot as taken
+                    IF EXISTS (SELECT 1 FROM appointments WITH (UPDLOCK, HOLDLOCK)
+                               WHERE doctor_id = @doctor_id AND appointment_date = @appointment_date
+                                 AND start_time = @start_time AND status = 'booked')
+                        RAISERROR('Slot already booked', 16, 1);
+
                     --------------------------------------------------
                     -- INSERT
                     --------------------------------------------------

@@ -28,11 +28,21 @@ class AppointmentResponseModel {
   @JsonKey(name: 'started_appointment_id')
   int? startedAppointmentId;
 
+  // walkInBook: the booked appointment and patient — lets an offline
+  // walk-in's placeholder id be swapped for the real one on sync.
+  @JsonKey(name: 'appointment_id')
+  int? appointmentId;
+
+  @JsonKey(name: 'patient_id')
+  int? patientId;
+
   AppointmentResponseModel({
     this.success,
     this.message,
     this.data,
     this.startedAppointmentId,
+    this.appointmentId,
+    this.patientId,
   });
 
   factory AppointmentResponseModel.fromJson(Map<String, dynamic> json) =>

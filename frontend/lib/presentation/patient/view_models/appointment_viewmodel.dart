@@ -219,10 +219,23 @@ class AppointmentViewmodel extends StateNotifier<AppointmentState> {
   // }
 
 
+  int? _lastFamilyId;
+
   Future<void> getPatientAppointments(int familyId, {bool silent = false}) async {
-    if (!silent) {
+    // Cache first: show the list from last time straight away, then replace
+    // it with the network result. Only blank to loading when there is
+    // nothing for this family to show.
+    final sameFamily = _lastFamilyId == familyId;
+    _lastFamilyId = familyId;
+    if (!silent && !(sameFamily && (state.patientAppointmentsList?.hasValue ?? false))) {
+      List<AppointmentList> cached = const [];
+      try {
+        cached = await offlineStore.getCachedPatientAppointments(familyId);
+      } catch (_) {}
       state = state.copyWith(
-        patientAppointmentsList: const AsyncValue.loading(),
+        patientAppointmentsList: cached.isNotEmpty
+            ? AsyncValue.data(cached)
+            : const AsyncValue.loading(),
         error: null,
       );
     }

@@ -127,17 +127,33 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
-  /// Offline-first fetch: tries the network, falls back to SQLite cache.
-  /// [silent] skips the loading spinner — used for background socket refreshes.
+  /// Cache first, then network: the cached list shows straight away and the
+  /// network result replaces it; falls back to the cache when the fetch fails.
+  /// [silent] skips the loading state — used for background socket refreshes.
   Future<void> fetchPatientAppointments(int doctorId,
       {bool isOnline = true, bool silent = false, String? clinicId}) async {
+    final clinicChanged = clinicId != null && clinicId != _currentClinicId;
     if (clinicId != null) _currentClinicId = clinicId;
     final clinicIdToUse = _currentClinicId;
-    if (!silent) {
-      state = state.copyWith(
-        patientAppointmentsList: const AsyncValue.loading(),
-        error: null,
-      );
+    // Already showing data (another screen loaded it) → refresh in place
+    // instead of blanking it to a skeleton. A clinic switch must not keep
+    // showing the other clinic's list.
+    if (!silent && (clinicChanged || !state.patientAppointmentsList.hasValue)) {
+      var shownCache = false;
+      if (isOnline && !clinicChanged) {
+        try {
+          if ((await offlineStore.getCachedAppointments(doctorId)).isNotEmpty) {
+            await _loadFromCache(doctorId, clinicId: clinicIdToUse);
+            shownCache = true;
+          }
+        } catch (_) {}
+      }
+      if (!shownCache) {
+        state = state.copyWith(
+          patientAppointmentsList: const AsyncValue.loading(),
+          error: null,
+        );
+      }
     }
     try {
       if (isOnline) {
@@ -154,8 +170,15 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
           await offlineStore.cacheQueues(todayQueues, clinicId: clinicIdToUse);
         } catch (_) {}
 
-        final emIds = state.emergencyQueueIds;
         final pendingCount = await offlineStore.pendingOpsCount();
+        if (pendingCount > 0) {
+          // Work done offline hasn't reached the server yet — lay it back over
+          // the fresh rows, or a patient completed offline shows up again.
+          await offlineStore.reapplyPendingOps(doctorId);
+          await _loadFromCache(doctorId, clinicId: clinicIdToUse);
+          return;
+        }
+        final emIds = state.emergencyQueueIds;
         state = state.copyWith(
           patientAppointmentsList: AsyncValue.data(result),
           queueState: _adjustForEmergency(derivedQueueState, result, emIds),
@@ -192,6 +215,13 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       cachedAppts = await offlineStore.getCachedAppointments(doctorId);
     } catch (e) {
       debugPrint('[AppointmentVM] Cache appointments read failed: $e');
+    }
+    try {
+      // Today's schedule stands in for sessions never downloaded / not yet
+      // created on the server, so the doctor can still start the queue.
+      await offlineStore.ensureScheduledSessions(doctorId, clinicId: clinicId);
+    } catch (e) {
+      debugPrint('[AppointmentVM] Scheduled sessions fallback failed: $e');
     }
     try {
       cachedQueues = await offlineStore.getCachedQueues(doctorId, clinicId: clinicId);
@@ -520,7 +550,7 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
     }
     try {
       // Offline emergency pause
-      await offlineStore.enqueueEmergencyPause(queueId, doctorId ?? queueId);
+      await offlineStore.enqueueEmergencyPause(queueId, doctorId);
       await offlineStore.applyOfflineQueueOp(
           OfflineOperation.queuePauseEmergency, queueId, null,
           doctorId: doctorId, clinicId: clinicId);
@@ -581,6 +611,10 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       if (isOnline) {
         result = await usecase.getTodayQueue(doctorId, clinicId: clinicId);
         await offlineStore.cacheQueues(result, clinicId: clinicId);
+        if (await offlineStore.pendingOpsCount() > 0) {
+          await offlineStore.reapplyPendingOps(doctorId);
+          result = await offlineStore.getCachedQueues(doctorId, clinicId: clinicId);
+        }
       } else {
         result = await offlineStore.getCachedQueues(doctorId, clinicId: clinicId);
       }
@@ -645,9 +679,10 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       case OfflineOperation.endSession:
         return usecase.endSession(AppointmentRequestModel.fromJson(payload));
       case OfflineOperation.walkInBook:
+      case OfflineOperation.addMedicine:
         // flushPendingOps filters these out; they replay via
-        // ReceptionistLoginViewmodel.syncPendingWalkIns.
-        throw StateError('walkInBook must not replay through flushPendingOps');
+        // syncPendingWalkIns / syncPendingMedicines.
+        throw StateError('${op.name} must not replay through flushPendingOps');
     }
   }
 
@@ -683,6 +718,16 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
         // fall through to the offline path below
       }
     }
+    // The server only starts / completes / skips a queue patient while that
+    // session's queue is running. Allowing it offline queued work the replay
+    // then had refused — and the patient came back after reconnecting.
+    if (_needsRunningQueue.contains(op)) {
+      final blocked = await _queueNotRunningOffline(request);
+      if (blocked != null) {
+        state = state.copyWith(isLoading: false);
+        return blocked;
+      }
+    }
     // Replicate any server-side precondition locally (e.g. "only one patient
     // can be in progress at a time") so offline behaviour matches online. A
     // non-null result blocks the op without queuing it.
@@ -704,6 +749,42 @@ class AppointmentListViewmodel extends StateNotifier<AppointmentListState> {
       state = state.copyWith(isLoading: false, error: e.toString());
       rethrow;
     }
+  }
+
+  static const _needsRunningQueue = {
+    OfflineOperation.startSession,
+    OfflineOperation.queueNext,
+    OfflineOperation.endSession,
+    OfflineOperation.queueSkip,
+  };
+
+  /// Offline mirror of the SPs' "Queue not started or already stopped" check
+  /// (START_ / NEXT_ / END_ / SKIP_SESSION require queue_status = 1). Slot
+  /// appointments are exempt, as in the SPs. An appointment or session the
+  /// cache doesn't know never blocks — offline must stay usable.
+  Future<AppointmentResponseModel?> _queueNotRunningOffline(
+      AppointmentRequestModel request) async {
+    final doctorId = request.doctorId;
+    final apptId = request.appointmentId;
+    if (doctorId == null || apptId == null) return null;
+    try {
+      final appt = (await offlineStore.getCachedAppointments(doctorId))
+          .where((a) => a.appointmentId == apptId)
+          .firstOrNull;
+      if (appt == null || _isSlotAppointment(appt)) return null;
+      final queueId = appt.queueId ?? request.queueId;
+      if (queueId == null) return null;
+      final queue = (await offlineStore.getCachedQueues(doctorId))
+          .where((q) => q.queueId == queueId)
+          .firstOrNull;
+      if (queue == null || queue.queueStatus == 1) return null;
+    } catch (_) {
+      return null;
+    }
+    return AppointmentResponseModel(
+      success: false,
+      message: 'Queue not started or already stopped',
+    );
   }
 
   /// Offline equivalent of the backend START_SESSION guard: a doctor may only

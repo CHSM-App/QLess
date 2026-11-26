@@ -86,11 +86,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       _snack('Please select a medicine type', isError: true);
       return;
     }
-    if (ref.read(connectivityNotifierProvider).isOffline) {
-      _snack(connectivityErrorMessage, isError: true);
-      return;
-    }
-
+    // Offline is fine: the view model saves it on the phone and syncs later.
     final notifier   = ref.read(doctorLoginViewModelProvider.notifier);
     var   loginState = ref.read(doctorLoginViewModelProvider);
     var   doctorId   = loginState.doctorId ?? 0;
@@ -129,7 +125,7 @@ class _AddMedicinePageState extends ConsumerState<AddMedicinePage>
       _strengthCtrl.clear();
       _componentsCtrl.clear();
       setState(() => _selectedType = null);
-      _snack('Medicine added successfully');
+      _snack(response['message']?.toString() ?? 'Medicine added successfully');
       widget.onSaved?.call(medicine);
     } else {
       final message = response['message']?.toString();

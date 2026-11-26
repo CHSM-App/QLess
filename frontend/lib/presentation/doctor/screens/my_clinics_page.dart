@@ -11,6 +11,7 @@ import 'package:qless/core/network/auth_image_url.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart';
+import 'package:qless/presentation/shared/widgets/skeleton.dart';
 
 // ── Colour palette (mirrors doctor_registration.dart) ─────────────
 const _kPrimary       = Color(0xFF26C6B0);
@@ -88,9 +89,9 @@ class _MyClinicsPageState extends ConsumerState<MyClinicsPage> {
         ),
       ),
       body: state.clinicsList == null
-          ? const Center(child: CircularProgressIndicator(color: _kPrimary))
+          ? const SkeletonList(count: 3)
           : state.clinicsList!.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: _kPrimary)),
+              loading: () => const SkeletonList(count: 3),
               error: (e, _) => Center(
                 child: Text('Error: $e', style: const TextStyle(color: _kError)),
               ),

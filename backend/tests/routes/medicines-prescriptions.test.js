@@ -60,6 +60,13 @@ describe('POST /doctor/insert/insertPrescription', () => {
     expect((await save({ ...rx, [f]: undefined })).status).toBe(400);
   });
 
+  test('follow_up_time: HH:mm saved, anything else 400', async () => {
+    mockDb.respond = db();
+    expect((await save({ ...rx, follow_up_time: '9am' })).status).toBe(400);
+    expect((await save({ ...rx, follow_up_time: '14:30' })).status).toBe(200);
+    expect(mockDb.callsTo('sp_prescription', 'Insert')[0].inputs.follow_up_time).toBe('14:30');
+  });
+
   test('one Insert per medicine; the first creates the prescription, the rest reuse its id', async () => {
     mockDb.respond = db();
     const res = await save({ ...rx, medicines: [
@@ -71,6 +78,31 @@ describe('POST /doctor/insert/insertPrescription', () => {
     expect(inserts).toHaveLength(2);
     expect(inserts[0].inputs).toMatchObject({ prescription_id: 0, medicine_id: 1, tablet_dosage: '1', appointment_id: 50 });
     expect(inserts[1].inputs).toMatchObject({ prescription_id: 90, medicine_id: 2, syrup_dosage_ml: '5' });
+  });
+
+  test('clinic stock fields go to the insert with who gave it; old apps send none', async () => {
+    mockDb.respond = db();
+    const res = await save({ ...rx, medicines: [
+      { medicine_id: 1, medicine_type_id: 1, source: 'clinic', qty_given: 10, unit_price: '2.5' },
+      { medicine_id: 5, medicine_type_id: 4, source: 'outside', administered_at_clinic: true },
+      { medicine_id: 2, medicine_type_id: 2 },
+    ] });
+    expect(res.status).toBe(200);
+    const [given, injected, old] = mockDb.callsTo('sp_prescription', 'Insert').map((c) => c.inputs);
+    expect(given).toMatchObject({ source: 'clinic', qty_given: 10, unit_price: 2.5, administered_at_clinic: 0,
+      clinic_id: 'CL001', created_by_id: 1, created_by_role: ROLE.DOCTOR });
+    expect(injected).toMatchObject({ source: 'outside', administered_at_clinic: 1, qty_given: null });
+    expect(old).toMatchObject({ source: null, qty_given: null, unit_price: null });
+  });
+
+  test.each([
+    ['no clinic', { clinic_id: undefined }, { source: 'clinic', qty_given: 1 }],
+    ['no quantity', {}, { source: 'clinic' }],
+    ['negative price', {}, { source: 'outside', unit_price: -5 }],
+  ])('clinic stock line with %s → 400, nothing saved', async (_, head, line) => {
+    const res = await save({ ...rx, ...head, medicines: [{ medicine_id: 1, medicine_type_id: 1, ...line }] });
+    expect(res.status).toBe(400);
+    expect(mockDb.callsTo('sp_prescription')).toHaveLength(0);
   });
 
   test('a replayed save for the same appointment returns the existing prescription', async () => {
@@ -86,6 +118,28 @@ describe('POST /doctor/insert/insertPrescription', () => {
     expect(res.status).toBe(500);
     expect(mockDb.callsTo('sp_notification', 'INSERT')).toHaveLength(0);
   });
+
+  test('a later medicine failing removes the half-saved prescription', async () => {
+    mockDb.respond = ({ kind, target, inputs }) => {
+      if (target === 'sp_prescription') return inputs.medicine_id === 2 ? [{ success: 0, message: 'bad' }] : [{ success: 1, prescription_id: 90 }];
+      return [];
+    };
+    const res = await save({ ...rx, medicines: [{ medicine_id: 1 }, { medicine_id: 2 }] });
+    expect(res.status).toBe(500);
+    expect(mockDb.callsTo('DELETE FROM patient_records')[0].inputs.prescription_id).toBe(90);
+    // stock rows reference the medicine lines, so they go first
+    expect(mockDb.callsTo('DELETE FROM patient_records')[0].target).toMatch(/Clinic_Stock_Movement[\s\S]*PrescriptionMedicine/);
+  });
+
+  test('a notification failure after saving does not undo the prescription', async () => {
+    mockDb.respond = ({ target }) => {
+      if (target === 'sp_prescription') return [{ success: 1, prescription_id: 90 }];
+      if (target === 'sp_notification') throw new Error('inbox down');
+      return [];
+    };
+    await save({ ...rx, medicines: [{ medicine_id: 1 }] });
+    expect(mockDb.callsTo('DELETE FROM patient_records')).toHaveLength(0);
+  });
 });
 
 describe('prescription reads', () => {
@@ -97,5 +151,23 @@ describe('prescription reads', () => {
     expect((await request(app).get('/patient/users/patientPrescriptionDetails/1').set(patient)).status).toBe(200);
     expect(mockDb.callsTo('sp_prescription').map((c) => c.inputs.operation))
       .toEqual(['AppointmentWisePrescription', 'PatientPrescriptionList', 'PrescriptionDetail']);
+  });
+});
+
+describe('medicines added offline', () => {
+  const add = (body) => request(app).post('/doctor/insert/insertMedicine').set(doctor()).send(body);
+  const med = { doctor_id: 1, medicine_name: 'Paracetamol', medicine_type_id: 1 };
+
+  test('the new medicine id comes back', async () => {
+    mockDb.respond = () => [{ Message: 'Medicine added successfully.', medicine_id: 42 }];
+    const res = await add(med);
+    expect(res.body).toMatchObject({ success: 1, medicine_id: 42 });
+  });
+
+  test('a replayed duplicate is success with the existing id', async () => {
+    mockDb.respond = () => [{ Message: 'Medicine already in your list.', medicine_id: 42 }];
+    const res = await add({ ...med, offline_queued_at: new Date().toISOString() });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ success: 1, medicine_id: 42 });
   });
 });

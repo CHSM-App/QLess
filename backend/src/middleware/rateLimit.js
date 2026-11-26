@@ -69,11 +69,20 @@ const otpVerifyLimiter = rateLimit({
   ...commonOptions, windowMs: 15 * 60 * 1000, max: 10, keyGenerator: (req) => `verify:${mobileKey(req)}`,
 });
 
-// ── /health: an uptime monitor polls every few minutes; this only stops abuse.
+// ── WhatsApp to a patient (prescription / follow-up). Paid per message, and
+// a tap-happy clinic must not spam the patient: a few resends per visit.
+const whatsappLimiter = rateLimit({
+  ...commonOptions, windowMs: 60 * 60 * 1000, max: 3,
+  keyGenerator: (req) => `wa:${Number(req.body?.appointment_id) || 0}:${req.body?.kind}`,
+});
+
+// ── /health: the uptime monitor, and the doctor app's reachability check
+// (every 10 s per device, plus on resume). One clinic's devices share an IP,
+// so this only stops abuse.
 const healthLimiter = rateLimit({
   ...commonOptions,
   windowMs: 60 * 1000,
-  max: 30,
+  max: 120,
 });
 
 module.exports = {
@@ -84,4 +93,5 @@ module.exports = {
   deletionLimiter,
   otpSendLimiter,
   otpVerifyLimiter,
+  whatsappLimiter,
 };

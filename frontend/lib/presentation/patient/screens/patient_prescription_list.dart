@@ -12,6 +12,7 @@ import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
+import 'package:qless/presentation/shared/widgets/skeleton.dart';
 
 // ── Shared colour palette ─────────────────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -1348,8 +1349,8 @@ class _PrescriptionDetailEntryState
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        backgroundColor:kPageBg,
-        body: Center(child: CircularProgressIndicator(color: kPrimary)),
+        backgroundColor: kPageBg,
+        body: SafeArea(child: SkeletonBlocks(heights: [120, 72, 200, 96])),
       );
     }
 
@@ -1754,8 +1755,14 @@ class _PatientPrescriptionViewScreenState
   Widget _buildNotesRow() {
     final hasClinical = _rx.clinicalNotes?.isNotEmpty == true;
     final hasAdvice   = _rx.advice?.isNotEmpty == true;
-    if (!hasClinical && !hasAdvice) return const SizedBox.shrink();
-    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    final hasInv      = _rx.investigation?.isNotEmpty == true;
+    if (!hasClinical && !hasAdvice && !hasInv) return const SizedBox.shrink();
+    final inv = hasInv ? _noteBox(
+        color: kAmberLight.withValues(alpha: 0.4), borderColor: kAmberLight,
+        iconColor: kWarning, icon: Icons.biotech_rounded,
+        title: 'INVESTIGATION', text: _rx.investigation!) : null;
+    if (!hasClinical && !hasAdvice) return inv!;
+    final notes = Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (hasClinical) Expanded(child: _noteBox(
         color: kInfoLight.withValues(alpha: 0.3), borderColor: kInfoLight,
         iconColor: kInfo, icon: Icons.notes_rounded,
@@ -1766,6 +1773,8 @@ class _PatientPrescriptionViewScreenState
         iconColor: kSuccess, icon: Icons.medical_information_rounded,
         title: "ADVICE", text: _rx.advice!)),
     ]);
+    if (inv == null) return notes;
+    return Column(children: [inv, const SizedBox(height: 10), notes]);
   }
 
   Widget _noteBox({required Color color, required Color borderColor,
@@ -2107,6 +2116,13 @@ DateTime? _tryParseDate(String? raw) {
   return DateTime.tryParse(raw);
 }
 DateTime _parseDateOrNow(String? raw) => _tryParseDate(raw) ?? DateTime.now();
+// follow_up_time ("HH:mm") folded into the follow-up date, when set.
+DateTime? _followUpAt(String? date, String? time) {
+  final d = _tryParseDate(date);
+  final hm = (time ?? '').split(':');
+  if (d == null || hm.length < 2) return d;
+  return DateTime(d.year, d.month, d.day, int.tryParse(hm[0]) ?? 0, int.tryParse(hm[1]) ?? 0);
+}
 String _statusFromFollowUp(DateTime? fu) {
   if (fu == null) return 'completed';
   return fu.isAfter(DateTime.now()) ? 'active' : 'completed';
@@ -2118,7 +2134,7 @@ class PatientPrescription {
       clinicName, clinicAddress, clinicContact, status;
   final int? patientAge, tokenNumber;
   final String? patientGender, regNo, followUpRoom, followUpInstruction,
-      symptoms, diagnosis, clinicalNotes, advice;
+      symptoms, diagnosis, clinicalNotes, advice, investigation;
   final DateTime prescriptionDate;
   final DateTime? followUpDate;
   final List<PrescriptionMedicineItem> medicines;
@@ -2137,12 +2153,12 @@ class PatientPrescription {
     this.patientAge, this.tokenNumber, this.patientGender,
     this.regNo, this.followUpRoom, this.followUpInstruction,
     this.symptoms, this.diagnosis, this.clinicalNotes,
-    this.followUpDate, this.advice, this.userType,
+    this.followUpDate, this.advice, this.investigation, this.userType,
   });
 
   factory PatientPrescription.fromModel(PrescriptionModel model,
       {required int fallbackPatientId, required String fallbackPatientName}) {
-    final fu = _tryParseDate(model.followUpDate);
+    final fu = _followUpAt(model.followUpDate, model.followUpTime);
     final flatMeds = (model.medicines == null || model.medicines!.isEmpty)
         ? [if (model.medicineId != null || model.medicineName != null)
             PrescriptionMedicineItem.fromFlatModel(model)]
@@ -2161,6 +2177,7 @@ class PatientPrescription {
       prescriptionDate: _parseDateOrNow(model.prescriptionDate),
       symptoms: model.symptoms, diagnosis: model.diagnosis,
       clinicalNotes: model.clinicalNotes, followUpDate: fu, advice: model.advice,
+      investigation: model.investigation,
       medicines: (model.medicines ?? <PrescriptionMedicineModel>[])
               .map(PrescriptionMedicineItem.fromModel).toList() + flatMeds,
       status: _statusFromFollowUp(fu),
@@ -2171,7 +2188,7 @@ class PatientPrescription {
   factory PatientPrescription.fromFlatList(List<PrescriptionModel> items,
       {required int fallbackPatientId, required String fallbackPatientName}) {
     final first = items.first;
-    final fu = _tryParseDate(first.followUpDate);
+    final fu = _followUpAt(first.followUpDate, first.followUpTime);
     final meds = items.map(PrescriptionMedicineItem.fromFlatModel)
         .where((m) => m.medicineId != null || m.medicineName != null).toList();
     return PatientPrescription(
@@ -2188,6 +2205,7 @@ class PatientPrescription {
       prescriptionDate: _parseDateOrNow(first.prescriptionDate),
       symptoms: first.symptoms, diagnosis: first.diagnosis,
       clinicalNotes: first.clinicalNotes, followUpDate: fu, advice: first.advice,
+      investigation: first.investigation,
       medicines: meds, status: _statusFromFollowUp(fu),
       userType: first.userType,
     );

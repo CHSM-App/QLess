@@ -18,6 +18,11 @@ class Prescriptionmpl implements PrescriptionRepository {
   }
 
   @override
+  Future<dynamic> sendWhatsApp(int appointmentId, String kind) {
+    return apiService.sendWhatsApp({'appointment_id': appointmentId, 'kind': kind});
+  }
+
+  @override
   Future<Medicine> deleteMedicine(int doctorId, int medicineId) {
     return apiService.deleteMedicine(doctorId, medicineId);
   }

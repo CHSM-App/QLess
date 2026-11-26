@@ -1,10 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/constant.dart';
 
 /// The connectivity state exposed to the UI.
 enum ConnectivityStatus {
@@ -47,7 +48,7 @@ class ConnectivityState {
 /// * Transitions to [ConnectivityStatus.offline] when connectivity is lost.
 /// * Transitions to [ConnectivityStatus.backOnline] for 2 seconds when
 ///   connectivity is restored, then to [ConnectivityStatus.online].
-/// * Uses an actual DNS lookup (like [NetworkService]) to confirm real internet.
+/// * Confirms reachability by calling the backend's `/health`.
 class ConnectivityNotifier extends StateNotifier<ConnectivityState>
     with WidgetsBindingObserver {
   ConnectivityNotifier() : super(const ConnectivityState()) {
@@ -181,11 +182,21 @@ class ConnectivityNotifier extends StateNotifier<ConnectivityState>
     return _lookupOnce();
   }
 
+  // Ask our own backend, not a public site. "Online" must mean the API
+  // answers: with only DNS working, every action waited out a request timeout
+  // before falling back to the outbox, and a blocked DNS kept the app
+  // "offline" (no sync) while the API was reachable. 503 = database down →
+  // offline too. 429 = rate-limited, but the server is clearly there.
+  static final _probe = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 5),
+    receiveTimeout: const Duration(seconds: 5),
+    validateStatus: (_) => true,
+  ));
+
   Future<bool> _lookupOnce() async {
     try {
-      final result = await InternetAddress.lookup('google.com')
-          .timeout(const Duration(seconds: 5));
-      return result.isNotEmpty && result.first.rawAddress.isNotEmpty;
+      final res = await _probe.get<dynamic>('${baseUrl}health');
+      return res.statusCode == 200 || res.statusCode == 429;
     } catch (_) {
       return false;
     }

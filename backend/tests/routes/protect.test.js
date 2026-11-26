@@ -48,7 +48,7 @@ describe('/doctor/insert — clinic staff only', () => {
     .flatMap((l) => Object.keys(l.route.methods).map((m) => [m, '/doctor/insert' + l.route.path.replace(/:\w+\??/g, '1')]));
 
   test('covers every /doctor/insert route', () => {
-    expect(routes).toHaveLength(20);
+    expect(routes).toHaveLength(21);
   });
 
   test.each(routes)('%s %s → 403 for a patient, no DB call', async (method, url) => {

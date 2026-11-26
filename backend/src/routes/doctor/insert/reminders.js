@@ -204,13 +204,14 @@ async function runFollowUpReminders(tag = 'cron 09:00') {
     const token = row.patient_token;
     const doctorName = row.doctor_name || 'your doctor';
     const kind = row.reminder_kind; // 'day_before' | 'day_of'
+    const at = row.follow_up_time ? ` at ${row.follow_up_time}` : '';
 
     if (!token || !kind) { skippedCount++; continue; }
 
     const title = kind === 'day_of' ? 'Follow-up Today' : 'Follow-up Tomorrow';
     const body = kind === 'day_of'
-      ? `Your follow-up with Dr. ${doctorName} is today. Tap to book your visit.`
-      : `Your follow-up with Dr. ${doctorName} is tomorrow. Tap to book your visit.`;
+      ? `Your follow-up with Dr. ${doctorName} is today${at}. Tap to book your visit.`
+      : `Your follow-up with Dr. ${doctorName} is tomorrow${at}. Tap to book your visit.`;
 
     // type 'appointment' with no appointment_id → the tap lands on the
     // appointments tab where the patient can book the follow-up. doctor_id is

@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/network/dio_provider.dart';
+import 'package:qless/domain/models/clinic_stock.dart';
 import 'package:qless/core/network/socket_service.dart';
 import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
@@ -42,4 +44,14 @@ final receptionistLoginViewModelProvider =
   final usecase      = ref.watch(receptionistUsecaseProvider);
   final offlineStore = ref.watch(offlineQueueStoreProvider);
   return ReceptionistLoginViewmodel(usecase, offlineStore);
+});
+/// The clinic's medicine stock by medicine_id; empty when the clinic is
+/// unknown. Errors (offline) surface as AsyncError — the prescription screen
+/// reads valueOrNull and just shows no stock.
+final clinicStockProvider =
+    FutureProvider.autoDispose.family<Map<int, ClinicStockItem>, String?>((ref, clinicId) async {
+  if (clinicId == null || clinicId.isEmpty) return const {};
+  final raw = await ref.read(apiServiceProvider).getClinicStock(clinicId) as Map<String, dynamic>;
+  final rows = (raw['data'] as List<dynamic>? ?? const []).cast<Map<String, dynamic>>();
+  return {for (final r in rows.map(ClinicStockItem.fromJson)) r.medicineId: r};
 });

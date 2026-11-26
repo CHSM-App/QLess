@@ -132,8 +132,27 @@ extension _OverviewSidebarView on _QueueHomePageState {
   Widget _buildLoadingBody(String doctorName) =>
       _buildRefreshableScrollView(
         slivers: [
-          const SliverFillRemaining(
-            child: Center(child: CircularProgressIndicator(color: kPrimary)),
+          // Stats row, session card, patient rows — the home layout's shape.
+          SliverToBoxAdapter(
+            child: SkeletonPulse(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                child: Column(children: [
+                  Row(children: [
+                    for (var i = 0; i < 3; i++) ...[
+                      if (i > 0) const SizedBox(width: 10),
+                      const Expanded(child: SkeletonBox(height: 64, radius: 12)),
+                    ],
+                  ]),
+                  const SizedBox(height: 14),
+                  const SkeletonBox(height: 150, radius: 14),
+                  for (var i = 0; i < 4; i++) ...[
+                    const SizedBox(height: 10),
+                    const SkeletonBox(height: 72, radius: 12),
+                  ],
+                ]),
+              ),
+            ),
           ),
         ],
       );

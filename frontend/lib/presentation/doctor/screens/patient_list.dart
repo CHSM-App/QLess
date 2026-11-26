@@ -268,12 +268,12 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   AppointmentList? _selected;
   _Tab _activeTab = _Tab.upcoming;
 
-  _DateFilter _upcomingFilter = _DateFilter.tomorrow;
+  _DateFilter _upcomingFilter = _DateFilter.all;
   DateTime? _upcomingFrom;
   DateTime? _upcomingTo;
   bool _upcomingSortNewest = true;
 
-  _DateFilter _completedFilter = _DateFilter.today;
+  _DateFilter _completedFilter = _DateFilter.all;
   DateTime? _completedFrom;
   DateTime? _completedTo;
   bool _completedSortNewest = true;
@@ -448,7 +448,10 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   Future<void> _startSession(AppointmentList p) async {
     final pid = p.patientId ?? 0;
     final did = _doctorId;
-    if (pid == 0 || did == 0) {
+    // A walk-in booked offline (negative placeholder appointment id) gets its
+    // patient id only when it syncs; the queued actions are filled in then.
+    final offlineWalkIn = (p.appointmentId ?? 0) < 0;
+    if ((pid == 0 && !offlineWalkIn) || did == 0) {
       _snack('Missing info', isError: true);
       return;
     }
@@ -542,7 +545,9 @@ class _PatientListScreenState extends ConsumerState<PatientListScreen>
   }
 
   void _viewPrescription(AppointmentList p) {
-    if ((p.patientId ?? 0) == 0) {
+    // The prescription loads by appointment. A new patient booked as a walk-in
+    // offline has no patient id until the booking syncs — still viewable.
+    if ((p.appointmentId ?? 0) == 0) {
       _snack('Missing info', isError: true);
       return;
     }

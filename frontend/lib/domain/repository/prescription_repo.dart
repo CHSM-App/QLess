@@ -5,6 +5,7 @@ abstract class PrescriptionRepository {
 
   //DOCTOR PRESCRIPTION API
   Future<dynamic> insertPrescription(PrescriptionModel prescription);
+  Future<dynamic> sendWhatsApp(int appointmentId, String kind);
 
   Future<Medicine> deleteMedicine(int doctorId, int medicineId);
 

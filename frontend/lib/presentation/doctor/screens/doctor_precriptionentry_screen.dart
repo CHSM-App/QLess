@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:qless/core/navigation/navigator_key.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
+import 'package:qless/domain/models/clinic_stock.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/prescription.dart';
 import 'package:qless/presentation/doctor/providers/doctor_repository_provider.dart';
@@ -74,7 +76,8 @@ const _kDesktopBreak = 1050.0;
 // ════════════════════════════════════════════════════════════════════
 //  MEDICINE TYPE
 // ════════════════════════════════════════════════════════════════════
-enum MedicineType { tablet, syrups, drops,injections, lotions,inhalers,sprays,powders}
+// typeId = index + 1 = Medicine_Type.medicine_type_id — keep the order.
+enum MedicineType { tablet, syrups, drops,injections, lotions,inhalers,sprays,powders, consumables}
 
 extension MedTypeX on MedicineType {
   String get label => const {
@@ -86,6 +89,7 @@ extension MedTypeX on MedicineType {
      MedicineType.inhalers:  'Inhalers',
     MedicineType.sprays:     'Sprays',
     MedicineType.powders:   'Powders',
+    MedicineType.consumables: 'Consumables',
    
 
   }[this]!;
@@ -100,6 +104,7 @@ extension MedTypeX on MedicineType {
      MedicineType.inhalers:  Icons.air_rounded,
     MedicineType.sprays:     Icons.air_rounded,
     MedicineType.powders:   Icons.grain_rounded,
+    MedicineType.consumables: Icons.medical_services_rounded,
    
   }[this]!;
 
@@ -113,6 +118,7 @@ extension MedTypeX on MedicineType {
         MedicineType.inhalers:  Color(0xFF1E40AF),
     MedicineType.sprays:     Color(0xFFF6AD55),
     MedicineType.powders:   Color(0xFF4DD9C8),
+    MedicineType.consumables: Color(0xFF718096),
 
   }[this]!;
 
@@ -126,6 +132,7 @@ extension MedTypeX on MedicineType {
         MedicineType.inhalers:  Color(0xFFEBF8FF),
     MedicineType.sprays:     Color(0xFFFEF3C7),
     MedicineType.powders:   Color(0xFFE0F2F1),
+    MedicineType.consumables: Color(0xFFEDF2F7),
 
   }[this]!;
 
@@ -139,6 +146,7 @@ extension MedTypeX on MedicineType {
       MedicineType.inhalers:  Color(0xFF2D3748),
     MedicineType.sprays:     Color(0xFF975A16),
     MedicineType.powders:   Color(0xFF1A5643),
+    MedicineType.consumables: Color(0xFF2D3748),
   
   }[this]!;
 
@@ -182,6 +190,35 @@ class MedicineEntry {
    String powderForm;
   String inhalerType;
   String inhalerTechnique;
+  // Clinic stock: 'clinic' takes qtyGiven out of the clinic's stock,
+  // 'outside' is bought at a medical shop.
+  String source = 'outside';
+  bool   administered = false; // injection given here (even if bought outside)
+  String qtyGiven = '';
+  String unitPrice = '';
+  bool   qtyAuto = true;       // follow dosage × days until the doctor types a qty
+
+  bool get fromClinic => source == 'clinic';
+
+  /// Units to hand over: tablets = dose per day × days; anything else 1
+  /// (a bottle, a vial, a tube). Empty when the days aren't known yet.
+  String suggestedQty() {
+    if (type != MedicineType.tablet) return '1';
+    double slot(String s) {
+      var v = 0.0;
+      for (final f in const {'½': 0.5, '¼': 0.25, '¾': 0.75}.entries) {
+        if (s.contains(f.key)) { v += f.value; s = s.replaceAll(f.key, ''); }
+      }
+      return v + (double.tryParse(s.trim()) ?? 0);
+    }
+    final perDay = dosage.split('-').fold<double>(0, (a, s) => a + slot(s));
+    final n = int.tryParse(RegExp(r'\d+').firstMatch(duration)?.group(0) ?? '');
+    if (n == null || perDay == 0) return '';
+    final d = duration.toLowerCase();
+    final days = d.contains('week') ? n * 7 : d.contains('month') ? n * 30 : n;
+    final total = (perDay * days).ceil();
+    return '$total';
+  }
 
   MedicineEntry()
       : type             = MedicineType.tablet,
@@ -203,9 +240,14 @@ class MedicineEntry {
   PrescriptionMedicineModel toApiModel() => PrescriptionMedicineModel(
     medicineId:       medicineId,
     medicineTypeId:   type.typeId,
-    frequency:        frequency.isEmpty ? null : frequency,
+    frequency:        type == MedicineType.consumables || frequency.isEmpty ? null : frequency,
     duration:         duration.isEmpty  ? null : duration,
-    timing:           type == MedicineType.lotions ? null : (timing.isEmpty ? null : timing),
+    timing:           type == MedicineType.lotions || type == MedicineType.consumables
+                          ? null : (timing.isEmpty ? null : timing),
+    source:               source,
+    administeredAtClinic: type == MedicineType.injections && administered,
+    qtyGiven:             fromClinic ? double.tryParse(qtyGiven) : null,
+    unitPrice:            fromClinic ? double.tryParse(unitPrice) : null,
     tabletDosage:     type == MedicineType.tablet    ? (dosage.isEmpty ? null : dosage) : null,
     syrupDosageMl:    type == MedicineType.syrups     ? (dosage.isEmpty ? null : dosage) : null,
     injDosage:        type == MedicineType.injections ? (dosage.isEmpty ? null : dosage) : null,
@@ -643,11 +685,13 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   final _diagCtrl = TextEditingController();
   final _clinCtrl = TextEditingController();
   final _advCtrl  = TextEditingController();
+  final _invCtrl  = TextEditingController();
   final _sympKey  = GlobalKey();
   bool _symptomsError = false;
   bool _showSymptomSuggestions = false;
   final List<String> _symptomChips = [];
   DateTime? _followDate;
+  TimeOfDay? _followTime; // optional; cancelling the time picker keeps date only
 
   /// Chips + any text still being typed, joined as "a, b, c".
   String get _symptomsText => [
@@ -695,6 +739,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _maybeFetchMedicines(widget.doctorId);
     });
+    // Fresh balances: the Medicines tab may hold an older copy of the stock.
+    Future.microtask(() => ref.invalidate(clinicStockProvider(widget.clinicId)));
     _fetchPreviousVisits();
   }
 
@@ -756,7 +802,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
   @override
   void dispose() {
     _sympCtrl.dispose(); _diagCtrl.dispose();
-    _clinCtrl.dispose(); _advCtrl.dispose();
+    _clinCtrl.dispose(); _advCtrl.dispose(); _invCtrl.dispose();
     _doctorIdSub.close();
     super.dispose();
   }
@@ -784,7 +830,17 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
         child: child!,
       ),
     );
-    if (d != null) setState(() => _followDate = d);
+    if (d == null || !mounted) return;
+    final t = await showTimePicker(
+      context: context,
+      initialTime: _followTime ?? const TimeOfDay(hour: 10, minute: 0),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+            colorScheme: const ColorScheme.light(primary: kPrimary)),
+        child: child!,
+      ),
+    );
+    setState(() { _followDate = d; _followTime = t; });
   }
 
   String? _validate() {
@@ -796,6 +852,21 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       badMed ??= m.hasError ? m : null;
     }
     _symptomsError = symptomsEmpty;
+
+    // Given from clinic stock needs a quantity (and a clinic to take it from)
+    final badQty = symptomsEmpty || badMed != null ? null : _meds.where((m) => m.fromClinic &&
+        (widget.clinicId == null || !((double.tryParse(m.qtyGiven) ?? 0) > 0))).firstOrNull;
+    if (badQty != null) {
+      badQty.hasError = true;
+      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = badQty.cardKey.currentContext;
+        if (ctx != null) Scrollable.ensureVisible(ctx, duration: const Duration(milliseconds: 250), alignment: 0.2);
+      });
+      return widget.clinicId == null
+          ? 'Clinic not known for this visit — choose Medical shop for Medicine ${_meds.indexOf(badQty) + 1}'
+          : 'Enter quantity given for Medicine ${_meds.indexOf(badQty) + 1}';
+    }
 
     if (!symptomsEmpty && badMed == null) return null;
 
@@ -842,7 +913,10 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     userType:      widget.userTypeId,
     appointmentId: widget.appointmentId,
     followUpDate:  _followUpStr(),
+    followUpTime:  _followDate == null || _followTime == null ? null
+        : '${_followTime!.hour.toString().padLeft(2, '0')}:${_followTime!.minute.toString().padLeft(2, '0')}',
     advice:        _advCtrl.text.trim().isEmpty ? null : _advCtrl.text.trim(),
+    investigation: _invCtrl.text.trim().isEmpty ? null : _invCtrl.text.trim(),
     medicines:     _meds.map((e) => e.toApiModel()).toList(),
     clinicId:      widget.clinicId,
   );
@@ -1048,16 +1122,20 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       final state = ref.read(prescriptionViewModelProvider);
       debugPrint('[RxDebug] _completeAndBack: state.error=${state.error}');
       if (state.error != null) { _showSnack(state.error!, isError: true); return; }
-      // Fire-and-forget — don't let endSession block or unmount the widget before pop
-      ref.read(appointmentViewModelProvider.notifier).endSession(
+      // Fire-and-forget online — don't let endSession block or unmount the
+      // widget before pop. Offline it is a quick local write: wait for it, so
+      // the home refresh after pop already sees the patient completed.
+      final isOnline = ref.read(connectivityNotifierProvider).isOnline;
+      final ending = ref.read(appointmentViewModelProvider.notifier).endSession(
         AppointmentRequestModel(
           doctorId:      widget.doctorId,
           appointmentId: widget.appointmentId,
           patientId:     widget.patientId,
           clinicId:      widget.clinicId,
         ),
-        isOnline: ref.read(connectivityNotifierProvider).isOnline,
+        isOnline: isOnline,
       ).catchError((_) => AppointmentResponseModel(success: false));
+      if (!isOnline) await ending;
       _showSnack('Prescription saved', isError: false);
       await Future.delayed(const Duration(milliseconds: 300));
       debugPrint('[RxDebug] _completeAndBack: about to pop');
@@ -1284,7 +1362,8 @@ Widget build(BuildContext context) {
               _patientCard(), _gap(12),
               if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
               _symptomsSection(), _gap(10),
-              _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'),
+              _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
+              _textSection('Investigation', _invCtrl, 'Tests advised — e.g. CBC, X-ray chest…'),
               // _gap(10),
               // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'),
             ],
@@ -1336,6 +1415,7 @@ Widget build(BuildContext context) {
                 if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
                 _symptomsSection(), _gap(10),
                 _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
+                _textSection('Investigation', _invCtrl, 'Tests advised — e.g. CBC, X-ray chest…'), _gap(10),
                 // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(10),
                 _followUpCard(),
               ],
@@ -1365,6 +1445,7 @@ Widget build(BuildContext context) {
           if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
           _symptomsSection(), _gap(10),
           _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(12),
+          _textSection('Investigation', _invCtrl, 'Tests advised — e.g. CBC, X-ray chest…'), _gap(12),
           // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
           _medicinesHeader(), _gap(10),
           ..._buildMedCards(medicines),
@@ -1619,20 +1700,22 @@ Widget build(BuildContext context) {
       ),
     ],
   );
-List<Widget> _buildMedCards(List<Medicine> medicines) =>
-  List.generate(_meds.length, (i) =>
+List<Widget> _buildMedCards(List<Medicine> medicines) {
+  final stock = ref.watch(clinicStockProvider(widget.clinicId)).valueOrNull ?? const <int, ClinicStockItem>{};
+  return List.generate(_meds.length, (i) =>
     Padding(
       key: _meds[i].cardKey,
       padding: const EdgeInsets.only(bottom: 12),
       child: _MedCard(
         index: _meds.length - i,  // ← i+1 ऐवजी हे
-        entry: _meds[i], medicines: medicines,
+        entry: _meds[i], medicines: medicines, stock: stock,
         onDelete: () => _delMed(i),
         rebuild: () => setState(() {}),
         onMedicineAdded: (m) => _onNewMedicineAdded(_meds[i], m),
       ),
     ),
   );
+}
 
   Future<void> _onNewMedicineAdded(MedicineEntry entry, Medicine created) async {
     await ref.read(doctorLoginViewModelProvider.notifier)
@@ -1690,8 +1773,9 @@ List<Widget> _buildMedCards(List<Medicine> medicines) =>
           const SizedBox(width: 10),
           Expanded(child: Text(
             _followDate == null
-                ? 'Select follow-up date'
-                : '${_followDate!.day.toString().padLeft(2, '0')}/${_followDate!.month.toString().padLeft(2, '0')}/${_followDate!.year}',
+                ? 'Select follow-up date & time'
+                : '${_followDate!.day.toString().padLeft(2, '0')}/${_followDate!.month.toString().padLeft(2, '0')}/${_followDate!.year}'
+                  '${_followTime == null ? '' : '  ·  ${_followTime!.format(context)}'}',
             style: TextStyle(
               fontSize: 13,
               color: _followDate == null ? kTextMuted : kTextPrimary,
@@ -1803,13 +1887,14 @@ class _MedCard extends StatefulWidget {
   final int index;
   final MedicineEntry entry;
   final List<Medicine> medicines;
+  final Map<int, ClinicStockItem> stock;
   final VoidCallback onDelete;
   final VoidCallback rebuild;
   final ValueChanged<Medicine> onMedicineAdded;
 
   const _MedCard({
     required this.index, required this.entry, required this.medicines,
-    required this.onDelete, required this.rebuild,
+    required this.stock, required this.onDelete, required this.rebuild,
     required this.onMedicineAdded,
   });
 
@@ -1821,17 +1906,50 @@ class _MedCardState extends State<_MedCard> {
   MedicineEntry get e => widget.entry;
   late TextEditingController _durCtrl;
   late TextEditingController _areaCtrl;
+  late TextEditingController _qtyCtrl;
+  late TextEditingController _priceCtrl;
   bool _showSuggestions = false;
 
   @override
   void initState() { super.initState(); _initControllers(); }
 
   void _initControllers() {
-    _durCtrl  = TextEditingController(text: e.duration);
-    _areaCtrl = TextEditingController(text: e.lotionApplyArea);
+    _durCtrl   = TextEditingController(text: e.duration);
+    _areaCtrl  = TextEditingController(text: e.lotionApplyArea);
+    _qtyCtrl   = TextEditingController(text: e.qtyGiven);
+    _priceCtrl = TextEditingController(text: e.unitPrice);
   }
 
-  void _disposeControllers() { _durCtrl.dispose(); _areaCtrl.dispose(); }
+  void _disposeControllers() {
+    _durCtrl.dispose(); _areaCtrl.dispose(); _qtyCtrl.dispose(); _priceCtrl.dispose();
+  }
+
+  // Keep the suggested quantity in step with dosage / duration until the
+  // doctor types their own.
+  void _autoQty() {
+    if (!e.fromClinic || !e.qtyAuto) return;
+    e.qtyGiven = e.suggestedQty();
+    _qtyCtrl.text = e.qtyGiven;
+  }
+
+  void _onDuration(String v) { e.duration = v; setState(_autoQty); }
+
+  void _setSource(String source) => setState(() {
+    e.source = source;
+    e.hasError = false;
+    if (e.fromClinic) {
+      e.qtyAuto = true;
+      _autoQty();
+      final price = widget.stock[e.medicineId]?.salePrice;
+      if (e.unitPrice.isEmpty && price != null) {
+        e.unitPrice = _fmt(price);
+        _priceCtrl.text = e.unitPrice;
+      }
+      if (e.type == MedicineType.injections) e.administered = true;
+    }
+  });
+
+  static String _fmt(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(2);
 
   String _freqFromDosage(String dosage) {
     final parts = dosage.split('-');
@@ -1884,6 +2002,8 @@ void _onTypeChange(MedicineType t) {
   e.powderForm = 'Loose Powder';
   e.inhalerType = 'MDI';
   e.inhalerTechnique = 'Shake & Inhale';
+  e.source = 'outside'; e.administered = false;
+  e.qtyGiven = ''; e.unitPrice = ''; e.qtyAuto = true;
   _initControllers();
   setState(() {});
   widget.rebuild();
@@ -1909,7 +2029,10 @@ void _onTypeChange(MedicineType t) {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _header(tc),
-        Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 14), child: _body()),
+        Padding(padding: const EdgeInsets.fromLTRB(12, 12, 12, 14), child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [_body(), if (e.medicineId != null) _supplySection()],
+        )),
       ]),
     );
   }
@@ -1952,9 +2075,103 @@ void _onTypeChange(MedicineType t) {
         case MedicineType.inhalers:  return _inhalersBody();
       case MedicineType.sprays:     return _sprayBody();
        case MedicineType.powders:   return _powdersBody();
-  
+      case MedicineType.consumables: return _nameSearch(); // syringe, IV set: just name + qty
     }
   }
+
+  // ── Supply: clinic stock or medical shop ─────────────────────────
+  Widget _supplySection() {
+    final item = widget.stock[e.medicineId];
+    final unit = item?.unit ?? '';
+    final qty = double.tryParse(e.qtyGiven) ?? 0;
+    final short = e.fromClinic && item != null && qty > item.balance;
+
+    final (String badge, Color bg, Color fg) = item == null
+        ? ('Not in clinic stock', kBg, kTextSecondary)
+        : item.balance <= 0
+            ? ('Out of stock', kRedLight, kRedDark)
+            : item.isLow
+                ? ('Low: ${_fmt(item.balance)} $unit', kAmberLight, kAmberDark)
+                : ('In stock: ${_fmt(item.balance)} $unit', kGreenLight, kGreenDark);
+
+    Widget choice(String value, String label, IconData icon) => Expanded(
+      child: ChoiceChip(
+        selected: e.source == value,
+        onSelected: (_) => _setSource(value),
+        avatar: Icon(icon, size: 15, color: e.source == value ? Colors.white : kTextSecondary),
+        label: SizedBox(width: double.infinity, child: Text(label, overflow: TextOverflow.ellipsis)),
+        labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+            color: e.source == value ? Colors.white : kTextPrimary),
+        selectedColor: kPrimary,
+        backgroundColor: kBg,
+        showCheckmark: false,
+        side: const BorderSide(color: kBorder),
+      ),
+    );
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _gap(12),
+      Row(children: [
+        _lbl('Supply'),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
+          child: Text(badge.trim(), style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: fg)),
+        ),
+      ]),
+      _gap(6),
+      Row(children: [
+        choice('clinic', 'Clinic stock', Icons.inventory_2_outlined),
+        const SizedBox(width: 8),
+        choice('outside', 'Medical shop', Icons.storefront_outlined),
+      ]),
+      if (e.type == MedicineType.injections)
+        CheckboxListTile(
+          value: e.administered,
+          onChanged: (v) => setState(() => e.administered = v ?? false),
+          title: const Text('Given at clinic', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: kTextPrimary)),
+          subtitle: e.fromClinic ? null : const Text('Patient brought it from a medical shop',
+              style: TextStyle(fontSize: 11, color: kTextMuted)),
+          dense: true,
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          activeColor: kPrimary,
+        ),
+      if (e.fromClinic) ...[
+        _gap(10),
+        _r2([
+          _numField('Qty given${unit.isEmpty ? '' : ' ($unit)'}', _qtyCtrl, (v) {
+            e.qtyGiven = v;
+            e.qtyAuto = false;
+            setState(() => e.hasError = false);
+          }),
+          _numField('Price per unit (₹)', _priceCtrl, (v) => e.unitPrice = v),
+        ]),
+        if (short) ...[
+          _gap(5),
+          Row(children: [
+            const Icon(Icons.warning_amber_rounded, size: 13, color: kAmberDark),
+            const SizedBox(width: 5),
+            Expanded(child: Text('Only ${_fmt(item.balance)} in stock — stock will go negative',
+                style: const TextStyle(fontSize: 11, color: kAmberDark))),
+          ]),
+        ],
+      ],
+    ]);
+  }
+
+  Widget _numField(String label, TextEditingController ctrl, ValueChanged<String> onChanged) =>
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _lbl(label), _gap(5),
+        TextField(
+          controller: ctrl, onChanged: onChanged,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF1A1D2E)),
+          decoration: _ideco('0'),
+        ),
+      ]);
   Widget _powdersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
   _nameSearch(), _gap(10),
   _dropField('Form', e.powderForm, ['Loose Powder', 'Sachet', 'Dusting Powder', 'Oral Powder'],
@@ -1962,7 +2179,7 @@ void _onTypeChange(MedicineType t) {
   _gap(10),
   _dosagePicker(label: 'Dose per slot'), _gap(10),
   _r2([
-    _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: (v) => e.duration = v),
+    _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: _onDuration),
     _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
   ]),
 ]);
@@ -1980,7 +2197,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
   _gap(10),
   _dosagePicker(label: 'Puffs per slot'), _gap(10),
   _r2([
-    _txtField('Duration', 'e.g. 30 days', _durCtrl, onChanged: (v) => e.duration = v),
+    _txtField('Duration', 'e.g. 30 days', _durCtrl, onChanged: _onDuration),
     _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
   ]),
   _gap(10),
@@ -2000,6 +2217,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     onChanged: (val) => setState(() {
       e.dosage = val;
       e.frequency = _freqFromDosage(val);
+      _autoQty();
     }),
   );
 
@@ -2007,7 +2225,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     _nameSearch(), _gap(10),
     _dosagePicker(), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: _onDuration),
       _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
@@ -2017,7 +2235,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     _dropField('Route', e.injRoute, _routeOpts, (v) => setState(() => e.injRoute = v!)),
     _gap(10), _dosagePicker(), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 3 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _txtField('Duration', 'e.g. 3 days', _durCtrl, onChanged: _onDuration),
       _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
@@ -2027,7 +2245,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     _dropField('Application', e.dropsApplication, _appOpts, (v) => setState(() => e.dropsApplication = v!)),
     _gap(10), _dosagePicker(label: 'Drops per slot'), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _txtField('Duration', 'e.g. 5 days', _durCtrl, onChanged: _onDuration),
       _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
@@ -2036,7 +2254,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     _nameSearch(), _gap(10),
     _txtField('Apply Area / Body Part', 'e.g. Scalp, Face', _areaCtrl, onChanged: (v) => e.lotionApplyArea = v),
     _gap(10), _dosagePicker(label: 'Application per slot'), _gap(10),
-    _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
+    _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: _onDuration),
   ]);
 
   Widget _sprayBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -2044,7 +2262,7 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
     _dropField('Usage', e.sprayUsage, _sprayUsage, (v) => setState(() => e.sprayUsage = v!)),
     _gap(10), _dosagePicker(label: 'Puffs per slot'), _gap(10),
     _r2([
-      _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: (v) => e.duration = v),
+      _txtField('Duration', 'e.g. 7 days', _durCtrl, onChanged: _onDuration),
       _dropField('Timing', e.timing, _timingOpts, (v) => setState(() => e.timing = v!)),
     ]),
   ]);
@@ -2063,6 +2281,10 @@ Widget _inhalersBody() => Column(crossAxisAlignment: CrossAxisAlignment.start, c
       e.searchText      = '';
       _showSuggestions  = false;
     });
+    // In stock here → hand it over from the clinic by default
+    final item = widget.stock[m.medicineId];
+    e.unitPrice = ''; _priceCtrl.text = '';
+    _setSource(item != null && item.balance > 0 ? 'clinic' : 'outside');
   }
 
   Widget _nameSearch() {
@@ -2277,11 +2499,6 @@ class _PreviousHistoryPage extends StatelessWidget {
     required this.onSelect,
   });
 
-  String _fmtDate(String? raw) {
-    final d = DateTime.tryParse(raw ?? '');
-    return d == null ? 'Unknown date' : DateFormat('EEEE, d MMMM yyyy').format(d);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2335,47 +2552,66 @@ class _PreviousHistoryPage extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: visits.isEmpty
-              ? const Center(child: Text('No previous visits', style: TextStyle(color: kTextMuted, fontSize: 13)))
-              : ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
-                  itemCount: visits.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (_, i) {
-                    final v = visits[i];
-                    return GestureDetector(
-                      onTap: () => onSelect(v),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: kBorder),
-                          boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
-                        ),
-                        child: Row(children: [
-                          Container(
-                            width: 36, height: 36,
-                            decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(10)),
-                            child: const Icon(Icons.event_note_rounded, color: kPurpleDark, size: 16),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(_fmtDate(v.appointmentDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
-                            if (v.queueNumber != null) ...[
-                              const SizedBox(height: 3),
-                              Text('Queue #${v.queueNumber}', style: const TextStyle(fontSize: 11, color: kTextMuted)),
-                            ],
-                          ])),
-                          const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
-                        ]),
-                      ),
-                    );
-                  },
-                ),
+          child: PatientVisitHistoryList(visits: visits, onSelect: onSelect),
         ),
       ]),
     );
   }
 }
 
+
+/// One patient's past visits, newest first; tap opens that visit. Used by the
+/// Previous History page and the History tab of the prescription details.
+class PatientVisitHistoryList extends StatelessWidget {
+  final List<AppointmentList> visits;
+  final ValueChanged<AppointmentList> onSelect;
+
+  const PatientVisitHistoryList({super.key, required this.visits, required this.onSelect});
+
+  String _fmtDate(String? raw) {
+    final d = DateTime.tryParse(raw ?? '');
+    return d == null ? 'Unknown date' : DateFormat('EEEE, d MMMM yyyy').format(d);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return visits.isEmpty
+        ? const Center(child: Text('No previous visits', style: TextStyle(color: kTextMuted, fontSize: 13)))
+        : ListView.separated(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+            itemCount: visits.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            itemBuilder: (_, i) {
+              final v = visits[i];
+              return GestureDetector(
+                onTap: () => onSelect(v),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: kBorder),
+                    boxShadow: const [BoxShadow(color: Color(0x08000000), blurRadius: 8, offset: Offset(0, 2))],
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.event_note_rounded, color: kPurpleDark, size: 16),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(_fmtDate(v.appointmentDate), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
+                      if (v.queueNumber != null) ...[
+                        const SizedBox(height: 3),
+                        Text('Queue #${v.queueNumber}', style: const TextStyle(fontSize: 11, color: kTextMuted)),
+                      ],
+                    ])),
+                    const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
+                  ]),
+                ),
+              );
+            },
+          );
+  }
+}

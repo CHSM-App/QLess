@@ -32,6 +32,10 @@ PrescriptionMedicineModel _$PrescriptionMedicineModelFromJson(
   inhalerType: json['inhaler_type'] as String?,
   inhalerTechnique: json['inhaler_technique'] as String?,
   inhalerUsage: json['inhaler_usage'] as String?,
+  source: json['source'] as String?,
+  administeredAtClinic: json['administered_at_clinic'] as bool?,
+  qtyGiven: (json['qty_given'] as num?)?.toDouble(),
+  unitPrice: (json['unit_price'] as num?)?.toDouble(),
 );
 
 Map<String, dynamic> _$PrescriptionMedicineModelToJson(
@@ -60,6 +64,10 @@ Map<String, dynamic> _$PrescriptionMedicineModelToJson(
   'inhaler_type': instance.inhalerType,
   'inhaler_technique': instance.inhalerTechnique,
   'inhaler_usage': instance.inhalerUsage,
+  'source': instance.source,
+  'administered_at_clinic': instance.administeredAtClinic,
+  'qty_given': instance.qtyGiven,
+  'unit_price': instance.unitPrice,
 };
 
 PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
@@ -104,7 +112,9 @@ PrescriptionModel _$PrescriptionModelFromJson(Map<String, dynamic> json) =>
       diagnosis: json['diagnosis'] as String?,
       clinicalNotes: json['clinical_notes'] as String?,
       followUpDate: json['follow_up_date'] as String?,
+      followUpTime: json['follow_up_time'] as String?,
       advice: json['advice'] as String?,
+      investigation: json['investigation'] as String?,
       createdAt: json['created_at'] as String?,
       medicines: (json['medicines'] as List<dynamic>?)
           ?.map(
@@ -159,7 +169,9 @@ Map<String, dynamic> _$PrescriptionModelToJson(PrescriptionModel instance) =>
       'diagnosis': instance.diagnosis,
       'clinical_notes': instance.clinicalNotes,
       'follow_up_date': instance.followUpDate,
+      'follow_up_time': instance.followUpTime,
       'advice': instance.advice,
+      'investigation': instance.investigation,
       'created_at': instance.createdAt,
       'user_type': instance.userType,
       'appointment_id': instance.appointmentId,

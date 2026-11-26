@@ -69,6 +69,18 @@ class PrescriptionMedicineModel {
   @JsonKey(name: 'inhaler_usage')
   final String? inhalerUsage;
 
+  // ── Clinic stock ─────────────────────────────────────────────────
+  /// 'clinic' = given from clinic stock (stock goes down), 'outside' = medical shop.
+  final String? source;
+
+  @JsonKey(name: 'administered_at_clinic')
+  final bool? administeredAtClinic;
+
+  @JsonKey(name: 'qty_given')
+  final double? qtyGiven;
+
+  @JsonKey(name: 'unit_price')
+  final double? unitPrice;
 
   const PrescriptionMedicineModel({
     this.prescMedId,
@@ -94,7 +106,10 @@ class PrescriptionMedicineModel {
     this.inhalerType, 
     this.inhalerTechnique,
     this.inhalerUsage,
-
+    this.source,
+    this.administeredAtClinic,
+    this.qtyGiven,
+    this.unitPrice,
   });
   factory PrescriptionMedicineModel.fromJson(Map<String, dynamic> json) =>
    _$PrescriptionMedicineModelFromJson(json);
@@ -220,7 +235,13 @@ class PrescriptionModel {
   @JsonKey(name: 'follow_up_date')
   final String? followUpDate;
 
+  // 'HH:mm', null when the doctor set only a date
+  @JsonKey(name: 'follow_up_time')
+  final String? followUpTime;
+
   final String? advice;
+
+  final String? investigation;
 
   @JsonKey(name: 'created_at')
   final String? createdAt;
@@ -279,7 +300,9 @@ class PrescriptionModel {
     this.diagnosis,
     this.clinicalNotes,
     this.followUpDate,
+    this.followUpTime,
     this.advice,
+    this.investigation,
     this.createdAt,
     this.medicines,
     this.userType,

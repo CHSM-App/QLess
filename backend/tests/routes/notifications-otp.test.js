@@ -56,6 +56,28 @@ describe('login OTP', () => {
     expect(JSON.stringify(res.body)).not.toContain(code);
   });
 
+  describe('OTP_TO_CONSOLE (WhatsApp down)', () => {
+    let print;
+    beforeEach(() => { process.env.OTP_TO_CONSOLE = '1'; print = jest.spyOn(console, 'log').mockImplementation(() => {}); });
+    afterEach(() => { process.env.OTP_TO_CONSOLE = ''; process.env.NODE_ENV = 'test'; print.mockRestore(); });
+
+    test('prints the code instead of sending it', async () => {
+      mockDb.respond = () => [{ status: 1 }];
+      const res = await request(app).post('/login/send-otp').send({ mobile_no: MOBILE });
+      expect(res.status).toBe(200);
+      expect(axios.post).not.toHaveBeenCalled();
+      const code = print.mock.calls.flat().join(' ').match(/→ (\d{6})/)[1];
+      expect(bcrypt.compareSync(code, mockDb.callsTo('sp_otp', 'send_otp')[0].inputs.otp_hash)).toBe(true);
+    });
+
+    test('ignored in production', async () => {
+      process.env.NODE_ENV = 'production';
+      mockDb.respond = () => [{ status: 1 }];
+      await request(app).post('/login/send-otp').send({ mobile_no: MOBILE });
+      expect(print).not.toHaveBeenCalledWith(expect.stringContaining('[OTP]'));
+    });
+  });
+
   test('verify-otp: right code → login ticket for that mobile, marked verified', async () => {
     mockDb.respond = ({ inputs }) => (inputs.operation === 'verify_otp' ? [{ status: 1, otp_hash: bcrypt.hashSync(OTP, 4) }] : [{ status: 1 }]);
     const res = await request(app).post('/login/verify-otp').send({ mobile_no: MOBILE, otp: OTP });

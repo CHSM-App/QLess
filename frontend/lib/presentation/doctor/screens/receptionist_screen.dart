@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/receptionist_model.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/shared/widgets/skeleton.dart';
 
 // ── Colour tokens ─────────────────────────────────────────────────────────────
 const _kPrimary       = Color(0xFF26C6B0);
@@ -254,9 +255,7 @@ class _ReceptionistPageState extends ConsumerState<ReceptionistPage> {
         // ── Body ────────────────────────────────────────────────────────────
         Expanded(
           child: receptionistList.when(
-            loading: () => const Center(
-              child: CircularProgressIndicator(color: _kPrimary, strokeWidth: 2),
-            ),
+            loading: () => const SkeletonList(count: 4),
             error: (_, __) => _buildError(),
             data: (list) => list.isEmpty
                 ? _buildEmpty()

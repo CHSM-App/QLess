@@ -1,11 +1,14 @@
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:qless/core/database/local_database.dart';
 import 'package:qless/core/network/network_errors.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/appointment_response_model.dart';
+import 'package:qless/domain/models/doctor_leave_model.dart';
+import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/domain/models/patients.dart';
 import 'package:qless/domain/models/prescription.dart';
@@ -23,6 +26,7 @@ enum OfflineOperation {
   startSession,
   endSession,
   walkInBook,
+  addMedicine,
 }
 
 extension OfflineOperationX on OfflineOperation {
@@ -38,6 +42,7 @@ extension OfflineOperationX on OfflineOperation {
       case OfflineOperation.startSession:        return 'startSession';
       case OfflineOperation.endSession:          return 'endSession';
       case OfflineOperation.walkInBook:          return 'walkInBook';
+      case OfflineOperation.addMedicine:         return 'addMedicine';
     }
   }
 
@@ -53,6 +58,7 @@ extension OfflineOperationX on OfflineOperation {
       case 'startSession':        return OfflineOperation.startSession;
       case 'endSession':          return OfflineOperation.endSession;
       case 'walkInBook':          return OfflineOperation.walkInBook;
+      case 'addMedicine':         return OfflineOperation.addMedicine;
       default: throw ArgumentError('Unknown offline operation: $s');
     }
   }
@@ -103,6 +109,11 @@ class OfflineQueueStore {
 
   OfflineQueueStore(this._db);
 
+  /// Bumped whenever work is queued, so the sync controller can send it right
+  /// away instead of waiting for the next connectivity change or timer tick.
+  final changes = ValueNotifier<int>(0);
+  void _changed() => changes.value++;
+
   // ── Cache writes ─────────────────────────────────────────────────────────────
 
   /// [clinicId] is the clinic this batch was fetched for — stamped onto every
@@ -122,6 +133,77 @@ class OfflineQueueStore {
   Future<void> cacheAppointments(List<AppointmentList> appointments) async {
     final rows = appointments.map((a) => _appointmentToRow(a)).toList();
     await _db.upsertAppointments(rows);
+  }
+
+  // ── Sessions from the schedule ───────────────────────────────────────────────
+
+  static const _weekdays = [
+    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
+  ];
+
+  /// Offline, today's sessions may never have been downloaded (app opened
+  /// with no internet) or may not exist on the server yet (nobody booked).
+  /// For each of today's queue-type schedule slots with no cached session,
+  /// adds one with queue_id = -slot_id so the doctor can still start it. The
+  /// server turns that id back into the real queue when the actions sync
+  /// (resolveTempQueue); [LocalDatabase.upsertQueues] drops it once the real
+  /// row is downloaded.
+  Future<void> ensureScheduledSessions(int doctorId, {String? clinicId}) async {
+    final raw = await getCachedJson('schedule:$doctorId:${clinicId ?? ''}');
+    if (raw is! Map<String, dynamic>) return;
+    final now = DateTime.now();
+
+    final leaves = await getCachedJson('leaves:$doctorId');
+    if (leaves is List &&
+        leaves.any((l) {
+          try {
+            return LeaveRange.fromJson(l as Map<String, dynamic>).contains(now);
+          } catch (_) {
+            return false;
+          }
+        })) {
+      return;
+    }
+
+    final dayName = _weekdays[now.weekday - 1];
+    final day = (DoctorScheduleModel.fromJson(raw).schedule ?? const [])
+        .where((d) => (d.day ?? '').toLowerCase() == dayName && (d.isEnabled ?? 0) == 1)
+        .firstOrNull;
+    if (day == null) return;
+
+    String two(int n) => n.toString().padLeft(2, '0');
+    final today = '${now.year}-${two(now.month)}-${two(now.day)}';
+    final cachedSlots = (await _db.getQueuesForDoctor(doctorId, clinicId: clinicId))
+        .where((r) => (r['queue_date'] as String? ?? '').startsWith(today))
+        .map((r) => r['slot_id'] as int?)
+        .toSet();
+
+    final rows = <Map<String, dynamic>>[];
+    for (final s in day.slots ?? const <TimeSlotModel>[]) {
+      final slotId = s.slotId;
+      final start = s.startTime;
+      final end = s.endTime;
+      if (slotId == null || start == null || end == null) continue;
+      if (cachedSlots.contains(slotId)) continue;
+      if (s.bookingMode != 1 && s.bookingMode != 3) continue; // slots-only has no queue
+      final endParts = end.split(':');
+      final endAt = DateTime(now.year, now.month, now.day,
+          int.tryParse(endParts[0]) ?? 23, int.tryParse(endParts.elementAtOrNull(1) ?? '') ?? 59);
+      if (now.isAfter(endAt)) continue;
+      rows.add({
+        'queue_id':       -slotId,
+        'doctor_id':      doctorId,
+        'queue_date':     today,
+        'slot_id':        slotId,
+        // same shape the server sends for a SQL time column
+        'start_time':     '1970-01-01T${start.substring(0, 5)}:00.000Z',
+        'end_time':       '1970-01-01T${end.substring(0, 5)}:00.000Z',
+        'queue_status':   0,
+        'booking_closed': 0,
+        'clinic_id':      clinicId,
+      });
+    }
+    if (rows.isNotEmpty) await _db.upsertQueues(rows);
   }
 
   // ── Cache reads ──────────────────────────────────────────────────────────────
@@ -218,6 +300,8 @@ class OfflineQueueStore {
       case OfflineOperation.walkInBook:
         // No local queue mutation needed — the booking appears after sync.
         break;
+      case OfflineOperation.addMedicine:
+        break; // the catalog cache is updated when it is queued
     }
   }
 
@@ -241,6 +325,16 @@ class OfflineQueueStore {
     bool isSlot(AppointmentList a) =>
         a.bookingType == 2 ||
         (a.bookingType == null && a.startTime != null && a.endTime != null);
+    // Someone in this session is already in progress — the advance already
+    // happened (reapplyPendingOps can run a queueNext over the same rows
+    // twice); starting another would put two patients in progress.
+    if (appts.any((a) =>
+        (a.status ?? '').toLowerCase().trim() == 'in_progress' &&
+        a.appointmentId != excludeAppointmentId &&
+        (queueId == null || a.queueId == queueId) &&
+        !isSlot(a))) {
+      return;
+    }
     final candidates = appts.where((a) {
       if ((a.status ?? '').toLowerCase().trim() != 'booked') return false;
       if (a.appointmentId == excludeAppointmentId) return false;
@@ -278,6 +372,25 @@ class OfflineQueueStore {
       appointmentId: request.appointmentId,
     );
     debugPrint('[OfflineQueueStore] Enqueued offline op: ${op.name}');
+    _changed();
+  }
+
+  /// Re-applies the queue actions still waiting to sync on top of freshly
+  /// downloaded server rows, so a refresh before the sync finishes doesn't
+  /// bring back a patient the doctor already completed offline.
+  Future<void> reapplyPendingOps(int doctorId) async {
+    final rows = (await _db.getPendingOps(doctorId: doctorId)).where((r) =>
+        r['operation'] != OfflineOperation.walkInBook.name &&
+        r['operation'] != OfflineOperation.addMedicine.name);
+    for (final row in rows) {
+      try {
+        final op = PendingOperation.fromRow(row);
+        await applyOfflineQueueOp(op.operation, op.queueId, op.appointmentId,
+            doctorId: doctorId, clinicId: op.payload['clinic_id']?.toString());
+      } catch (e) {
+        debugPrint('[OfflineQueueStore] Re-apply skipped row ${row['id']}: $e');
+      }
+    }
   }
 
   /// Internal payload key marking the placeholder appointment id — stripped
@@ -301,6 +414,7 @@ class OfflineQueueStore {
       doctorId:  doctorId,
     );
     debugPrint('[OfflineQueueStore] Enqueued offline walkInBook for doctor $doctorId');
+    _changed();
   }
 
   /// Builds the placeholder appointment row. Uses a negative synthetic id —
@@ -360,9 +474,16 @@ class OfflineQueueStore {
         final tempId = payload.remove(_tempApptKey) as int?;
         final res = await executor(payload);
         _checkSuccess(res.success, res.message);
-        // Drop the placeholder — the real synced row (server appointment_id)
-        // lands separately via the caller's post-flush fetchPatientAppointments.
-        if (tempId != null) await _db.deleteAppointment(tempId);
+        if (tempId != null) {
+          // Prescriptions / queue ops queued against the placeholder now point
+          // at the real appointment (they replay after walk-ins).
+          if (res.appointmentId != null) {
+            await _db.remapAppointment(tempId, res.appointmentId!, res.patientId);
+          }
+          // Drop the placeholder — the real synced row lands separately via
+          // the caller's post-flush fetchPatientAppointments.
+          await _db.deleteAppointment(tempId);
+        }
       },
       onSent: _db.deletePendingOp,
       markFailed: _db.markOpFailed,
@@ -370,14 +491,68 @@ class OfflineQueueStore {
     );
   }
 
-  Future<void> enqueueEmergencyPause(int queueId, int doctorId) async {
+  Future<void> enqueueEmergencyPause(int queueId, int? doctorId) async {
     await _db.enqueuePendingOp(
       operation: OfflineOperation.queuePauseEmergency.name,
-      payload:   {'queue_id': queueId, 'doctor_id': doctorId},
+      payload:   _stamp({'queue_id': queueId, 'doctor_id': doctorId}),
       doctorId:  doctorId,
       queueId:   queueId,
     );
     debugPrint('[OfflineQueueStore] Enqueued offline emergency pause: $queueId');
+    _changed();
+  }
+
+  // ── Medicines added offline ────────────────────────────────────────────────
+
+  /// Payload key for a medicine's placeholder id (negative, never a server
+  /// id) — stripped before the body is sent.
+  static const _tempMedKey = '_offlineTempMedId';
+
+  /// Saves a medicine added offline: it goes into the catalog cache straight
+  /// away with a negative id (so it can be prescribed now) and is queued for
+  /// insertMedicine. Returns the placeholder id.
+  Future<int> enqueueAddMedicine(Medicine medicine) async {
+    final tempId = -(DateTime.now().microsecondsSinceEpoch % 1000000000);
+    final doctorId = medicine.doctorId;
+    final json = {...medicine.toJson(), 'medicine_id': tempId};
+    await _db.insertMedicine(tempId, doctorId, jsonEncode(json));
+    await _db.enqueuePendingOp(
+      operation: OfflineOperation.addMedicine.name,
+      payload:   _stamp({...medicine.toJson(), _tempMedKey: tempId}..remove('medicine_id')),
+      doctorId:  doctorId,
+    );
+    debugPrint('[OfflineQueueStore] Enqueued offline medicine ${medicine.medicineName}');
+    _changed();
+    return tempId;
+  }
+
+  /// Sends medicines added offline. Each one's placeholder id is swapped for
+  /// the server's in queued prescriptions and in the catalog cache.
+  Future<int> flushPendingMedicines(
+    Future<dynamic> Function(Map<String, dynamic> body) executor, {
+    int? doctorId,
+  }) async {
+    final rows = (await _db.getPendingOps(doctorId: doctorId))
+        .where((r) => r['operation'] == OfflineOperation.addMedicine.name)
+        .toList();
+    return _flush(
+      rows,
+      send: (row) async {
+        final payload = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+        final tempId = payload.remove(_tempMedKey) as int?;
+        final res = await executor(payload);
+        if (res is! Map) throw Exception('Unexpected server response');
+        final ok = res['success'];
+        _checkSuccess(ok == true || ok == 1, res['message']?.toString());
+        final realId = (res['medicine_id'] as num?)?.toInt();
+        if (tempId != null && realId != null) {
+          await _db.remapMedicine(tempId, realId);
+        }
+      },
+      onSent: _db.deletePendingOp,
+      markFailed: _db.markOpFailed,
+      bumpRetry: _db.incrementRetry,
+    );
   }
 
   /// Everything still waiting to sync — queue ops, walk-ins and prescriptions.
@@ -404,7 +579,13 @@ class OfflineQueueStore {
       try {
         final payload = jsonDecode(item?['payload_json'] as String? ?? '{}');
         final tempId = payload is Map ? payload[_tempApptKey] as int? : null;
-        if (tempId != null) await _db.deleteAppointment(tempId);
+        if (tempId != null) {
+          await _db.deleteAppointment(tempId);
+          // what was queued for that walk-in can never sync either
+          await _db.deletePendingForAppointment(tempId);
+        }
+        final tempMed = payload is Map ? payload[_tempMedKey] as int? : null;
+        if (tempMed != null) await _db.deleteMedicine(tempMed);
       } catch (_) {} // corrupt payload — nothing to clean up
     }
     await _db.deletePendingItem(kind, id);
@@ -453,6 +634,11 @@ class OfflineQueueStore {
         } else if (isNetworkError(e)) {
           debugPrint('[OfflineQueueStore] Network down mid-sync, stopping at row $id');
           break;
+        } else if (e is DioException && e.response?.statusCode == 401) {
+          // Token refresh failed (often a flaky link right after reconnect).
+          // Not this row's fault — stop and retry on the next sync uncounted.
+          debugPrint('[OfflineQueueStore] Not signed in mid-sync, stopping at row $id');
+          break;
         } else if (await bumpRetry(id) >= _maxRetries) {
           await markFailed(id, errorMessage(e));
         }
@@ -460,6 +646,37 @@ class OfflineQueueStore {
       }
     }
     return sent;
+  }
+
+  /// Rows tied to a walk-in booked offline carry its placeholder (negative)
+  /// appointment id until the walk-in syncs and [LocalDatabase.remapAppointment]
+  /// swaps it. Sent before that, the server refuses them and they'd be parked
+  /// for good — so hold them back while the walk-in is still waiting, and park
+  /// them only once the walk-in itself failed or was discarded.
+  Future<List<Map<String, dynamic>>> _withoutUnsyncedWalkIns(
+    List<Map<String, dynamic>> rows,
+    Future<void> Function(int id, String error) markFailed, {
+    int? doctorId,
+  }) async {
+    if (!rows.any((r) => (r['appointment_id'] as int? ?? 0) < 0)) return rows;
+    final waiting = <int>{};
+    for (final r in await _db.getPendingOps(doctorId: doctorId)) {
+      if (r['operation'] != OfflineOperation.walkInBook.name) continue;
+      try {
+        final temp = (jsonDecode(r['payload_json'] as String) as Map)[_tempApptKey];
+        if (temp is int) waiting.add(temp);
+      } catch (_) {}
+    }
+    final out = <Map<String, dynamic>>[];
+    for (final r in rows) {
+      final appt = r['appointment_id'] as int? ?? 0;
+      if (appt >= 0) {
+        out.add(r);
+      } else if (!waiting.contains(appt)) {
+        await markFailed(r['id'] as int, 'Walk-in booking did not sync');
+      }
+    }
+    return out;
   }
 
   // ── Pending prescriptions ──────────────────────────────────────────────────
@@ -473,9 +690,77 @@ class OfflineQueueStore {
     );
     debugPrint('[OfflineQueueStore] Enqueued offline prescription '
         '(appt ${prescription.appointmentId})');
+    _changed();
   }
 
   Future<int> pendingPrescriptionsCount() => _db.pendingPrescriptionsCount();
+
+  // ── Prescriptions for offline viewing ──────────────────────────────────────
+
+  static String _rxKey(int appointmentId) => 'rx:appt:$appointmentId';
+
+  /// Server rows of an appointment's prescription, kept for offline viewing.
+  Future<void> cacheAppointmentPrescription(
+          int appointmentId, List<PrescriptionModel> rows) =>
+      cacheJson(_rxKey(appointmentId), rows.map((r) => r.toJson()).toList());
+
+  Future<bool> hasCachedAppointmentPrescription(int appointmentId) async =>
+      await _db.getJson(_rxKey(appointmentId)) != null;
+
+  Future<void> pruneCachedPrescriptions() => _db.pruneJson('rx:');
+
+  /// An appointment's prescription without the network, in the same flat
+  /// one-row-per-medicine shape the server returns: the cached server copy,
+  /// else the one written offline and not yet synced. Empty when neither.
+  Future<List<PrescriptionModel>> offlineAppointmentPrescription(
+      int appointmentId, {int? doctorId}) async {
+    final cached = await getCachedJson(_rxKey(appointmentId));
+    if (cached is List && cached.isNotEmpty) {
+      try {
+        return cached
+            .map((e) => PrescriptionModel.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } catch (e) {
+        debugPrint('[OfflineQueueStore] Bad cached prescription: $e');
+      }
+    }
+
+    final row = await _db.getPendingPrescriptionFor(appointmentId);
+    if (row == null) return const [];
+    try {
+      final payload = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
+      final meds = (payload.remove('medicines') as List?) ?? const [];
+      final header = <String, dynamic>{
+        ...payload,
+        'prescription_date': payload['prescription_date'] ?? row['created_at'],
+      };
+      // The queued payload has ids only — names come from the local caches.
+      final docId = doctorId ?? payload['doctor_id'] as int?;
+      if (docId != null) {
+        final appt = (await getCachedAppointments(docId))
+            .where((a) => a.appointmentId == appointmentId).firstOrNull;
+        if (appt?.patientName != null) header['patient_name'] = appt!.patientName;
+      }
+      final names = <int, Medicine>{
+        if (docId != null)
+          for (final m in await getCachedMedicines(docId))
+            if (m.medicineId != null) m.medicineId!: m,
+      };
+      if (meds.isEmpty) return [PrescriptionModel.fromJson(header)];
+      return [
+        for (final m in meds.cast<Map<String, dynamic>>())
+          PrescriptionModel.fromJson({
+            ...header,
+            ...m,
+            'medicine_name': names[m['medicine_id']]?.medicineName,
+            'Medi_Type_Name': names[m['medicine_id']]?.medTypeName,
+          }),
+      ];
+    } catch (e) {
+      debugPrint('[OfflineQueueStore] Bad pending prescription: $e');
+      return const [];
+    }
+  }
 
   // ── Medicines catalog cache ────────────────────────────────────────────────
 
@@ -578,11 +863,18 @@ class OfflineQueueStore {
     int? doctorId,
   }) async {
     return _flush(
-      await _db.getPendingPrescriptions(doctorId: doctorId),
+      await _withoutUnsyncedWalkIns(
+          await _db.getPendingPrescriptions(doctorId: doctorId),
+          _db.markPrescriptionFailed,
+          doctorId: doctorId),
       send: (row) async {
         final json = jsonDecode(row['payload_json'] as String) as Map<String, dynamic>;
         final res = await executor(PrescriptionModel.fromJson(json));
-        if (res is Map) _checkSuccess(res['success'] as bool?, res['message']?.toString());
+        // Only a JSON `success: true` counts as saved. Anything else (e.g. a
+        // captive-portal HTML page with 200) would otherwise delete the row.
+        if (res is! Map) throw Exception('Unexpected server response');
+        final ok = res['success'];
+        _checkSuccess(ok == true || ok == 1, res['message']?.toString());
       },
       onSent: _db.deletePendingPrescription,
       markFailed: _db.markPrescriptionFailed,
@@ -604,10 +896,12 @@ class OfflineQueueStore {
     int? doctorId,
   }) async {
     final rows = (await _db.getPendingOps(doctorId: doctorId))
-        .where((r) => r['operation'] != OfflineOperation.walkInBook.name)
+        .where((r) =>
+            r['operation'] != OfflineOperation.walkInBook.name &&
+            r['operation'] != OfflineOperation.addMedicine.name)
         .toList();
     return _flush(
-      rows,
+      await _withoutUnsyncedWalkIns(rows, _db.markOpFailed, doctorId: doctorId),
       send: (row) async {
         final op = PendingOperation.fromRow(row);
         final res = await executor(op.operation, op.payload);

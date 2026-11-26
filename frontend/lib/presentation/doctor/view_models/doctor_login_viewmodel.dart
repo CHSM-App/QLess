@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qless/core/database/offline_queue_store.dart';
+import 'package:qless/core/network/network_errors.dart';
 import 'package:qless/core/storage/token_storage.dart';
 import 'package:qless/domain/models/doctor_details.dart';
 import 'package:qless/domain/models/medicine.dart';
@@ -384,6 +385,15 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
       state = state.copyWith(isLoading: false);
       return response;
     } catch (e) {
+      // No connection — save it on the phone (usable in a prescription right
+      // away) and add it to the server when the sync runs.
+      if (isNetworkError(e)) {
+        try {
+          final tempId = await offlineStore.enqueueAddMedicine(medicine);
+          state = state.copyWith(isLoading: false);
+          return {'success': 1, 'message': 'Saved offline — will sync', 'medicine_id': tempId};
+        } catch (_) {} // fall through to the error below
+      }
       // Keep the real error text so the UI can tell a network failure apart
       // from a genuine server error and show "No internet connection".
       final message = e.toString().replaceFirst('Exception: ', '');
@@ -392,15 +402,44 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     }
   }
 
+  /// Sends medicines added offline. A duplicate (409 — the first send landed
+  /// before its answer was lost) still carries the server's id, so it counts.
+  Future<int> syncPendingMedicines({int? doctorId}) {
+    return offlineStore.flushPendingMedicines((body) async {
+      try {
+        return await usecase.addMedicine(Medicine.fromJson(body));
+      } on DioException catch (e) {
+        final data = e.response?.data;
+        if (e.response?.statusCode == 409 && data is Map && data['medicine_id'] != null) {
+          return {...data, 'success': 1};
+        }
+        rethrow;
+      }
+    }, doctorId: doctorId);
+  }
+
   Future<void> fetchMedicineTypes() async {
     state = state.copyWith(
       medicineTypes: const AsyncValue.loading(),
       error: null,
     );
+    const cacheKey = 'medicineTypes';
     try {
       final result = await usecase.fetchMedicineTypes();
       state = state.copyWith(medicineTypes: AsyncValue.data(result));
+      // Cached so a medicine can still be added offline (the type is required).
+      offlineStore.cacheJson(cacheKey, result.map((m) => m.toJson()).toList())
+          .catchError((Object _) {});
     } catch (e, st) {
+      try {
+        final cached = await offlineStore.getCachedJson(cacheKey);
+        if (cached is List && cached.isNotEmpty) {
+          state = state.copyWith(medicineTypes: AsyncValue.data(cached
+              .map((j) => Medicine.fromJson(j as Map<String, dynamic>))
+              .toList()));
+          return;
+        }
+      } catch (_) {}
       state = state.copyWith(medicineTypes: AsyncValue.error(e, st));
     }
   }
@@ -410,10 +449,15 @@ class DoctorLoginViewmodel extends StateNotifier<DoctorLoginState> {
     try {
       final result = await usecase.fetchAllMedicines(doctorId);
       // Cache the catalog so it's available for offline prescriptions.
+      var list = result;
       try {
         await offlineStore.cacheMedicines(doctorId, result);
+        // keep the server's order; add medicines added offline, not yet synced
+        final unsynced = (await offlineStore.getCachedMedicines(doctorId))
+            .where((m) => (m.medicineId ?? 0) < 0);
+        list = [...result, ...unsynced];
       } catch (_) {}
-      state = state.copyWith(medicines: AsyncValue.data(result));
+      state = state.copyWith(medicines: AsyncValue.data(list));
     } catch (e) {
       // Network down — serve the cached catalog instead of an error state
       // (which would otherwise crash the prescription screen on `.value`).

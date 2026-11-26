@@ -12,6 +12,7 @@ process.env.DEMO_ENABLED = 'true'; // suites use the demo numbers
 process.env.DEMO_OTP = '123456';
 // Never send real WhatsApp OTPs or push notifications from a test run.
 process.env.WHATSAPP_API_TOKEN = '';
+process.env.OTP_TO_CONSOLE = ''; // a dev's .env may print OTPs instead
 process.env.GOOGLE_APPLICATION_CREDENTIALS = '';
 
 // No real database: every route talks to the scripted mock in helpers/db.js.

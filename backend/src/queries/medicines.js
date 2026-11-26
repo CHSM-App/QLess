@@ -60,7 +60,7 @@ BEGIN
               AND is_active   = 1
         )
         BEGIN
-            SELECT 'Medicine already in your list.' AS Message;
+            SELECT 'Medicine already in your list.' AS Message, @medId AS medicine_id;
             RETURN;
         END
 
@@ -77,7 +77,7 @@ BEGIN
             WHERE  doctor_id   = @doctor_id
               AND  medicine_id = @medId;
 
-            SELECT 'Medicine reactivated.' AS Message;
+            SELECT 'Medicine reactivated.' AS Message, @medId AS medicine_id;
             RETURN;
         END
 
@@ -85,7 +85,7 @@ BEGIN
         INSERT INTO dbo.Doctor_Medicine (doctor_id, medicine_id, is_active)
         VALUES (@doctor_id, @medId, 1);
 
-        SELECT 'Medicine added successfully.' AS Message;
+        SELECT 'Medicine added successfully.' AS Message, @medId AS medicine_id;
     END
 
 END

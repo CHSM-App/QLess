@@ -51,7 +51,12 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
 
 		const mobile_no_cc = `91${normalized}`;
 
-		if (!process.env.WHATSAPP_API_TOKEN) {
+		// Dev fallback while the WhatsApp provider is down: OTP_TO_CONSOLE=1 in
+		// .env prints the code in the server terminal instead of sending it.
+		// Never in production — anyone reading the logs could sign in as anyone.
+		const otpToConsole = process.env.OTP_TO_CONSOLE === '1' && process.env.NODE_ENV !== 'production';
+
+		if (!otpToConsole && !process.env.WHATSAPP_API_TOKEN) {
 			return res.status(500).json({
 				status: 0,
 				message: 'WhatsApp API token not configured'
@@ -61,16 +66,18 @@ router.post('/send-otp', otpSendLimiter, async (req, res) => {
 		// ✅ Generate OTP
 		const otp = crypto.randomInt(100000, 1000000).toString();
 
-		// ✅ Send WhatsApp OTP
-		const waResponse = await axios.post(
-			"https://api2.smsala.com/whatsapp/SendOtp",
-			{
-				PhoneNumber: mobile_no_cc,
-				OtpCode: otp,
-				ApiToken: process.env.WHATSAPP_API_TOKEN,
-				TemplateId: 463
-			}
-		);
+		// ✅ Send WhatsApp OTP (or print it, see otpToConsole)
+		const waResponse = otpToConsole
+			? (console.log(`\n[OTP] ${normalized} → ${otp}\n`), { data: { IsSuccess: true } })
+			: await axios.post(
+				"https://api2.smsala.com/whatsapp/SendOtp",
+				{
+					PhoneNumber: mobile_no_cc,
+					OtpCode: otp,
+					ApiToken: process.env.WHATSAPP_API_TOKEN,
+					TemplateId: 463
+				}
+			);
 
 		if (!waResponse.data || waResponse.data.IsSuccess !== true) {
 			log.error('send-otp: WhatsApp provider refused: ' + JSON.stringify(waResponse.data).slice(0, 500));

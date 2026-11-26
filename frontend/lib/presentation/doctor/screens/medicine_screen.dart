@@ -7,6 +7,7 @@ import 'package:qless/domain/models/medicine.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
 import 'package:qless/presentation/doctor/screens/add_medicine_page.dart';
+import 'package:qless/presentation/doctor/screens/clinic_stock_page.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 
 // ── Colour Palette (matches QueueHomePage exactly) ───────────────────────────
@@ -394,6 +395,9 @@ class _DoctorMedicinePageState extends ConsumerState<DoctorMedicinePage> {
         children: [
           // ── Header (matches QueueHomePage header style exactly) ──────────
           _buildHeader(),
+
+          // ── Clinic stock (doctor + receptionist) ────────────────────────
+          const ClinicStockEntry(),
 
           // ── Count row ───────────────────────────────────────────────────
           medicinesAsync.when(

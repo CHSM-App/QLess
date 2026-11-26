@@ -146,6 +146,8 @@ app.use('/doctor/users', protect, doctorUsersRouter);
 // Queue, leave, schedule, prescriptions, walk-in: clinic staff only.
 app.use('/doctor/insert', protect, authorize(ROLE.DOCTOR, ROLE.RECEPTIONIST), doctorInsertRouter);
 app.use('/doctor/index', protect, doctorIndexRouter);
+// Clinic medicine stock: doctor and receptionist manage it together.
+app.use('/doctor/stock', protect, authorize(ROLE.DOCTOR, ROLE.RECEPTIONIST), require('./routes/doctor/stock'));
 app.use('/patient/users', protect, patientUsersRouter);
 // Booking, cancelling, family and favorites: patient tokens only. (patient/users
 // lets staff into the few read routes the clinic app needs — see its guard.)

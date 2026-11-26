@@ -9,6 +9,7 @@ const log = require('../../../middleware/logger');
 const { saveFamilyMember } = require('../../../familyMembers');
 
 const {
+  alreadyApplied,
   emitQueueUpdate,
   isStaleReplay,
   fetchCurrentServing,
@@ -39,6 +40,7 @@ router.post('/appointment/queueNext', async (req, res) => {
   }
 
   try {
+    if (await alreadyApplied(req, 'next')) return res.json({ success: true, message: 'Already applied' });
     const result = await db.request()
       .input('operation', 'NEXT_SESSION')
       .input('doctor_id', doctor_id)
@@ -113,6 +115,7 @@ router.post('/appointment/queueStart', async (req, res) => {
   }
 
   try {
+    if (await alreadyApplied(req, 'queueStart')) return res.json({ success: true, message: 'Already applied' });
     const result = await db.request()
       .input('operation', 'QUEUE_START')
       .input('queue_id', queue_id)
@@ -195,6 +198,7 @@ router.post('/appointment/queuePause', async (req, res) => {
   }
 
   try {
+    if (await alreadyApplied(req, 'queuePause')) return res.json({ success: true, message: 'Already applied' });
     const result = await db.request()
       .input('operation', 'QUEUE_PAUSE')
       .input('queue_id', queue_id)
@@ -274,6 +278,7 @@ router.post('/appointment/queueStop', async (req, res) => {
   }
 
   try {
+    if (await alreadyApplied(req, 'queueStop')) return res.json({ success: true, message: 'Already applied' });
     // Pre-fetch personalized context BEFORE the SP cancels everything.
     const detailsRes = await db.request()
       .input('operation', 'APPT_CONTEXT_QUEUE')
@@ -458,6 +463,7 @@ router.post('/appointment/queueSkip', async (req, res) => {
   }
 
   try {
+    if (await alreadyApplied(req, 'skip')) return res.json({ success: true, message: 'Already applied' });
     const result = await db.request()
       .input('operation', 'SKIP_SESSION')
       .input('doctor_id', doctor_id)
@@ -583,6 +589,7 @@ router.post('/appointment/startSession', async (req, res) => {
   }
 
   try {
+    if (await alreadyApplied(req, 'start')) return res.json({ success: true, message: 'Already applied' });
     const result = await db.request()
       .input('operation', 'START_SESSION')
       .input('doctor_id', doctor_id)
@@ -623,6 +630,7 @@ router.post('/appointment/endSession', async (req, res) => {
   }
 
   try {
+    if (await alreadyApplied(req, 'end')) return res.json({ success: true, message: 'Already applied' });
     const result = await db.request()
       .input('operation', 'END_SESSION')
       .input('doctor_id', doctor_id)
@@ -839,7 +847,7 @@ router.post('/walkInBook', async (req, res) => {
       const row = dup.recordset?.[0];
       if (row) {
         log.info(`walkInBook: replay matched existing appointment ${row.appointment_id} — skipped duplicate`);
-        return res.json({ success: true, message: 'Walk-in already booked', patient_id: row.patient_id });
+        return res.json({ success: true, message: 'Walk-in already booked', patient_id: row.patient_id, appointment_id: row.appointment_id });
       }
     }
 
@@ -909,32 +917,38 @@ router.post('/walkInBook', async (req, res) => {
     log.info(`walkInBook: patient_id=${patient_id} user_type=${user_type} family_id=${family_id || null} booked=${booked} msg=${bookRes.recordset[0].message}`);
     if (booked) emitQueueUpdate(req, 'booked', doctor_id);
 
+    // The new appointment's id goes back to the app so an offline walk-in's
+    // placeholder id can be swapped for it (queued prescription / queue ops).
     // Queue running and nobody in progress or waiting → start this walk-in
     // straight away so the doctor doesn't have to press Start on them. The app
-    // opens the prescription for started_appointment_id.
+    // opens the prescription for started_appointment_id. Not on offline replay:
+    // the doctor's own queued start/next actions replay right after.
+    let appointment_id = null;
     let started_appointment_id = null;
     if (booked) {
       try {
-        const idle = await db.request()
+        const appt = await db.request()
           .input('doctor_id', sql.Int, parseInt(doctor_id))
           .input('patient_id', sql.Int, patient_id)
           .input('user_type', sql.Int, parseInt(user_type || 1))
           .input('appointment_date', appointment_date)
           .query(`
-            SELECT TOP 1 a.appointment_id
-            FROM appointments a
-            JOIN doctor_queue dq ON dq.queue_id = a.queue_id AND dq.queue_status = 1
-            WHERE a.doctor_id = @doctor_id AND a.patient_id = @patient_id
-              AND a.user_type = @user_type AND a.appointment_date = @appointment_date
-              AND a.booking_type = 1 AND a.status = 'booked'
-              AND NOT EXISTS (
+            SELECT TOP 1 a.appointment_id,
+              CASE WHEN a.booking_type = 1 AND dq.queue_status = 1 AND NOT EXISTS (
                 SELECT 1 FROM appointments o
                 WHERE o.queue_id = a.queue_id AND o.appointment_id <> a.appointment_id
                   AND o.status IN ('booked', 'in_progress'))
+              THEN 1 ELSE 0 END AS idle
+            FROM appointments a
+            LEFT JOIN doctor_queue dq ON dq.queue_id = a.queue_id
+            WHERE a.doctor_id = @doctor_id AND a.patient_id = @patient_id
+              AND a.user_type = @user_type AND a.appointment_date = @appointment_date
+              AND a.status = 'booked'
             ORDER BY a.appointment_id DESC
           `);
-        const appointment_id = idle.recordset?.[0]?.appointment_id;
-        if (appointment_id) {
+        const row = appt.recordset?.[0];
+        appointment_id = row?.appointment_id ?? null;
+        if (appointment_id && row.idle === 1 && !req.body.offline_queued_at) {
           const start = await db.request()
             .input('operation', 'START_SESSION')
             .input('doctor_id', doctor_id)
@@ -956,6 +970,7 @@ router.post('/walkInBook', async (req, res) => {
       success: booked,
       message: bookRes.recordset[0].message,
       patient_id,
+      appointment_id,
       started_appointment_id,
     });
 

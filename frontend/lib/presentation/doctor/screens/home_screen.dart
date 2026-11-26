@@ -12,6 +12,7 @@ import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/domain/models/appointment_request_model.dart';
 import 'package:qless/domain/models/doctor_availability_model.dart';
 import 'package:qless/domain/models/doctor_details.dart';
+import 'package:qless/domain/models/available_slots.dart';
 import 'package:qless/domain/models/doctor_schedule_model.dart';
 import 'package:qless/domain/models/family_member.dart';
 import 'package:qless/domain/models/patients.dart';
@@ -22,6 +23,7 @@ import 'package:qless/presentation/doctor/screens/doctor_availability_page.dart'
 import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart';
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+import 'package:qless/presentation/shared/widgets/skeleton.dart';
 
 part 'home_screen/overview_sidebar.dart';
 part 'home_screen/live_queue_bar.dart';
@@ -354,7 +356,10 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> with WidgetsBindi
   Future<void> _startSession(AppointmentList p) async {
     final pid = p.patientId ?? 0;
     final did = _doctorId;
-    if (pid == 0 || did == 0) { _snack('Missing info'); return; }
+    // A walk-in booked offline (negative placeholder appointment id) gets its
+    // patient id only when it syncs; the queued actions are filled in then.
+    final offlineWalkIn = (p.appointmentId ?? 0) < 0;
+    if ((pid == 0 && !offlineWalkIn) || did == 0) { _snack('Missing info'); return; }
     final status = p.status?.toLowerCase() ?? '';
     if (status != 'in_progress') {
       if (status == 'booked') {

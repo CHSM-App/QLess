@@ -260,6 +260,11 @@ class _PatientPrescriptionPdfScreenState
           pw.SizedBox(height: 6),
         ],
 
+        if (rx.investigation?.isNotEmpty == true) ...[
+          labeledRow('Investigation', rx.investigation!),
+          pw.SizedBox(height: 6),
+        ],
+
         // Advice
         if (rx.advice?.isNotEmpty == true) ...[
           labeledRow("Doctor's Advice", rx.advice!),

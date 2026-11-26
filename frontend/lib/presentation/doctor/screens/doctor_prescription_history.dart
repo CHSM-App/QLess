@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/domain/models/appointment_list.dart';
 import 'package:qless/presentation/doctor/providers/doctor_usecase_provider.dart';
 import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.dart';
+import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen.dart' show PatientVisitHistoryList;
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/print_prescription_screen.dart';
+import 'package:qless/presentation/shared/widgets/skeleton.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — exact match with PatientListScreen
@@ -114,7 +117,8 @@ class DoctorPrescriptionDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorPrescriptionDetailScreenState
-    extends ConsumerState<DoctorPrescriptionDetailScreen> {
+    extends ConsumerState<DoctorPrescriptionDetailScreen>
+    with SingleTickerProviderStateMixin {
   PatientPrescription? _rx;
   bool    _loading = true;
   String? _error;
@@ -144,6 +148,32 @@ class _DoctorPrescriptionDetailScreenState
   // across all days, completed visits only, all clinics).
   Map<int, int> _doctorVisitNo = {};
 
+  // History tab: this patient's completed visits with this doctor, newest first.
+  List<AppointmentList> _history = const [];
+  late final TabController _tabs = TabController(length: 2, vsync: this);
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  /// History tap: walk the full history with the arrows, open that visit.
+  void _openFromHistory(AppointmentList a) {
+    final i = _history.indexOf(a);
+    _tabs.animateTo(0);
+    if (_appointmentId == a.appointmentId) return;
+    _dir = 1;
+    setState(() {
+      _visits = [
+        for (final h in _history)
+          (appointmentId: h.appointmentId!, queueNumber: h.queueNumber),
+      ];
+      _index = i;
+    });
+    _fetchDetails();
+  }
+
   Future<void> _loadDoctorVisitNumbers() async {
     try {
       final doctorId = ref.read(doctorLoginViewModelProvider).doctorId ?? 0;
@@ -162,26 +192,27 @@ class _DoctorPrescriptionDetailScreenState
         });
       if (!mounted) return;
 
-      // Build this patient's visit list (newest first) if caller gave none.
+      // This patient's completed visits, newest first; same date keeps the
+      // list's own order so the arrows match the Completed tab.
+      final indexed = <(int, AppointmentList)>[
+        for (var k = 0; k < all.length; k++)
+          if (all[k].appointmentId != null &&
+              all[k].patientId == widget.patientId &&
+              (all[k].status?.toLowerCase().trim() ?? '') == 'completed')
+            (k, all[k]),
+      ];
+      indexed.sort((x, y) {
+        final dx = DateTime.tryParse(x.$2.appointmentDate ?? '');
+        final dy = DateTime.tryParse(y.$2.appointmentDate ?? '');
+        final c = (dx != null && dy != null) ? dy.compareTo(dx) : 0;
+        return c != 0 ? c : x.$1.compareTo(y.$1);
+      });
+      final mine = [for (final e in indexed) e.$2];
+
+      // Up/down arrows walk these visits if the caller gave no list.
       List<({int appointmentId, int? queueNumber})>? built;
       var builtIndex = 0;
       if (_visits == null) {
-        // Newest date first; same date keeps the list's own order so the
-        // arrows match what the doctor sees in the Completed tab.
-        final indexed = <(int, AppointmentList)>[
-          for (var k = 0; k < all.length; k++)
-            if (all[k].appointmentId != null &&
-                all[k].patientId == widget.patientId &&
-                (all[k].status?.toLowerCase().trim() ?? '') == 'completed')
-              (k, all[k]),
-        ];
-        indexed.sort((x, y) {
-          final dx = DateTime.tryParse(x.$2.appointmentDate ?? '');
-          final dy = DateTime.tryParse(y.$2.appointmentDate ?? '');
-          final c = (dx != null && dy != null) ? dy.compareTo(dx) : 0;
-          return c != 0 ? c : x.$1.compareTo(y.$1);
-        });
-        final mine = [for (final e in indexed) e.$2];
         final i = mine.indexWhere((a) => a.appointmentId == widget.appointmentId);
         if (mine.length > 1 && i >= 0) {
           built = [
@@ -193,6 +224,7 @@ class _DoctorPrescriptionDetailScreenState
       }
 
       setState(() {
+        _history = mine;
         _doctorVisitNo = {
           for (var i = 0; i < done.length; i++) done[i].appointmentId!: i + 1,
         };
@@ -221,9 +253,11 @@ class _DoctorPrescriptionDetailScreenState
     try {
       await ref
           .read(prescriptionViewModelProvider.notifier)
-          .appointmentWisePrescription(_appointmentId);
+          .appointmentWisePrescription(_appointmentId,
+              doctorId: ref.read(doctorLoginViewModelProvider).doctorId);
       if (!mounted) return;
-      final details = ref.read(prescriptionViewModelProvider).appointmentWisePrescriptions;
+      final rxState = ref.read(prescriptionViewModelProvider);
+      final details = rxState.appointmentWisePrescriptions;
       if (details != null && details.isNotEmpty) {
         setState(() {
           _rx = PatientPrescription.fromFlatList(
@@ -234,7 +268,7 @@ class _DoctorPrescriptionDetailScreenState
           _loading = false;
         });
       } else {
-        setState(() { _error = 'No prescription data found'; _loading = false; });
+        setState(() { _error = rxState.error ?? 'No prescription data found'; _loading = false; });
       }
     } catch (e) {
       if (mounted) setState(() { _error = e.toString(); _loading = false; });
@@ -264,6 +298,30 @@ class _DoctorPrescriptionDetailScreenState
     backgroundColor: kBg,
     body: Column(children: [
       _buildHeader(),
+      Material(
+        color: Colors.white,
+        child: TabBar(
+          controller: _tabs,
+          labelColor: kPrimaryDark,
+          unselectedLabelColor: kTextSecondary,
+          indicatorColor: kPrimary,
+          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          tabs: [
+            const Tab(text: 'Prescription'),
+            Tab(text: _history.isEmpty ? 'History' : 'History (${_history.length})'),
+          ],
+        ),
+      ),
+      Expanded(
+        child: TabBarView(controller: _tabs, children: [
+          _prescriptionTab(),
+          PatientVisitHistoryList(visits: _history, onSelect: _openFromHistory),
+        ]),
+      ),
+    ]),
+  );
+
+  Widget _prescriptionTab() => Column(children: [
       if (_hasNav) _visitBar(),
       Expanded(
         child: ClipRect(
@@ -286,8 +344,7 @@ class _DoctorPrescriptionDetailScreenState
           ),
         ),
       ),
-    ]),
-  );
+    ]);
 
   // // ── Header — PatientListScreen style ─────────────────────────────
   // Widget _buildHeader() => Container(
@@ -415,6 +472,7 @@ Widget _buildHeader() => Container(
               child: const Icon(Icons.print_rounded, color: kPrimary, size: 16),
             ),
           ),
+        if (_rx != null) ..._whatsAppButton(),
         const SizedBox(width: 8),
         // Completed badge
         Container(
@@ -432,6 +490,47 @@ Widget _buildHeader() => Container(
     ),
   ),
 );
+  // ── WhatsApp: doctor sends prescription or follow-up, reception only
+  // the follow-up. The server picks the patient's number.
+  List<Widget> _whatsAppButton() {
+    final isDoctor = ref.read(tokenProvider).roleId != 3;
+    final kinds = [
+      if (isDoctor) ('prescription', 'Send prescription'),
+      if (_rx!.followUpDate != null) ('followup', 'Send follow-up reminder'),
+    ];
+    if (kinds.isEmpty) return const [];
+    return [
+      const SizedBox(width: 8),
+      PopupMenuButton<String>(
+        tooltip: 'Send on WhatsApp',
+        onSelected: _sendWhatsApp,
+        itemBuilder: (_) => [
+          for (final k in kinds) PopupMenuItem(value: k.$1, child: Text(k.$2)),
+        ],
+        child: Container(
+          width: 34, height: 34,
+          decoration: BoxDecoration(
+            color: kGreenLight,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: kSuccess.withValues(alpha: 0.3)),
+          ),
+          child: const Icon(Icons.chat_rounded, color: kGreenDark, size: 16),
+        ),
+      ),
+    ];
+  }
+
+  Future<void> _sendWhatsApp(String kind) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final err = await ref
+        .read(prescriptionViewModelProvider.notifier)
+        .sendWhatsApp(_appointmentId, kind);
+    messenger.showSnackBar(SnackBar(
+      content: Text(err ?? 'Sent to ${widget.patientName} on WhatsApp'),
+      backgroundColor: err == null ? kGreenDark : null,
+    ));
+  }
+
   // ── Visit navigation bar (below header) ───────────────────────────
   Widget _visitBar() => Container(
     color: Colors.white,
@@ -469,9 +568,8 @@ Widget _buildHeader() => Container(
   // ── Body ──────────────────────────────────────────────────────────
   Widget _buildBody() {
     if (_loading) {
-      return const Center(
-      child: CircularProgressIndicator(color: kPrimary, strokeWidth: 2.5),
-    );
+      // Patient banner, visit card, clinical notes, medicines.
+      return const SkeletonBlocks(heights: [84, 64, 120, 180]);
     }
 
     if (_error != null) return _buildError();
@@ -520,6 +618,12 @@ Widget _buildHeader() => Container(
         _gap(10),
         _medicinesCard(rx),
         if (rx.followUpDate != null) ...[_gap(10), _followUpCard(rx.followUpDate!)],
+        if (rx.investigation?.isNotEmpty == true) ...[
+          _gap(10),
+          _sectionHeader('Investigation'),
+          _gap(8),
+          _adviceCard(rx.investigation!),
+        ],
         if (rx.advice?.isNotEmpty == true) ...[
           _gap(10),
           _sectionHeader('Advice'),
@@ -550,6 +654,12 @@ Widget _buildHeader() => Container(
               _appointmentCard(rx),
               if (_hasClinical(rx)) ...[_gap(10), _clinicalCard(rx)],
               if (rx.followUpDate != null) ...[_gap(10), _followUpCard(rx.followUpDate!)],
+              if (rx.investigation?.isNotEmpty == true) ...[
+                _gap(10),
+                _sectionHeader('Investigation'),
+                _gap(8),
+                _adviceCard(rx.investigation!),
+              ],
               if (rx.advice?.isNotEmpty == true) ...[
                 _gap(10),
                 _sectionHeader('Advice'),
@@ -693,7 +803,11 @@ Widget _buildHeader() => Container(
                 const Text('Follow-up Date', style: TextStyle(
                     fontSize: 12, fontWeight: FontWeight.w500, color: kTextSecondary)),
                 const SizedBox(height: 2),
-                Text(_fmtDate(date), style: const TextStyle(
+                Text(
+                    date.hour == 0 && date.minute == 0 // date only
+                        ? _fmtDate(date)
+                        : '${_fmtDate(date)}  ·  ${TimeOfDay.fromDateTime(date).format(context)}',
+                    style: const TextStyle(
                     fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
               ]),
             ]),

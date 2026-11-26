@@ -6,6 +6,8 @@ const admin = require('../../../fcm');
 const log = require('../../../middleware/logger');
 const notificationsSql = require('../../../queries/notifications');
 const appointmentsSql = require('../../../queries/appointments');
+const doctorLeaveSql = require('../../../queries/doctorLeave');
+const ownStaff = require('../../../middleware/ownStaff');
 
 // Helper — emits a queue_update event to all sockets in clinic_<doctor_id> room.
 // req.app.get('io') is available because app.set('io', io) is called in server.js.
@@ -345,7 +347,136 @@ function formatApptTime(t) {
   return `${h}:${mm} ${ampm}`;
 }
 
+// ── Replays that already took effect ────────────────────────────────────────
+// An offline action is sent again on reconnect — sometimes after the first
+// send already landed (timeout with the response lost). The SPs are not all
+// idempotent (NEXT_SESSION on a completed patient still bumps completed_count
+// and starts the next one), so for a replay already in its end state, answer
+// success and skip the SP. Live actions (no offline_queued_at) never check.
+const APPT_DONE = {
+  next: (s) => s !== 'booked' && s !== 'in_progress',
+  skip: (s) => s === 'skipped',
+  start: (s) => s === 'in_progress' || s === 'completed',
+  end: (s) => s === 'completed',
+};
+const QUEUE_DONE = { queueStart: 1, queuePause: 2, queueStop: 3 };
+
+async function alreadyApplied(req, kind) {
+  if (!req.body?.offline_queued_at) return false;
+  if (APPT_DONE[kind]) {
+    const id = parseInt(req.body.appointment_id);
+    if (!(id > 0)) return false;
+    const r = await db.request().input('appointment_id', sql.Int, id)
+      .query('/* alreadyApplied */ SELECT status FROM appointments WHERE appointment_id = @appointment_id');
+    const status = r.recordset?.[0]?.status;
+    return status != null && APPT_DONE[kind](String(status).toLowerCase().trim());
+  }
+  const id = parseInt(req.body.queue_id);
+  if (!(id > 0)) return false;
+  const r = await db.request().input('queue_id', sql.Int, id)
+    .query('/* alreadyApplied */ SELECT queue_status FROM doctor_queue WHERE queue_id = @queue_id');
+  return r.recordset?.[0]?.queue_status === QUEUE_DONE[kind];
+}
+
+// ── Sessions started offline ────────────────────────────────────────────────
+// A session the doctor never had a doctor_queue row for (opened the app
+// offline, or nobody booked yet) gets a temporary queue_id = -slot_id on the
+// device. When its queued actions replay, turn that back into the real row —
+// found, or created from the slot — before ownStaff checks the queue_id.
+
+const DAY_NAMES = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+// Validates the slot (this doctor's, scheduled today, queue-type) and returns
+// the queue_id of today's row for it, creating it if needed. 1900-01-01 was a
+// Monday, so the weekday maths doesn't depend on DATEFIRST / server language.
+const RESOLVE_TEMP_QUEUE_SQL = `/* resolveTempQueue */
+SET NOCOUNT ON; SET XACT_ABORT ON;
+DECLARE @today DATE = CAST(GETDATE() AS DATE);
+DECLARE @dow VARCHAR(10) = CHOOSE(DATEDIFF(DAY, '19000101', @today) % 7 + 1, ${DAY_NAMES.map((d) => `'${d}'`).join(', ')});
+DECLARE @max INT, @clinic NVARCHAR(20), @q INT;
+SELECT @max = ts.max_queue_length, @clinic = da.clinic_id
+FROM doctor_time_slots ts
+JOIN doctor_availability da ON da.availability_id = ts.availability_id
+WHERE ts.slot_id = @slot_id AND da.doctor_id = @doctor_id
+  AND LOWER(da.day_of_week) = @dow AND da.is_enabled = 1
+  AND ts.is_active = 1 AND ISNULL(ts.is_deleted, 0) = 0 AND ts.booking_mode IN (1, 3);
+IF @@ROWCOUNT = 0 BEGIN SELECT CAST(NULL AS INT) AS queue_id; RETURN; END
+BEGIN TRAN;
+SELECT @q = queue_id FROM doctor_queue WITH (UPDLOCK, HOLDLOCK)
+WHERE doctor_id = @doctor_id AND slot_id = @slot_id AND queue_date = @today;
+IF @q IS NULL
+BEGIN
+  INSERT INTO doctor_queue (slot_id, doctor_id, queue_date, total_queue, current_serving,
+                            current_patient_id, queue_status, completed_count, max_queue, clinic_id)
+  VALUES (@slot_id, @doctor_id, @today, 0, 0, 0, 0, 0, @max, @clinic);
+  SET @q = SCOPE_IDENTITY();
+END
+COMMIT;
+SELECT @q AS queue_id;`;
+
+class TempQueueError extends Error {
+  constructor(message) { super(message); this.status = 409; }
+}
+
+async function resolveTempQueueId(req, raw) {
+  const slotId = -Number(raw);
+  if (!(slotId > 0) || !Number.isInteger(slotId)) return raw;
+  if (!ownStaff.isStaff(req)) return raw;
+  const doctorId = await ownStaff.staffDoctorId(req);
+  if (!doctorId) return raw; // ownStaff answers 401 for this
+
+  // ponytail: compares in the server's timezone; fine while API and DB share one.
+  const queuedAt = Date.parse(req.body?.offline_queued_at);
+  if (Number.isFinite(queuedAt) && new Date(queuedAt).toDateString() !== new Date().toDateString()) {
+    throw new TempQueueError('That session was from an earlier day.');
+  }
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const leave = await db.request()
+    .input('operation', 'IS_BLOCKED')
+    .input('doctor_id', doctorId)
+    .input('from_date', today)
+    .run(doctorLeaveSql);
+  if (leave.recordset?.[0]?.blocked === 1) {
+    throw new TempQueueError('Doctor is on leave today.');
+  }
+
+  const r = await db.request()
+    .input('doctor_id', sql.Int, doctorId)
+    .input('slot_id', sql.Int, slotId)
+    .query(RESOLVE_TEMP_QUEUE_SQL);
+  const queueId = r.recordset?.[0]?.queue_id;
+  if (!queueId) throw new TempQueueError('That session is not in today\'s schedule.');
+  log.info(`[resolveTempQueue] doctor ${doctorId} slot ${slotId} → queue ${queueId}`);
+  return queueId;
+}
+
+const TEMP_QUEUE_PATH = /^(\/appointment\/queuePauseEmergency\/)(-\d+)$/;
+
+/** Router middleware: install BEFORE ownStaff. Rewrites a negative queue_id in
+ *  the body, or in the queuePauseEmergency URL, to the real one. */
+async function resolveTempQueue(req, res, next) {
+  try {
+    if (Number(req.body?.queue_id) < 0) {
+      req.body.queue_id = await resolveTempQueueId(req, req.body.queue_id);
+    }
+    const m = TEMP_QUEUE_PATH.exec(req.path);
+    if (m) {
+      const real = await resolveTempQueueId(req, m[2]);
+      req.url = req.url.replace(m[0], m[1] + real);
+    }
+    return next();
+  } catch (e) {
+    if (e instanceof TempQueueError) return res.status(e.status).json({ success: false, message: e.message });
+    return next(e);
+  }
+}
+
 module.exports = {
+  alreadyApplied,
+  resolveTempQueue,
+  resolveTempQueueId,
   emitQueueUpdate,
   STALE_REPLAY_MS,
   isStaleReplay,

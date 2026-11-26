@@ -7,6 +7,7 @@ import 'package:qless/presentation/doctor/screens/doctor_bottom_nav.dart';
 import 'package:qless/presentation/patient/providers/patient_view_model_provider.dart';
 import 'package:qless/presentation/patient/screens/patient_bottom_nav.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
+import 'package:qless/presentation/shared/widgets/skeleton.dart';
 
 /// Startup gate — no splash. Checks stored tokens and routes directly:
 /// logged-in doctor/patient land on their dashboard, everyone else on the
@@ -94,11 +95,12 @@ class _AuthGateState extends ConsumerState<AuthGate> {
           : 0;
       final effectiveDoctorId = stateDocId > 0 ? stateDocId : fallbackId;
       if (effectiveDoctorId > 0) {
-        try {
-          await ref
-              .read(doctorLoginViewModelProvider.notifier)
-              .getDoctorClinics(effectiveDoctorId);
-        } catch (_) {}
+        // Not awaited: it only fills the header's clinic dropdown, and waiting
+        // on the network here held the whole app on a blank screen.
+        ref
+            .read(doctorLoginViewModelProvider.notifier)
+            .getDoctorClinics(effectiveDoctorId)
+            .catchError((Object _) {});
       }
       target = const DoctorBottomNav();
     } else if (tokenState.isLoggedIn && tokenState.roleId == 2) {
@@ -149,9 +151,10 @@ class _AuthGateState extends ConsumerState<AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    // App-shell placeholder instead of a blank white screen with a spinner.
     return const Scaffold(
-      backgroundColor: Colors.white,
-      body: Center(child: CircularProgressIndicator()),
+      backgroundColor: Color(0xFFF7F8FA),
+      body: SafeArea(child: SkeletonBlocks(heights: [56, 120, 72, 72, 72])),
     );
   }
 }

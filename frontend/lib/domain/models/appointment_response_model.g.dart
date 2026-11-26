@@ -15,6 +15,8 @@ AppointmentResponseModel _$AppointmentResponseModelFromJson(
       ?.map((e) => AppointmentData.fromJson(e as Map<String, dynamic>))
       .toList(),
   startedAppointmentId: (json['started_appointment_id'] as num?)?.toInt(),
+  appointmentId: (json['appointment_id'] as num?)?.toInt(),
+  patientId: (json['patient_id'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$AppointmentResponseModelToJson(
@@ -24,6 +26,8 @@ Map<String, dynamic> _$AppointmentResponseModelToJson(
   'message': instance.message,
   'data': instance.data,
   'started_appointment_id': instance.startedAppointmentId,
+  'appointment_id': instance.appointmentId,
+  'patient_id': instance.patientId,
 };
 
 AppointmentData _$AppointmentDataFromJson(Map<String, dynamic> json) =>

@@ -708,11 +708,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
 
   Future<void> _handleViewPrescription(AppointmentList a) async {
     if (a.appointmentId == null || a.patientId == null) return;
-    if (ref.read(connectivityNotifierProvider).isOffline) {
-      _snack('No internet connection. Connect to view the prescription.',
-          isError: true);
-      return;
-    }
+    // Offline is fine — appointmentWisePrescription falls back to the copy
+    // cached the last time this prescription was opened.
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -729,7 +726,8 @@ class AppointmentScreenState extends ConsumerState<AppointmentScreen>
       final details =
           ref.read(prescriptionViewModelProvider).appointmentWisePrescriptions;
       if (details == null || details.isEmpty) {
-        _snack('No prescription found for this appointment', isError: true);
+        _snack(ref.read(prescriptionViewModelProvider).error ??
+            'No prescription found for this appointment', isError: true);
         return;
       }
       final prescriptionId = details.first.prescriptionId;
@@ -1242,7 +1240,8 @@ Widget _filterChip({
   // States
   // ---------------------------------------------------------------------------
   Widget _buildLoading(String msg) {
-    if (msg.contains('Fetching')) {
+    // Waiting on data → skeleton; only a real status message gets a spinner.
+    if (!msg.startsWith('Session expired')) {
       return _buildSkeletonList();
     }
     return Center(

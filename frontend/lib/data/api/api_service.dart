@@ -193,6 +193,10 @@ abstract class ApiService {
   @POST("doctor/insert/insertPrescription")
   Future<dynamic> insertPrescription(@Body() PrescriptionModel prescription);
 
+  // kind: 'prescription' (doctor) | 'followup' (doctor or reception)
+  @POST("doctor/insert/sendWhatsApp")
+  Future<dynamic> sendWhatsApp(@Body() Map<String, dynamic> body);
+
   @POST("doctor/insert/saveDoctorSchedule")
   Future<dynamic> saveDoctorSchedule(
     @Body() Map<String, dynamic> body,
@@ -384,6 +388,24 @@ Future<AppointmentResponseModel> queuePauseEmergency(
 
   @POST("patient/users/markAllNotificationsRead/{patient_id}")
   Future<dynamic> markAllNotificationsRead(@Path("patient_id") int patientId);
+
+  // ── Clinic medicine stock — { success, data: [...] }, see clinic_stock.dart
+  @GET("doctor/stock/{clinic_id}")
+  Future<dynamic> getClinicStock(@Path("clinic_id") String clinicId);
+
+  @GET("doctor/stock/{clinic_id}/movements")
+  Future<dynamic> getStockMovements(
+    @Path("clinic_id") String clinicId,
+    @Query("medicine_id") int? medicineId,
+  );
+
+  /// { clinic_id, medicine_id, unit, reorder_level, sale_price } — all replaced
+  @PUT("doctor/stock/item")
+  Future<dynamic> saveStockItem(@Body() Map<String, dynamic> body);
+
+  /// { client_uuid, clinic_id, medicine_id, qty, reason, unit_cost, note }
+  @POST("doctor/stock/movement")
+  Future<dynamic> addStockMovement(@Body() Map<String, dynamic> body);
 
   // // POST API
   // @POST("login/addPatientDetails")

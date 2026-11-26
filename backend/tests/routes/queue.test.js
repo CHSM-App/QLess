@@ -146,7 +146,7 @@ describe('POST /walkInBook', () => {
     mockDb.respond = walkInDb();
     const res = await post('/walkInBook', walkIn);
 
-    expect(res.body).toEqual({ success: true, message: 'Booked', patient_id: 41, started_appointment_id: null });
+    expect(res.body).toEqual({ success: true, message: 'Booked', patient_id: 41, appointment_id: null, started_appointment_id: null });
     expect(mockDb.callsTo('sp_appointment', 'START_SESSION')).toHaveLength(0);
     expect(mockDb.callsTo('sp_patients', 'Insert')[0].inputs.name).toBe('Asha');
     expect(mockDb.callsTo('sp_appointment', 'BOOK')[0].inputs).toMatchObject({ patient_id: 41, user_type: 1, clinic_id: 3 });
@@ -154,12 +154,20 @@ describe('POST /walkInBook', () => {
   });
 
   test('idle running queue: starts the walk-in straight away', async () => {
-    mockDb.respond = walkInDb({ idle: { appointment_id: 90 } });
+    mockDb.respond = walkInDb({ idle: { appointment_id: 90, idle: 1 } });
     const res = await post('/walkInBook', walkIn);
 
     expect(res.body.started_appointment_id).toBe(90);
     expect(mockDb.callsTo('sp_appointment', 'START_SESSION')[0].inputs.appointment_id).toBe(90);
     expect(emitted.map((e) => e.payload.event)).toEqual(['booked', 'session_started']);
+  });
+
+  test('offline replay returns the new appointment id but does not auto-start', async () => {
+    mockDb.respond = walkInDb({ idle: { appointment_id: 90, idle: 1 } });
+    const res = await post('/walkInBook', { ...walkIn, offline_queued_at: new Date().toISOString() });
+
+    expect(res.body).toMatchObject({ success: true, appointment_id: 90, started_appointment_id: null });
+    expect(mockDb.callsTo('sp_appointment', 'START_SESSION')).toHaveLength(0);
   });
 
   test('family member walk-in books under the new member id', async () => {
@@ -183,8 +191,118 @@ describe('POST /walkInBook', () => {
     mockDb.respond = walkInDb({ duplicate: { appointment_id: 77, patient_id: 41 } });
     const res = await post('/walkInBook', { ...walkIn, offline_queued_at: new Date().toISOString() });
 
-    expect(res.body).toEqual({ success: true, message: 'Walk-in already booked', patient_id: 41 });
+    expect(res.body).toEqual({ success: true, message: 'Walk-in already booked', patient_id: 41, appointment_id: 77 });
     expect(mockDb.callsTo('sp_patients', 'Insert')).toHaveLength(0);
     expect(mockDb.callsTo('sp_appointment', 'BOOK')).toHaveLength(0);
+  });
+});
+
+describe('offline-started sessions (queue_id = -slot_id)', () => {
+  // resolveTempQueue answers the real queue id (null = slot not scheduled today)
+  function tempDb({ queueId = 55, blocked = 0 } = {}) {
+    const rest = queueDb({});
+    return (call) => {
+      if (call.kind === 'query' && call.target.includes('/* resolveTempQueue */')) return [{ queue_id: queueId }];
+      if (call.target === 'sp_doctor_leave' && call.inputs.operation === 'IS_BLOCKED') return [{ blocked }];
+      return rest(call);
+    };
+  }
+
+  test('queueStart on a temporary id runs against the real queue', async () => {
+    mockDb.respond = tempDb();
+    const res = await post('/appointment/queueStart', { doctor_id: 2, queue_id: -7 });
+
+    expect(res.body.success).toBe(true);
+    expect(mockDb.callsTo('resolveTempQueue')[0].inputs).toMatchObject({ doctor_id: 2, slot_id: 7 });
+    expect(mockDb.callsTo('sp_appointment', 'QUEUE_START')[0].inputs.queue_id).toBe(55);
+  });
+
+  test('emergency pause URL with a temporary id is resolved too', async () => {
+    mockDb.respond = tempDb();
+    await post('/appointment/queuePauseEmergency/-7', {});
+    expect(mockDb.callsTo('sp_appointment', 'QUEUE_PAUSE_EMERGENCY')[0].inputs.queue_id).toBe('55');
+  });
+
+  test('real queue ids are left alone', async () => {
+    mockDb.respond = tempDb();
+    await post('/appointment/queueStart', { doctor_id: 2, queue_id: 12 });
+    expect(mockDb.callsTo('resolveTempQueue')).toHaveLength(0);
+    expect(mockDb.callsTo('sp_appointment', 'QUEUE_START')[0].inputs.queue_id).toBe(12);
+  });
+
+  test('409 when the slot is not in today\'s schedule', async () => {
+    mockDb.respond = tempDb({ queueId: null });
+    const res = await post('/appointment/queueStart', { doctor_id: 2, queue_id: -7 });
+    expect(res.status).toBe(409);
+    expect(mockDb.callsTo('sp_appointment', 'QUEUE_START')).toHaveLength(0);
+  });
+
+  test('409 on a leave day, before any queue row is made', async () => {
+    mockDb.respond = tempDb({ blocked: 1 });
+    const res = await post('/appointment/queueStart', { doctor_id: 2, queue_id: -7 });
+    expect(res.status).toBe(409);
+    expect(mockDb.callsTo('resolveTempQueue')).toHaveLength(0);
+  });
+
+  test('409 when the action was queued on an earlier day', async () => {
+    mockDb.respond = tempDb();
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const res = await post('/appointment/queueStart', { doctor_id: 2, queue_id: -7, offline_queued_at: twoDaysAgo });
+    expect(res.status).toBe(409);
+    expect(mockDb.callsTo('resolveTempQueue')).toHaveLength(0);
+  });
+});
+
+describe('offline replay of an action that already took effect', () => {
+  const now = () => new Date().toISOString();
+  // alreadyApplied looks up the current appointment status / queue status
+  function stateDb({ status, queueStatus }) {
+    const rest = queueDb({ NEXT_SESSION: [{ success: 1 }], QUEUE_START: [{ success: 1 }] });
+    return (call) => {
+      if (call.kind === 'query' && call.target.includes('/* alreadyApplied */')) {
+        return call.target.includes('FROM appointments') ? [{ status }] : [{ queue_status: queueStatus }];
+      }
+      return rest(call);
+    };
+  }
+
+  test.each([
+    ['queueNext', 'NEXT_SESSION', 'completed'],
+    ['queueSkip', 'SKIP_SESSION', 'skipped'],
+    ['startSession', 'START_SESSION', 'in_progress'],
+    ['endSession', 'END_SESSION', 'completed'],
+  ])('%s replay on a %s patient answers success without running the SP', async (route, op, status) => {
+    mockDb.respond = stateDb({ status });
+    const res = await post('/appointment/' + route, { doctor_id: 2, appointment_id: 11, offline_queued_at: now() });
+
+    expect(res.body).toEqual({ success: true, message: 'Already applied' });
+    expect(mockDb.callsTo('sp_appointment', op)).toHaveLength(0);
+    expect(send()).not.toHaveBeenCalled();
+    expect(emitted).toHaveLength(0);
+  });
+
+  test.each([
+    ['queueStart', 'QUEUE_START', 1],
+    ['queuePause', 'QUEUE_PAUSE', 2],
+    ['queueStop', 'QUEUE_STOP', 3],
+  ])('%s replay on a queue already in that state is a no-op', async (route, op, queueStatus) => {
+    mockDb.respond = stateDb({ queueStatus });
+    const res = await post('/appointment/' + route, { doctor_id: 2, queue_id: 5, offline_queued_at: now() });
+
+    expect(res.body).toEqual({ success: true, message: 'Already applied' });
+    expect(mockDb.callsTo('sp_appointment', op)).toHaveLength(0);
+  });
+
+  test('a replay that has not happened yet still runs', async () => {
+    mockDb.respond = stateDb({ status: 'in_progress' });
+    await post('/appointment/queueNext', { doctor_id: 2, appointment_id: 11, offline_queued_at: now() });
+    expect(mockDb.callsTo('sp_appointment', 'NEXT_SESSION')).toHaveLength(1);
+  });
+
+  test('a live action never checks — even on a completed patient', async () => {
+    mockDb.respond = stateDb({ status: 'completed' });
+    await post('/appointment/queueNext', { doctor_id: 2, appointment_id: 11 });
+    expect(mockDb.callsTo('alreadyApplied')).toHaveLength(0);
+    expect(mockDb.callsTo('sp_appointment', 'NEXT_SESSION')).toHaveLength(1);
   });
 });
