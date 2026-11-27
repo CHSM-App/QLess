@@ -122,6 +122,9 @@ class AppointmentList {
   @JsonKey(name: 'mobile')
   String? mobile;
 
+  @JsonKey(name: 'patient_mobile')
+  String? patientMobile;
+
   @JsonKey(name: 'is_arrived')
   bool? isArrived;
 
@@ -170,6 +173,7 @@ class AppointmentList {
     this.symptoms,
     this.isReviewed,
     this.mobile,
+    this.patientMobile,
     this.isArrived,
     this.arrivedAt,
   });

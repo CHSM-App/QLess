@@ -13,6 +13,8 @@ import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 import 'package:qless/presentation/shared/widgets/connectivity_error_card.dart';
 import 'package:qless/presentation/shared/widgets/skeleton.dart';
+import 'package:qless/core/feature_flags.dart';
+import 'package:qless/presentation/shared/reports/report_screens.dart';
 
 // ── Shared colour palette ─────────────────────────────────────────────────────
 const kPrimary      = Color(0xFF26C6B0);
@@ -352,6 +354,23 @@ class _PatientPrescriptionListScreenState
           ],
         ),
         actions: [
+          // Lab reports (AI summary) of whoever the member filter shows; self by default.
+          if (kAiReportsEnabled && pid > 0)
+            IconButton(
+              tooltip: 'My reports',
+              icon: const Icon(Icons.document_scanner_outlined, color: kPrimary),
+              onPressed: () {
+                final member = members.where((m) => m.memberId == _memberFilter).firstOrNull;
+                Navigator.push(context, MaterialPageRoute(builder: (_) => ReportsListScreen(
+                  mode: ReportsListMode.patient,
+                  isPatient: true,
+                  patientId: member?.memberId ?? pid,
+                  userType: member != null ? 2 : 1,
+                  patientName: member?.memberName ?? pName,
+                  title: member != null ? "${member.memberName ?? 'Member'}'s reports" : 'My reports',
+                )));
+              },
+            ),
           // Member filter dropdown
           _MemberDropdown(
             selected: _memberFilter,
@@ -1523,6 +1542,16 @@ class _PatientPrescriptionViewScreenState
                   const SizedBox(height: 10), _buildNotesRow(),
                   if (_rx.followUpDate != null) ...[
                     const SizedBox(height: 10), _buildFollowUpCard()],
+                  if (kAiReportsEnabled) ...[
+                    const SizedBox(height: 10),
+                    PrescriptionReportsTile(
+                      prescriptionId: _rx.prescriptionId,
+                      patientId: _rx.patientId,
+                      userType: _rx.userType,
+                      patientName: _rx.patientName,
+                      isPatient: true,
+                    ),
+                  ],
                   const SizedBox(height: 10), _buildFooter(),
                   const SizedBox(height: 10),
                 ]),

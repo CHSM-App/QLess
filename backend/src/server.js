@@ -153,10 +153,14 @@ app.use('/patient/users', protect, patientUsersRouter);
 // lets staff into the few read routes the clinic app needs — see its guard.)
 app.use('/patient/insert', protect, authorize(ROLE.PATIENT), patientInsertRouter);
 app.use('/patient/index', protect, authorize(ROLE.PATIENT), patientIndexRouter);
+// AI medical report summaries — doctor, receptionist and patient (role checks inside).
+app.use('/reports', protect, require('./routes/reports'));
 
 // Uploaded images — JWT-gated. Folder: UPLOADS_DIR (src/uploads.js).
 const UPLOADS_DIR = require('./uploads');
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+// Medical reports are served only through the ownership-checked /reports/:id/file route.
+app.use('/uploads/reports', (req, res) => res.sendStatus(404));
 app.use('/uploads', uploadAuth, express.static(UPLOADS_DIR));
 
 // Landing page static assets (CSS, JS, images).

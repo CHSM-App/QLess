@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +17,8 @@ import 'package:qless/presentation/doctor/providers/doctor_view_model_provider.d
 import 'package:qless/presentation/doctor/screens/doctor_prescription_history.dart';
 import 'package:qless/presentation/doctor/screens/add_medicine_page.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
+
+part 'prescription_med_demos.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — aligned with PatientListScreen
@@ -574,7 +578,8 @@ class _CompleteDropdownState extends State<_CompleteDropdown> {
   @override
   Widget build(BuildContext context) {
     final opt = _options[_selected];
-    return Row(children: [
+    // Stretches to the bar's height so both halves line up with Skip & Next.
+    return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Expanded(
         child: ElevatedButton(
           onPressed: _action,
@@ -583,16 +588,19 @@ class _CompleteDropdownState extends State<_CompleteDropdown> {
             shape: const RoundedRectangleBorder(borderRadius: BorderRadius.only(
               topLeft: Radius.circular(10), bottomLeft: Radius.circular(10),
             )),
-            padding: const EdgeInsets.symmetric(vertical: 13),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
           ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text(opt.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-            const SizedBox(width: 4),
-            Icon(opt.icon, size: 14),
-          ]),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Text(opt.label, maxLines: 1, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              const SizedBox(width: 6),
+              Icon(opt.icon, size: 16),
+            ]),
+          ),
         ),
       ),
-      Container(width: 1, height: 46, color: Colors.white.withValues(alpha: 0.3)),
+      Container(width: 1, color: Colors.white.withValues(alpha: 0.3)),
       PopupMenuButton<int>(
         onSelected: (v) => setState(() => _selected = v),
         padding: EdgeInsets.zero,
@@ -604,8 +612,7 @@ class _CompleteDropdownState extends State<_CompleteDropdown> {
           _menuItem(1, Icons.arrow_back_rounded,    'Complete & Back'),
         ],
         child: Container(
-          height: 46,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: const BoxDecoration(
             color: kPrimary,
             borderRadius: BorderRadius.only(
@@ -680,7 +687,7 @@ class PrescriptionScreen extends ConsumerStatefulWidget {
   ConsumerState<PrescriptionScreen> createState() => _PrescriptionScreenState();
 }
 
-class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
+class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> with WidgetsBindingObserver {
   final _sympCtrl = TextEditingController();
   final _diagCtrl = TextEditingController();
   final _clinCtrl = TextEditingController();
@@ -742,6 +749,8 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     // Fresh balances: the Medicines tab may hold an older copy of the stock.
     Future.microtask(() => ref.invalidate(clinicStockProvider(widget.clinicId)));
     _fetchPreviousVisits();
+    FocusManager.instance.addListener(_onFocusChanged);
+    WidgetsBinding.instance.addObserver(this);
   }
 
   // Doctor-wide, ALL-clinic history — deliberately bypasses the shared
@@ -775,7 +784,7 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
       });
       setState(() => _previousVisitsCache = visits);
     } catch (_) {
-      // Leave _previousVisitsCache as-is — card just won't show/refresh.
+      // Leave _previousVisitsCache as-is — the header history icon just won't show/refresh.
     }
   }
 
@@ -804,7 +813,61 @@ class _PrescriptionScreenState extends ConsumerState<PrescriptionScreen> {
     _sympCtrl.dispose(); _diagCtrl.dispose();
     _clinCtrl.dispose(); _advCtrl.dispose(); _invCtrl.dispose();
     _doctorIdSub.close();
+    FocusManager.instance.removeListener(_onFocusChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    _kbTimer?.cancel();
     super.dispose();
+  }
+
+  // ── Keep the focused text box near the top while the keyboard is up ──
+  // One focus listener covers every field on the page. The scroll waits for
+  // the keyboard to stop animating (didChangeMetrics fires every frame of
+  // it); scrolling earlier gets clamped because the list hasn't shrunk yet.
+  Timer? _kbTimer;
+
+  /// Extra room under the list while the keyboard is open, so even the last
+  /// fields can be brought up to the top.
+  double get _listPadBottom => 110 +
+      (MediaQuery.viewInsetsOf(context).bottom > 0 ? MediaQuery.sizeOf(context).height * 0.5 : 0);
+
+  void _onFocusChanged() {
+    final kbOpen = View.of(context).viewInsets.bottom > 0;
+    // Keyboard already up (moving between fields): scroll now. Otherwise
+    // didChangeMetrics re-arms this every frame until the keyboard settles.
+    _scheduleScroll(Duration(milliseconds: kbOpen ? 50 : 700));
+  }
+
+  @override
+  void didChangeMetrics() => _scheduleScroll(const Duration(milliseconds: 150));
+
+  void _scheduleScroll(Duration delay) {
+    _kbTimer?.cancel();
+    _kbTimer = Timer(delay, _scrollFocusedFieldUp);
+  }
+
+  void _scrollFocusedFieldUp() {
+    if (!mounted) return;
+    final ctx = FocusManager.instance.primaryFocus?.context;
+    if (ctx == null || !ctx.mounted || ctx.findAncestorWidgetOfExactType<EditableText>() == null) return;
+    if (ModalRoute.of(ctx) != ModalRoute.of(context)) return; // e.g. a bottom sheet
+    if (View.of(context).viewInsets.bottom == 0) return;      // keyboard closed
+    // Only the vertical page list: Scrollable.ensureVisible would also slide
+    // sideways scrollers (the medicine table) and cut the field off.
+    var s = Scrollable.maybeOf(ctx);
+    while (s != null && s.position.axis != Axis.vertical) {
+      s = Scrollable.maybeOf(s.context);
+    }
+    final field = ctx.findRenderObject();
+    final list = s?.context.findRenderObject();
+    if (s == null || field is! RenderBox || list is! RenderBox) return;
+    // Measured against the page list itself: position.ensureVisible() measures
+    // against the field's NEAREST viewport — the table's sideways scroller —
+    // and applied that horizontal offset to the page, throwing the field down.
+    final pos = s.position;
+    final dy = field.localToGlobal(Offset.zero, ancestor: list).dy;
+    final target = (pos.pixels + dy - pos.viewportDimension * 0.05)
+        .clamp(pos.minScrollExtent, pos.maxScrollExtent);
+    pos.animateTo(target, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
   }
   void _addMed() {
   setState(() => _meds.insert(0, MedicineEntry()));
@@ -1319,26 +1382,57 @@ Widget build(BuildContext context) {
               child: const Icon(Icons.arrow_back_ios_new_rounded, color: kTextPrimary, size: 15),
             ),
           ),
-          const SizedBox(width: 10),
-          
-          // Icon badge — same 34×34 style as PatientListScreen
-          Container(
-            width: 34, height: 34,
-            decoration: BoxDecoration(
-              color: kPrimaryLight,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: kPrimary.withValues(alpha: 0.2)),
-            ),
-            child: const Icon(Icons.description_outlined, color: kPrimary, size: 16),
-          ),
-          const SizedBox(width: 8),
-          const Expanded(
+          const SizedBox(width: 12),
+          // Who this prescription is for: patient name + queue number.
+          Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('New Prescription', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
-              SizedBox(height: 1),
-              Text('Fill in consultation details', style: TextStyle(fontSize: 11, color: kTextSecondary)),
+              Text(widget.patientName, maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: kTextPrimary)),
+              const SizedBox(height: 1),
+              Text(
+                  [
+                    widget.queueNumber != null ? 'Queue #${widget.queueNumber}' : 'Walk-in',
+                    if (widget.patientAge != null) widget.patientAge!,
+                    if (widget.patientGender != null) widget.patientGender!,
+                  ].join(' · '),
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kPrimaryDark)),
             ]),
           ),
+          // Previous visits with this doctor — only when there are some; badge = count.
+          if (_previousVisitsCache.isNotEmpty) ...[
+            const SizedBox(width: 10),
+            Tooltip(
+              message: 'Previous history',
+              child: GestureDetector(
+                onTap: () => _openPreviousHistory(_previousVisitsCache),
+                child: Stack(clipBehavior: Clip.none, children: [
+                  Container(
+                    width: 34, height: 34,
+                    decoration: BoxDecoration(
+                      color: kPurpleLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.history_rounded, color: kPurpleDark, size: 18),
+                  ),
+                  Positioned(
+                    top: -5, right: -5,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: kPurpleDark,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text('${_previousVisitsCache.length}', textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Colors.white)),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ],
         ]),
       ),
     ),
@@ -1357,10 +1451,8 @@ Widget build(BuildContext context) {
             border: Border(right: BorderSide(color: kBorder)),
           ),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+            padding: EdgeInsets.fromLTRB(16, 14, 16, _listPadBottom),
             children: [
-              _patientCard(), _gap(12),
-              if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
               _symptomsSection(), _gap(10),
               _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
               _textSection('Investigation', _invCtrl, 'Tests advised — e.g. CBC, X-ray chest…'),
@@ -1374,11 +1466,10 @@ Widget build(BuildContext context) {
       Expanded(
         child: Stack(children: [
           ListView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+            padding: EdgeInsets.fromLTRB(16, 14, 16, _listPadBottom),
             children: [
               _medicinesHeader(), _gap(10),
-              ..._buildMedCards(medicines),
-              if (_meds.isEmpty) _emptyMeds(),
+              ..._medSection(medicines),
             ],
           ),
           _bottomBar(),
@@ -1393,7 +1484,7 @@ Widget build(BuildContext context) {
             border: Border(left: BorderSide(color: kBorder)),
           ),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
+            padding: EdgeInsets.fromLTRB(16, 14, 16, _listPadBottom),
             children: [_followUpCard()],
           ),
         ),
@@ -1409,10 +1500,8 @@ Widget build(BuildContext context) {
           Expanded(
             flex: 4,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 10, 110),
+              padding: EdgeInsets.fromLTRB(16, 14, 10, _listPadBottom),
               children: [
-                _patientCard(), _gap(12),
-                if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
                 _symptomsSection(), _gap(10),
                 _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(10),
                 _textSection('Investigation', _invCtrl, 'Tests advised — e.g. CBC, X-ray chest…'), _gap(10),
@@ -1424,11 +1513,10 @@ Widget build(BuildContext context) {
           Expanded(
             flex: 5,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(10, 14, 16, 110),
+              padding: EdgeInsets.fromLTRB(10, 14, 16, _listPadBottom),
               children: [
                 _medicinesHeader(), _gap(10),
-                ..._buildMedCards(medicines),
-                if (_meds.isEmpty) _emptyMeds(),
+                ..._medSection(medicines),
               ],
             ),
           ),
@@ -1439,17 +1527,14 @@ Widget build(BuildContext context) {
     // Mobile — single column
     return Stack(children: [
       ListView(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 110),
+        padding: EdgeInsets.fromLTRB(14, 14, 14, _listPadBottom),
         children: [
-          _patientCard(), _gap(12),
-          if (_previousVisitsCache.isNotEmpty) ...[_previousHistoryCard(), _gap(12)],
           _symptomsSection(), _gap(10),
           _textSection('Diagnosis', _diagCtrl, 'Enter diagnosis…'), _gap(12),
           _textSection('Investigation', _invCtrl, 'Tests advised — e.g. CBC, X-ray chest…'), _gap(12),
           // _textSection('Clinical Notes', _clinCtrl, 'Optional clinical notes…'), _gap(12),
           _medicinesHeader(), _gap(10),
-          ..._buildMedCards(medicines),
-          if (_meds.isEmpty) _emptyMeds(),
+          ..._medSection(medicines),
           _gap(12),
           _followUpCard(),
         ],
@@ -1457,55 +1542,6 @@ Widget build(BuildContext context) {
       _bottomBar(),
     ]);
   }
-
-  // ── Patient Card — matches PatientListScreen card style ──────────
-  Widget _patientCard() {
-    final inits = widget.patientName.trim().split(' ').take(2)
-        .map((w) => w.isNotEmpty ? w[0] : '').join().toUpperCase();
-    return _card(child: Row(children: [
-      Container(
-        width: 44, height: 44,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(colors: [_kGradFrom, _kGradTo],
-              begin: Alignment.topLeft, end: Alignment.bottomRight),
-          shape: BoxShape.circle,
-        ),
-        alignment: Alignment.center,
-        child: Text(inits, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Colors.white)),
-      ),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(widget.patientName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary),
-            overflow: TextOverflow.ellipsis),
-        const SizedBox(height: 4),
-        Wrap(spacing: 5, runSpacing: 4, children: [
-          if (widget.patientAge != null)    _chip(widget.patientAge!, bg: kInfoLight, fg: kInfoDark),
-          if (widget.patientGender != null) _chip(widget.patientGender!, bg: kPrimaryLighter, fg: kPrimaryDark),
-          if (widget.queueNumber != null)   _chip('Queue #${widget.queueNumber}', bg: kPrimaryLight, fg: kPrimaryDark),
-        ]),
-      ])),
-    ]));
-  }
-
-  // ── Previous History card — only if this patient has past completed visits with this doctor ──
-  Widget _previousHistoryCard() => GestureDetector(
-    onTap: () => _openPreviousHistory(_previousVisitsCache),
-    child: _card(child: Row(children: [
-      Container(
-        width: 38, height: 38,
-        decoration: BoxDecoration(color: kPurpleLight, borderRadius: BorderRadius.circular(10)),
-        child: const Icon(Icons.history_rounded, color: kPurpleDark, size: 18),
-      ),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Previous History', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: kTextPrimary)),
-        const SizedBox(height: 2),
-        Text('${_previousVisitsCache.length} earlier visit${_previousVisitsCache.length == 1 ? '' : 's'} with this patient',
-            style: const TextStyle(fontSize: 11, color: kTextSecondary)),
-      ])),
-      const Icon(Icons.chevron_right_rounded, color: kTextMuted, size: 20),
-    ])),
-  );
 
   Widget _textSection(String label, TextEditingController ctrl, String hint, {bool hasError = false, Key? key}) =>
       KeyedSubtree(key: key, child: _card(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1678,11 +1714,31 @@ Widget build(BuildContext context) {
     );
   }
 
-  Widget _medicinesHeader() => Row(
+  // DEMO: layout switcher — see prescription_med_demos.dart
+  List<Widget> _medSection(List<Medicine> medicines) {
+    if (medLayoutDemo == 0) return [..._buildMedCards(medicines), if (_meds.isEmpty) _emptyMeds()];
+    final stock = ref.watch(clinicStockProvider(widget.clinicId)).valueOrNull ?? const <int, ClinicStockItem>{};
+    void changed() => setState(() {});
+    return [switch (medLayoutDemo) {
+      1 => MedTableDemo(meds: _meds, medicines: medicines, stock: stock, changed: changed),
+      2 => MedChipsDemo(meds: _meds, medicines: medicines, stock: stock, changed: changed),
+      3 => MedWizardDemo(meds: _meds, medicines: medicines, stock: stock, changed: changed),
+      4 => MedGridDemo(meds: _meds, medicines: medicines, stock: stock, changed: changed),
+      _ => MedShorthandDemo(meds: _meds, medicines: medicines, stock: stock, changed: changed),
+    }];
+  }
+
+  Widget _medicinesHeader() => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    MedLayoutSwitcher(onChanged: (i) => setState(() => medLayoutDemo = i)),
+    const SizedBox(height: 8),
+    _medicinesHeaderRow(),
+  ]);
+
+  Widget _medicinesHeaderRow() => Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
       _secLabel('Medicines', bare: true),
-      GestureDetector(
+      if (medLayoutDemo == 0) GestureDetector(
         onTap: _addMed,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -1796,6 +1852,9 @@ List<Widget> _buildMedCards(List<Medicine> medicines) {
 
   // ── Bottom Action Bar ────────────────────────────────────────────
   Widget _bottomBar() {
+    // Out of the way while typing — on a phone it ate a third of the space
+    // left above the keyboard. "Done" on the keyboard brings it back.
+    if (MediaQuery.viewInsetsOf(context).bottom > 0) return const SizedBox.shrink();
     final isLoading = ref.watch(prescriptionViewModelProvider).isLoading || _isSubmitting;
     return Positioned(
       bottom: 0, left: 0, right: 0,
@@ -1806,17 +1865,28 @@ List<Widget> _buildMedCards(List<Medicine> medicines) {
           border: Border(top: BorderSide(color: kBorder)),
           boxShadow: [BoxShadow(color: Color(0x14000000), blurRadius: 16, offset: Offset(0, -3))],
         ),
-        child: Row(children: [
+        // Fixed height + stretch: both buttons always the same height, labels on one line.
+        child: SizedBox(
+          height: 48,
+          child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(
-            child: OutlinedButton.icon(
+            flex: 2,
+            child: OutlinedButton(
               onPressed: isLoading ? null : _onSkip,
-              icon: const Icon(Icons.skip_next_rounded, size: 15, color: kAmberDark),
-              label: const Text('Skip & Next', style: TextStyle(color: kAmberDark, fontWeight: FontWeight.w700, fontSize: 12)),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: kAmberLight, width: 1.5),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(vertical: 13),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 backgroundColor: kAmberLight,
+              ),
+              child: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.skip_next_rounded, size: 16, color: kAmberDark),
+                  SizedBox(width: 4),
+                  Text('Skip & Next', maxLines: 1,
+                      style: TextStyle(color: kAmberDark, fontWeight: FontWeight.w700, fontSize: 13)),
+                ]),
               ),
             ),
           ),
@@ -1825,7 +1895,6 @@ List<Widget> _buildMedCards(List<Medicine> medicines) {
             flex: 3,
             child: isLoading
                 ? Container(
-                    height: 46,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(colors: [_kGradFrom, _kGradTo],
                           begin: Alignment.topLeft, end: Alignment.bottomRight),
@@ -1838,6 +1907,7 @@ List<Widget> _buildMedCards(List<Medicine> medicines) {
                 : _CompleteDropdown(onNext: _completePrescription, onBack: _completeAndBack),
           ),
         ]),
+        ),
       ),
     );
   }
@@ -1862,12 +1932,6 @@ List<Widget> _buildMedCards(List<Medicine> medicines) {
     const SizedBox(width: 7),
     Text(t, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: kTextPrimary, letterSpacing: -0.2)),
   ]);
-
-  Widget _chip(String t, {required Color bg, required Color fg}) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-    child: Text(t, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: fg)),
-  );
 
   InputDecoration _ideco(String hint, {bool hasError = false}) => InputDecoration(
     hintText: hint,

@@ -18,6 +18,8 @@ Database: SQL Server. `QLess_test_db` doubles as **staging**.
 | `SIGNUP_REQUIRES_OTP` / `MOBILE_CHANGE_REQUIRES_OTP` | `false` until the app version with the OTP step (Wave 7) is on most phones, then `true`. While `false`, a missing proof is only logged. |
 | `UPLOADS_DIR` | user images folder **outside the repo** (see §4) |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | admin panel credential (long, unique) |
+| `ANTHROPIC_API_KEY` | Claude API key for AI report summaries (console.anthropic.com). Unset = feature answers 503 |
+| `AI_REPORTS_ENABLED` | `true`; set `false` to stop all AI spend instantly (kill switch — see `ROLLBACK_AI_REPORTS.md`) |
 
 `.env` never goes to git. After changing it, restart the app (Plesk → Node.js → Restart).
 

@@ -2401,15 +2401,9 @@ class _PatientListBody extends ConsumerWidget {
         onRefresh: onRefresh,
         child: ListView.builder(
           padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + extraBottom),
-          itemCount: items.length + 1,
+          itemCount: items.length,
           itemBuilder: (ctx, i) {
-            if (i == 0) {
-              return _SectionHeader(
-                title: 'Upcoming',
-                badge: '${patients.length} scheduled',
-              );
-            }
-            final item = items[i - 1];
+            final item = items[i];
             if (item is (String, int)) {
               return _DateGroupHeader(dateStr: item.$1, count: item.$2);
             }
@@ -2652,6 +2646,7 @@ class _PatientCard extends ConsumerWidget {
     if (tab == _Tab.completed) {
       final sub = [
         if (_info.isNotEmpty) _info,
+        if (patient.patientMobile?.isNotEmpty ?? false) patient.patientMobile!,
         if (isSlot) _slotTimeLabel(patient.startTime, patient.endTime),
       ].join(' · ');
       return GestureDetector(
@@ -2754,6 +2749,18 @@ class _PatientCard extends ConsumerWidget {
             ],
           ),
         ),
+      );
+    }
+
+    if (tab == _Tab.upcoming) {
+      return _UpcomingCard(
+        patient: patient,
+        metaLabel: metaLabel,
+        borderColor: borderColor,
+        borderWidth: borderWidth,
+        onTap: onTap,
+        onView: onView,
+        onCancel: onCancel,
       );
     }
 
@@ -2885,26 +2892,6 @@ class _PatientCard extends ConsumerWidget {
                         onTap: onStart,
                       ),
                     ),
-                ] else if (tab == _Tab.upcoming) ...[
-                  Expanded(
-                    child: _ActionBtn(
-                      label: 'View',
-                      bg: kPrimaryLight,
-                      fg: kPrimaryDark,
-                      border: const Color(0xFF9FE1CB),
-                      onTap: onView,
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Expanded(
-                    child: _ActionBtn(
-                      label: 'Cancel',
-                      bg: kRedLight,
-                      fg: kRedDark,
-                      border: kRedBorder,
-                      onTap: onCancel,
-                    ),
-                  ),
                 ] else ...[
                   Expanded(
                     child: _ActionBtn(
@@ -2918,6 +2905,128 @@ class _PatientCard extends ConsumerWidget {
                 ],
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Upcoming: name · phone · date/time; tap reveals View / Cancel.
+class _UpcomingCard extends StatefulWidget {
+  final AppointmentList patient;
+  final String? metaLabel;
+  final Color borderColor;
+  final double borderWidth;
+  final VoidCallback? onTap, onView;
+  final VoidCallback onCancel;
+
+  const _UpcomingCard({
+    required this.patient,
+    required this.metaLabel,
+    required this.borderColor,
+    required this.borderWidth,
+    required this.onTap,
+    required this.onView,
+    required this.onCancel,
+  });
+
+  @override
+  State<_UpcomingCard> createState() => _UpcomingCardState();
+}
+
+class _UpcomingCardState extends State<_UpcomingCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = widget.patient;
+    final phone = p.patientMobile;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _open = !_open);
+        widget.onTap?.call();
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: kCardBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: widget.borderColor,
+            width: widget.borderWidth,
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(10, 9, 10, 9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p.patientName ?? 'Patient',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: kTextPrimary,
+                          letterSpacing: -0.1,
+                          height: 1.15,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (phone != null && phone.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          phone,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: kTextSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (widget.metaLabel != null) ...[
+                  const SizedBox(width: 8),
+                  _Chip(
+                    label: widget.metaLabel!,
+                    bg: kBlueLight,
+                    fg: kBlueDark,
+                  ),
+                ],
+              ],
+            ),
+            if (_open) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: _ActionBtn(
+                      label: 'View',
+                      bg: kPrimaryLight,
+                      fg: kPrimaryDark,
+                      border: const Color(0xFF9FE1CB),
+                      onTap: widget.onView,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: _ActionBtn(
+                      label: 'Cancel',
+                      bg: kRedLight,
+                      fg: kRedDark,
+                      border: kRedBorder,
+                      onTap: widget.onCancel,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),

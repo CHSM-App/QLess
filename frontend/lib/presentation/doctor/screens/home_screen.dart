@@ -24,6 +24,8 @@ import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen
 import 'package:qless/presentation/doctor/view_models/appointment_list_viewmodel.dart';
 import 'package:qless/presentation/shared/providers/connectivity_notifier.dart';
 import 'package:qless/presentation/shared/widgets/skeleton.dart';
+import 'package:qless/core/feature_flags.dart';
+import 'package:qless/presentation/shared/reports/report_screens.dart';
 
 part 'home_screen/overview_sidebar.dart';
 part 'home_screen/live_queue_bar.dart';
@@ -753,6 +755,22 @@ class _QueueHomePageState extends ConsumerState<QueueHomePage> with WidgetsBindi
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                 tooltip: 'Add Walk-in Patient',
                 child: const Icon(Icons.person_add_rounded),
+              ),
+            ),
+          // Scan a lab report (AI summary) — sits above the walk-in button.
+          if (kAiReportsEnabled && (!isWide || (!isFullWide && !_showWalkInForm)))
+            Positioned(
+              right: 20,
+              bottom: fabBottom + (_isDoctorOnLeaveToday ? 0 : 68),
+              child: FloatingActionButton.small(
+                heroTag: 'scanReport',
+                onPressed: () => Navigator.push(context, MaterialPageRoute(
+                    builder: (_) => const ReportCaptureScreen(isPatient: false))),
+                backgroundColor: Colors.white,
+                foregroundColor: kPrimaryDark,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                tooltip: 'Scan Report (AI summary)',
+                child: const Icon(Icons.document_scanner_outlined),
               ),
             ),
         ],

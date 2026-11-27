@@ -812,7 +812,7 @@ router.post('/appointment/cancelByDoctor', async (req, res) => {
 // Finds or creates a patient by mobile, then books the appointment.
 // ─────────────────────────────────────────────────────────────────────────────
 router.post('/walkInBook', async (req, res) => {
-  const { name, mobile_no, doctor_id, clinic_id, appointment_date, start_time, slot_id, user_type, symptoms, gender_id, family_id, patient_id: existingPatientId } = req.body;
+  let { name, mobile_no, doctor_id, clinic_id, appointment_date, start_time, slot_id, user_type, symptoms, gender_id, family_id, patient_id: existingPatientId } = req.body;
 
   if (!name || !mobile_no || !doctor_id || !appointment_date) {
     return res.status(400).json({ success: false, message: 'name, mobile_no, doctor_id, appointment_date required' });
@@ -871,7 +871,49 @@ router.post('/walkInBook', async (req, res) => {
     } else if (existingPatientId) {
       // Existing patient returning — use their patient_id directly.
       patient_id = parseInt(existingPatientId);
-    } else {
+    }
+
+    // Mobile already registered (name typed without picking the suggestion, or
+    // an offline walk-in syncing): same name → that patient; different name →
+    // a family member under them, since patients.mobile_no is unique.
+    if (!patient_id) {
+      const ex = await db.request()
+        .input('mobile_no', String(mobile_no))
+        .input('name', String(name).trim())
+        .query(`
+          SELECT TOP 1 p.patient_id,
+            CASE WHEN LOWER(LTRIM(RTRIM(p.name))) = LOWER(@name) THEN 1 ELSE 0 END AS same_name,
+            (SELECT TOP 1 fm.member_id FROM family_members fm
+              WHERE fm.family_id = p.patient_id AND LOWER(LTRIM(RTRIM(fm.name))) = LOWER(@name)
+              ORDER BY fm.member_id) AS member_id
+          FROM patients p
+          WHERE p.mobile_no = @mobile_no AND p.active_status = 1
+        `);
+      const row = ex.recordset?.[0];
+      if (row?.same_name === 1) {
+        patient_id = row.patient_id;
+        user_type = 1;
+      } else if (row) {
+        patient_id = row.member_id;
+        if (!patient_id) {
+          const famRes = await saveFamilyMember('Insert', {
+            member_id: null,
+            family_id: row.patient_id,
+            name: String(name).trim(),
+            Gender_id: gender_id ? parseInt(gender_id) : null,
+            relation_id: null,
+            DOB: null,
+            mobile_no,
+          });
+          patient_id = famRes.recordset[0]?.member_id;
+          if (!patient_id) throw new Error('Failed to create family member record');
+        }
+        user_type = 2;
+        log.info(`walkInBook: mobile exists under patient ${row.patient_id} — booked as family member ${patient_id}`);
+      }
+    }
+
+    if (!patient_id) {
       // New first-time walk-in — create a shadow profile in patients table.
       const insertRes = await db.request()
         .input('operation', 'Insert')

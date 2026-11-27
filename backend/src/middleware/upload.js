@@ -74,6 +74,8 @@ async function detectImageMagic(filePath) {
       buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
       buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50
     ) return 'image/webp';
+    // PDF: "%PDF-" (medical reports only — verifyImageFiles rejects it)
+    if (buf.toString('latin1', 0, 5) === '%PDF-') return 'application/pdf';
 
     return null;
   } finally {
@@ -111,7 +113,7 @@ function uploadHandler(multerMiddleware) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({
           success: false,
-          error: 'File too large. Max 5 MB per file.',
+          error: 'File too large. Max 5 MB per file (10 MB for reports).',
         });
       }
       if (err.code === 'LIMIT_FILE_COUNT' || err.code === 'LIMIT_UNEXPECTED_FILE') {
@@ -138,7 +140,7 @@ async function verifyImageFiles(req, res) {
   const files = collectFiles(req);
   for (const f of files) {
     const realType = await detectImageMagic(f.path);
-    if (!realType) {
+    if (!realType || realType === 'application/pdf') {
       await cleanupFiles(req).catch(() => {});
       res.status(415).json({
         success: false,
@@ -150,9 +152,59 @@ async function verifyImageFiles(req, res) {
   return true;
 }
 
+// ── Medical reports (routes/reports.js): photos of a report, or one PDF.
+// Limits keep each Claude request small (credit usage) and under its 32 MB cap.
+const REPORT_MAX_FILES = 6;
+const REPORT_MAX_TOTAL = 15 * 1024 * 1024;
+const REPORT_MAX_PDF_PAGES = 10;
+
+const reportUpload = multer({
+  storage,
+  fileFilter(req, file, cb) {
+    if (!ALLOWED_MIMES.has(file.mimetype) && file.mimetype !== 'application/pdf') {
+      return cb(new MulterRejection(`Unsupported file type: ${file.mimetype}`));
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 10 * 1024 * 1024, files: REPORT_MAX_FILES },
+});
+
+// ponytail: regex page count — misses pages inside compressed object streams;
+// use a PDF library if oversized PDFs show up in the token columns.
+function countPdfPages(buf) {
+  return (buf.toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+}
+
+// Either 1–6 images or exactly one PDF of ≤ 10 pages, ≤ 15 MB in total.
+// Sets f.realType on each file. Answers 400/413/415 itself and drops the temp
+// files; returns false then.
+async function verifyReportFiles(req, res) {
+  const files = collectFiles(req);
+  const fail = async (status, error) => {
+    await cleanupFiles(req).catch(() => {});
+    res.status(status).json({ success: false, error });
+    return false;
+  };
+  if (files.length === 0) return fail(400, 'Attach report photos or a PDF.');
+  for (const f of files) {
+    f.realType = await detectImageMagic(f.path);
+    if (!f.realType) return fail(415, `Not a valid image or PDF: ${f.originalname}`);
+  }
+  const pdfs = files.filter((f) => f.realType === 'application/pdf');
+  if (pdfs.length && files.length > 1) return fail(400, 'Upload either photos or a single PDF, not both.');
+  if (files.reduce((n, f) => n + f.size, 0) > REPORT_MAX_TOTAL) return fail(413, 'Report too large. Max 15 MB in total.');
+  if (pdfs.length && countPdfPages(await fs.readFile(pdfs[0].path)) > REPORT_MAX_PDF_PAGES) {
+    return fail(413, `PDF too long. Max ${REPORT_MAX_PDF_PAGES} pages.`);
+  }
+  return true;
+}
+
 module.exports = {
   upload,
   uploadHandler,
   verifyImageFiles,
   cleanupFiles,
+  reportUpload,
+  verifyReportFiles,
+  countPdfPages,
 };

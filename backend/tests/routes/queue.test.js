@@ -124,8 +124,9 @@ describe('POST /appointment/queueRecall', () => {
 describe('POST /walkInBook', () => {
   const walkIn = { name: ' Asha ', mobile_no: '9000011111', doctor_id: 2, appointment_date: '2026-11-20', clinic_id: 3 };
 
-  function walkInDb({ blocked = 0, booked = 1, duplicate = null, idle = null } = {}) {
+  function walkInDb({ blocked = 0, booked = 1, duplicate = null, idle = null, existing = null } = {}) {
     return ({ kind, target, inputs }) => {
+      if (kind === 'query' && target.includes('AS same_name')) return existing ? [existing] : [];
       if (kind === 'query' && target.includes('JOIN doctor_queue dq')) return idle ? [idle] : [];
       if (kind === 'query' && target.includes('FROM appointments a')) return duplicate ? [duplicate] : [];
       if (target === 'sp_appointment' && inputs.operation === 'START_SESSION') return [{ success: 1 }];
@@ -173,6 +174,24 @@ describe('POST /walkInBook', () => {
   test('family member walk-in books under the new member id', async () => {
     mockDb.respond = walkInDb();
     const res = await post('/walkInBook', { ...walkIn, family_id: 8, user_type: 2 });
+
+    expect(res.body.patient_id).toBe(51);
+    expect(mockDb.callsTo('sp_patients', 'Insert')).toHaveLength(0);
+    expect(mockDb.callsTo('sp_appointment', 'BOOK')[0].inputs).toMatchObject({ patient_id: 51, user_type: 2 });
+  });
+
+  test('mobile already registered, same name: books that patient, no insert', async () => {
+    mockDb.respond = walkInDb({ existing: { patient_id: 30, same_name: 1, member_id: null } });
+    const res = await post('/walkInBook', walkIn);
+
+    expect(res.body.patient_id).toBe(30);
+    expect(mockDb.callsTo('sp_patients', 'Insert')).toHaveLength(0);
+    expect(mockDb.callsTo('sp_appointment', 'BOOK')[0].inputs).toMatchObject({ patient_id: 30, user_type: 1 });
+  });
+
+  test('mobile already registered, different name: books as a new family member', async () => {
+    mockDb.respond = walkInDb({ existing: { patient_id: 30, same_name: 0, member_id: null } });
+    const res = await post('/walkInBook', walkIn);
 
     expect(res.body.patient_id).toBe(51);
     expect(mockDb.callsTo('sp_patients', 'Insert')).toHaveLength(0);

@@ -8,6 +8,8 @@ import 'package:qless/presentation/doctor/screens/doctor_precriptionentry_screen
 import 'package:qless/presentation/patient/screens/patient_prescription_list.dart';
 import 'package:qless/presentation/patient/screens/print_prescription_screen.dart';
 import 'package:qless/presentation/shared/widgets/skeleton.dart';
+import 'package:qless/core/feature_flags.dart';
+import 'package:qless/presentation/shared/reports/report_screens.dart';
 
 // ════════════════════════════════════════════════════════════════════
 //  DESIGN TOKENS — exact match with PatientListScreen
@@ -618,6 +620,7 @@ Widget _buildHeader() => Container(
         _gap(10),
         _medicinesCard(rx),
         if (rx.followUpDate != null) ...[_gap(10), _followUpCard(rx.followUpDate!)],
+        if (kAiReportsEnabled) ...[_gap(10), _reportsTile(rx)],
         if (rx.investigation?.isNotEmpty == true) ...[
           _gap(10),
           _sectionHeader('Investigation'),
@@ -654,6 +657,7 @@ Widget _buildHeader() => Container(
               _appointmentCard(rx),
               if (_hasClinical(rx)) ...[_gap(10), _clinicalCard(rx)],
               if (rx.followUpDate != null) ...[_gap(10), _followUpCard(rx.followUpDate!)],
+              if (kAiReportsEnabled) ...[_gap(10), _reportsTile(rx)],
               if (rx.investigation?.isNotEmpty == true) ...[
                 _gap(10),
                 _sectionHeader('Investigation'),
@@ -1022,6 +1026,17 @@ Widget _buildHeader() => Container(
   );
 
   Widget _divider() => const Divider(height: 1, color: kBorder);
+
+  // Reports attached to this prescription (AI summaries); key = prescription so
+  // up/down visit navigation reloads it.
+  Widget _reportsTile(PatientPrescription rx) => PrescriptionReportsTile(
+        key: ValueKey(rx.prescriptionId),
+        prescriptionId: rx.prescriptionId,
+        patientId: rx.patientId,
+        userType: rx.userType,
+        patientName: rx.patientName,
+        isPatient: false,
+      );
 
   // ── Section header — matches PatientListScreen _SectionHeader ─────
   Widget _sectionHeader(String title, {String? badge}) => Row(

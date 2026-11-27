@@ -3462,9 +3462,16 @@ BEGIN
         --------------------------------------------------
         -- 🔥 SESSION START TIME (FROM SLOT)
         --------------------------------------------------
-        FORMAT(ts.start_time, 'hh:mm tt') AS session_start_time
+        FORMAT(ts.start_time, 'hh:mm tt') AS session_start_time,
+
+        -- vw.mobile is the doctor's; family members fall back to the head's
+        CASE WHEN vw.user_type = 1 THEN pt.mobile_no
+             ELSE COALESCE(NULLIF(fm.mobile_no, ''), head.mobile_no) END AS patient_mobile
 
     FROM dbo.appointment_booking_vw vw
+    LEFT JOIN dbo.Patients pt ON vw.user_type = 1 AND pt.patient_id = vw.patient_id
+    LEFT JOIN dbo.family_members fm ON vw.user_type = 2 AND fm.member_id = vw.patient_id
+    LEFT JOIN dbo.Patients head ON head.patient_id = fm.family_id
 
     --------------------------------------------------
     -- 🔥 QUEUE JOIN (SESSION BASED)

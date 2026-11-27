@@ -21,6 +21,8 @@ import 'package:qless/presentation/doctor/screens/my_clinics_page.dart';
 import 'package:qless/presentation/doctor/screens/receptionist_screen.dart';
 import 'package:qless/presentation/doctor/view_models/doctor_login_viewmodel.dart';
 import 'package:qless/presentation/shared/screens/continue_as.dart';
+import 'package:qless/core/feature_flags.dart';
+import 'package:qless/presentation/shared/reports/report_screens.dart';
 import 'package:qless/presentation/shared/widgets/app_expandable_header_search.dart';
 import 'package:qless/core/network/token_provider.dart';
 import 'package:qless/core/network/socket_service.dart';
@@ -985,6 +987,21 @@ class _DoctorSettingsPageState extends ConsumerState<DoctorSettingsPage> {
                   context,
                   MaterialPageRoute(
                       builder: (_) => const ReceptionistPage()),
+                )),
+      if (kAiReportsEnabled)
+        _Item(Icons.document_scanner_outlined, 'AI Report Summary',
+            'Photo or PDF of a lab report → summary',
+            onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ReportCaptureScreen(isPatient: false)),
+                )),
+      if (kAiReportsEnabled)
+        _Item(Icons.inbox_outlined, 'Unassigned Reports',
+            'Reports not yet attached to a patient',
+            onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ReportsListScreen(
+                      mode: ReportsListMode.unassigned, isPatient: false)),
                 )),
       if (isReceptionist)
         _Item(Icons.star_outline_rounded, 'Doctor Reviews',
